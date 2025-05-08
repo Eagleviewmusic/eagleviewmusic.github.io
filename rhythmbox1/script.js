@@ -4,7 +4,7 @@ const cells = [];
 const boxes = [];
 let currentColor = '';
 let currentLength = 0;
-let bpm = 60;
+let bpm = 90;
 let isPlaying = false;
 let currentStep = 0;
 let interval;
