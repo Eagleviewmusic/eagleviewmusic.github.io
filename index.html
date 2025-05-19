@@ -27,14 +27,30 @@
     main {
       padding: 3rem 1rem;
       display: flex;
+      justify-content: center;
+    }
+
+    .apps-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2.5rem;
+      max-width: 900px;
+      width: 100%;
+    }
+
+    .column {
+      display: flex;
       flex-direction: column;
-      align-items: center;
       gap: 2rem;
+      align-items: stretch;
     }
 
     .app-link {
       display: block;
-      width: 250px;
+      width: 100%;
+      min-width: 220px;
+      max-width: 270px;
+      margin: 0 auto;
       padding: 1.5rem;
       font-size: 1.25rem;
       font-weight: bold;
@@ -44,11 +60,22 @@
       border-radius: 12px;
       background-color: #fff8dc;
       transition: background-color 0.3s, transform 0.2s;
+      box-sizing: border-box;
     }
 
     .app-link:hover {
       background-color: #ffef99;
       transform: scale(1.05);
+    }
+
+    @media (max-width: 900px) {
+      .apps-grid {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+      main {
+        padding: 1.5rem 0.5rem;
+      }
     }
   </style>
 </head>
@@ -58,11 +85,23 @@
     <p>with Mr. Walby</p>
   </header>
   <main>
-    <a class="app-link" href="/chords/">🎼 Chord Tower</a>
-    <a class="app-link" href="/solfege/">🎵 Solfege Tower</a>
-    <a class="app-link" href="https://eagleviewmusic.com/rhythmcraft-basics/">🥁 RhythmCraft Basics</a>
-    <a class="app-link" href="https://eagleviewmusic.com/chord-charting-basics/">🎹 Chord Charting: Basics</a>
-    <a class="app-link" href="https://eagleviewmusic.com/chord-charting-advanced/">🎹 Chord Charting: Advanced</a>
+    <div class="apps-grid">
+      <!-- Column 1 -->
+      <div class="column">
+        <a class="app-link" href="/solfege/">🎵 Solfege Tower</a>
+        <a class="app-link" href="/chords/">🎼 Chord Tower</a>
+      </div>
+      <!-- Column 2 -->
+      <div class="column">
+        <a class="app-link" href="https://eagleviewmusic.com/rhythmcraft-basics/">🥁 Rhythm Craft Basics</a>
+        <a class="app-link" href="https://eagleviewmusic.com/rhythmcraft-advanced/">🥁 Rhythm Craft</a>
+      </div>
+      <!-- Column 3 -->
+      <div class="column">
+        <a class="app-link" href="https://eagleviewmusic.com/chord-charting-basics/">🎹 Chord Charting: Basics</a>
+        <a class="app-link" href="https://eagleviewmusic.com/chord-charting-advanced/">🎹 Chord Charting</a>
+      </div>
+    </div>
   </main>
 </body>
 </html>
