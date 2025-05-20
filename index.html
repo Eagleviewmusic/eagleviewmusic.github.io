@@ -7,74 +7,120 @@
   <style>
     body {
       margin: 0;
-      font-family: "Segoe UI", sans-serif;
-      background-color: #fdfdfd;
-      color: #003366; /* Deep blue */
-      text-align: center;
+      font-family: "Segoe UI", "Arial", sans-serif;
+      background: #f6f9fc;
+      color: #003366;
     }
-
     header {
-      background-color: #003366;
-      color: #FFD700; /* Yellow */
-      padding: 2rem 1rem;
+      background: linear-gradient(90deg, #003366 70%, #0077cc 100%);
+      color: #FFD700;
+      padding: 2.5rem 1rem 1.5rem 1rem;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.07);
     }
-
     h1 {
+      margin: 0 0 0.3em 0;
+      font-size: 2.7rem;
+      letter-spacing: 1px;
+      text-shadow: 1px 2px 12px #00224444;
+    }
+    header p {
       margin: 0;
-      font-size: 2.5rem;
+      font-size: 1.25rem;
+      color: #ffd700cc;
+      letter-spacing: 0.5px;
     }
-
     main {
-      padding: 3rem 1rem;
-      display: flex;
-      justify-content: center;
-    }
-
-    .apps-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 2.5rem;
       max-width: 900px;
-      width: 100%;
+      margin: 2rem auto 3rem auto;
+      padding: 0 1rem;
     }
+    .category {
+      border-radius: 18px;
+      margin: 2.4rem 0;
+      padding: 2.2rem 1.5rem 1.8rem 1.5rem;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+      position: relative;
+      overflow: hidden;
+    }
+    .category.notes   { background: linear-gradient(100deg, #e6f1fa 70%, #c2e9fb 100%); border-left: 8px solid #0077cc; }
+    .category.chords  { background: linear-gradient(100deg, #fffbe6 70%, #fff1b8 100%); border-left: 8px solid #f9d006; }
+    .category.rhythm  { background: linear-gradient(100deg, #ffeaea 70%, #ffd6cc 100%); border-left: 8px solid #e25822; }
+    .category.games   { background: linear-gradient(100deg, #f3e6ff 70%, #e4d0ff 100%); border-left: 8px solid #9933ff; }
 
-    .column {
+    .category h2 {
+      margin-top: 0;
+      margin-bottom: 0.2em;
+      font-size: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5em;
+      letter-spacing: 0.5px;
+    }
+    .category p {
+      margin-top: 0;
+      margin-bottom: 1.5em;
+      color: #003366bb;
+      font-size: 1.07rem;
+      font-weight: 500;
+      letter-spacing: 0.2px;
+    }
+    .apps-row {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 1rem;
+    }
+    .app-card {
       display: flex;
       flex-direction: column;
-      gap: 2rem;
-      align-items: stretch;
-    }
-
-    .app-link {
-      display: block;
+      align-items: center;
+      min-width: 180px;
+      max-width: 250px;
       width: 100%;
-      min-width: 220px;
-      max-width: 270px;
-      margin: 0 auto;
-      padding: 1.5rem;
-      font-size: 1.25rem;
+      padding: 1.3rem 1rem 1.1rem 1rem;
+      background: white;
+      border-radius: 13px;
+      border: 2.5px solid #e0e0e0;
+      font-size: 1.18rem;
       font-weight: bold;
-      text-decoration: none;
       color: #003366;
-      border: 3px solid #FFD700;
-      border-radius: 12px;
-      background-color: #fff8dc;
-      transition: background-color 0.3s, transform 0.2s;
-      box-sizing: border-box;
+      text-decoration: none;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      transition: transform 0.21s, box-shadow 0.21s, border-color 0.21s, background 0.21s;
+      margin-bottom: 0.6rem;
+      position: relative;
+      overflow: hidden;
     }
-
-    .app-link:hover {
-      background-color: #ffef99;
-      transform: scale(1.05);
+    .app-card:hover {
+      transform: translateY(-4px) scale(1.06);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.13);
+      background: #f7faff;
+      border-color: #FFD700;
+      color: #222;
     }
-
-    @media (max-width: 900px) {
-      .apps-grid {
-        grid-template-columns: 1fr;
-        gap: 2rem;
+    .app-card .emoji {
+      font-size: 1.7rem;
+      margin-bottom: 0.45em;
+      filter: drop-shadow(0 1px 2px #ffe5b011);
+    }
+    /* Responsive for mobile */
+    @media (max-width: 700px) {
+      .apps-row {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
       }
-      main {
-        padding: 1.5rem 0.5rem;
+      .category {
+        padding: 1.3rem 0.6rem 1.1rem 0.6rem;
+      }
+      .app-card {
+        margin-bottom: 0.5rem;
+        min-width: unset;
+        max-width: unset;
+        width: 100%;
+        font-size: 1rem;
       }
     }
   </style>
@@ -85,25 +131,65 @@
     <p>with Mr. Walby</p>
   </header>
   <main>
-    <div class="apps-grid">
-      <!-- Column 1 -->
-      <div class="column">
-        <a class="app-link" href="/solfege/">🎵 Solfege Tower</a>
-        <a class="app-link" href="/chords/">🎼 Chord Tower</a>
-        <a class="app-link" href="https://eagleviewmusic.com/recorder/">🪈 Recorder</a>
-        <a class="app-link" href="https://eagleviewmusic.com/keyboard-builder-game/">🛠️ The Keyboard Builder Game</a>
+    <section class="category notes">
+      <h2>🎵 Notes</h2>
+      <p>Explore musical notes, pitch, and melody.</p>
+      <div class="apps-row">
+        <a class="app-card" href="/solfege/">
+          <span class="emoji">🎵</span>
+          Solfege Tower
+        </a>
+        <a class="app-card" href="https://eagleviewmusic.com/recorder/">
+          <span class="emoji">🪈</span>
+          Recorder
+        </a>
       </div>
-      <!-- Column 2 -->
-      <div class="column">
-        <a class="app-link" href="https://eagleviewmusic.com/rhythmcraft-basics/">🥁 Rhythm Craft Basics</a>
-        <a class="app-link" href="https://eagleviewmusic.com/rhythmcraft-advanced/">🥁 Rhythm Craft</a>
+    </section>
+
+    <section class="category chords">
+      <h2>🎹 Chords</h2>
+      <p>Master harmony, chord progressions, and keyboard skills.</p>
+      <div class="apps-row">
+        <a class="app-card" href="/chords/">
+          <span class="emoji">🎼</span>
+          Chord Tower
+        </a>
+        <a class="app-card" href="https://eagleviewmusic.com/chord-charting-basics/">
+          <span class="emoji">🎹</span>
+          Chord Charting: Basics
+        </a>
+        <a class="app-card" href="https://eagleviewmusic.com/chord-charting-advanced/">
+          <span class="emoji">🎹</span>
+          Chord Charting
+        </a>
       </div>
-      <!-- Column 3 -->
-      <div class="column">
-        <a class="app-link" href="https://eagleviewmusic.com/chord-charting-basics/">🎹 Chord Charting: Basics</a>
-        <a class="app-link" href="https://eagleviewmusic.com/chord-charting-advanced/">🎹 Chord Charting</a>
+    </section>
+
+    <section class="category rhythm">
+      <h2>🥁 Rhythm</h2>
+      <p>Practice rhythm, timing, and musical patterns.</p>
+      <div class="apps-row">
+        <a class="app-card" href="https://eagleviewmusic.com/rhythmcraft-basics/">
+          <span class="emoji">🥁</span>
+          Rhythm Craft Basics
+        </a>
+        <a class="app-card" href="https://eagleviewmusic.com/rhythmcraft-advanced/">
+          <span class="emoji">🥁</span>
+          Rhythm Craft
+        </a>
       </div>
-    </div>
+    </section>
+
+    <section class="category games">
+      <h2>🕹️ Games</h2>
+      <p>Fun and interactive music games for all ages!</p>
+      <div class="apps-row">
+        <a class="app-card" href="https://eagleviewmusic.com/keyboard-builder-game/">
+          <span class="emoji">🛠️</span>
+          The Keyboard Builder Game
+        </a>
+      </div>
+    </section>
   </main>
 </body>
 </html>
