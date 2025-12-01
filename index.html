@@ -30,10 +30,107 @@
       color: #ffd700cc;
       letter-spacing: 0.5px;
     }
+
     main {
       max-width: 900px;
       margin: 2rem auto 3rem auto;
       padding: 0 1rem;
+    }
+
+    /* Top spotlight area for Song Writer */
+    .spotlight {
+      display: flex;
+      justify-content: center;
+      margin-top: -1.2rem;
+      margin-bottom: 1.25rem;
+      pointer-events: none; /* allow only the inner link to be clickable */
+    }
+    .spotlight .app-card {
+      pointer-events: auto;
+      min-width: 260px;
+      max-width: 720px;
+      width: 100%;
+      padding: 1.6rem 1.2rem;
+      border-radius: 16px;
+      border: 3px solid #ffd700;
+      background: linear-gradient(180deg,#fffef8,#fffdf0);
+      box-shadow: 0 10px 36px rgba(0,0,0,0.12);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      justify-content: center;
+      text-decoration: none;
+      color: #003366;
+      font-size: 1.25rem;
+      font-weight: 700;
+      transition: transform .18s, box-shadow .18s;
+    }
+    .spotlight .emoji {
+      font-size: 2.2rem;
+      display: inline-block;
+      width: 3rem;
+      text-align: center;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.12));
+    }
+    .spotlight .meta {
+      text-align: left;
+    }
+    .spotlight .meta .title {
+      font-size: 1.35rem;
+      margin-bottom: 0.15rem;
+    }
+    .spotlight .meta .subtitle {
+      font-weight: 600;
+      color: #225;
+      opacity: 0.85;
+      font-size: 0.98rem;
+    }
+    .spotlight .app-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.18);
+    }
+
+    /* Legacy Mode banner */
+    .legacy-banner {
+      margin: 0 auto 1rem auto;
+      max-width: 900px;
+      display: flex;
+      justify-content: center;
+    }
+    .legacy-banner button {
+      appearance: none;
+      border: 0;
+      background: linear-gradient(180deg,#222,#111);
+      color: #fff;
+      padding: 0.9rem 1.2rem;
+      border-radius: 999px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.28);
+      transition: transform .12s, background .12s;
+    }
+    .legacy-banner button:active { transform: translateY(2px) scale(0.996); }
+    .legacy-banner .hint {
+      margin-left: 0.9rem;
+      align-self: center;
+      color: #002244;
+      font-weight: 600;
+      opacity: 0.85;
+    }
+
+    /* The legacy app content is hidden by default and revealed when opened */
+    .legacy-content {
+      max-width: 900px;
+      margin: 0 auto;
+      overflow: hidden;
+      transition: max-height 400ms cubic-bezier(.2,.9,.2,1), opacity 300ms;
+      max-height: 0;
+      opacity: 0;
+    }
+    .legacy-content.open {
+      max-height: 3000px; /* large enough to reveal all content */
+      opacity: 1;
     }
     .category {
       border-radius: 18px;
@@ -105,6 +202,7 @@
       margin-bottom: 0.45em;
       filter: drop-shadow(0 1px 2px #ffe5b011);
     }
+
     /* Responsive for mobile */
     @media (max-width: 700px) {
       .apps-row {
@@ -122,11 +220,15 @@
         width: 100%;
         font-size: 1rem;
       }
+      .spotlight .app-card {
+        padding: 1rem;
+        font-size: 1rem;
+      }
+      .spotlight .emoji { font-size: 1.8rem; width: 2.6rem; }
     }
+
     /* Add a little extra space below the last section */
-    main {
-      padding-bottom: 2.5rem;
-    }
+    main { padding-bottom: 2.5rem; }
   </style>
 </head>
 <body>
@@ -134,78 +236,145 @@
     <h1>Eagle View Music</h1>
     <p>with Mr. Walby</p>
   </header>
+
+  <!-- Spotlight: Song Writer -->
+  <div class="spotlight" role="region" aria-label="Featured application - Song Writer">
+    <a class="app-card" href="https://github.com/Eagleviewmusic/song-writer" target="_blank" rel="noopener" title="Open Song Writer (repository)">
+      <span class="emoji">✍️</span>
+      <div class="meta">
+        <div class="title">Song Writer</div>
+        <div class="subtitle">Featured app — Click to open the Song Writer repository</div>
+      </div>
+    </a>
+  </div>
+
+  <!-- Legacy Mode banner -->
+  <div class="legacy-banner" role="region" aria-label="Legacy mode toggle">
+    <button id="legacy-toggle" aria-expanded="false" aria-controls="legacy-content">
+      Legacy Mode: Click to Explore
+    </button>
+    <div class="hint" id="legacy-hint">Reveal other apps</div>
+  </div>
+
   <main>
-    <section class="category notes">
-      <h2>🎵 Notes</h2>
-      <p>Explore musical notes, pitch, and melody.</p>
-      <div class="apps-row">
-        <a class="app-card" href="/solfege/">
-          <span class="emoji">🎵</span>
-          Solfege Tower
-        </a>
-        <a class="app-card" href="https://eagleviewmusic.com/recorder/">
-          <span class="emoji">🪈</span>
-          Recorder
-        </a>
-      </div>
-    </section>
+    <!-- All the original app sections are wrapped here and hidden until the Legacy Mode is opened -->
+    <div id="legacy-content" class="legacy-content" aria-hidden="true">
+      <section class="category notes">
+        <h2>🎵 Notes</h2>
+        <p>Explore musical notes, pitch, and melody.</p>
+        <div class="apps-row">
+          <a class="app-card" href="/solfege/">
+            <span class="emoji">🎵</span>
+            Solfege Tower
+          </a>
+          <a class="app-card" href="https://eagleviewmusic.com/recorder/">
+            <span class="emoji">🪈</span>
+            Recorder
+          </a>
+        </div>
+      </section>
 
-    <section class="category chords">
-      <h2>🎹 Chords</h2>
-      <p>Master harmony, chord progressions, and keyboard skills.</p>
-      <div class="apps-row">
-        <a class="app-card" href="/chords/">
-          <span class="emoji">🎼</span>
-          Chord Tower
-        </a>
-        <a class="app-card" href="https://eagleviewmusic.com/chord-charting-basics/">
-          <span class="emoji">🎹</span>
-          Chord Charting: Basics
-        </a>
-        <a class="app-card" href="https://eagleviewmusic.com/chord-charting-advanced/">
-          <span class="emoji">🎹</span>
-          Chord Charting
-        </a>
-      </div>
-    </section>
+      <section class="category chords">
+        <h2>🎹 Chords</h2>
+        <p>Master harmony, chord progressions, and keyboard skills.</p>
+        <div class="apps-row">
+          <a class="app-card" href="/chords/">
+            <span class="emoji">🎼</span>
+            Chord Tower
+          </a>
+          <a class="app-card" href="https://eagleviewmusic.com/chord-charting-basics/">
+            <span class="emoji">🎹</span>
+            Chord Charting: Basics
+          </a>
+          <a class="app-card" href="https://eagleviewmusic.com/chord-charting-advanced/">
+            <span class="emoji">🎹</span>
+            Chord Charting
+          </a>
+        </div>
+      </section>
 
-    <section class="category rhythm">
-      <h2>🥁 Rhythm</h2>
-      <p>Practice rhythm, timing, and musical patterns.</p>
-      <div class="apps-row">
-        <a class="app-card" href="https://eagleviewmusic.com/rhythmcraft-basics/">
-          <span class="emoji">🥁</span>
-          Rhythm Craft Basics
-        </a>
-        <a class="app-card" href="https://eagleviewmusic.com/rhythmcraft-advanced/">
-          <span class="emoji">🥁</span>
-          Rhythm Craft
-        </a>
-        <a class="app-card" href="https://eagleviewmusic.com/cyber-drums/">
-          <span class="emoji">🛸</span>
-          Cyber Drums
-        </a>
-      </div>
-    </section>
+      <section class="category rhythm">
+        <h2>🥁 Rhythm</h2>
+        <p>Practice rhythm, timing, and musical patterns.</p>
+        <div class="apps-row">
+          <a class="app-card" href="https://eagleviewmusic.com/rhythmcraft-basics/">
+            <span class="emoji">🥁</span>
+            Rhythm Craft Basics
+          </a>
+          <a class="app-card" href="https://eagleviewmusic.com/rhythmcraft-advanced/">
+            <span class="emoji">🥁</span>
+            Rhythm Craft
+          </a>
+          <a class="app-card" href="https://eagleviewmusic.com/cyber-drums/">
+            <span class="emoji">🛸</span>
+            Cyber Drums
+          </a>
+        </div>
+      </section>
 
-    <section class="category games">
-      <h2>🕹️ Games</h2>
-      <p>Fun and interactive music games for all ages!</p>
-      <div class="apps-row">
-        <a class="app-card" href="https://eagleviewmusic.com/keyboard-builder-game/">
-          <span class="emoji">🛠️</span>
-          The Keyboard Builder Game
-        </a>
-        <a class="app-card" href="https://eagleviewmusic.com/music-symbol-maker/">
-          <span class="emoji">🖌️</span>
-          Music Symbol Maker
-        </a>
-        <a class="app-card" href="https://eagleviewmusic.com/music-memory-blocks/">
-          <span class="emoji">🧱</span>
-          Music Memory Blocks
-        </a>
-      </div>
-    </section>
+      <section class="category games">
+        <h2>🕹️ Games</h2>
+        <p>Fun and interactive music games for all ages!</p>
+        <div class="apps-row">
+          <a class="app-card" href="https://eagleviewmusic.com/keyboard-builder-game/">
+            <span class="emoji">🛠️</span>
+            The Keyboard Builder Game
+          </a>
+          <a class="app-card" href="https://eagleviewmusic.com/music-symbol-maker/">
+            <span class="emoji">🖌️</span>
+            Music Symbol Maker
+          </a>
+          <a class="app-card" href="https://eagleviewmusic.com/music-memory-blocks/">
+            <span class="emoji">🧱</span>
+            Music Memory Blocks
+          </a>
+        </div>
+      </section>
+    </div>
   </main>
+
+  <script>
+    (function() {
+      const toggleBtn = document.getElementById('legacy-toggle');
+      const legacy = document.getElementById('legacy-content');
+      const hint = document.getElementById('legacy-hint');
+
+      function openLegacy() {
+        legacy.classList.add('open');
+        legacy.setAttribute('aria-hidden', 'false');
+        toggleBtn.setAttribute('aria-expanded', 'true');
+        toggleBtn.textContent = 'Legacy Mode: Click to Hide';
+        hint.textContent = 'Hide other apps';
+        // Scroll into view so users on small screens see the revealed content
+        setTimeout(() => {
+          legacy.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 160);
+      }
+      function closeLegacy() {
+        legacy.classList.remove('open');
+        legacy.setAttribute('aria-hidden', 'true');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+        toggleBtn.textContent = 'Legacy Mode: Click to Explore';
+        hint.textContent = 'Reveal other apps';
+      }
+
+      toggleBtn.addEventListener('click', () => {
+        const isOpen = toggleBtn.getAttribute('aria-expanded') === 'true';
+        if (isOpen) closeLegacy(); else openLegacy();
+      });
+
+      // Allow keyboard accessibility
+      toggleBtn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggleBtn.click();
+        }
+      });
+
+      // Keep legacy closed by default on first load. If you want to persist user choice,
+      // you can add a small localStorage flag here in the future.
+      closeLegacy();
+    })();
+  </script>
 </body>
 </html>
