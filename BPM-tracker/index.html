@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BPM Tap Tempo</title>
+<style>
+  /* ===== The Fix for Horizontal Alignment ===== */
+  html {
+    overflow-y: scroll;
+  }
+
+  body { 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center; 
+    min-height: 100vh;
+    background: #0f172a; 
+    color: white; 
+    font-family: sans-serif; 
+    margin: 0; 
+    padding: 10px; 
+    box-sizing: border-box; 
+  }
+
+  /* --- Tap Button & Ripple Effect --- */
+  .tap { 
+    position: relative;
+    overflow: hidden;
+    width: 200px; 
+    height: 200px; 
+    border-radius: 50%; 
+    background: #ef4444; 
+    border: none; 
+    cursor: pointer; 
+    font-size: 1.5rem; 
+    color: white; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    user-select: none; 
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tap:active { 
+    filter: brightness(0.95);
+  }
+
+  .ripple {
+    position: absolute;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.3);
+    transform: scale(0);
+    animation: ripple-effect 600ms linear;
+    pointer-events: none;
+  }
+
+  @keyframes ripple-effect {
+    to {
+      transform: scale(4);
+      opacity: 0;
+    }
+  }
+  /* --- End Tap Button Styles --- */
+
+  .bpm-box { margin-top: 20px; font-size: 2rem; }
+  
+  /* --- Tempo Box Styles --- */
+  .tempo-box { margin-top: 10px; padding: 8px 16px; border-radius: 8px; background: #1f2937; color: #6b7280; transition: all 0.2s ease-in-out; font-size: 1.1rem; text-align: center; min-width: 140px; }
+  .tempo-box.active { color: white; }
+  
+  .tempo-largo { background-color: #8b5cf6; box-shadow: 0 0 12px rgba(139,92,246,0.5); }
+  .tempo-adagio { background-color: #166534; box-shadow: 0 0 12px rgba(22,101,52,0.5); }
+  .tempo-andante { background-color: #14b8a6; box-shadow: 0 0 12px rgba(20,184,166,0.5); }
+  .tempo-moderato { background-color: #C2B280; box-shadow: 0 0 12px rgba(194,178,128,0.5); }
+  .tempo-allegro { background-color: #3b82f6; box-shadow: 0 0 12px rgba(59,130,246,0.5); }
+  .tempo-presto { background-color: #eab308; box-shadow: 0 0 12px rgba(234,179,8,0.5); }
+  .tempo-prestissimo { background-color: #ef4444; box-shadow: 0 0 12px rgba(239,68,68,0.5); }
+  /* --- End Tempo Box Styles --- */
+
+  .trend-box { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+  .trend-item { padding: 6px 12px; border-radius: 8px; background: #1f2937; color: #6b7280; transition: all 0.2s ease-in-out; }
+  .trend-item.slowing { background: #ef4444; color: white; box-shadow: 0 0 12px rgba(239,68,68,0.5); }
+  .trend-item.steady { background: #22c55e; color: white; box-shadow: 0 0 12px rgba(34,197,94,0.5); }
+  .trend-item.accelerating { background: #eab308; color: white; box-shadow: 0 0 12px rgba(234,179,8,0.5); }
+  .info-text { margin-top: 14px; color: #94a3b8; text-align: center; }
+  .debug-info { margin-top: 10px; color: #64748b; font-size: 0.9rem; text-align: center; }
+
+  @media (max-width: 400px) {
+    .trend-box { flex-direction: column; gap: 8px; align-items: center; width: 100%; max-width: 200px; }
+    .trend-item { width: 100%; text-align: center; padding: 8px 12px; }
+    .tap { width: 180px; height: 180px; font-size: 1.3rem; }
+    .bpm-box { font-size: 1.8rem; }
+    .tempo-box { font-size: 1rem; min-width: 120px; }
+    .info-text { font-size: 0.9rem; padding: 0 10px; }
+    .debug-info { font-size: 0.8rem; }
+  }
+
+  @media (max-width: 320px) {
+    .tap { width: 160px; height: 160px; font-size: 1.2rem; }
+    .bpm-box { font-size: 1.6rem; margin-top: 15px; }
+    .tempo-box { font-size: 0.9rem; padding: 6px 12px; }
+    .trend-box { margin-top: 8px; max-width: 180px; }
+    .trend-item { padding: 6px 10px; font-size: 0.9rem; }
+    .info-text { margin-top: 12px; font-size: 0.8rem; }
+    .debug-info { margin-top: 8px; font-size: 0.75rem; }
+  }
+
+  /* Back to Eagle View Music button */
+  .back-home-btn {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(30, 41, 59, 0.9);
+    backdrop-filter: blur(8px);
+    color: #e2e8f0;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    transition: all 0.2s ease;
+    z-index: 1000;
+  }
+  .back-home-btn:hover {
+    background: #334155;
+    color: #38bdf8;
+    transform: translateY(-1px);
+    border-color: #38bdf8;
+  }
+
+  /* Hide back button when embedded inside an iframe (e.g. Google Sites / LMS) */
+  .in-iframe .back-home-btn {
+    display: none !important;
+  }
+</style>
+<script>
+  try {
+    if (window.self !== window.top) {
+      document.documentElement.classList.add('in-iframe');
+    }
+  } catch (e) {
+    document.documentElement.classList.add('in-iframe');
+  }
+</script>
+</head>
+<body>
+<a href="../index.html" class="back-home-btn" aria-label="Back to Eagle View Music Hub">
+  <span>← Eagle View Music</span>
+</a>
+<button id="tap" class="tap">Tap</button>
+<div class="bpm-box">BPM: <span id="bpm">--</span></div>
+<div id="tempo-name" class="tempo-box">TEMPO</div>
+<div class="trend-box">
+  <span id="slowing" class="trend-item">Slowing</span>
+  <span id="steady" class="trend-item">Steady</span>
+  <span id="accelerating" class="trend-item">Accelerating</span>
+</div>
+<div class="info-text">
+  <span>(Press Space to tap | R to reset)</span>
+</div>
+<div class="debug-info" id="debug">
+  Taps: 0 | Confidence: -- | Stability: --
+</div>
+<script>
+const tapBtn = document.getElementById('tap');
+const bpmOut = document.getElementById('bpm');
+const tempoNameOut = document.getElementById('tempo-name');
+const slowingOut = document.getElementById('slowing');
+const steadyOut = document.getElementById('steady');
+const acceleratingOut = document.getElementById('accelerating');
+const debugOut = document.getElementById('debug');
+
+const stamps = [];
+const MAX_TAPS = 16;
+const AUTO_RESET_MS = 2500;
+const MIN_BPM = 30;
+const MAX_BPM = 300;
+let lastTapAt = 0;
+
+const tempoColorClasses = [
+  'tempo-largo', 'tempo-adagio', 'tempo-andante', 
+  'tempo-moderato', 'tempo-allegro', 'tempo-presto', 'tempo-prestissimo'
+];
+
+function clearHighlights() {
+  slowingOut.classList.remove('slowing');
+  steadyOut.classList.remove('steady');
+  acceleratingOut.classList.remove('accelerating');
+}
+
+function softReset() {
+  stamps.length = 0;
+  lastTapAt = 0;
+  bpmOut.textContent = '--';
+  tempoNameOut.textContent = 'TEMPO';
+  tempoNameOut.classList.remove('active', ...tempoColorClasses);
+  debugOut.textContent = 'Taps: 0 | Confidence: -- | Stability: --';
+  clearHighlights();
+}
+
+function onTap(eventTime) {
+  const now = eventTime || performance.now();
+  
+  if (lastTapAt && (now - lastTapAt) > AUTO_RESET_MS) {
+    softReset();
+  }
+  
+  // Debounce accidental micro-double taps (< 100ms = > 600 BPM)
+  if (lastTapAt && (now - lastTapAt) < 100) return;
+
+  stamps.push(now);
+  if (stamps.length > MAX_TAPS) stamps.shift();
+  lastTapAt = now;
+
+  updateBpm();
+}
+
+// Linear regression (OLS) to find the optimal interval slope across all taps
+function calculateAccurateBPM() {
+  const n = stamps.length;
+  if (n < 2) return null;
+
+  if (n === 2) {
+    const interval = stamps[1] - stamps[0];
+    const bpm = 60000 / interval;
+    return (bpm >= MIN_BPM && bpm <= MAX_BPM) ? bpm : null;
+  }
+
+  let sumX = 0;
+  let sumY = 0;
+  let sumXY = 0;
+  let sumXX = 0;
+
+  for (let i = 0; i < n; i++) {
+    sumX += i;
+    sumY += stamps[i];
+    sumXY += i * stamps[i];
+    sumXX += i * i;
+  }
+
+  // Slope = ms per beat
+  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+  if (slope <= 0) return null;
+
+  const bpm = 60000 / slope;
+  return (bpm >= MIN_BPM && bpm <= MAX_BPM) ? bpm : null;
+}
+
+function calculateStability() {
+  if (stamps.length < 3) return { confidence: 0, status: 'Tracking' };
+
+  const intervals = [];
+  for (let i = 1; i < stamps.length; i++) {
+    intervals.push(stamps[i] - stamps[i - 1]);
+  }
+
+  const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+  const variance = intervals.reduce((sum, x) => sum + Math.pow(x - mean, 2), 0) / intervals.length;
+  const stdDev = Math.sqrt(variance);
+  const cv = stdDev / mean; // Coefficient of variation
+
+  const confidence = Math.max(0, Math.min(100, Math.round((1 - cv * 3.5) * 100)));
+  const status = confidence > 85 ? 'Locked' : confidence > 60 ? 'Stabilizing' : 'Tracking';
+
+  return { confidence, status };
+}
+
+function getTempoName(bpm) {
+  if (bpm >= 40 && bpm <= 60) return 'Largo';
+  if (bpm >= 61 && bpm <= 76) return 'Adagio';
+  if (bpm >= 77 && bpm <= 96) return 'Andante';
+  if (bpm >= 97 && bpm <= 116) return 'Moderato';
+  if (bpm >= 117 && bpm <= 168) return 'Allegro';
+  if (bpm >= 169 && bpm <= 200) return 'Presto';
+  if (bpm >= 201) return 'Prestissimo';
+  return null;
+}
+
+function updateBpm() {
+  if (stamps.length < 2) {
+    bpmOut.textContent = '--';
+    debugOut.textContent = `Taps: ${stamps.length} | Confidence: -- | Stability: --`;
+    clearHighlights();
+    return;
+  }
+
+  const calculatedBpm = calculateAccurateBPM();
+  if (!calculatedBpm) return;
+
+  const displayBpm = Math.round(calculatedBpm);
+  bpmOut.textContent = String(displayBpm);
+
+  const tempoName = getTempoName(displayBpm);
+  tempoNameOut.classList.remove(...tempoColorClasses);
+  if (tempoName) {
+    tempoNameOut.textContent = tempoName;
+    tempoNameOut.classList.add('active', `tempo-${tempoName.toLowerCase()}`);
+  } else {
+    tempoNameOut.textContent = 'TEMPO';
+    tempoNameOut.classList.remove('active');
+  }
+
+  const { confidence, status } = calculateStability();
+  debugOut.textContent = `Taps: ${stamps.length} | Confidence: ${confidence}% | ${status}`;
+
+  updateTrendDisplay();
+}
+
+function updateTrendDisplay() {
+  if (stamps.length < 4) {
+    clearHighlights();
+    return;
+  }
+
+  const intervals = [];
+  for (let i = 1; i < stamps.length; i++) intervals.push(stamps[i] - stamps[i - 1]);
+
+  const mid = Math.floor(intervals.length / 2);
+  const olderAvg = intervals.slice(0, mid).reduce((a, b) => a + b, 0) / mid;
+  const newerAvg = intervals.slice(mid).reduce((a, b) => a + b, 0) / (intervals.length - mid);
+
+  const delta = (newerAvg - olderAvg) / olderAvg;
+  clearHighlights();
+
+  if (Math.abs(delta) < 0.03) {
+    steadyOut.classList.add('steady');
+  } else if (delta > 0.03) {
+    slowingOut.classList.add('slowing'); // Longer intervals = slowing down
+  } else {
+    acceleratingOut.classList.add('accelerating'); // Shorter intervals = speeding up
+  }
+}
+
+// Ripple Effect
+function createRipple(event, button) {
+  const circle = document.createElement("span");
+  const diameter = Math.max(button.clientWidth, button.clientHeight);
+  const radius = diameter / 2;
+
+  circle.style.width = circle.style.height = `${diameter}px`;
+
+  if (event && event.clientX && event.clientY) {
+    const rect = button.getBoundingClientRect();
+    circle.style.left = `${event.clientX - rect.left - radius}px`;
+    circle.style.top = `${event.clientY - rect.top - radius}px`;
+  } else {
+    circle.style.left = `${button.clientWidth / 2 - radius}px`;
+    circle.style.top = `${button.clientHeight / 2 - radius}px`;
+  }
+
+  circle.classList.add("ripple");
+  button.appendChild(circle);
+
+  setTimeout(() => circle.remove(), 600);
+}
+
+// Event Listeners with precise e.timeStamp extraction
+tapBtn.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  const time = e.timeStamp;
+  createRipple(e, e.currentTarget);
+  onTap(time);
+}, { passive: false });
+
+const handleKeyDown = (e) => {
+  const isSpace = (e.code === 'Space') || (e.key === ' ') || (e.key === 'Spacebar');
+  if (isSpace && !e.repeat) {
+    e.preventDefault();
+    const time = e.timeStamp;
+    createRipple(null, tapBtn);
+    onTap(time);
+  } else if (e.key === 'r' || e.key === 'R') {
+    softReset();
+  }
+};
+document.addEventListener('keydown', handleKeyDown, true);
+
+function enableGlobalKeyCapture() {
+  if (!document.body.hasAttribute('tabindex')) document.body.tabIndex = -1;
+  try { document.body.focus(); } catch {}
+}
+
+// Iframe detection DOM cleanup
+try {
+  if (window.self !== window.top) {
+    const hubLink = document.querySelector('.back-home-btn');
+    if (hubLink) hubLink.remove();
+  }
+} catch (e) {
+  const hubLink = document.querySelector('.back-home-btn');
+  if (hubLink) hubLink.remove();
+}
+
+window.addEventListener('load', enableGlobalKeyCapture);
+tapBtn.addEventListener('pointerdown', enableGlobalKeyCapture);
+</script>
+</body>
+</html>
