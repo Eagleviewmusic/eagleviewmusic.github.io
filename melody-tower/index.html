@@ -12,18 +12,15 @@
     try {
       if (window.self !== window.top) {
         document.documentElement.classList.add('in-iframe');
+        document.documentElement.classList.add('menu-hidden');
       }
     } catch (e) {
       document.documentElement.classList.add('in-iframe');
+      document.documentElement.classList.add('menu-hidden');
     }
   </script>
 </head>
 <body>
-  <!-- Menu toggle button -->
-  <button id="menu-toggle" class="menu-toggle-btn" aria-label="Collapse settings menu" aria-expanded="true">
-    <span class="arrow-icon">&#9664;</span>
-  </button>
-
   <div id="app-wrapper">
     <div class="controls-bar" id="controls-bar"></div>
     <div class="main-content">
