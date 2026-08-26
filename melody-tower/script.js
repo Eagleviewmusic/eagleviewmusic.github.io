@@ -615,17 +615,17 @@ const voiceQueue = []; // For voice stealing
 const heldKeys = new Set();
 const accidentalHeld = { sharp: false, flat: false };
 const heldNoteKeys = new Set();
-let sharpTouchHeld = false;
-let flatTouchHeld = false;
+const pointerHeldNotes = new Set();
+let sharpPointerLatch = false;
+let flatPointerLatch = false;
 
 // --- AUDIO FUNCTIONS ---
 function getAccidentalShift() {
-  if (sharpTouchHeld && flatTouchHeld) return 0;
-  if (sharpTouchHeld) return 1;
-  if (flatTouchHeld) return -1;
-  if (accidentalHeld.sharp && accidentalHeld.flat) return 0;
-  if (accidentalHeld.sharp) return 1;
-  if (accidentalHeld.flat) return -1;
+  const isSharp = accidentalHeld.sharp || sharpPointerLatch;
+  const isFlat = accidentalHeld.flat || flatPointerLatch;
+  if (isSharp && isFlat) return 0;
+  if (isSharp) return 1;
+  if (isFlat) return -1;
   return 0;
 }
 
@@ -733,10 +733,13 @@ function stopNote(key, isVoiceStealing = false) {
   }
 }
 
-function handlePlayKey(key) {
+function handlePlayKey(key, isPointer = false) {
   const btn = buttons.find(b => b.keys.includes(key));
   if (!btn) return;
   heldNoteKeys.add(key);
+  if (isPointer) {
+    pointerHeldNotes.add(key);
+  }
   const accidental = getAccidentalShift();
   const oscKey = `${key}_${accidental}`;
   
@@ -748,8 +751,11 @@ function handlePlayKey(key) {
   
   let freq = noteFrequencies[btn.note] * Math.pow(2, accidental / 12);
   
-  // Only apply octave shift if NOT a left-hand key
-  if (octaveButtonActive && !leftHandKeys.has(key)) {
+  // When octave shift is active:
+  // - Mouse/touch interactions play an octave higher
+  // - Right-hand keyboard keys (jkl;, uiop, m,./, 7890) play an octave higher
+  // - Left-hand keyboard keys (asdf, qwer, zxcv, 1234) play the lower/normal octave
+  if (octaveButtonActive && (isPointer || !leftHandKeys.has(key))) {
     freq *= 2;
   }
   
@@ -758,9 +764,20 @@ function handlePlayKey(key) {
 
 function handleStopKey(key) {
   heldNoteKeys.delete(key);
+  pointerHeldNotes.delete(key);
   stopNote(`${key}_0`);
   stopNote(`${key}_1`);
   stopNote(`${key}_-1`);
+
+  // Release the pointer sharp/flat latch with the release of the note
+  if (heldNoteKeys.size === 0) {
+    if (sharpPointerLatch) {
+      setSharpPointerLatch(false);
+    }
+    if (flatPointerLatch) {
+      setFlatPointerLatch(false);
+    }
+  }
 }
 
 function reTriggerHeldKeysAccidentals() {
@@ -775,7 +792,11 @@ function reTriggerHeldKeysAccidentals() {
     
     if (!noteFrequencies[btn.note]) continue;
 
-    const freq = noteFrequencies[btn.note] * Math.pow(2, accidental / 12);
+    let freq = noteFrequencies[btn.note] * Math.pow(2, accidental / 12);
+    const isPointer = pointerHeldNotes.has(key);
+    if (octaveButtonActive && (isPointer || !leftHandKeys.has(key))) {
+      freq *= 2;
+    }
     startNote(oscKey, freq);
   }
 }
@@ -841,19 +862,26 @@ function renderToggleButton() {
   el.className = 'chord-toggle-btn';
   el.setAttribute('type', 'button');
   el.setAttribute('aria-pressed', cButtonState === 'S');
+  el.setAttribute('aria-label', cButtonState === 'note' ? 'Switch to letter names (C D E)' : 'Switch to solfege names (Do Re Mi)');
+  
   if (cButtonState === 'note') {
-    el.innerHTML = '<span class="music-symbol">&#9835;</span>';
+    // Melody tower boxes are showing Solfege (Do Re Mi) -> Button shows stepped C D E
+    el.innerHTML = '<div class="stepped-labels stepped-letters"><span class="step step-1">C</span><span class="step step-2">D</span><span class="step step-3">E</span></div>';
   } else {
-    el.innerText = 'S';
+    // Melody tower boxes are showing Letter names (C D E) -> Button shows stepped Do Re Mi
+    el.innerHTML = '<div class="stepped-labels stepped-solfege"><span class="step step-1">Do</span><span class="step step-2">Re</span><span class="step step-3">Mi</span></div>';
   }
+
   el.addEventListener('click', () => {
     cButtonState = (cButtonState === 'note') ? 'S' : 'note';
+    renderToggleButton();
     updateBoxNames();
   });
   el.addEventListener('keydown', (e) => {
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
       cButtonState = (cButtonState === 'note') ? 'S' : 'note';
+      renderToggleButton();
       updateBoxNames();
     }
   });
@@ -923,17 +951,35 @@ function setupAccidentalButtons() {
   cellRefs['8d'].innerHTML = '<img class="solfege-img" src="https://raw.githubusercontent.com/VisualMusicalMinds/Musical-Images/refs/heads/main/MusicAppFlatSign3.png" alt="Flat">';
 }
 
-function setSharpTouchHeld(val) {
-  sharpTouchHeld = val;
-  if (val) cellRefs['7d'].classList.add('active');
-  else cellRefs['7d'].classList.remove('active');
+function setSharpPointerLatch(val) {
+  sharpPointerLatch = val;
+  if (val) {
+    flatPointerLatch = false;
+    if (!accidentalHeld.flat) {
+      cellRefs['8d'].classList.remove('active');
+    }
+    cellRefs['7d'].classList.add('active');
+  } else {
+    if (!accidentalHeld.sharp) {
+      cellRefs['7d'].classList.remove('active');
+    }
+  }
   reTriggerHeldKeysAccidentals();
 }
 
-function setFlatTouchHeld(val) {
-  flatTouchHeld = val;
-  if (val) cellRefs['8d'].classList.remove('active');
-  else cellRefs['8d'].classList.remove('active');
+function setFlatPointerLatch(val) {
+  flatPointerLatch = val;
+  if (val) {
+    sharpPointerLatch = false;
+    if (!accidentalHeld.sharp) {
+      cellRefs['7d'].classList.remove('active');
+    }
+    cellRefs['8d'].classList.add('active');
+  } else {
+    if (!accidentalHeld.flat) {
+      cellRefs['8d'].classList.remove('active');
+    }
+  }
   reTriggerHeldKeysAccidentals();
 }
 
@@ -941,33 +987,30 @@ function setupTouchHandlers() {
   const sharpCell = cellRefs['7d'];
   const flatCell = cellRefs['8d'];
 
-  sharpCell.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const touch = e.changedTouches[i];
-      activeTouches.set(touch.identifier, { type: 'sharp', element: sharpCell });
-    }
-    setSharpTouchHeld(true);
-  });
+  let lastSharpTouchTime = 0;
+  let lastFlatTouchTime = 0;
 
-  flatCell.addEventListener('touchstart', function(e) {
+  function handleSharpTrigger(e) {
     e.preventDefault();
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const touch = e.changedTouches[i];
-      activeTouches.set(touch.identifier, { type: 'flat', element: flatCell });
-    }
-    setFlatTouchHeld(true);
-  });
+    const now = Date.now();
+    if (e.type === 'click' && now - lastSharpTouchTime < 500) return;
+    if (e.type === 'touchstart') lastSharpTouchTime = now;
+    setSharpPointerLatch(!sharpPointerLatch);
+  }
 
-  sharpCell.addEventListener('mousedown', function(e) {
+  function handleFlatTrigger(e) {
     e.preventDefault();
-    setSharpTouchHeld(true);
-  });
+    const now = Date.now();
+    if (e.type === 'click' && now - lastFlatTouchTime < 500) return;
+    if (e.type === 'touchstart') lastFlatTouchTime = now;
+    setFlatPointerLatch(!flatPointerLatch);
+  }
 
-  flatCell.addEventListener('mousedown', function(e) {
-    e.preventDefault();
-    setFlatTouchHeld(true);
-  });
+  sharpCell.addEventListener('click', handleSharpTrigger);
+  sharpCell.addEventListener('touchstart', handleSharpTrigger, { passive: false });
+
+  flatCell.addEventListener('click', handleFlatTrigger);
+  flatCell.addEventListener('touchstart', handleFlatTrigger, { passive: false });
 }
 
 function updateBoxNames() {
@@ -1075,6 +1118,15 @@ function createControlsBar() {
     backHubBtn.innerHTML = '← Eagle View Music';
     controlsBar.appendChild(backHubBtn);
   }
+
+  // Toggle button (Hide / Expand)
+  const toggleBtn = document.createElement('button');
+  toggleBtn.id = 'menu-toggle';
+  toggleBtn.className = 'menu-toggle-btn';
+  toggleBtn.setAttribute('aria-label', 'Hide settings menu');
+  toggleBtn.setAttribute('aria-expanded', 'true');
+  toggleBtn.innerHTML = '<span class="arrow-icon">&#9664;</span> <span class="toggle-text">Hide</span>';
+  controlsBar.appendChild(toggleBtn);
   
   // App Title Header
   const appTitle = document.createElement('h1');
@@ -1384,7 +1436,7 @@ function renderButtons() {
 
     div.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      handlePlayKey(btn.keys[0]);
+      handlePlayKey(btn.keys[0], true);
       div.classList.add('active');
       window.focus();
     });
@@ -1405,7 +1457,7 @@ function renderButtons() {
         const touch = e.changedTouches[i];
         activeTouches.set(touch.identifier, { key: btn.keys[0], element: div });
       }
-      handlePlayKey(btn.keys[0]);
+      handlePlayKey(btn.keys[0], true);
       div.classList.add('active');
       window.focus();
     });
@@ -1427,10 +1479,8 @@ function setupGlobalEventHandlers() {
   document.addEventListener('mouseup', (e) => {
     accidentalHeld.sharp = false;
     accidentalHeld.flat = false;
-    cellRefs['7d'].classList.remove('active');
-    cellRefs['8d'].classList.remove('active');
-    setSharpTouchHeld(false);
-    setFlatTouchHeld(false);
+    if (!sharpPointerLatch) cellRefs['7d'].classList.remove('active');
+    if (!flatPointerLatch) cellRefs['8d'].classList.remove('active');
     for (const key of [...heldNoteKeys]) {
       handleStopKey(key);
       if (keyToDiv[key]) {
@@ -1515,12 +1565,12 @@ function setupGlobalEventHandlers() {
     if (mappedKey === '=') {
       accidentalHeld.sharp = false; 
       accidentalChanged = true;
-      cellRefs['7d'].classList.remove('active');
+      if (!sharpPointerLatch) cellRefs['7d'].classList.remove('active');
     }
     if (mappedKey === '-') {
       accidentalHeld.flat = false; 
       accidentalChanged = true;
-      cellRefs['8d'].classList.remove('active');
+      if (!flatPointerLatch) cellRefs['8d'].classList.remove('active');
     }
     
     if (heldKeys.has(mappedKey)) {
@@ -1542,8 +1592,8 @@ function setupGlobalEventHandlers() {
       heldNoteKeys.clear();
       accidentalHeld.sharp = false;
       accidentalHeld.flat = false;
-      setSharpTouchHeld(false);
-      setFlatTouchHeld(false);
+      setSharpPointerLatch(false);
+      setFlatPointerLatch(false);
       activeTouches.clear();
       document.querySelectorAll('.active').forEach(el => {
         el.classList.remove('active');
@@ -1571,10 +1621,6 @@ function handleTouchEnd(e) {
         if (touchData.element) {
           touchData.element.classList.remove('active');
         }
-      } else if (touchData.type === 'sharp') {
-        setSharpTouchHeld(false);
-      } else if (touchData.type === 'flat') {
-        setFlatTouchHeld(false);
       }
       activeTouches.delete(touch.identifier);
     }
@@ -1681,11 +1727,11 @@ function setupSimulatedKeyboardEvents() {
                 if (keyToDiv[key]) keyToDiv[key].classList.remove('active');
             } else if (key === '=') {
                 accidentalHeld.sharp = false;
-                cellRefs['7d'].classList.remove('active');
+                if (!sharpPointerLatch) cellRefs['7d'].classList.remove('active');
                 reTriggerHeldKeysAccidentals();
             } else if (key === '-') {
                 accidentalHeld.flat = false;
-                cellRefs['8d'].classList.remove('active');
+                if (!flatPointerLatch) cellRefs['8d'].classList.remove('active');
                 reTriggerHeldKeysAccidentals();
             }
         };
@@ -1737,38 +1783,29 @@ function resizeGrid() {
     div.style.fontSize = fontSize + 'px';
   });
   
-  const toggleBtn = cellRefs['5d'] && cellRefs['5d'].querySelector('.chord-toggle-btn');
-  if (toggleBtn) toggleBtn.style.fontSize = Math.max(fontSize * 1.1, 20) + 'px';
+  const toggleBtn = cellRefs['6d'] && cellRefs['6d'].querySelector('.chord-toggle-btn');
+  if (toggleBtn) toggleBtn.style.fontSize = fontSize + 'px';
 }
 
 function setupMenuToggle() {
   const toggleBtn = document.getElementById('menu-toggle');
   const body = document.body;
-  let menuVisible = true;
 
   if (!toggleBtn) return;
 
-  const arrowIcon = toggleBtn.querySelector('.arrow-icon');
-
   function updateToggleState() {
-    if (arrowIcon) {
-      arrowIcon.innerHTML = menuVisible ? '&#9664;' : '&#9654;';
-    }
-    toggleBtn.setAttribute('aria-expanded', String(menuVisible));
-    toggleBtn.setAttribute('aria-label', menuVisible ? 'Collapse settings menu' : 'Expand settings menu');
+    const isHidden = body.classList.contains('menu-hidden');
+    toggleBtn.setAttribute('aria-expanded', String(!isHidden));
+    toggleBtn.setAttribute('aria-label', isHidden ? 'Expand settings menu' : 'Hide settings menu');
+    toggleBtn.innerHTML = isHidden 
+      ? '<span class="arrow-icon">&#9654;</span> <span class="toggle-text">Expand</span>' 
+      : '<span class="arrow-icon">&#9664;</span> <span class="toggle-text">Hide</span>';
   }
 
   updateToggleState();
 
-  toggleBtn.addEventListener('click', () => {
-    menuVisible = !menuVisible;
-    
-    if (menuVisible) {
-      body.classList.remove('menu-hidden');
-    } else {
-      body.classList.add('menu-hidden');
-    }
-    
+  toggleBtn.onclick = () => {
+    body.classList.toggle('menu-hidden');
     updateToggleState();
 
     // Trigger grid resize during and after transition completes
@@ -1779,19 +1816,31 @@ function setupMenuToggle() {
     setTimeout(() => {
       resizeGrid();
     }, 350);
-  });
+  };
 
   // Keyboard support for accessibility
-  toggleBtn.addEventListener('keydown', (e) => {
+  toggleBtn.onkeydown = (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       toggleBtn.click();
     }
-  });
+  };
 }
 
 // --- INITIALIZATION ---
 function initialize() {
+  const isInsideIframe = (() => {
+    try {
+      return window.self !== window.top || document.documentElement.classList.contains('in-iframe');
+    } catch (e) {
+      return true;
+    }
+  })();
+
+  if (isInsideIframe) {
+    document.body.classList.add('menu-hidden');
+  }
+
   loadSettingsFromURL();
   initializeGrid();
   setupAccidentalButtons();
