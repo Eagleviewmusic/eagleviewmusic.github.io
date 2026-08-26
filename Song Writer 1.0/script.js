@@ -462,7 +462,9 @@ async function copyCanvasToClipboard(canvas) {
 
 async function captureVisual() {
     const originalText = copyVisualBtn.innerHTML;
+    const prevZoom = document.documentElement.style.zoom;
     try {
+        document.documentElement.style.zoom = '1';
         document.body.classList.add('capturing');
         copyVisualBtn.innerHTML = '⏳';
         copyVisualBtn.style.backgroundColor = '#ffc107';
@@ -496,6 +498,7 @@ async function captureVisual() {
         copyVisualBtn.innerHTML = '✗';
         copyVisualBtn.style.backgroundColor = '#dc3545';
     } finally {
+        document.documentElement.style.zoom = prevZoom || '';
         document.body.classList.remove('capturing');
         setTimeout(() => {
             copyVisualBtn.innerHTML = originalText;
@@ -3423,3 +3426,21 @@ document.addEventListener('keydown', (event) => {
       break;
   }
 });
+
+// ===== UNIVERSAL FRAME RESIZE SCALING =====
+function updateFrameScaling() {
+  const baseW = 800;
+  const baseH = 550;
+  const wScale = window.innerWidth / baseW;
+  const hScale = window.innerHeight / baseH;
+  let scale = Math.min(wScale, hScale);
+  // Allow resizing up to 50% smaller (scale clamped between 0.5 and 1.0)
+  scale = Math.min(1.0, Math.max(0.5, scale));
+  document.documentElement.style.zoom = scale;
+  document.documentElement.style.setProperty('--app-scale', scale);
+}
+
+window.addEventListener('resize', updateFrameScaling);
+window.addEventListener('orientationchange', updateFrameScaling);
+updateFrameScaling();
+
