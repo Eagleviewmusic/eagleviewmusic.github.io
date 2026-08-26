@@ -6,13 +6,24 @@
     <title>Musical Notation Tool</title>
     <link rel="stylesheet" href="style.css">
     <script>
-      try {
-        if (window.self !== window.top) {
+      function applyAppScaling() {
+        try {
+          if (window.self !== window.top) {
+            document.documentElement.classList.add('in-iframe');
+          }
+        } catch (e) {
           document.documentElement.classList.add('in-iframe');
         }
-      } catch (e) {
-        document.documentElement.classList.add('in-iframe');
+        var baseW = 800;
+        var baseH = 550;
+        var wScale = window.innerWidth / baseW;
+        var hScale = window.innerHeight / baseH;
+        var scale = Math.min(wScale, hScale);
+        scale = Math.min(1.0, Math.max(0.5, scale));
+        document.documentElement.style.zoom = scale;
+        document.documentElement.style.setProperty('--app-scale', scale);
       }
+      applyAppScaling();
     </script>
 </head>
 <body>
