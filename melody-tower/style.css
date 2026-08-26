@@ -379,18 +379,19 @@ select.scale-dropdown {
   background: transparent;
 }
 
-/* Chord toggle button (Note/S) in grid cell */
+/* Note/Solfege toggle button in grid cell */
 .chord-toggle-btn {
   padding: 0;
   margin: 0;
-  background: transparent;
-  border: none;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 1vmin;
   width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(1.2em, 6vw, 2em);
+  font-size: inherit;
   line-height: 1;
   overflow: hidden;
   font-family: 'EB Garamond', Garamond, 'Times New Roman', Times, serif;
@@ -398,22 +399,57 @@ select.scale-dropdown {
   color: #222;
   cursor: pointer;
   outline: none;
-  transition: background 0.15s, color 0.15s, font-size 0.15s;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
 }
 
-.chord-toggle-btn .music-symbol {
-  font-size: 1em;
-  line-height: 1;
-  vertical-align: middle;
-  display: inline-block;
-  max-width: 100%;
-  max-height: 100%;
-  text-align: center;
-}
-
-.chord-toggle-btn:focus {
-  outline: 2px solid #007AFF;
+.chord-toggle-btn:hover {
   background: #f4f8ff;
+}
+
+.chord-toggle-btn:focus-visible {
+  outline: 2px solid #007AFF;
+}
+
+/* Stepped labels inside the Solfege/Letter toggle button */
+.stepped-labels {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 2px;
+  font-family: 'EB Garamond', Garamond, 'Times New Roman', Times, serif;
+  font-weight: bold;
+  line-height: 1;
+  color: #222;
+  user-select: none;
+  pointer-events: none;
+}
+
+.stepped-letters .step {
+  font-size: 0.52em;
+  display: inline-block;
+  line-height: 1;
+}
+
+.stepped-solfege .step {
+  font-size: 0.38em;
+  display: inline-block;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.stepped-labels .step-1 {
+  transform: translateY(28%);
+}
+
+.stepped-labels .step-2 {
+  transform: translateY(0%);
+}
+
+.stepped-labels .step-3 {
+  transform: translateY(-28%);
 }
 
 /* Smaller font for keyboard binding text */
@@ -539,11 +575,14 @@ select.scale-dropdown {
   justify-content: center;
   align-items: center;
   font-family: 'EB Garamond', Garamond, 'Times New Roman', Times, serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  user-select: none;
 }
 
 .octave-btn.active {
-  background-color: #34C759; /* Green */
-  color: white;
+  background-color: #34C759 !important; /* Green */
+  color: white !important;
+  transform: none !important;
 }
 
 .octave-sup {
@@ -588,63 +627,82 @@ select.scale-dropdown {
   }
 }
 
-/* Menu toggle button - anchored on the left sidebar */
+/* Menu toggle button */
 .menu-toggle-btn {
-  position: fixed;
-  top: 15px;
-  left: 270px;
-  z-index: 10000;
-  background-color: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  border-left: none;
-  border-top-right-radius: 8px;
-  border-bottom-right-radius: 8px;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  padding: 8px 10px;
-  cursor: pointer;
-  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.18);
-  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease, transform 0.2s ease;
-  outline: none;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 4px;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  width: 100%;
+  outline: none;
+  user-select: none;
+  font-family: inherit;
 }
 
 .menu-toggle-btn:hover {
-  background-color: rgba(255, 255, 255, 1);
-  transform: scale(1.05);
+  background: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
-.menu-toggle-btn:focus {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+.menu-toggle-btn:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
 }
 
 .arrow-icon {
   display: inline-block;
-  font-size: 13px;
-  color: #333;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.toggle-text {
+  display: inline-block;
   line-height: 1;
 }
 
 /* Hide the controls bar when menu is collapsed */
 .menu-hidden .controls-bar {
   margin-left: -270px;
-  opacity: 0;
   pointer-events: none;
 }
 
+/* When menu is collapsed, display toggle button as a fixed 'Expand' button on the left */
 .menu-hidden .menu-toggle-btn {
-  left: 0;
-  border-left: none;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  width: auto;
+  z-index: 10000;
+  background: rgba(255, 255, 255, 0.95);
+  color: #111827;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  pointer-events: auto;
+}
+
+.menu-hidden .menu-toggle-btn:hover {
+  background: #ffffff;
+  color: #000000;
+  transform: scale(1.04);
 }
 
 @media (max-width: 550px) {
   .controls-bar {
     width: 230px;
-  }
-  .menu-toggle-btn {
-    left: 230px;
   }
   .menu-hidden .controls-bar {
     margin-left: -230px;
