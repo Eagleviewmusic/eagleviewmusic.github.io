@@ -560,6 +560,24 @@ body { margin: 0; padding: 46px 0 0 0; }
   color: #e60000;
 }
 
+.play-button.paused {
+  background-color: #ffffff;
+  border-color: #e67e22;
+  color: #e67e22;
+  box-shadow: 0 0 6px rgba(230, 126, 34, 0.35);
+}
+
+.play-button.paused:hover {
+  background-color: #fff9f0;
+  border-color: #d35400;
+  color: #d35400;
+}
+
+/* Playback active cursor and interaction styling */
+body.playback-active #poem {
+  cursor: pointer;
+}
+
 /* 16th Note Button */
 .sixteenth-note-button {
     padding: 0 8px;
