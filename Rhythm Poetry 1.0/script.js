@@ -306,6 +306,7 @@
   let circleIconActive = true;
   let isFirstPlay = true;
   let isPlaying = false;
+  let isPaused = false;
   let playTimeouts = [];
   let currentPlayPosition = 0;
   let notesBoxElements = []; // Store references to notes boxes for highlighting
@@ -1250,6 +1251,7 @@
   }
 
   function loadSongById(songId) {
+    if (isPlaying || isPaused) stopPlayback();
     const library = getStoredLibrary();
     let song = library[songId];
     if (!song && DEFAULT_SONGS[songId]) {
@@ -1384,6 +1386,7 @@
 
   // --- CREATE NEW SONG MODAL FUNCTIONS ---
   function showNewSongModal() {
+    if (isPlaying || isPaused) stopPlayback();
     if (!newSongModal) return;
     updateNewSongModalTexts();
     newSongTitleInput.value = '';
@@ -1554,6 +1557,7 @@
 
   // --- MANAGE LIBRARY MODAL FUNCTIONS ---
   function showManageLibraryModal() {
+    if (isPlaying || isPaused) stopPlayback();
     saveCurrentSongToLibrary();
     renderLibrarySongList();
     if (manageLibraryModal) manageLibraryModal.classList.add('show');
@@ -1772,6 +1776,7 @@
   }
 
   function showImportExportModal() {
+    if (isPlaying || isPaused) stopPlayback();
     saveCurrentSongToLibrary();
     if (uploadStatusMsg) {
       uploadStatusMsg.textContent = '';
@@ -2032,6 +2037,7 @@
 
   // Mode Toggle: Left is Rhythm, Right is Poetry
   function setMode(mode) {
+    if (isPlaying || isPaused) stopPlayback();
     currentMode = mode;
     const isRhythm = mode === 'rhythm';
 
@@ -2180,7 +2186,13 @@
   // Play button
   const playButton = document.getElementById('play-button');
   playButton.addEventListener('click', () => {
-    if (isPlaying) stopPlayback(); else startPlayback();
+    if (isPlaying) {
+      stopPlayback();
+    } else if (isPaused) {
+      resumePlayback();
+    } else {
+      startPlayback();
+    }
   });
 
   // Sound Toggle Buttons
@@ -2233,6 +2245,7 @@
   const toggleReplaceBtn = document.getElementById('toggle-replace-btn');
 
   function openTextInputModal() {
+    if (isPlaying || isPaused) stopPlayback();
     multiLineInput.value = wordsToText();
     textInputModal.style.display = 'flex';
   }
@@ -2413,75 +2426,92 @@
 
   // --- PLAYBACK LOGIC ---
 
-  function startPlayback() {
-    initAudioContext();
-    
+  function schedulePlayback(delay = 0, startBeat = 0) {
     const activeState = getActiveState();
     const isRhythm = currentMode === 'rhythm';
     const BPM = activeState.BPM;
     const beatInterval = 60000 / BPM;
+    const totalBeats = notesBoxElements.length;
+    if (totalBeats === 0) return;
 
-    isPlaying = true;
-    currentPlayPosition = activeState.selectedPlayStartPosition || 0;
-    playButton.textContent = '■';
-    playButton.classList.add('playing');
+    if (startBeat >= totalBeats) {
+      startBeat = 0;
+    }
 
-    const startPoetry = (delay = 0, startBeat = 0) => {
-      const totalBeats = notesBoxElements.length;
-      if (totalBeats === 0) return;
+    const totalDuration = (totalBeats - startBeat) * beatInterval;
 
-      const totalDuration = (totalBeats - startBeat) * beatInterval;
+    // Schedule BEAT track
+    for (let beat = startBeat; beat < totalBeats; beat++) {
+      const timeDelay = delay + ((beat - startBeat) * beatInterval);
+      const beatTimeout = setTimeout(() => {
+        if (isPlaying) {
+          currentPlayPosition = beat;
+          highlightNotesBox(beat);
+          if (beatEnabled) playBrushDrum();
+        }
+      }, timeDelay);
+      playTimeouts.push(beatTimeout);
+    }
 
-      // Schedule BEAT track
-      for (let beat = startBeat; beat < totalBeats; beat++) {
-        const timeDelay = delay + ((beat - startBeat) * beatInterval);
-        const beatTimeout = setTimeout(() => {
-          if (isPlaying) {
-            highlightNotesBox(beat);
-            if (beatEnabled) playBrushDrum();
-          }
-        }, timeDelay);
-        playTimeouts.push(beatTimeout);
-      }
+    // Schedule RHYTHM track
+    for (let beat = startBeat; beat < totalBeats; beat++) {
+      const S = getBeatSubdivision(beat);
+      const subInterval = beatInterval / S;
+      const beatStartTime = delay + ((beat - startBeat) * beatInterval);
 
-      // Schedule RHYTHM track
-      for (let beat = startBeat; beat < totalBeats; beat++) {
-        const S = getBeatSubdivision(beat);
-        const subInterval = beatInterval / S;
-        const beatStartTime = delay + ((beat - startBeat) * beatInterval);
-        const startCircle = getBeatStartIndex(beat);
-
-        for (let s = 0; s < S; s++) {
-          let hasSound = false;
-          if (isRhythm) {
-            hasSound = !!(rhythmState.beats[beat] && rhythmState.beats[beat][s]);
-          } else {
-            const circleIdx = startCircle + s;
-            hasSound = isPositionActive(circleIdx, poetryState.words);
-          }
-
-          const timeDelay = beatStartTime + (s * subInterval);
-          const rhythmTimeout = setTimeout(() => {
-            if (isPlaying && hasSound && rhythmEnabled) {
+      for (let s = 0; s < S; s++) {
+        const timeDelay = beatStartTime + (s * subInterval);
+        const rhythmTimeout = setTimeout(() => {
+          if (isPlaying && rhythmEnabled) {
+            let hasSound = false;
+            if (currentMode === 'rhythm') {
+              hasSound = !!(rhythmState.beats[beat] && rhythmState.beats[beat][s]);
+            } else {
+              const startCircle = getBeatStartIndex(beat);
+              const circleIdx = startCircle + s;
+              hasSound = isPositionActive(circleIdx, poetryState.words);
+            }
+            if (hasSound) {
               if (pitchMode === 'pitch') {
                 playTriangleTone(subInterval * 0.8 / 1000);
               } else {
                 playBassDrum();
               }
             }
-          }, timeDelay);
-          playTimeouts.push(rhythmTimeout);
-        }
+          }
+        }, timeDelay);
+        playTimeouts.push(rhythmTimeout);
       }
+    }
 
-      const loopTimeout = setTimeout(() => {
-        if (isPlaying) {
-          isFirstPlay = false;
-          startPoetry(0, 0);
-        }
-      }, delay + totalDuration);
-      playTimeouts.push(loopTimeout);
-    };
+    const loopTimeout = setTimeout(() => {
+      if (isPlaying) {
+        isFirstPlay = false;
+        currentPlayPosition = 0;
+        schedulePlayback(0, 0);
+      }
+    }, delay + totalDuration);
+    playTimeouts.push(loopTimeout);
+  }
+
+  function startPlayback() {
+    initAudioContext();
+    if (audioContext && audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+    
+    const activeState = getActiveState();
+    const BPM = activeState.BPM;
+    const beatInterval = 60000 / BPM;
+
+    isPlaying = true;
+    isPaused = false;
+    currentPlayPosition = activeState.selectedPlayStartPosition || 0;
+    playButton.textContent = '■';
+    playButton.classList.add('playing');
+    playButton.classList.remove('paused');
+    document.body.classList.add('playback-active');
+    document.body.classList.remove('playback-paused');
 
     const shouldPlayCountIn = introEnabled && (isFirstPlay || activeState.selectedPlayStartPosition !== null);
 
@@ -2499,18 +2529,52 @@
         playTimeouts.push(countInTimeout);
       }
       
-      startPoetry(countInBeats * beatInterval, currentPlayPosition);
+      schedulePlayback(countInBeats * beatInterval, currentPlayPosition);
     } else {
-      startPoetry(0, currentPlayPosition);
+      schedulePlayback(0, currentPlayPosition);
     }
+  }
+
+  function pausePlayback() {
+    if (!isPlaying) return;
+    isPlaying = false;
+    isPaused = true;
+    playTimeouts.forEach(timeout => clearTimeout(timeout));
+    playTimeouts = [];
+    playButton.textContent = '▶';
+    playButton.classList.remove('playing');
+    playButton.classList.add('paused');
+    document.body.classList.add('playback-paused');
+  }
+
+  function resumePlayback() {
+    if (!isPaused) return;
+    initAudioContext();
+    if (audioContext && audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+    
+    isPlaying = true;
+    isPaused = false;
+    playButton.textContent = '■';
+    playButton.classList.add('playing');
+    playButton.classList.remove('paused');
+    document.body.classList.add('playback-active');
+    document.body.classList.remove('playback-paused');
+
+    schedulePlayback(0, currentPlayPosition);
   }
 
   function stopPlayback() {
     isPlaying = false;
+    isPaused = false;
     currentPlayPosition = 0;
     isFirstPlay = true;
     playButton.textContent = '▶';
     playButton.classList.remove('playing');
+    playButton.classList.remove('paused');
+    document.body.classList.remove('playback-active');
+    document.body.classList.remove('playback-paused');
     clearHighlights();
     playTimeouts.forEach(timeout => clearTimeout(timeout));
     playTimeouts = [];
@@ -2518,6 +2582,58 @@
     activeState.selectedPlayStartPosition = null;
     render();
   }
+
+  function isMainScreenClick(target) {
+    if (!target) return false;
+    if (target.closest('#floating-panel, #zoom-controls, .app-header, .modal-backdrop, .popup-overlay')) {
+      return false;
+    }
+    if (target.closest('.group')) {
+      return false;
+    }
+    return true;
+  }
+
+  // Tap / click anywhere on the main screen to pause or resume playback
+  document.addEventListener('click', (e) => {
+    if ((isPlaying || isPaused) && isMainScreenClick(e.target)) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      if (isPlaying) {
+        pausePlayback();
+      } else if (isPaused) {
+        resumePlayback();
+      }
+    }
+  }, true);
+
+  // Prevent double-click actions on the main screen during playback or pause
+  document.addEventListener('dblclick', (e) => {
+    if ((isPlaying || isPaused) && isMainScreenClick(e.target)) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+    }
+  }, true);
+
+  // Spacebar to toggle playback / pause / resume
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.key === ' ') {
+      const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+        return;
+      }
+      e.preventDefault();
+      if (isPlaying) {
+        pausePlayback();
+      } else if (isPaused) {
+        resumePlayback();
+      } else {
+        startPlayback();
+      }
+    }
+  });
 
   function updateCircleVisibility() {
     document.querySelectorAll('.circles').forEach(box => {
@@ -2953,6 +3069,9 @@
     
     if (beatIndex === activeState.selectedPlayStartPosition) {
         notesBox.classList.add('selected');
+    }
+    if ((isPlaying || isPaused) && beatIndex === currentPlayPosition) {
+        notesBox.classList.add('playing');
     }
 
     notesBox.addEventListener('click', () => {
