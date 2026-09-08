@@ -1,0 +1,3451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Eagle View Bathroom Pass</title>
+  <!--
+    ==============================================================================
+    EVE HALLWAY & BATHROOM PASS KIOSK - STANDALONE HTML APPLICATION
+    ==============================================================================
+    Kid-friendly elementary kiosk for Chromebooks & tablets.
+    Hosted on GitHub Pages & pre-wired for Google Form data collection.
+  -->
+  
+  <!-- Kid-friendly, ultra-legible typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* ==========================================================================
+       CSS RESET & THEME VARIABLES (Eagle View Blue & Yellow)
+       ========================================================================== */
+    :root {
+      --font-main: 'Lexend', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-display: 'Fredoka', 'Lexend', system-ui, sans-serif;
+      
+      /* Base Colors with Eagle View Blue & Yellow Theme */
+      --bg-gradient: linear-gradient(135deg, #EFF6FF 0%, #FEFCE8 45%, #F0F9FF 100%);
+      --card-bg: #FFFFFF;
+      --text-dark: #0F172A;
+      --text-muted: #64748B;
+      --border-subtle: #E2E8F0;
+      
+      /* School Colors: Blue & Gold/Yellow */
+      --school-blue: #1D4ED8;
+      --school-blue-dark: #1E40AF;
+      --school-blue-light: #EFF6FF;
+      --school-yellow: #FACC15;
+      --school-yellow-dark: #CA8A04;
+      --school-yellow-light: #FEF08A;
+
+      /* Pass Accent Colors */
+      --color-orange: #FF7A00;
+      --color-orange-light: #FFF7ED;
+      --color-orange-dark: #C2410C;
+      --color-orange-shadow: #EA580C;
+
+      --color-blue: #0085FF;
+      --color-blue-light: #EFF6FF;
+      --color-blue-dark: #0369A1;
+      --color-blue-shadow: #0284C7;
+
+      --color-green: #10B981;
+      --color-green-light: #ECFDF5;
+      --color-green-dark: #047857;
+      --color-green-shadow: #059669;
+
+      --color-purple: #8B5CF6;
+      --color-purple-light: #F5F3FF;
+      --color-purple-dark: #6D28D9;
+      --color-purple-shadow: #7C3AED;
+
+      /* Primary / Action Colors */
+      --primary-color: #1D4ED8;
+      --primary-dark: #1E40AF;
+      --success-color: #10B981;
+      --success-dark: #059669;
+      --success-shadow: #047857;
+      
+      --radius-sm: 12px;
+      --radius-md: 18px;
+      --radius-lg: 24px;
+      --radius-full: 9999px;
+      
+      --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+      --shadow-card: 0 10px 25px -5px rgba(29, 78, 216, 0.08), 0 8px 10px -6px rgba(202, 138, 4, 0.06);
+      --shadow-pop: 0 8px 0 rgba(0, 0, 0, 0.08);
+      --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-bounce: 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: var(--font-main);
+      background: var(--bg-gradient);
+      background-attachment: fixed;
+      color: var(--text-dark);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.25rem;
+      overflow-x: hidden;
+      user-select: none;
+    }
+
+    /* Screen Reader Only */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* ==========================================================================
+       APP CONTAINER & HEADER
+       ========================================================================== */
+    .kiosk-container {
+      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .kiosk-header {
+      background: var(--card-bg);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem 1.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow-card);
+      border: 3.5px solid #BFDBFE;
+      position: relative;
+    }
+
+    .header-branding {
+      display: flex;
+      align-items: center;
+      gap: 1.15rem;
+    }
+
+    .header-icon {
+      width: 64px;
+      height: 64px;
+      background: #FEF08A;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 3px solid #FACC15;
+      box-shadow: 0 4px 0 #CA8A04;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .eagle-mascot-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .header-title h1 {
+      font-family: var(--font-display);
+      font-size: 1.85rem;
+      font-weight: 700;
+      color: #1E3A8A;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .header-title p {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .clock-badge {
+      background: #F8FAFC;
+      border: 2px solid #E2E8F0;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-full);
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: #334155;
+      letter-spacing: 0.03em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .clock-dot {
+      width: 10px;
+      height: 10px;
+      background: #10B981;
+      border-radius: 50%;
+      animation: pulseDot 2s infinite;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: 0.6; }
+    }
+
+    /* ==========================================================================
+       SETTINGS GEAR & PASSCODE DROPDOWN
+       ========================================================================== */
+    .settings-wrapper {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .settings-btn {
+      background: #F8FAFC;
+      border: 2px solid #E2E8F0;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #475569;
+      transition: var(--transition-fast);
+      position: relative;
+    }
+
+    .settings-btn:hover {
+      background: #E2E8F0;
+      color: #1E293B;
+      transform: scale(1.05);
+    }
+
+    .settings-btn.active {
+      background: #DBEAFE;
+      border-color: #3B82F6;
+      color: #1D4ED8;
+    }
+
+    .gear-icon {
+      width: 22px;
+      height: 22px;
+      transition: transform 0.3s ease;
+    }
+
+    .settings-btn:hover .gear-icon {
+      transform: rotate(45deg);
+    }
+
+    .settings-dropdown {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      background: #FFFFFF;
+      border: 2.5px solid #CBD5E1;
+      border-radius: var(--radius-md);
+      box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.18), 0 6px 10px -4px rgba(15, 23, 42, 0.08);
+      width: 240px;
+      padding: 14px;
+      z-index: 600;
+      animation: dropdownPop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes dropdownPop {
+      from { opacity: 0; transform: translateY(-6px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .passcode-view {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .passcode-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #64748B;
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .passcode-form {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .passcode-input {
+      flex: 1;
+      height: 40px;
+      border: 2px solid #CBD5E1;
+      border-radius: var(--radius-sm);
+      padding: 0 8px;
+      font-size: 1.25rem;
+      font-family: monospace;
+      letter-spacing: 0.3em;
+      text-align: center;
+      color: #0F172A;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .passcode-input:focus {
+      border-color: #3B82F6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+    }
+
+    .passcode-submit-btn {
+      height: 40px;
+      width: 40px;
+      background: #1D4ED8;
+      color: #FFFFFF;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition-fast);
+      flex-shrink: 0;
+    }
+
+    .passcode-submit-btn:hover {
+      background: #1E40AF;
+      transform: scale(1.05);
+    }
+
+    .passcode-error {
+      font-size: 0.75rem;
+      color: #DC2626;
+      font-weight: 700;
+      margin-top: 6px;
+      text-align: center;
+    }
+
+    .input-shake {
+      animation: shakeInput 0.4s ease-in-out !important;
+      border-color: #EF4444 !important;
+    }
+
+    @keyframes shakeInput {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-5px); }
+      40%, 80% { transform: translateX(5px); }
+    }
+
+    .settings-menu-view {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .settings-menu-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #F8FAFC;
+      border: 2px solid #E2E8F0;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-family: var(--font-main);
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #1E3A8A;
+      transition: var(--transition-fast);
+      text-align: left;
+    }
+
+    .settings-menu-item:hover {
+      background: #EFF6FF;
+      border-color: #3B82F6;
+      color: #1D4ED8;
+      transform: translateY(-1px);
+    }
+
+    .menu-item-icon {
+      font-size: 1.15rem;
+    }
+
+    .menu-item-text {
+      flex: 1;
+    }
+
+    /* ==========================================================================
+       MANAGE CLASSES MODAL STYLES
+       ========================================================================== */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1100;
+      padding: 1.25rem;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    .manage-classes-card {
+      background: #FFFFFF;
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 860px;
+      height: 85vh;
+      max-height: 720px;
+      min-height: 440px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35);
+      border: 3.5px solid #1D4ED8;
+      overflow: hidden;
+      animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+    }
+
+    .manage-classes-header {
+      background: #F8FAFC;
+      border-bottom: 2px solid #E2E8F0;
+      padding: 1.1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-shrink: 0;
+    }
+
+    .manage-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #1E40AF;
+      background: #DBEAFE;
+      padding: 0.2rem 0.6rem;
+      border-radius: var(--radius-full);
+      margin-bottom: 0.35rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    #manage-classes-title {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #1E3A8A;
+      line-height: 1.2;
+    }
+
+    .manage-classes-desc {
+      font-size: 0.85rem;
+      color: #64748B;
+      margin-top: 0.25rem;
+      font-weight: 500;
+    }
+
+    .manage-close-btn {
+      background: transparent;
+      border: none;
+      font-size: 1.75rem;
+      line-height: 1;
+      color: #94A3B8;
+      cursor: pointer;
+      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition-fast);
+      flex-shrink: 0;
+    }
+
+    .manage-close-btn:hover {
+      background: #F1F5F9;
+      color: #1E293B;
+    }
+
+    /* 6 Grade Tabs: 6-column grid so all 6 are visible at once without scrolling */
+    .grade-tabs-bar {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+      padding: 0.75rem 1.25rem 0;
+      background: #F1F5F9;
+      border-bottom: 2.5px solid #CBD5E1;
+      overflow: visible;
+    }
+
+    .grade-tab {
+      background: #FFFFFF;
+      border: 2px solid #CBD5E1;
+      border-bottom: none;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      padding: 0.6rem 0.35rem;
+      font-family: var(--font-main);
+      font-weight: 700;
+      color: #475569;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      white-space: nowrap;
+      transition: var(--transition-fast);
+      position: relative;
+      margin-bottom: -2.5px;
+    }
+
+    .grade-tab:hover {
+      background: #EFF6FF;
+      color: #1D4ED8;
+      border-color: #93C5FD;
+    }
+
+    .grade-tab.active {
+      background: #1D4ED8;
+      border-color: #1D4ED8;
+      border-bottom: 2.5px solid #1D4ED8;
+      color: #FFFFFF;
+      box-shadow: 0 -2px 8px rgba(29, 78, 216, 0.25);
+      z-index: 2;
+    }
+
+    .tab-grade-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+      line-height: 1.1;
+      pointer-events: none;
+    }
+
+    .tab-count-badge {
+      font-size: 0.72rem;
+      background: #E2E8F0;
+      color: #475569;
+      padding: 0.1rem 0.5rem;
+      border-radius: var(--radius-full);
+      font-weight: 800;
+      pointer-events: none;
+    }
+
+    .grade-tab.active .tab-count-badge {
+      background: #FACC15;
+      color: #78350F;
+    }
+
+    .manage-body {
+      padding: 1.25rem 1.5rem;
+      overflow-y: auto;
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .manage-body::-webkit-scrollbar {
+      width: 8px;
+    }
+    .manage-body::-webkit-scrollbar-track {
+      background: #F1F5F9;
+      border-radius: 4px;
+    }
+    .manage-body::-webkit-scrollbar-thumb {
+      background: #94A3B8;
+      border-radius: 4px;
+    }
+
+    .manage-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1.5px solid #E2E8F0;
+      padding-bottom: 0.6rem;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .current-grade-title {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #1E3A8A;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .manage-instruction {
+      font-size: 0.85rem;
+      color: #64748B;
+      font-weight: 600;
+    }
+
+    .teachers-edit-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .empty-teachers-msg {
+      text-align: center;
+      padding: 2rem;
+      color: #64748B;
+      font-size: 0.95rem;
+      background: #F8FAFC;
+      border: 2px dashed #CBD5E1;
+      border-radius: var(--radius-sm);
+      line-height: 1.5;
+    }
+
+    .teacher-edit-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: #F8FAFC;
+      border: 2px solid #E2E8F0;
+      border-radius: var(--radius-sm);
+      padding: 0.5rem 0.75rem;
+      transition: var(--transition-fast);
+      user-select: text !important;
+      -webkit-user-select: text !important;
+    }
+
+    .teacher-edit-row:hover {
+      background: #F1F5F9;
+      border-color: #CBD5E1;
+    }
+
+    .teacher-row-number {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #1D4ED8;
+      background: #DBEAFE;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .teacher-input-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      background: #FFFFFF;
+      border: 2px solid #CBD5E1;
+      border-radius: 8px;
+      padding: 0.45rem 0.75rem;
+      gap: 8px;
+      transition: var(--transition-fast);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+      cursor: text;
+    }
+
+    .teacher-input-wrapper:hover {
+      border-color: #93C5FD;
+    }
+
+    .teacher-input-wrapper:focus-within {
+      border-color: #1D4ED8;
+      box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.15);
+      background: #FFFFFF;
+    }
+
+    .teacher-edit-icon {
+      font-size: 1rem;
+      opacity: 0.7;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .teacher-name-input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font-family: var(--font-main);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #0F172A;
+      outline: none;
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      width: 100%;
+      padding: 0;
+    }
+
+    .teacher-name-input::placeholder {
+      color: #94A3B8;
+      font-weight: 400;
+    }
+
+    .teacher-delete-btn {
+      background: #FEF2F2;
+      border: 1.5px solid #FECACA;
+      color: #DC2626;
+      cursor: pointer;
+      padding: 0.5rem 0.9rem;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-main);
+      font-size: 0.88rem;
+      font-weight: 700;
+      transition: var(--transition-fast);
+      flex-shrink: 0;
+    }
+
+    .teacher-delete-btn:hover {
+      background: #DC2626;
+      border-color: #DC2626;
+      color: #FFFFFF;
+      transform: translateY(-1px);
+    }
+
+    .add-teacher-bar {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      margin-top: 0.5rem;
+      background: #F0F9FF;
+      border: 2px dashed #93C5FD;
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1rem;
+    }
+
+    .add-input-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      background: #FFFFFF;
+      border: 2px solid #CBD5E1;
+      border-radius: var(--radius-sm);
+      padding: 0.45rem 0.75rem;
+      gap: 0.5rem;
+      transition: var(--transition-fast);
+    }
+
+    .add-input-wrapper:focus-within {
+      border-color: #1D4ED8;
+      box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.15);
+    }
+
+    .new-teacher-input {
+      border: none;
+      outline: none;
+      width: 100%;
+      font-family: var(--font-main);
+      font-size: 1rem;
+      font-weight: 600;
+      color: #0F172A;
+      background: transparent;
+      user-select: text !important;
+      -webkit-user-select: text !important;
+    }
+
+    .add-teacher-btn {
+      background: #1D4ED8;
+      border: 2px solid #1E40AF;
+      color: #FFFFFF;
+      font-family: var(--font-main);
+      font-weight: 700;
+      font-size: 0.95rem;
+      padding: 0.6rem 1.25rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: var(--transition-fast);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 0 #1E40AF;
+    }
+
+    .add-teacher-btn:hover {
+      background: #1E40AF;
+      transform: translateY(-1px);
+      box-shadow: 0 3px 0 #172554;
+    }
+
+    .manage-footer {
+      background: #F8FAFC;
+      border-top: 2.5px solid #CBD5E1;
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-shrink: 0;
+      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+      z-index: 10;
+    }
+
+    .manage-sync-note {
+      font-size: 0.85rem;
+      color: #475569;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .manage-footer-actions {
+      display: flex;
+      gap: 0.85rem;
+      align-items: center;
+      margin-left: auto;
+    }
+
+    .btn-cancel-manage {
+      background: #FFFFFF;
+      border: 2px solid #94A3B8;
+      color: #334155;
+      font-family: var(--font-main);
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 0.7rem 1.4rem;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: var(--transition-fast);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-cancel-manage:hover {
+      background: #F1F5F9;
+      border-color: #64748B;
+      color: #0F172A;
+    }
+
+    .btn-save-manage {
+      background: #1D4ED8;
+      border: 2.5px solid #1E40AF;
+      color: #FFFFFF;
+      font-family: var(--font-main);
+      font-weight: 800;
+      font-size: 1.05rem;
+      padding: 0.7rem 1.75rem;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      box-shadow: 0 4px 0 #1E40AF;
+      transition: var(--transition-fast);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-save-manage:hover {
+      background: #1E40AF;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 #172554;
+    }
+
+    .btn-save-manage:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 #172554;
+    }
+
+    .manage-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .btn-header-save {
+      background: #1D4ED8;
+      border: 2px solid #1E40AF;
+      color: #FFFFFF;
+      font-family: var(--font-main);
+      font-weight: 800;
+      font-size: 0.9rem;
+      padding: 0.45rem 1rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: var(--transition-fast);
+    }
+
+    .btn-header-save:hover {
+      background: #1E40AF;
+      transform: translateY(-1px);
+    }
+
+    /* Toast Notification */
+    .toast-notification {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #0F172A;
+      color: #FFFFFF;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--radius-full);
+      font-weight: 700;
+      font-size: 0.95rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      z-index: 2000;
+      border: 2px solid #3B82F6;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: slideDownToast 0.25s ease-out;
+    }
+
+    @keyframes slideDownToast {
+      from { opacity: 0; transform: translate(-50%, -12px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
+    }
+
+    /* ==========================================================================
+       MAIN STEP CARDS & FORM
+       ========================================================================== */
+    .step-card {
+      background: var(--card-bg);
+      border-radius: var(--radius-lg);
+      padding: 1.75rem;
+      box-shadow: var(--shadow-card);
+      border: 3px solid #F1F5F9;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    .step-card.error-shake {
+      animation: shakeCard 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+      border-color: #EF4444 !important;
+    }
+
+    @keyframes shakeCard {
+      10%, 90% { transform: translate3d(-2px, 0, 0); }
+      20%, 80% { transform: translate3d(4px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+      40%, 60% { transform: translate3d(6px, 0, 0); }
+    }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .step-number {
+      background: #1D4ED8;
+      color: #FEF08A;
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 800;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2.5px solid #FACC15;
+      box-shadow: 0 2px 4px rgba(29, 78, 216, 0.25);
+    }
+
+    .step-title {
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #1E293B;
+    }
+
+    .step-subtitle {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-left: auto;
+      font-weight: 500;
+    }
+
+    /* Step 1: Student Names */
+    .students-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+
+    @media (max-width: 640px) {
+      .students-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      position: relative;
+    }
+
+    .input-label {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #334155;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .input-badge {
+      font-size: 0.75rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: var(--radius-full);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-required {
+      background: #FEE2E2;
+      color: #DC2626;
+    }
+
+    .badge-optional {
+      background: #F1F5F9;
+      color: #64748B;
+    }
+
+    .name-input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .name-input {
+      width: 100%;
+      font-family: var(--font-main);
+      font-size: 1.25rem;
+      font-weight: 600;
+      padding: 0.9rem 1.1rem;
+      padding-left: 3rem;
+      border: 3px solid #CBD5E1;
+      border-radius: var(--radius-md);
+      color: #0F172A;
+      background: #F8FAFC;
+      outline: none;
+      transition: var(--transition-fast);
+      user-select: text;
+    }
+
+    .name-input:focus {
+      background: #FFFFFF;
+      border-color: #3B82F6;
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 1rem;
+      font-size: 1.4rem;
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    .input-clear-btn {
+      position: absolute;
+      right: 0.75rem;
+      background: #E2E8F0;
+      border: none;
+      color: #64748B;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.9rem;
+    }
+
+    .input-clear-btn:hover {
+      background: #CBD5E1;
+      color: #0F172A;
+    }
+
+    .name-input:not(:placeholder-shown) ~ .input-clear-btn,
+    .name-input-wrapper.has-value .input-clear-btn {
+      display: flex;
+    }
+
+    /* Step 2: Grade Selection */
+    .grades-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 0.75rem;
+    }
+
+    @media (max-width: 640px) {
+      .grades-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    .grade-btn {
+      background: #F8FAFC;
+      border: 3px solid #E2E8F0;
+      border-radius: var(--radius-md);
+      padding: 1rem 0.5rem;
+      cursor: pointer;
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #334155;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.25rem;
+      box-shadow: 0 4px 0 #CBD5E1;
+      transition: all var(--transition-fast);
+      position: relative;
+    }
+
+    .grade-btn .grade-sub {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .grade-btn:hover {
+      background: #F1F5F9;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 #CBD5E1;
+      border-color: #94A3B8;
+    }
+
+    .grade-btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 #CBD5E1;
+    }
+
+    .grade-btn.selected {
+      background: #EFF6FF;
+      border-color: #1D4ED8;
+      color: #1D4ED8;
+      box-shadow: 0 4px 0 #1E40AF;
+      transform: translateY(-2px);
+    }
+
+    .grade-btn.selected .grade-sub {
+      color: #2563EB;
+    }
+
+    .grade-btn.selected::after {
+      content: '✓';
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: #FACC15;
+      color: #1E40AF;
+      font-size: 0.75rem;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      border: 2px solid #1D4ED8;
+      box-shadow: 0 2px 4px rgba(29, 78, 216, 0.25);
+    }
+
+    /* Step 3: Dynamic Teachers Section */
+    .teachers-container {
+      margin-top: 1rem;
+      padding-top: 1.25rem;
+      border-top: 2px dashed #BFDBFE;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .teachers-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.85rem;
+    }
+
+    .teachers-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1E3A8A;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .teacher-limit-badge {
+      background: #FEF08A;
+      color: #854D0E;
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 0.2rem 0.6rem;
+      border-radius: var(--radius-full);
+      border: 1.5px solid #FACC15;
+    }
+
+    .teachers-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.85rem;
+    }
+
+    .teacher-btn {
+      background: #FFFFFF;
+      border: 3px solid #E2E8F0;
+      border-radius: var(--radius-md);
+      padding: 0.9rem 1rem;
+      font-family: var(--font-main);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #1E293B;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 0 #E2E8F0;
+      transition: all var(--transition-fast);
+      position: relative;
+    }
+
+    .teacher-btn:hover {
+      border-color: #93C5FD;
+      background: #F8FAFC;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 #CBD5E1;
+    }
+
+    .teacher-btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 #CBD5E1;
+    }
+
+    .teacher-btn.selected {
+      background: #EFF6FF;
+      border-color: #1D4ED8;
+      color: #1E40AF;
+      box-shadow: 0 4px 0 #1E40AF;
+    }
+
+    .teacher-check {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid #CBD5E1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      color: transparent;
+      transition: var(--transition-fast);
+    }
+
+    .teacher-btn.selected .teacher-check {
+      background: #FACC15;
+      border-color: #CA8A04;
+      color: #1E40AF;
+      font-weight: 900;
+    }
+
+    /* Step 4: Bathroom Pass Colors */
+    .passes-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+    }
+
+    @media (max-width: 640px) {
+      .passes-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .pass-card {
+      position: relative;
+      border-radius: var(--radius-lg);
+      padding: 1.25rem 1rem;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      background: #FFFFFF;
+      border: 3.5px solid var(--pass-border);
+      box-shadow: 0 6px 0 var(--pass-shadow);
+      transition: all var(--transition-fast);
+    }
+
+    .pass-card:hover {
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 9px 0 var(--pass-shadow);
+    }
+
+    .pass-card:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 var(--pass-shadow);
+    }
+
+    .pass-card.selected {
+      background: var(--pass-bg-light);
+      border-color: var(--pass-color);
+      transform: translateY(-3px) scale(1.03);
+      box-shadow: 0 8px 0 var(--pass-shadow), 0 0 0 3px rgba(0,0,0,0.05);
+    }
+
+    .pass-card.selected::after {
+      content: '✓ Selected';
+      position: absolute;
+      top: -10px;
+      background: var(--pass-color);
+      color: white;
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.2rem 0.6rem;
+      border-radius: var(--radius-full);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    /* Disabled / Greyed out pass styling for grade-level restrictions */
+    .pass-card:disabled,
+    .pass-card.pass-disabled {
+      opacity: 0.32;
+      filter: grayscale(90%);
+      cursor: not-allowed;
+      pointer-events: none;
+      box-shadow: 0 2px 0 #CBD5E1 !important;
+      border-color: #CBD5E1 !important;
+      background: #F1F5F9 !important;
+      transform: none !important;
+    }
+
+    .pass-card:disabled .pass-icon-badge,
+    .pass-card.pass-disabled .pass-icon-badge {
+      box-shadow: none;
+      border-color: #E2E8F0;
+      background: #94A3B8;
+    }
+
+    .pass-card:disabled .pass-title,
+    .pass-card.pass-disabled .pass-title {
+      color: #94A3B8 !important;
+    }
+
+    .pass-card:disabled:hover,
+    .pass-card.pass-disabled:hover {
+      transform: none !important;
+      box-shadow: 0 2px 0 #CBD5E1 !important;
+    }
+
+    /* Color specific themes */
+    .pass-orange {
+      --pass-color: var(--color-orange);
+      --pass-border: #FDBA74;
+      --pass-bg-light: var(--color-orange-light);
+      --pass-shadow: var(--color-orange-shadow);
+      --pass-text: var(--color-orange-dark);
+    }
+    .pass-blue {
+      --pass-color: var(--color-blue);
+      --pass-border: #93C5FD;
+      --pass-bg-light: var(--color-blue-light);
+      --pass-shadow: var(--color-blue-shadow);
+      --pass-text: var(--color-blue-dark);
+    }
+    .pass-green {
+      --pass-color: var(--color-green);
+      --pass-border: #86EFAC;
+      --pass-bg-light: var(--color-green-light);
+      --pass-shadow: var(--color-green-shadow);
+      --pass-text: var(--color-green-dark);
+    }
+    .pass-purple {
+      --pass-color: var(--color-purple);
+      --pass-border: #D8B4FE;
+      --pass-bg-light: var(--color-purple-light);
+      --pass-shadow: var(--color-purple-shadow);
+      --pass-text: var(--color-purple-dark);
+    }
+
+    .pass-icon-badge {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: var(--pass-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.6rem;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+      border: 3px solid white;
+    }
+
+    .pass-title {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--pass-text);
+      text-align: center;
+    }
+
+    /* ==========================================================================
+       SUBMIT / CHECKOUT ACTION BUTTON
+       ========================================================================== */
+    .action-container {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .btn-checkout {
+      width: 100%;
+      background: #10B981;
+      color: #FFFFFF;
+      font-family: var(--font-display);
+      font-size: 1.75rem;
+      font-weight: 700;
+      padding: 1.35rem 2rem;
+      border: none;
+      border-radius: var(--radius-lg);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      box-shadow: 0 8px 0 #059669, 0 12px 20px rgba(16, 185, 129, 0.3);
+      transition: all var(--transition-fast);
+      position: relative;
+    }
+
+    .btn-checkout:hover {
+      background: #059669;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 0 #047857, 0 16px 24px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-checkout:active {
+      transform: translateY(4px);
+      box-shadow: 0 4px 0 #047857, 0 6px 10px rgba(16, 185, 129, 0.2);
+    }
+
+    .validation-toast {
+      background: #FEE2E2;
+      border: 2px solid #FCA5A5;
+      color: #B91C1C;
+      padding: 0.75rem 1.25rem;
+      border-radius: var(--radius-md);
+      font-size: 1rem;
+      font-weight: 600;
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    /* ==========================================================================
+       ACTIVE PASS SCREEN (WAITING FOR RETURN)
+       ========================================================================== */
+    .active-pass-view {
+      display: none;
+      flex-direction: column;
+      gap: 1.5rem;
+      animation: fadeIn 0.4s ease-out;
+    }
+
+    .active-hero-card {
+      background: #FFFFFF;
+      border-radius: var(--radius-lg);
+      padding: 2.25rem 2rem;
+      box-shadow: var(--shadow-card);
+      border: 4px solid var(--active-border-color, #3B82F6);
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .active-hero-banner {
+      background: var(--active-banner-bg, #EFF6FF);
+      color: var(--active-banner-color, #1D4ED8);
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      padding: 0.4rem 1.25rem;
+      border-radius: var(--radius-full);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .timer-display {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .timer-label {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .timer-value {
+      font-family: var(--font-display);
+      font-size: 3.5rem;
+      font-weight: 700;
+      color: #0F172A;
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+
+    @media (max-width: 640px) {
+      .timer-value {
+        font-size: 2.75rem;
+      }
+    }
+
+    .active-details-grid {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+      margin: 1rem 0;
+    }
+
+    @media (max-width: 640px) {
+      .active-details-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .active-detail-box {
+      background: #F8FAFC;
+      border: 3px solid #E2E8F0;
+      border-radius: var(--radius-md);
+      padding: 1.25rem 1rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      box-shadow: 0 4px 0 #E2E8F0;
+    }
+
+    .active-detail-label {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #64748B;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .active-detail-value {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #1E293B;
+      font-family: var(--font-display);
+    }
+
+    .active-pass-badge-large {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 700;
+      padding: 0.6rem 1.25rem;
+      border-radius: var(--radius-full);
+      color: white;
+      background: var(--active-pass-color, #FF7A00);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    }
+
+    /* Big Pulsing Check-In Button */
+    .btn-checkin {
+      width: 100%;
+      background: #EF4444;
+      color: #FFFFFF;
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 700;
+      padding: 1.5rem 2rem;
+      border: none;
+      border-radius: var(--radius-lg);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      box-shadow: 0 8px 0 #B91C1C, 0 12px 24px rgba(239, 68, 68, 0.35);
+      transition: all var(--transition-fast);
+      animation: pulseAttention 2.2s infinite ease-in-out;
+    }
+
+    @keyframes pulseAttention {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 8px 0 #B91C1C, 0 10px 20px rgba(239, 68, 68, 0.3);
+      }
+      50% {
+        transform: scale(1.02);
+        box-shadow: 0 10px 0 #B91C1C, 0 18px 30px rgba(239, 68, 68, 0.45);
+      }
+    }
+
+    .btn-checkin:hover {
+      background: #DC2626;
+      animation: none;
+      transform: translateY(-2px) scale(1.01);
+      box-shadow: 0 10px 0 #991B1B, 0 16px 28px rgba(239, 68, 68, 0.4);
+    }
+
+    .btn-checkin:active {
+      transform: translateY(4px);
+      box-shadow: 0 4px 0 #991B1B;
+    }
+
+    /* ==========================================================================
+       SUCCESS / RETURN CELEBRATION MODAL
+       ========================================================================== */
+    .success-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1.5rem;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    .success-card {
+      background: #FFFFFF;
+      border-radius: var(--radius-lg);
+      padding: 2.5rem 2rem;
+      max-width: 520px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+      border: 4px solid #1D4ED8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.25rem;
+      animation: popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.85); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .success-icon-badge {
+      font-size: 3.5rem;
+      background: #FEF08A;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 3px solid #FACC15;
+    }
+
+    .success-title {
+      font-family: var(--font-display);
+      font-size: 2.1rem;
+      font-weight: 700;
+      color: #1E3A8A;
+    }
+
+    .success-stats {
+      background: #EFF6FF;
+      border: 2.5px solid #BFDBFE;
+      border-radius: var(--radius-md);
+      padding: 1rem 1.5rem;
+      width: 100%;
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #1E40AF;
+    }
+
+    #success-time-summary {
+      background: #FEF9C3;
+      border-color: #FDE047;
+      color: #854D0E;
+    }
+
+    .auto-reset-bar-container {
+      width: 100%;
+      background: #E2E8F0;
+      height: 8px;
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+
+    .auto-reset-bar {
+      height: 100%;
+      background: #1D4ED8;
+      width: 100%;
+      transition: width 30s linear;
+    }
+
+    .btn-reset-instant {
+      background: #1D4ED8;
+      color: white;
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 700;
+      padding: 0.9rem 1.75rem;
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      box-shadow: 0 4px 0 #1E40AF;
+      transition: var(--transition-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-reset-instant:hover {
+      background: #1E40AF;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 #172554;
+    }
+
+    /* Confetti Canvas */
+    #confetti-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 1001;
+    }
+
+    /* Footer */
+    .kiosk-footer {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #64748B;
+      font-weight: 600;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="kiosk-container">
+    
+    <!-- ==================== HEADER ==================== -->
+    <header class="kiosk-header">
+      <div class="header-branding">
+        <div class="header-icon" aria-label="Eagle View Mascot">
+          <!-- Cartoon Bald Eagle Mascot SVG -->
+          <svg class="eagle-mascot-svg" viewBox="0 0 120 120" width="60" height="60" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Circular Blue & Yellow Mascot Badge Background -->
+            <circle cx="60" cy="60" r="56" fill="#FEF08A" stroke="#1D4ED8" stroke-width="5"/>
+            <circle cx="60" cy="60" r="49" fill="#DBEAFE"/>
+            
+            <!-- Brown Body / Shoulders -->
+            <path d="M28 96 C28 78, 92 78, 92 96 C92 108, 28 108, 28 96 Z" fill="#5C381E"/>
+            <path d="M42 88 L60 102 L78 88 Z" fill="#78350F"/>
+
+            <!-- Eagle Head (White Crown & Cheeks) -->
+            <path d="M60 18 C42 18, 30 32, 30 52 C30 70, 38 80, 48 85 C54 88, 66 88, 72 85 C82 80, 90 70, 90 52 C90 32, 78 18, 60 18 Z" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
+            
+            <!-- Cute Feather Crest on Top -->
+            <path d="M60 14 C63 6, 56 6, 52 16 Z" fill="#FFFFFF"/>
+            <path d="M64 15 C70 8, 63 6, 59 15 Z" fill="#FFFFFF"/>
+
+            <!-- Friendly Rosy Cheeks -->
+            <circle cx="39" cy="64" r="5" fill="#FED7AA" opacity="0.75"/>
+            <circle cx="81" cy="64" r="5" fill="#FED7AA" opacity="0.75"/>
+
+            <!-- Cute Big Expressive Eyes -->
+            <!-- Left Eye -->
+            <ellipse cx="46" cy="48" rx="7.5" ry="9.5" fill="#0F172A"/>
+            <circle cx="44" cy="45" r="3.2" fill="#FFFFFF"/>
+            <circle cx="48" cy="52" r="1.3" fill="#FFFFFF"/>
+            <!-- Right Eye -->
+            <ellipse cx="74" cy="48" rx="7.5" ry="9.5" fill="#0F172A"/>
+            <circle cx="72" cy="45" r="3.2" fill="#FFFFFF"/>
+            <circle cx="76" cy="52" r="1.3" fill="#FFFFFF"/>
+
+            <!-- Golden Yellow Beak with Smile Curve -->
+            <path d="M49 53 C49 53, 60 49, 71 53 C73 66, 68 79, 60 81 C52 79, 47 66, 49 53 Z" fill="#F59E0B" stroke="#D97706" stroke-width="2"/>
+            <!-- Beak Highlight & Smile Line -->
+            <path d="M53 56 C57 54, 63 54, 67 56" stroke="#FEF08A" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="55" cy="58" r="1.2" fill="#92400E"/>
+            <circle cx="65" cy="58" r="1.2" fill="#92400E"/>
+          </svg>
+        </div>
+        <div class="header-title">
+          <h1>Eagle View Bathroom Pass</h1>
+          <p id="greeting-text">Welcome Eagles! Please sign out before leaving the classroom</p>
+        </div>
+      </div>
+      
+      <div class="header-status">
+        <div class="clock-badge">
+          <span class="clock-dot"></span>
+          <span id="live-clock">12:00 PM</span>
+        </div>
+        <!-- Settings Gear & Passcode Dropdown -->
+        <div class="settings-wrapper" id="settings-wrapper">
+          <button id="settings-btn" class="settings-btn" title="Settings" aria-label="Settings" aria-expanded="false" aria-haspopup="true">
+            <svg class="gear-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+          
+          <!-- Small Unobtrusive Dropdown -->
+          <div id="settings-dropdown" class="settings-dropdown" style="display: none;" role="dialog" aria-label="Settings Menu">
+            <div id="passcode-view" class="passcode-view">
+              <label for="passcode-input" class="passcode-label">Admin Passcode</label>
+              <form id="passcode-form" class="passcode-form">
+                <input 
+                  type="password" 
+                  id="passcode-input" 
+                  class="passcode-input" 
+                  placeholder="••••" 
+                  maxlength="4" 
+                  inputmode="numeric" 
+                  pattern="[0-9]*" 
+                  autocomplete="off"
+                  aria-label="Admin Passcode"
+                >
+                <button type="submit" class="passcode-submit-btn" aria-label="Unlock Settings">
+                  ➔
+                </button>
+              </form>
+              <div id="passcode-error" class="passcode-error" style="display: none;">Incorrect passcode</div>
+            </div>
+
+            <div id="settings-menu-view" class="settings-menu-view" style="display: none;">
+              <button id="manage-classes-btn" class="settings-menu-item" type="button">
+                <span class="menu-item-icon">🏫</span>
+                <span class="menu-item-text">Manage Classes</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ==================== FORM VIEW (CHECK OUT) ==================== -->
+    <main id="form-view">
+      
+      <!-- STEP 1: Student Names -->
+      <section class="step-card" id="card-students">
+        <div class="step-header">
+          <span class="step-number">1</span>
+          <h2 class="step-title">Who is going?</h2>
+        </div>
+        
+        <div class="students-grid">
+          <!-- Student 1 -->
+          <div class="input-group">
+            <label for="student1-input" class="input-label">
+              <span>Student 1</span>
+            </label>
+            <div class="name-input-wrapper">
+              <span class="input-icon">👤</span>
+              <input type="text" id="student1-input" class="name-input" placeholder="Name" autocomplete="off" autocorrect="off" spellcheck="false">
+              <button type="button" class="input-clear-btn" aria-label="Clear Student 1" onclick="clearInput('student1-input')">✕</button>
+            </div>
+          </div>
+          
+          <!-- Student 2 (Buddy) -->
+          <div class="input-group">
+            <label for="student2-input" class="input-label">
+              <span>Student 2</span>
+              <span class="input-badge badge-optional">Buddy</span>
+            </label>
+            <div class="name-input-wrapper">
+              <span class="input-icon">👥</span>
+              <input type="text" id="student2-input" class="name-input" placeholder="Buddy's Name" autocomplete="off" autocorrect="off" spellcheck="false">
+              <button type="button" class="input-clear-btn" aria-label="Clear Student 2" onclick="clearInput('student2-input')">✕</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- STEP 2: Grade Selection -->
+      <section class="step-card" id="card-grade" style="margin-top: 1.25rem;">
+        <div class="step-header">
+          <span class="step-number">2</span>
+          <h2 class="step-title">Choose Your Grade</h2>
+        </div>
+        
+        <div class="grades-grid" role="radiogroup" aria-label="Grade selection">
+          <button type="button" class="grade-btn" data-grade="1st" onclick="selectGrade('1st')">
+            <span>1st</span>
+            <span class="grade-sub">Grade</span>
+          </button>
+          <button type="button" class="grade-btn" data-grade="2nd" onclick="selectGrade('2nd')">
+            <span>2nd</span>
+            <span class="grade-sub">Grade</span>
+          </button>
+          <button type="button" class="grade-btn" data-grade="3rd" onclick="selectGrade('3rd')">
+            <span>3rd</span>
+            <span class="grade-sub">Grade</span>
+          </button>
+          <button type="button" class="grade-btn" data-grade="4th" onclick="selectGrade('4th')">
+            <span>4th</span>
+            <span class="grade-sub">Grade</span>
+          </button>
+          <button type="button" class="grade-btn" data-grade="5th" onclick="selectGrade('5th')">
+            <span>5th</span>
+            <span class="grade-sub">Grade</span>
+          </button>
+          <button type="button" class="grade-btn" data-grade="6th" onclick="selectGrade('6th')">
+            <span>6th</span>
+            <span class="grade-sub">Grade</span>
+          </button>
+        </div>
+
+        <!-- STEP 3: Teacher Selection (Dynamic based on selected grade) -->
+        <div id="teachers-section" class="teachers-container" style="display: none;">
+          <div class="teachers-header">
+            <div class="teachers-title">
+              <span>🍎</span>
+              <span>Select Teacher(s):</span>
+            </div>
+          </div>
+          <div class="teachers-grid" id="teachers-grid" role="group" aria-label="Teacher list">
+            <!-- Dynamic Teacher Buttons Injected Here -->
+          </div>
+        </div>
+      </section>
+
+      <!-- STEP 3: Bathroom Color -->
+      <section class="step-card" id="card-pass" style="margin-top: 1.25rem;">
+        <div class="step-header">
+          <span class="step-number">3</span>
+          <h2 class="step-title">Bathroom Color</h2>
+        </div>
+        
+        <div class="passes-grid" role="radiogroup" aria-label="Bathroom color selection">
+          <!-- Orange -->
+          <button type="button" class="pass-card pass-orange" data-color="Orange" onclick="selectPassColor('Orange')">
+            <div class="pass-icon-badge">🟠</div>
+            <span class="pass-title">Orange</span>
+          </button>
+          
+          <!-- Blue -->
+          <button type="button" class="pass-card pass-blue" data-color="Blue" onclick="selectPassColor('Blue')">
+            <div class="pass-icon-badge">🔵</div>
+            <span class="pass-title">Blue</span>
+          </button>
+          
+          <!-- Green -->
+          <button type="button" class="pass-card pass-green" data-color="Green" onclick="selectPassColor('Green')">
+            <div class="pass-icon-badge">🟢</div>
+            <span class="pass-title">Green</span>
+          </button>
+          
+          <!-- Purple -->
+          <button type="button" class="pass-card pass-purple" data-color="Purple" onclick="selectPassColor('Purple')">
+            <div class="pass-icon-badge">🟣</div>
+            <span class="pass-title">Purple</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- CHECK OUT ACTION BUTTON -->
+      <div class="action-container">
+        <div id="validation-toast" class="validation-toast" role="alert">
+          <span>⚠️</span>
+          <span id="validation-message">Please fill in all required fields!</span>
+        </div>
+
+        <button type="button" id="btn-checkout" class="btn-checkout" onclick="handleCheckOut()">
+          <span>CHECK OUT / LEAVE ROOM</span>
+          <span style="font-size: 2rem;">🚪➔</span>
+        </button>
+      </div>
+
+    </main>
+
+    <!-- ==================== ACTIVE PASS VIEW (WAITING FOR RETURN) ==================== -->
+    <main id="active-view" class="active-pass-view">
+      <div class="active-hero-card" id="active-hero-card">
+        
+        <div class="active-hero-banner" id="active-pass-banner">
+          <span>📍</span>
+          <span>PASS IS CURRENTLY OUT</span>
+        </div>
+
+        <!-- 3 Center Summary Blocks: Name, Grade/Teacher, Time Out -->
+        <div class="active-details-grid">
+          <div class="active-detail-box">
+            <span class="active-detail-label">Name</span>
+            <span class="active-detail-value" id="active-students-display">Jane Doe</span>
+          </div>
+
+          <div class="active-detail-box">
+            <span class="active-detail-label">Grade & Teacher(s)</span>
+            <span class="active-detail-value" id="active-teachers-display">3rd Grade • Chaffin</span>
+          </div>
+
+          <div class="active-detail-box">
+            <span class="active-detail-label">Time Out</span>
+            <span class="active-detail-value" id="active-depart-time">10:45 AM</span>
+          </div>
+        </div>
+
+        <!-- Bathroom Color under the 3 blocks -->
+        <div class="active-pass-badge-large" id="active-pass-color-pill">
+          <span id="active-pass-icon">🟠</span>
+          <span id="active-pass-name">Orange</span>
+        </div>
+
+        <!-- Check In Button -->
+        <button type="button" id="btn-checkin" class="btn-checkin" onclick="handleCheckIn()">
+          <span>CHECK IN / I'M BACK</span>
+          <span style="font-size: 2.2rem;">🎉</span>
+        </button>
+
+      </div>
+    </main>
+
+    <footer class="kiosk-footer">
+      <span>Eagle View Elementary • Bathroom Pass Kiosk</span>
+    </footer>
+
+  </div>
+
+  <!-- ==================== SUCCESS / RESET MODAL ==================== -->
+  <div id="success-modal" class="success-overlay" role="dialog" aria-modal="true" aria-labelledby="success-title">
+    <div class="success-card">
+      <div class="success-icon-badge">🎉</div>
+      <h2 id="success-title" class="success-title">Welcome Back!</h2>
+      <p style="font-size: 1.15rem; font-weight: 500; color: #475569;">Pass complete. Thank you for returning promptly!</p>
+      
+      <div style="width: 100%; display: flex; flex-direction: column; gap: 0.75rem;">
+        <div class="success-stats" id="success-time-in">
+          Returned at: <strong>10:49 AM</strong>
+        </div>
+        <div class="success-stats" id="success-time-summary">
+          Total time out: <strong>2 mins 15 secs</strong>
+        </div>
+      </div>
+
+      <div style="width: 100%;">
+        <div style="font-size: 0.95rem; font-weight: 600; color: #64748B; margin-bottom: 0.35rem;" id="countdown-text">
+          Resetting kiosk in 30 seconds...
+        </div>
+        <div class="auto-reset-bar-container">
+          <div id="auto-reset-bar" class="auto-reset-bar"></div>
+        </div>
+      </div>
+
+      <button type="button" class="btn-reset-instant" onclick="resetKioskImmediately()">
+        <span>Next Student</span>
+        <span>➔</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Confetti Canvas for celebration -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <!-- ==================== MANAGE CLASSES MODAL ==================== -->
+  <div id="manage-classes-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="manage-classes-title" style="display: none;">
+    <div class="manage-classes-card">
+      <div class="manage-classes-header">
+        <div class="manage-classes-header-text">
+          <div class="manage-badge">⚙️ Admin Settings</div>
+          <h2 id="manage-classes-title">Manage Classes & Teachers</h2>
+          <p class="manage-classes-desc">Edit, add, or remove teachers for each grade level. Changes save permanently across all kiosks.</p>
+        </div>
+        <div class="manage-header-actions">
+          <button type="button" id="header-save-btn" class="btn-header-save" title="Save All Changes">
+            <span>💾</span>
+            <span>Save Changes</span>
+          </button>
+          <button type="button" id="close-manage-classes-x" class="manage-close-btn" title="Close" aria-label="Close modal">&times;</button>
+        </div>
+      </div>
+
+      <!-- Grade Tabs: 1st through 6th (all 6 visible side-by-side without scrolling) -->
+      <div class="grade-tabs-bar" role="tablist" aria-label="Grade Levels">
+        <button type="button" class="grade-tab active" data-grade="1st" role="tab" aria-selected="true">
+          <span class="tab-grade-title">1st Grade</span>
+          <span class="tab-count-badge" id="count-1st">0</span>
+        </button>
+        <button type="button" class="grade-tab" data-grade="2nd" role="tab" aria-selected="false">
+          <span class="tab-grade-title">2nd Grade</span>
+          <span class="tab-count-badge" id="count-2nd">0</span>
+        </button>
+        <button type="button" class="grade-tab" data-grade="3rd" role="tab" aria-selected="false">
+          <span class="tab-grade-title">3rd Grade</span>
+          <span class="tab-count-badge" id="count-3rd">0</span>
+        </button>
+        <button type="button" class="grade-tab" data-grade="4th" role="tab" aria-selected="false">
+          <span class="tab-grade-title">4th Grade</span>
+          <span class="tab-count-badge" id="count-4th">0</span>
+        </button>
+        <button type="button" class="grade-tab" data-grade="5th" role="tab" aria-selected="false">
+          <span class="tab-grade-title">5th Grade</span>
+          <span class="tab-count-badge" id="count-5th">0</span>
+        </button>
+        <button type="button" class="grade-tab" data-grade="6th" role="tab" aria-selected="false">
+          <span class="tab-grade-title">6th Grade</span>
+          <span class="tab-count-badge" id="count-6th">0</span>
+        </button>
+      </div>
+
+      <!-- Grade Teachers Content Panel -->
+      <div class="manage-body">
+        <div class="manage-panel-header">
+          <h3 id="current-grade-heading" class="current-grade-title">1st Grade Teachers</h3>
+          <span class="manage-instruction">✏️ Click any name to edit directly, or remove with 🗑️</span>
+        </div>
+
+        <div id="teachers-edit-list" class="teachers-edit-list">
+          <!-- Dynamically populated teacher rows -->
+        </div>
+
+        <!-- Add New Teacher Bar -->
+        <div class="add-teacher-bar">
+          <div class="add-input-wrapper">
+            <span class="add-icon" aria-hidden="true">➕</span>
+            <input 
+              type="text" 
+              id="new-teacher-input" 
+              class="new-teacher-input" 
+              placeholder="Add new teacher name (e.g., Martinez)" 
+              maxlength="40"
+              autocomplete="off"
+            >
+          </div>
+          <button type="button" id="add-teacher-btn" class="add-teacher-btn">
+            <span>➕</span>
+            <span id="add-btn-text">Add Teacher</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="manage-footer">
+        <span class="manage-sync-note">🔒 Changes save permanently on this device</span>
+        <div class="manage-footer-actions">
+          <button type="button" id="cancel-manage-btn" class="btn-cancel-manage">
+            <span>✖</span>
+            <span>Cancel</span>
+          </button>
+          <button type="button" id="save-manage-btn" class="btn-save-manage">
+            <span>💾</span>
+            <span>Save Changes</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Toast Notification -->
+  <div id="toast-notification" class="toast-notification" style="display: none;" role="status"></div>
+
+  <!-- ==========================================================================
+       JAVASCRIPT LOGIC
+       ========================================================================== -->
+  <script>
+    /**
+     * KIOSK CONFIGURATION & GRADE TEACHER MAPPINGS
+     */
+    const DEFAULT_TEACHERS = {
+      '1st': ['Meyers', 'Molina', 'Oh'],
+      '2nd': ['Paik', 'S.Lee', 'E.Lee', 'Ma'],
+      '3rd': ['Chaffin', 'Hamm', 'Oddo-Bennett'],
+      '4th': ['Bishop', 'Goodfriend', 'Shin'],
+      '5th': ['Choi', 'Krebs', 'Patterson'],
+      '6th': ['Costello', 'Campos', 'Gibson']
+    };
+
+    // Active teacher roster (loaded from cache, defaults, and server)
+    let teachersConfig = (() => {
+      try {
+        const saved = localStorage.getItem('eve_teachers_config');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object') {
+            const grades = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+            grades.forEach(g => {
+              if (!Array.isArray(parsed[g]) || parsed[g].length === 0) {
+                parsed[g] = [...DEFAULT_TEACHERS[g]];
+              }
+            });
+            return parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('Error reading cached teachers config:', e);
+      }
+      return JSON.parse(JSON.stringify(DEFAULT_TEACHERS));
+    })();
+
+    const ADMIN_PASSCODE = '4500';
+
+    const PASS_COLORS = {
+      'Orange': { hex: '#FF7A00', bg: '#FFF7ED', text: '#C2410C', icon: '🟠' },
+      'Blue':   { hex: '#0085FF', bg: '#EFF6FF', text: '#0369A1', icon: '🔵' },
+      'Green':  { hex: '#10B981', bg: '#ECFDF5', text: '#047857', icon: '🟢' },
+      'Purple': { hex: '#8B5CF6', bg: '#F5F3FF', text: '#6D28D9', icon: '🟣' }
+    };
+
+    /**
+     * ==============================================================================
+     * GOOGLE FORM BACKEND CONFIGURATION
+     * ==============================================================================
+     */
+    const GOOGLE_FORM_CONFIG = {
+      enabled: true,
+      formResponseUrl: 'https://docs.google.com/forms/d/e/1FAIpQLSfqgtkVRv83kTSdW4eX8tonUeZkoFdrreMuJdCQFIWfv2VE_Q/formResponse',
+      entries: {
+        student1: 'entry.2003066211',
+        student2: 'entry.872434750',
+        grade: 'entry.208129474',
+        teacher: 'entry.625481236',
+        destination: 'entry.308708653',
+        action: 'entry.1553351055'
+      }
+    };
+
+    /**
+     * APP STATE
+     */
+    const state = {
+      soundEnabled: true,
+      selectedGrade: null,
+      selectedTeachers: [],
+      selectedPassColor: null,
+      activePass: null,
+      timerInterval: null,
+      resetCountdownTimer: null
+    };
+
+    // Web Audio Synthesizer for friendly sound effects
+    const audioCtx = (typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined')
+      ? new (window.AudioContext || window.webkitAudioContext)()
+      : null;
+
+    function playSound(type) {
+      if (!state.soundEnabled || !audioCtx) return;
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const now = audioCtx.currentTime;
+
+        if (type === 'tap') {
+          // Subtle soft pop tone
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        } else if (type === 'success') {
+          // Friendly cheerful 3-note chime (C5 -> E5 -> G5)
+          const notes = [523.25, 659.25, 783.99];
+          notes.forEach((freq, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const noteTime = now + (i * 0.1);
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, noteTime);
+            gain.gain.setValueAtTime(0.18, noteTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, noteTime + 0.28);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(noteTime);
+            osc.stop(noteTime + 0.3);
+          });
+        } else if (type === 'error') {
+          // Gentle low boop
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.linearRampToValueAtTime(160, now + 0.18);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.18);
+        }
+      } catch (err) {
+        console.warn('Audio playback error:', err);
+      }
+    }
+
+    /**
+     * INITIALIZATION & EVENT LISTENERS
+     */
+    document.addEventListener('DOMContentLoaded', () => {
+      initClock();
+      restoreSavedState();
+      initTeacherConfig();
+      initSettingsAndClasses();
+      updatePassColorsAvailability();
+
+      // Input clear button indicators
+      const student1 = document.getElementById('student1-input');
+      const student2 = document.getElementById('student2-input');
+      [student1, student2].forEach(inp => {
+        inp.addEventListener('input', () => {
+          hideValidation();
+        });
+      });
+    });
+
+    /**
+     * TEACHER CONFIGURATION ASYNC FETCH & CACHING
+     * Loads teachers.json asynchronously with offline fallback & localStorage override support.
+     */
+    async function initTeacherConfig() {
+      try {
+        const response = await fetch('./teachers.json');
+        if (!response.ok) {
+          throw new Error(`HTTP error fetching teachers.json: ${response.status}`);
+        }
+        const fetchedRoster = await response.json();
+
+        if (fetchedRoster && typeof fetchedRoster === 'object') {
+          // Validate structure
+          const grades = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+          grades.forEach(g => {
+            if (!Array.isArray(fetchedRoster[g]) || fetchedRoster[g].length === 0) {
+              fetchedRoster[g] = [...DEFAULT_TEACHERS[g]];
+            }
+          });
+
+          // Check if the user has custom local overrides in localStorage.getItem('eve_teachers_config')
+          const hasAdminOverride = localStorage.getItem('eve_teachers_source') === 'admin_override' ||
+                                   localStorage.getItem('eve_teachers_custom_override') === 'true';
+          const savedConfig = localStorage.getItem('eve_teachers_config');
+          let hasLocalCustomChanges = hasAdminOverride;
+
+          if (!hasAdminOverride && savedConfig && localStorage.getItem('eve_teachers_source') !== 'remote') {
+            try {
+              const parsedSaved = JSON.parse(savedConfig);
+              if (JSON.stringify(parsedSaved) !== JSON.stringify(DEFAULT_TEACHERS)) {
+                hasLocalCustomChanges = true;
+              }
+            } catch (e) {}
+          }
+
+          // If no local admin changes exist in localStorage, update teachersConfig with fetched JSON data and cache it
+          if (!hasLocalCustomChanges) {
+            teachersConfig = fetchedRoster;
+            try {
+              localStorage.setItem('eve_teachers_config', JSON.stringify(fetchedRoster));
+              localStorage.setItem('eve_teachers_source', 'remote');
+            } catch (e) {
+              console.warn('Error caching teachers config to localStorage:', e);
+            }
+            console.log('✓ Teacher roster loaded from teachers.json and cached');
+          } else {
+            console.log('ℹ Local admin overrides detected in localStorage; preserving custom teacher roster');
+          }
+
+          // Re-render the active grade teacher buttons if a grade is currently selected
+          if (state.selectedGrade) {
+            renderTeachers(state.selectedGrade);
+          }
+        }
+      } catch (err) {
+        console.warn('Graceful fallback: Could not fetch ./teachers.json (offline or file:// protocol). Using cached/default roster.', err);
+        // Fall back to localStorage or DEFAULT_TEACHERS without breaking execution
+        if (state.selectedGrade) {
+          renderTeachers(state.selectedGrade);
+        }
+      }
+    }
+
+    /**
+     * SETTINGS & MANAGE CLASSES CONTROLLER
+     */
+    let modalDraftTeachers = null;
+    let modalCurrentGrade = '1st';
+
+    function initSettingsAndClasses() {
+      const settingsWrapper = document.getElementById('settings-wrapper');
+      const settingsBtn = document.getElementById('settings-btn');
+      const dropdown = document.getElementById('settings-dropdown');
+      const passcodeInput = document.getElementById('passcode-input');
+      const passcodeForm = document.getElementById('passcode-form');
+      const passcodeError = document.getElementById('passcode-error');
+      const passcodeView = document.getElementById('passcode-view');
+      const menuView = document.getElementById('settings-menu-view');
+      const manageClassesBtn = document.getElementById('manage-classes-btn');
+
+      // Modal elements
+      const manageModal = document.getElementById('manage-classes-modal');
+      const closeXBtn = document.getElementById('close-manage-classes-x');
+      const cancelManageBtn = document.getElementById('cancel-manage-btn');
+      const saveManageBtn = document.getElementById('save-manage-btn');
+      const addTeacherBtn = document.getElementById('add-teacher-btn');
+      const newTeacherInput = document.getElementById('new-teacher-input');
+
+      function toggleSettingsDropdown(show) {
+        const isVisible = dropdown.style.display !== 'none';
+        const willShow = (typeof show === 'boolean') ? show : !isVisible;
+
+        if (willShow) {
+          dropdown.style.display = 'block';
+          settingsBtn.classList.add('active');
+          settingsBtn.setAttribute('aria-expanded', 'true');
+          passcodeView.style.display = 'block';
+          menuView.style.display = 'none';
+          passcodeError.style.display = 'none';
+          passcodeInput.value = '';
+          setTimeout(() => passcodeInput.focus(), 60);
+        } else {
+          dropdown.style.display = 'none';
+          settingsBtn.classList.remove('active');
+          settingsBtn.setAttribute('aria-expanded', 'false');
+          passcodeInput.value = '';
+          passcodeError.style.display = 'none';
+        }
+      }
+
+      settingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleSettingsDropdown();
+      });
+
+      dropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+
+      document.addEventListener('click', (e) => {
+        if (settingsWrapper && !settingsWrapper.contains(e.target)) {
+          toggleSettingsDropdown(false);
+        }
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (dropdown.style.display !== 'none') {
+            toggleSettingsDropdown(false);
+          } else if (manageModal && manageModal.style.display !== 'none') {
+            closeManageModal();
+          }
+        }
+      });
+
+      function verifyPasscode() {
+        const entered = passcodeInput.value.trim();
+        if (entered === ADMIN_PASSCODE) {
+          playSound('success');
+          passcodeError.style.display = 'none';
+          passcodeView.style.display = 'none';
+          menuView.style.display = 'block';
+        } else {
+          playSound('error');
+          passcodeError.style.display = 'block';
+          passcodeInput.classList.add('input-shake');
+          setTimeout(() => passcodeInput.classList.remove('input-shake'), 450);
+          passcodeInput.select();
+        }
+      }
+
+      passcodeForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        verifyPasscode();
+      });
+
+      passcodeInput.addEventListener('input', () => {
+        passcodeError.style.display = 'none';
+        if (passcodeInput.value.length === 4) {
+          verifyPasscode();
+        }
+      });
+
+      manageClassesBtn.addEventListener('click', () => {
+        playSound('tap');
+        toggleSettingsDropdown(false);
+        openManageModal();
+      });
+
+      closeXBtn.addEventListener('click', closeManageModal);
+      cancelManageBtn.addEventListener('click', closeManageModal);
+
+      manageModal.addEventListener('click', (e) => {
+        if (e.target === manageModal) {
+          closeManageModal();
+        }
+      });
+
+      addTeacherBtn.addEventListener('click', handleAddTeacher);
+      newTeacherInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleAddTeacher();
+        }
+      });
+
+      document.querySelectorAll('.grade-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          const targetGrade = tab.getAttribute('data-grade');
+          if (targetGrade && targetGrade !== modalCurrentGrade) {
+            playSound('tap');
+            switchGradeTab(targetGrade);
+          }
+        });
+      });
+
+      const headerSaveBtn = document.getElementById('header-save-btn');
+      if (headerSaveBtn) {
+        headerSaveBtn.addEventListener('click', saveClassChanges);
+      }
+
+      saveManageBtn.addEventListener('click', saveClassChanges);
+    }
+
+    function hasUnsavedDraftChanges() {
+      if (!modalDraftTeachers) return false;
+      const grades = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+      for (const g of grades) {
+        const draft = (modalDraftTeachers[g] || []).map(t => String(t).trim()).filter(Boolean);
+        const orig = (teachersConfig[g] || []).map(t => String(t).trim()).filter(Boolean);
+        if (draft.length !== orig.length) return true;
+        for (let i = 0; i < draft.length; i++) {
+          if (draft[i] !== orig[i]) return true;
+        }
+      }
+      return false;
+    }
+
+    function openManageModal() {
+      const modal = document.getElementById('manage-classes-modal');
+      modalDraftTeachers = {};
+      const grades = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+      grades.forEach(g => {
+        const existing = (teachersConfig && Array.isArray(teachersConfig[g]) && teachersConfig[g].length > 0)
+          ? teachersConfig[g]
+          : DEFAULT_TEACHERS[g];
+        modalDraftTeachers[g] = [...existing];
+      });
+
+      modalCurrentGrade = (state.selectedGrade && grades.includes(state.selectedGrade))
+        ? state.selectedGrade
+        : '1st';
+
+      updateAllTabCounts();
+      renderModalCurrentGrade();
+      modal.style.display = 'flex';
+    }
+
+    function closeManageModal(force) {
+      if (force !== true) {
+        syncCurrentGradeInputsFromDOM();
+        if (hasUnsavedDraftChanges()) {
+          if (!confirm('You have unsaved changes to the teacher list. Discard them?')) {
+            return;
+          }
+        }
+      }
+      const modal = document.getElementById('manage-classes-modal');
+      modal.style.display = 'none';
+      modalDraftTeachers = null;
+      const newInp = document.getElementById('new-teacher-input');
+      if (newInp) newInp.value = '';
+    }
+
+    function syncCurrentGradeInputsFromDOM() {
+      if (!modalDraftTeachers || !modalCurrentGrade) return;
+      const inputs = document.querySelectorAll('#teachers-edit-list .teacher-name-input');
+      const updated = [];
+      inputs.forEach(inp => {
+        const val = inp.value.trim();
+        if (val) {
+          updated.push(val);
+        }
+      });
+      modalDraftTeachers[modalCurrentGrade] = updated;
+    }
+
+    function switchGradeTab(newGrade) {
+      syncCurrentGradeInputsFromDOM();
+      modalCurrentGrade = newGrade;
+      renderModalCurrentGrade();
+    }
+
+    function updateAllTabCounts() {
+      if (!modalDraftTeachers) return;
+      const grades = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+      grades.forEach(g => {
+        const countEl = document.getElementById(`count-${g}`);
+        if (countEl) {
+          countEl.textContent = (modalDraftTeachers[g] || []).length;
+        }
+      });
+    }
+
+    function renderModalCurrentGrade() {
+      document.querySelectorAll('.grade-tab').forEach(tab => {
+        const g = tab.getAttribute('data-grade');
+        if (g === modalCurrentGrade) {
+          tab.classList.add('active');
+          tab.setAttribute('aria-selected', 'true');
+        } else {
+          tab.classList.remove('active');
+          tab.setAttribute('aria-selected', 'false');
+        }
+      });
+
+      const heading = document.getElementById('current-grade-heading');
+      if (heading) {
+        heading.innerHTML = `<span>🏫 ${modalCurrentGrade} Grade Teachers</span>`;
+      }
+
+      const addBtnText = document.getElementById('add-btn-text');
+      if (addBtnText) {
+        addBtnText.textContent = `Add to ${modalCurrentGrade} Grade`;
+      }
+
+      const list = document.getElementById('teachers-edit-list');
+      list.innerHTML = '';
+      const teachers = modalDraftTeachers[modalCurrentGrade] || [];
+
+      if (teachers.length === 0) {
+        const emptyNotice = document.createElement('div');
+        emptyNotice.className = 'empty-teachers-msg';
+        emptyNotice.innerHTML = `<strong>No teachers listed for ${modalCurrentGrade} Grade yet.</strong><br>Type a teacher's name below and click "Add".`;
+        list.appendChild(emptyNotice);
+      } else {
+        teachers.forEach((teacher, idx) => {
+          const row = document.createElement('div');
+          row.className = 'teacher-edit-row';
+          row.innerHTML = `
+            <span class="teacher-row-number">${idx + 1}</span>
+            <div class="teacher-input-wrapper" title="Click to edit name">
+              <span class="teacher-edit-icon" aria-hidden="true">✏️</span>
+              <input 
+                type="text" 
+                class="teacher-name-input" 
+                value="${escapeHtml(teacher)}" 
+                placeholder="Teacher Last Name" 
+                aria-label="Teacher ${idx + 1} Name"
+              >
+            </div>
+            <button type="button" class="teacher-delete-btn" title="Remove ${escapeHtml(teacher)}" aria-label="Remove ${escapeHtml(teacher)}">
+              <span aria-hidden="true">🗑️</span>
+              <span>Remove</span>
+            </button>
+          `;
+
+          const input = row.querySelector('.teacher-name-input');
+          input.addEventListener('input', () => {
+            modalDraftTeachers[modalCurrentGrade][idx] = input.value;
+          });
+
+          const delBtn = row.querySelector('.teacher-delete-btn');
+          delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            playSound('tap');
+            syncCurrentGradeInputsFromDOM();
+            modalDraftTeachers[modalCurrentGrade].splice(idx, 1);
+            updateAllTabCounts();
+            renderModalCurrentGrade();
+          });
+
+          list.appendChild(row);
+        });
+      }
+
+      updateAllTabCounts();
+      const newInp = document.getElementById('new-teacher-input');
+      if (newInp) {
+        newInp.value = '';
+        newInp.placeholder = `Add new ${modalCurrentGrade} Grade teacher (e.g., Martinez)`;
+      }
+    }
+
+    function handleAddTeacher() {
+      const input = document.getElementById('new-teacher-input');
+      const name = input.value.trim();
+      if (!name) {
+        input.focus();
+        return;
+      }
+
+      syncCurrentGradeInputsFromDOM();
+      if (!modalDraftTeachers[modalCurrentGrade]) {
+        modalDraftTeachers[modalCurrentGrade] = [];
+      }
+
+      const exists = modalDraftTeachers[modalCurrentGrade].some(
+        t => t.toLowerCase() === name.toLowerCase()
+      );
+      if (exists) {
+        showToast(`"${name}" is already in ${modalCurrentGrade} Grade!`);
+        input.focus();
+        return;
+      }
+
+      modalDraftTeachers[modalCurrentGrade].push(name);
+      playSound('tap');
+      input.value = '';
+      updateAllTabCounts();
+      renderModalCurrentGrade();
+      input.focus();
+    }
+
+    function saveClassChanges() {
+      syncCurrentGradeInputsFromDOM();
+
+      const grades = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+      grades.forEach(g => {
+        modalDraftTeachers[g] = (modalDraftTeachers[g] || []).filter(t => t && t.trim().length > 0);
+      });
+
+      const emptyGrades = grades.filter(g => modalDraftTeachers[g].length === 0);
+      if (emptyGrades.length > 0) {
+        if (!confirm(`Notice: ${emptyGrades.join(', ')} has no teachers listed. Do you still want to save?`)) {
+          return;
+        }
+      }
+
+      teachersConfig = JSON.parse(JSON.stringify(modalDraftTeachers));
+
+      try {
+        localStorage.setItem('eve_teachers_config', JSON.stringify(teachersConfig));
+        localStorage.setItem('eve_teachers_source', 'admin_override');
+        localStorage.setItem('eve_teachers_custom_override', 'true');
+      } catch (e) {
+        console.warn('Failed to save teachers to localStorage:', e);
+      }
+
+      if (state.selectedGrade) {
+        const available = teachersConfig[state.selectedGrade] || [];
+        state.selectedTeachers = state.selectedTeachers.filter(t => available.includes(t));
+        renderTeachers(state.selectedGrade);
+      }
+
+      console.log('Teacher roster saved to local storage:', teachersConfig);
+
+      playSound('success');
+      showToast('✓ Teacher names saved permanently!');
+      closeManageModal(true);
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast-notification');
+      if (!toast) return;
+      toast.textContent = message;
+      toast.style.display = 'flex';
+      clearTimeout(toast._timeout);
+      toast._timeout = setTimeout(() => {
+        toast.style.display = 'none';
+      }, 3500);
+    }
+
+    /**
+     * CLOCK & GREETING
+     */
+    function initClock() {
+      const clockEl = document.getElementById('live-clock');
+      const greetingEl = document.getElementById('greeting-text');
+
+      function updateClock() {
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const formattedHours = hours % 12 || 12;
+        clockEl.textContent = `${formattedHours}:${minutes} ${ampm}`;
+
+        if (hours < 12) {
+          greetingEl.textContent = '☀️ Good morning Eagles! Sign out before leaving.';
+        } else if (hours < 17) {
+          greetingEl.textContent = '🌤️ Good afternoon Eagles! Sign out before leaving.';
+        } else {
+          greetingEl.textContent = '🦅 Welcome Eagles! Sign out before leaving.';
+        }
+      }
+      updateClock();
+      setInterval(updateClock, 1000);
+    }
+
+    /**
+     * FORM CONTROLS: INPUTS, GRADE, TEACHER, PASS COLOR
+     */
+    function clearInput(id) {
+      const input = document.getElementById(id);
+      if (input) {
+        input.value = '';
+        input.focus();
+        playSound('tap');
+      }
+    }
+
+    /**
+     * PASS COLOR RESTRICTIONS:
+     * - Grades 1st, 2nd, 3rd: Green pass is disabled / greyed out
+     * - Grades 4th, 5th, 6th: Purple pass is disabled / greyed out
+     */
+    function isPassDisabledForGrade(color, grade) {
+      if (!grade) return false;
+      if (['1st', '2nd', '3rd'].includes(grade) && color === 'Green') return true;
+      if (['4th', '5th', '6th'].includes(grade) && color === 'Purple') return true;
+      return false;
+    }
+
+    function updatePassColorsAvailability() {
+      const grade = state.selectedGrade;
+      document.querySelectorAll('.pass-card').forEach(card => {
+        const color = card.getAttribute('data-color');
+        const disabled = isPassDisabledForGrade(color, grade);
+
+        if (disabled) {
+          card.disabled = true;
+          card.classList.add('pass-disabled');
+          card.setAttribute('aria-disabled', 'true');
+          if (state.selectedPassColor === color) {
+            state.selectedPassColor = null;
+            card.classList.remove('selected');
+          }
+        } else {
+          card.disabled = false;
+          card.classList.remove('pass-disabled');
+          card.setAttribute('aria-disabled', 'false');
+        }
+      });
+    }
+
+    function selectGrade(grade) {
+      playSound('tap');
+      hideValidation();
+      state.selectedGrade = grade;
+
+      // Update grade buttons
+      document.querySelectorAll('.grade-btn').forEach(btn => {
+        if (btn.getAttribute('data-grade') === grade) {
+          btn.classList.add('selected');
+        } else {
+          btn.classList.remove('selected');
+        }
+      });
+
+      // Reset & Render Teacher list for this grade
+      state.selectedTeachers = [];
+      renderTeachers(grade);
+
+      // Update bathroom pass availability based on grade level
+      updatePassColorsAvailability();
+    }
+
+    function renderTeachers(grade) {
+      const container = document.getElementById('teachers-section');
+      const grid = document.getElementById('teachers-grid');
+      const teachers = (teachersConfig && teachersConfig[grade]) || [];
+
+      grid.innerHTML = '';
+      if (teachers.length > 0) {
+        teachers.forEach(teacher => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'teacher-btn';
+          if (state.selectedTeachers.includes(teacher)) {
+            btn.classList.add('selected');
+          }
+          btn.setAttribute('data-teacher', teacher);
+          btn.innerHTML = `
+            <span>${escapeHtml(teacher)}</span>
+            <span class="teacher-check" aria-hidden="true">✓</span>
+          `;
+          btn.addEventListener('click', () => toggleTeacher(teacher));
+          grid.appendChild(btn);
+        });
+        container.style.display = 'block';
+      } else {
+        container.style.display = 'none';
+      }
+      updateTeacherCountBadge();
+    }
+
+    function toggleTeacher(teacher) {
+      playSound('tap');
+      hideValidation();
+      const index = state.selectedTeachers.indexOf(teacher);
+
+      if (index > -1) {
+        // Deselect
+        state.selectedTeachers.splice(index, 1);
+      } else {
+        // Max 2 teachers allowed (e.g. partner from different class or co-teachers)
+        if (state.selectedTeachers.length >= 2) {
+          state.selectedTeachers.shift(); // Remove first selected to allow new one
+        }
+        state.selectedTeachers.push(teacher);
+      }
+
+      // Update UI button classes
+      document.querySelectorAll('.teacher-btn').forEach(btn => {
+        const tName = btn.getAttribute('data-teacher');
+        if (state.selectedTeachers.includes(tName)) {
+          btn.classList.add('selected');
+        } else {
+          btn.classList.remove('selected');
+        }
+      });
+
+      updateTeacherCountBadge();
+    }
+
+    function updateTeacherCountBadge() {
+      const badge = document.getElementById('teacher-count-badge');
+      if (!badge) return;
+      const count = state.selectedTeachers.length;
+      if (count === 0) {
+        badge.textContent = '';
+      } else if (count === 1) {
+        badge.textContent = '1 Selected ✓';
+        badge.style.background = '#DCFCE7';
+        badge.style.color = '#15803D';
+      } else {
+        badge.textContent = '2 Selected ✓';
+        badge.style.background = '#DCFCE7';
+        badge.style.color = '#15803D';
+      }
+    }
+
+    function selectPassColor(color) {
+      if (isPassDisabledForGrade(color, state.selectedGrade)) {
+        playSound('error');
+        return;
+      }
+
+      playSound('tap');
+      hideValidation();
+      state.selectedPassColor = color;
+
+      document.querySelectorAll('.pass-card').forEach(card => {
+        if (card.getAttribute('data-color') === color) {
+          card.classList.add('selected');
+        } else {
+          card.classList.remove('selected');
+        }
+      });
+    }
+
+    function showValidation(message, targetCardId) {
+      playSound('error');
+      const toast = document.getElementById('validation-toast');
+      const msg = document.getElementById('validation-message');
+      msg.textContent = message;
+      toast.style.display = 'inline-flex';
+
+      if (targetCardId) {
+        const card = document.getElementById(targetCardId);
+        if (card) {
+          card.classList.remove('error-shake');
+          void card.offsetWidth; // Trigger reflow
+          card.classList.add('error-shake');
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }
+
+    function hideValidation() {
+      const toast = document.getElementById('validation-toast');
+      toast.style.display = 'none';
+      document.querySelectorAll('.step-card').forEach(card => card.classList.remove('error-shake'));
+    }
+
+    /**
+     * CHECK-OUT WORKFLOW
+     */
+    function handleCheckOut() {
+      const student1 = document.getElementById('student1-input').value.trim();
+      const student2 = document.getElementById('student2-input').value.trim();
+
+      if (!student1) {
+        showValidation('Please enter Student 1 Name!', 'card-students');
+        document.getElementById('student1-input').focus();
+        return;
+      }
+
+      if (!student2) {
+        showValidation("Please enter Buddy's Name!", 'card-students');
+        document.getElementById('student2-input').focus();
+        return;
+      }
+
+      if (!state.selectedGrade) {
+        showValidation('Please select a Grade!', 'card-grade');
+        return;
+      }
+
+      if (state.selectedTeachers.length === 0) {
+        showValidation('Please select at least one Teacher!', 'card-grade');
+        return;
+      }
+
+      if (!state.selectedPassColor) {
+        showValidation('Please pick a Bathroom Color!', 'card-pass');
+        return;
+      }
+
+      hideValidation();
+      playSound('success');
+
+      // Create Active Pass Data
+      const passId = 'PASS-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 4);
+      const timeOut = new Date();
+
+      const passData = {
+        id: passId,
+        student1: student1,
+        student2: student2,
+        grade: state.selectedGrade,
+        teachers: [...state.selectedTeachers],
+        passColor: state.selectedPassColor,
+        timeOut: timeOut.toISOString(),
+        timeOutDisplay: timeOut.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      state.activePass = passData;
+      saveActivePassToStorage(passData);
+
+      // Record check-out event
+      sendCheckOutToBackend(passData);
+
+      // Transition to Active Pass Screen
+      showActivePassScreen(passData);
+    }
+
+    function showActivePassScreen(passData) {
+      document.getElementById('form-view').style.display = 'none';
+      const activeView = document.getElementById('active-view');
+      activeView.style.display = 'flex';
+
+      // Setup styles based on chosen pass color
+      const colorCfg = PASS_COLORS[passData.passColor] || PASS_COLORS['Orange'];
+      const heroCard = document.getElementById('active-hero-card');
+      heroCard.style.setProperty('--active-border-color', colorCfg.hex);
+      heroCard.style.setProperty('--active-pass-color', colorCfg.hex);
+
+      // Pass Color Badge
+      const passColorPill = document.getElementById('active-pass-color-pill');
+      passColorPill.style.background = colorCfg.hex;
+      document.getElementById('active-pass-icon').textContent = colorCfg.icon;
+      document.getElementById('active-pass-name').textContent = passData.passColor;
+
+      // Student info
+      let studentsText = passData.student1;
+      if (passData.student2) {
+        studentsText += ` & ${passData.student2}`;
+      }
+      document.getElementById('active-students-display').textContent = studentsText;
+      
+      const teacherDisplay = Array.isArray(passData.teachers) 
+        ? passData.teachers.join(' & ') 
+        : passData.teachers;
+
+      document.getElementById('active-teachers-display').textContent = `${passData.grade} Grade • ${teacherDisplay}`;
+      document.getElementById('active-depart-time').textContent = passData.timeOutDisplay || new Date(passData.timeOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    /**
+     * TIMER CONTROLS - Live Active Counting Loop
+     */
+    function startElapsedTimer(startTime) {
+      if (state.timerInterval) clearInterval(state.timerInterval);
+
+      const timerEl = document.getElementById('active-timer-display');
+      if (!timerEl) return;
+
+      function tick() {
+        const now = new Date();
+        const diffMs = Math.max(0, now - startTime);
+        const totalSeconds = Math.floor(diffMs / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        
+        timerEl.textContent = `${minutes} min${minutes === 1 ? '' : 's'} ${String(seconds).padStart(2, '0')} sec${seconds === 1 ? '' : 's'}`;
+      }
+
+      tick();
+      state.timerInterval = setInterval(tick, 1000);
+    }
+
+    /**
+     * CHECK-IN WORKFLOW
+     */
+    function handleCheckIn() {
+      if (!state.activePass) return;
+      if (state.timerInterval) clearInterval(state.timerInterval);
+
+      const timeIn = new Date();
+      const timeOut = new Date(state.activePass.timeOut);
+      const diffMs = Math.max(0, timeIn - timeOut);
+      const totalSeconds = Math.floor(diffMs / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+
+      const durationDisplay = `${minutes} min${minutes === 1 ? '' : 's'} ${seconds} sec${seconds === 1 ? '' : 's'}`;
+      const timeInDisplay = timeIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      const checkInData = {
+        id: state.activePass.id,
+        student1: state.activePass.student1,
+        student2: state.activePass.student2 || '',
+        grade: state.activePass.grade,
+        teachers: state.activePass.teachers,
+        passColor: state.activePass.passColor,
+        timeOut: state.activePass.timeOut,
+        timeOutDisplay: state.activePass.timeOutDisplay,
+        timeIn: timeIn.toISOString(),
+        timeInDisplay: timeInDisplay,
+        durationSeconds: totalSeconds,
+        durationDisplay: durationDisplay,
+        status: 'Returned'
+      };
+
+      // Record check-in event
+      sendCheckInToBackend(checkInData);
+
+      // Trigger Celebration & Audio
+      playSound('success');
+      launchConfetti();
+
+      // Show Return Modal
+      showSuccessModal(timeInDisplay, durationDisplay);
+
+      // Clear local storage
+      clearActivePassFromStorage();
+    }
+
+    function showSuccessModal(timeInDisplay, durationDisplay) {
+      const modal = document.getElementById('success-modal');
+      const timeInEl = document.getElementById('success-time-in');
+      const timeSummary = document.getElementById('success-time-summary');
+      const countdownText = document.getElementById('countdown-text');
+      const autoResetBar = document.getElementById('auto-reset-bar');
+
+      timeInEl.innerHTML = `Returned at: <strong>${timeInDisplay}</strong>`;
+      timeSummary.innerHTML = `Total time out: <strong>${durationDisplay}</strong>`;
+      modal.style.display = 'flex';
+
+      // 30-second animated auto-reset countdown
+      let remaining = 30;
+      countdownText.textContent = `Resetting kiosk in ${remaining} seconds...`;
+      autoResetBar.style.width = '100%';
+      autoResetBar.style.transition = 'none';
+      void autoResetBar.offsetWidth; // trigger reflow
+      autoResetBar.style.transition = 'width 30s linear';
+      autoResetBar.style.width = '0%';
+
+      if (state.resetCountdownTimer) clearInterval(state.resetCountdownTimer);
+
+      state.resetCountdownTimer = setInterval(() => {
+        remaining -= 1;
+        if (remaining > 0) {
+          countdownText.textContent = `Resetting kiosk in ${remaining} second${remaining === 1 ? '' : 's'}...`;
+        } else {
+          clearInterval(state.resetCountdownTimer);
+          resetKioskImmediately();
+        }
+      }, 1000);
+    }
+
+    function resetKioskImmediately() {
+      if (state.resetCountdownTimer) clearInterval(state.resetCountdownTimer);
+      if (state.timerInterval) clearInterval(state.timerInterval);
+
+      // Hide Modal
+      document.getElementById('success-modal').style.display = 'none';
+
+      // Reset State
+      state.selectedGrade = null;
+      state.selectedTeachers = [];
+      state.selectedPassColor = null;
+      state.activePass = null;
+
+      // Clear Inputs
+      document.getElementById('student1-input').value = '';
+      document.getElementById('student2-input').value = '';
+
+      // Reset Grade UI
+      document.querySelectorAll('.grade-btn').forEach(btn => btn.classList.remove('selected'));
+      document.getElementById('teachers-section').style.display = 'none';
+      document.getElementById('teachers-grid').innerHTML = '';
+
+      // Reset Pass Color UI
+      document.querySelectorAll('.pass-card').forEach(card => card.classList.remove('selected'));
+      updatePassColorsAvailability();
+
+      // Switch back to Form View
+      document.getElementById('active-view').style.display = 'none';
+      document.getElementById('form-view').style.display = 'block';
+
+      // Hide any validation hints
+      hideValidation();
+
+      // Clear storage
+      clearActivePassFromStorage();
+
+      playSound('tap');
+    }
+
+    /**
+     * LOCAL STORAGE PERSISTENCE (Handles accidental browser reloads)
+     */
+    function saveActivePassToStorage(passData) {
+      try {
+        localStorage.setItem('eve_active_hallway_pass', JSON.stringify(passData));
+      } catch (e) {
+        console.warn('LocalStorage error:', e);
+      }
+    }
+
+    function clearActivePassFromStorage() {
+      try {
+        localStorage.removeItem('eve_active_hallway_pass');
+      } catch (e) {
+        console.warn('LocalStorage error:', e);
+      }
+    }
+
+    function restoreSavedState() {
+      try {
+        const saved = localStorage.getItem('eve_active_hallway_pass');
+        if (saved) {
+          const passData = JSON.parse(saved);
+          if (passData && passData.id && passData.timeOut) {
+            state.activePass = passData;
+            showActivePassScreen(passData);
+          }
+        }
+      } catch (e) {
+        console.warn('Error restoring pass state:', e);
+      }
+    }
+
+    /**
+     * ==============================================================================
+     * DATA SUBMISSION & GOOGLE FORM INTEGRATION HOOKS
+     * ==============================================================================
+     * The functions below receive the kiosk check-out and check-in events.
+     * In this version, data is logged to the console and stored locally.
+     * When ready to link with your Google Form, configure GOOGLE_FORM_CONFIG above.
+     */
+    function sendCheckOutToBackend(passData) {
+      console.log('📋 [Check-Out Event Collected]', {
+        passId: passData.id,
+        student1: passData.student1,
+        student2: passData.student2,
+        grade: passData.grade,
+        teachers: passData.teachers,
+        passColor: passData.passColor,
+        timeOut: passData.timeOut,
+        timeOutDisplay: passData.timeOutDisplay,
+        status: 'OUT'
+      });
+
+      submitToGoogleForm(passData, 'checkout');
+    }
+
+    function sendCheckInToBackend(checkInData) {
+      console.log('✅ [Check-In Event Collected]', {
+        passId: checkInData.id,
+        student1: checkInData.student1,
+        student2: checkInData.student2,
+        grade: checkInData.grade,
+        teachers: checkInData.teachers,
+        passColor: checkInData.passColor,
+        timeOut: checkInData.timeOut,
+        timeOutDisplay: checkInData.timeOutDisplay,
+        timeIn: checkInData.timeIn,
+        timeInDisplay: checkInData.timeInDisplay,
+        durationSeconds: checkInData.durationSeconds,
+        durationDisplay: checkInData.durationDisplay,
+        status: 'IN'
+      });
+
+      submitToGoogleForm(checkInData, 'checkin');
+    }
+
+    function submitToGoogleForm(payload, actionType) {
+      if (!GOOGLE_FORM_CONFIG.enabled || !GOOGLE_FORM_CONFIG.formResponseUrl) return;
+
+      const formData = new URLSearchParams();
+      const entries = GOOGLE_FORM_CONFIG.entries;
+
+      // Map payload to the Google Form entries
+      if (payload.student1) formData.append(entries.student1, payload.student1);
+      if (payload.student2) formData.append(entries.student2, payload.student2);
+      if (payload.grade) formData.append(entries.grade, payload.grade);
+      
+      // Format teachers if array
+      if (payload.teachers) {
+        const tStr = Array.isArray(payload.teachers) ? payload.teachers.join(', ') : payload.teachers;
+        formData.append(entries.teacher, tStr);
+      }
+      
+      // Map bathroom color to destination
+      if (payload.passColor) formData.append(entries.destination, payload.passColor);
+      
+      // Action status: 'OUT' or 'IN'
+      const actionStatus = actionType === 'checkout' ? 'OUT' : 'IN';
+      formData.append(entries.action, actionStatus);
+
+      fetch(GOOGLE_FORM_CONFIG.formResponseUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: formData.toString()
+      }).then(() => {
+        console.log(`[Google Form] ${actionStatus} recorded successfully`);
+      }).catch(err => {
+        console.warn(`[Google Form] ${actionStatus} submission error:`, err);
+      });
+    }
+
+    /**
+     * LIGHTWEIGHT CONFETTI PARTICLE SYSTEM (Pure HTML5 Canvas)
+     */
+    function launchConfetti() {
+      const canvas = document.getElementById('confetti-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const particles = [];
+      const colors = ['#FF7A00', '#0085FF', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899'];
+      const totalParticles = 75;
+
+      for (let i = 0; i < totalParticles; i++) {
+        particles.push({
+          x: canvas.width / 2 + (Math.random() * 200 - 100),
+          y: canvas.height * 0.4 + (Math.random() * 100 - 50),
+          size: Math.random() * 10 + 6,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          vx: (Math.random() - 0.5) * 14,
+          vy: (Math.random() - 0.8) * 16,
+          gravity: 0.4,
+          rotation: Math.random() * 360,
+          vRot: (Math.random() - 0.5) * 10,
+          opacity: 1
+        });
+      }
+
+      let animationFrame;
+      const startTime = Date.now();
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = 0;
+
+        particles.forEach(p => {
+          if (p.opacity <= 0) return;
+          alive++;
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += p.gravity;
+          p.rotation += p.vRot;
+          p.opacity -= 0.008;
+
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate((p.rotation * Math.PI) / 180);
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = Math.max(0, p.opacity);
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.7);
+          ctx.restore();
+        });
+
+        if (alive > 0 && Date.now() - startTime < 3500) {
+          animationFrame = requestAnimationFrame(draw);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          cancelAnimationFrame(animationFrame);
+        }
+      }
+
+      draw();
+    }
+  </script>
+</body>
+</html>
