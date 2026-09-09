@@ -870,6 +870,8 @@
                         box-shadow 0.1s ease, 
                         background 0.15s ease;
             user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
             touch-action: pan-y manipulation;
             overflow: hidden;
             
@@ -915,6 +917,10 @@
             border-radius: 14px;
             overflow: hidden;
             padding: 8px 10px 38px 10px;
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
         }
         
         .drum-image img {
@@ -923,6 +929,21 @@
             object-fit: contain;
             transition: transform 0.12s ease;
             filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.15));
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-user-drag: none;
+            user-drag: none;
+        }
+        
+        img {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-user-drag: none;
+            user-drag: none;
+            pointer-events: none;
         }
         
         .drum-pad:hover .drum-image img {
@@ -1630,7 +1651,7 @@
                     </button>
                     <button class="pad-arrow pad-arrow-prev" type="button" aria-label="Previous instrument for box 1" tabindex="-1">◀</button>
                     <div class="drum-image">
-                        <img src="assets/virtualdrums-bass.png" alt="Bass Drum">
+                        <img src="assets/virtualdrums-bass.png" alt="Bass Drum" draggable="false">
                     </div>
                     <button class="pad-arrow pad-arrow-next" type="button" aria-label="Next instrument for box 1" tabindex="-1">▶</button>
                     <div class="sound-info">
@@ -1646,7 +1667,7 @@
                     </button>
                     <button class="pad-arrow pad-arrow-prev" type="button" aria-label="Previous instrument for box 2" tabindex="-1">◀</button>
                     <div class="drum-image">
-                        <img src="assets/virtualdrums-snare.png" alt="Snare Drum">
+                        <img src="assets/virtualdrums-snare.png" alt="Snare Drum" draggable="false">
                     </div>
                     <button class="pad-arrow pad-arrow-next" type="button" aria-label="Next instrument for box 2" tabindex="-1">▶</button>
                     <div class="sound-info">
@@ -1662,7 +1683,7 @@
                     </button>
                     <button class="pad-arrow pad-arrow-prev" type="button" aria-label="Previous instrument for box 3" tabindex="-1">◀</button>
                     <div class="drum-image">
-                        <img src="assets/virtualdrums-tom.png" alt="Tom Drum">
+                        <img src="assets/virtualdrums-tom.png" alt="Tom Drum" draggable="false">
                     </div>
                     <button class="pad-arrow pad-arrow-next" type="button" aria-label="Next instrument for box 3" tabindex="-1">▶</button>
                     <div class="sound-info">
@@ -1678,7 +1699,7 @@
                     </button>
                     <button class="pad-arrow pad-arrow-prev" type="button" aria-label="Previous instrument for box 4" tabindex="-1">◀</button>
                     <div class="drum-image">
-                        <img src="assets/virtualdrums-Conga-High.png" alt="High Conga Drum">
+                        <img src="assets/virtualdrums-Conga-High.png" alt="High Conga Drum" draggable="false">
                     </div>
                     <button class="pad-arrow pad-arrow-next" type="button" aria-label="Next instrument for box 4" tabindex="-1">▶</button>
                     <div class="sound-info">
@@ -1694,7 +1715,7 @@
                     </button>
                     <button class="pad-arrow pad-arrow-prev" type="button" aria-label="Previous instrument for box 5" tabindex="-1">◀</button>
                     <div class="drum-image">
-                        <img src="assets/virtualdrums-Conga-Low.png" alt="Low Conga Drum">
+                        <img src="assets/virtualdrums-Conga-Low.png" alt="Low Conga Drum" draggable="false">
                     </div>
                     <button class="pad-arrow pad-arrow-next" type="button" aria-label="Next instrument for box 5" tabindex="-1">▶</button>
                     <div class="sound-info">
@@ -1710,7 +1731,7 @@
                     </button>
                     <button class="pad-arrow pad-arrow-prev" type="button" aria-label="Previous instrument for box 6" tabindex="-1">◀</button>
                     <div class="drum-image">
-                        <img src="assets/virtualdrums-clap.png" alt="Hand Clap">
+                        <img src="assets/virtualdrums-clap.png" alt="Hand Clap" draggable="false">
                     </div>
                     <button class="pad-arrow pad-arrow-next" type="button" aria-label="Next instrument for box 6" tabindex="-1">▶</button>
                     <div class="sound-info">
@@ -1726,7 +1747,7 @@
                     </button>
                     <button class="pad-arrow pad-arrow-prev" type="button" aria-label="Previous instrument for box 7" tabindex="-1">◀</button>
                     <div class="drum-image">
-                        <img src="assets/virtualdrums-claves.png" alt="Claves">
+                        <img src="assets/virtualdrums-claves.png" alt="Claves" draggable="false">
                     </div>
                     <button class="pad-arrow pad-arrow-next" type="button" aria-label="Next instrument for box 7" tabindex="-1">▶</button>
                     <div class="sound-info">
@@ -1742,7 +1763,7 @@
                     </button>
                     <button class="pad-arrow pad-arrow-prev" type="button" aria-label="Previous instrument for box 8" tabindex="-1">◀</button>
                     <div class="drum-image">
-                        <img src="assets/virtualdrums-highhat.png" alt="Hi-Hat">
+                        <img src="assets/virtualdrums-highhat.png" alt="Hi-Hat" draggable="false">
                     </div>
                     <button class="pad-arrow pad-arrow-next" type="button" aria-label="Next instrument for box 8" tabindex="-1">▶</button>
                     <div class="sound-info">
@@ -1758,7 +1779,7 @@
                     </button>
                     <button class="pad-arrow pad-arrow-prev" type="button" aria-label="Previous instrument for box 9" tabindex="-1">◀</button>
                     <div class="drum-image">
-                        <img src="assets/virtualdrums-crash.png" alt="Crash Cymbal">
+                        <img src="assets/virtualdrums-crash.png" alt="Crash Cymbal" draggable="false">
                     </div>
                     <button class="pad-arrow pad-arrow-next" type="button" aria-label="Next instrument for box 9" tabindex="-1">▶</button>
                     <div class="sound-info">
@@ -1774,7 +1795,7 @@
                     </button>
                     <button class="pad-arrow pad-arrow-prev" type="button" aria-label="Previous instrument for box 10" tabindex="-1">◀</button>
                     <div class="drum-image">
-                        <img src="assets/virtualdrums-shaker.png" alt="Shaker">
+                        <img src="assets/virtualdrums-shaker.png" alt="Shaker" draggable="false">
                     </div>
                     <button class="pad-arrow pad-arrow-next" type="button" aria-label="Next instrument for box 10" tabindex="-1">▶</button>
                     <div class="sound-info">
@@ -3367,6 +3388,7 @@
             if (img) {
                 img.src = inst.img;
                 img.alt = inst.alt;
+                img.setAttribute('draggable', 'false');
             }
             const label = pad.querySelector('.sound-label');
             if (label) {
@@ -4848,6 +4870,11 @@
             }
         });
         
+        // Prevent long-press context menu popup on mobile/touch devices (e.g. Chrome "Search image with Google", "Open in new tab")
+        window.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+
         let wakeLock = null;
         async function requestWakeLock() {
             try { 
