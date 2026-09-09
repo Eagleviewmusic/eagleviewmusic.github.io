@@ -713,6 +713,7 @@
             outline: none;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
             transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease, color 0.15s ease;
         }
         
@@ -1032,6 +1033,7 @@
             line-height: 1;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
             transition: transform 0.12s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
                         background 0.12s ease, 
                         box-shadow 0.12s ease;
@@ -1123,6 +1125,7 @@
             -webkit-tap-highlight-color: transparent;
             pointer-events: none;
             cursor: default;
+            touch-action: manipulation;
         }
 
         .pad-repeat-btn .repeat-icon {
@@ -1271,6 +1274,7 @@
             box-shadow: 0 2px 0 var(--ink-dark);
             transition: transform 0.12s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.12s ease;
             -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
 
         .repeat-option-btn:hover {
@@ -3278,15 +3282,24 @@
 
         if (repeatPopover) {
             repeatPopover.addEventListener('mousedown', function(e) { e.stopPropagation(); });
-            repeatPopover.addEventListener('touchstart', function(e) { e.stopPropagation(); }, { passive: true });
+            repeatPopover.addEventListener('touchstart', function(e) { e.stopPropagation(); }, { passive: false });
+            repeatPopover.addEventListener('touchend', function(e) { e.stopPropagation(); });
             repeatPopover.addEventListener('pointerdown', function(e) { e.stopPropagation(); });
         }
 
         document.querySelectorAll('.repeat-option-btn').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
+            let lastOptionTime = 0;
+            function handleOptionSelect(e) {
+                if (e) {
+                    e.stopPropagation();
+                    if (e.cancelable) e.preventDefault();
+                }
+                const now = performance.now();
+                if (now - lastOptionTime < 350) return;
+                lastOptionTime = now;
+
                 if (activeRepeatPopoverPad !== null) {
-                    const state = parseInt(this.getAttribute('data-repeat-state'), 10);
+                    const state = parseInt(btn.getAttribute('data-repeat-state'), 10);
                     if (state >= 0 && state <= 6) {
                         const padIndex = activeRepeatPopoverPad;
                         const key = (padIndex + 1).toString();
@@ -3299,11 +3312,19 @@
                     }
                 }
                 closeRepeatPopover();
+            }
+
+            btn.addEventListener('touchstart', handleOptionSelect, { passive: false });
+            btn.addEventListener('touchend', function(e) {
+                e.stopPropagation();
+                if (e.cancelable) e.preventDefault();
             });
+            btn.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+            btn.addEventListener('click', handleOptionSelect);
         });
 
         // Close repeat popover on outside click/tap
-        document.addEventListener('pointerdown', function(e) {
+        function handleOutsideRepeatClose(e) {
             if (repeatPopover && repeatPopover.classList.contains('is-open')) {
                 if (repeatPopover.contains(e.target)) return;
                 if (activeRepeatPopoverPad !== null) {
@@ -3313,7 +3334,9 @@
                 }
                 closeRepeatPopover();
             }
-        });
+        }
+        document.addEventListener('pointerdown', handleOutsideRepeatClose);
+        document.addEventListener('touchstart', handleOutsideRepeatClose, { passive: true });
 
         function updatePadDisplay(padIndex) {
             const pad = document.querySelector(`.drum-pad[data-key="${padIndex + 1}"]`);
@@ -3635,10 +3658,24 @@
         }
 
         if (rearrangeBtn) {
-            rearrangeBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
+            let lastRearrangeToggleTime = 0;
+            function handleRearrangeToggle(e) {
+                if (e) {
+                    e.stopPropagation();
+                    if (e.cancelable) e.preventDefault();
+                }
+                const now = performance.now();
+                if (now - lastRearrangeToggleTime < 400) return;
+                lastRearrangeToggleTime = now;
                 toggleRearrange();
+            }
+
+            rearrangeBtn.addEventListener('touchstart', handleRearrangeToggle, { passive: false });
+            rearrangeBtn.addEventListener('touchend', function(e) {
+                e.stopPropagation();
+                if (e.cancelable) e.preventDefault();
             });
+            rearrangeBtn.addEventListener('click', handleRearrangeToggle);
         }
 
         const heldKeys = {};
@@ -4446,53 +4483,25 @@
             const repeatBtn = pad.querySelector('.pad-repeat-btn');
 
             if (repeatBtn) {
-                function handleRepeatTrigger(e) {
-                    if (isRearranging) return;
-                    if (padRepeats[padIndex] > 0) {
-                        if (e) {
-                            e.stopPropagation();
-                            if (e.cancelable) e.preventDefault();
-                        }
-                        lastRepeatDownTime = performance.now();
-                        if (latchedRepeats[key]) {
-                            stopLatchedRepeat(key);
-                        } else {
-                            startLatchedRepeat(key);
-                        }
-                    }
-                }
+                let lastRepeatBtnTime = 0;
 
-                repeatBtn.addEventListener('mousedown', function(e) {
-                    if (isRearranging || padRepeats[padIndex] > 0) {
+                function handleRepeatBtnAction(e) {
+                    if (e) {
                         e.stopPropagation();
+                        if (e.cancelable) e.preventDefault();
                     }
-                    if (!isRearranging && padRepeats[padIndex] > 0) {
-                        handleRepeatTrigger(e);
-                    }
-                });
-                repeatBtn.addEventListener('touchstart', function(e) {
-                    if (isRearranging || padRepeats[padIndex] > 0) {
-                        e.stopPropagation();
-                    }
-                    if (!isRearranging && padRepeats[padIndex] > 0) {
-                        handleRepeatTrigger(e);
-                    }
-                }, { passive: false });
-                repeatBtn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    e.preventDefault();
+                    const now = performance.now();
+                    if (now - lastRepeatBtnTime < 350) return;
+                    lastRepeatBtnTime = now;
+
                     if (isRearranging) {
                         if (repeatPopover && repeatPopover.classList.contains('is-open') && activeRepeatPopoverPad === padIndex) {
                             closeRepeatPopover();
                         } else {
-                            openRepeatPopover(padIndex, this);
+                            openRepeatPopover(padIndex, repeatBtn);
                         }
                     } else {
                         // When rearrange is OFF: Press repeat symbol to start hands-free repeating or stop it
-                        // Guard against duplicate toggling on button release (click event) after down-click
-                        if (performance.now() - lastRepeatDownTime < 400) {
-                            return;
-                        }
                         if (padRepeats[padIndex] > 0) {
                             if (latchedRepeats[key]) {
                                 stopLatchedRepeat(key);
@@ -4501,40 +4510,112 @@
                             }
                         }
                     }
+                }
+
+                repeatBtn.addEventListener('mousedown', function(e) {
+                    if (isRearranging || padRepeats[padIndex] > 0) {
+                        e.stopPropagation();
+                    }
+                });
+
+                repeatBtn.addEventListener('touchstart', function(e) {
+                    if (isRearranging || padRepeats[padIndex] > 0) {
+                        handleRepeatBtnAction(e);
+                    }
+                }, { passive: false });
+
+                repeatBtn.addEventListener('touchend', function(e) {
+                    if (isRearranging || padRepeats[padIndex] > 0) {
+                        e.stopPropagation();
+                        if (e.cancelable) e.preventDefault();
+                    }
+                });
+
+                repeatBtn.addEventListener('click', function(e) {
+                    handleRepeatBtnAction(e);
                 });
             }
 
             if (padNumberBadge) {
+                let lastBadgeTime = 0;
+                function handleBadgeAction(e) {
+                    if (!isRearranging) return;
+                    if (e) {
+                        e.stopPropagation();
+                        if (e.cancelable) e.preventDefault();
+                    }
+                    const now = performance.now();
+                    if (now - lastBadgeTime < 350) return;
+                    lastBadgeTime = now;
+                    startOrToggleRebind(padIndex);
+                }
+
                 padNumberBadge.addEventListener('mousedown', function(e) {
                     if (isRearranging) e.stopPropagation();
                 });
+
                 padNumberBadge.addEventListener('touchstart', function(e) {
-                    if (isRearranging) e.stopPropagation();
+                    if (isRearranging) {
+                        handleBadgeAction(e);
+                    }
+                }, { passive: false });
+
+                padNumberBadge.addEventListener('touchend', function(e) {
+                    if (isRearranging) {
+                        e.stopPropagation();
+                        if (e.cancelable) e.preventDefault();
+                    }
                 });
+
                 padNumberBadge.addEventListener('click', function(e) {
-                    if (!isRearranging) return;
-                    e.stopPropagation();
-                    e.preventDefault();
-                    startOrToggleRebind(padIndex);
+                    if (isRearranging) {
+                        handleBadgeAction(e);
+                    }
                 });
             }
 
             if (prevArrow) {
-                prevArrow.addEventListener('mousedown', function(e) { e.stopPropagation(); });
-                prevArrow.addEventListener('touchstart', function(e) { e.stopPropagation(); });
-                prevArrow.addEventListener('click', function(e) {
-                    e.stopPropagation();
+                let lastPrevTime = 0;
+                function handlePrevArrow(e) {
+                    if (e) {
+                        e.stopPropagation();
+                        if (e.cancelable) e.preventDefault();
+                    }
+                    const now = performance.now();
+                    if (now - lastPrevTime < 300) return;
+                    lastPrevTime = now;
                     changePadInstrument(padIndex, -1);
+                }
+
+                prevArrow.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+                prevArrow.addEventListener('touchstart', handlePrevArrow, { passive: false });
+                prevArrow.addEventListener('touchend', function(e) {
+                    e.stopPropagation();
+                    if (e.cancelable) e.preventDefault();
                 });
+                prevArrow.addEventListener('click', handlePrevArrow);
             }
 
             if (nextArrow) {
-                nextArrow.addEventListener('mousedown', function(e) { e.stopPropagation(); });
-                nextArrow.addEventListener('touchstart', function(e) { e.stopPropagation(); });
-                nextArrow.addEventListener('click', function(e) {
-                    e.stopPropagation();
+                let lastNextTime = 0;
+                function handleNextArrow(e) {
+                    if (e) {
+                        e.stopPropagation();
+                        if (e.cancelable) e.preventDefault();
+                    }
+                    const now = performance.now();
+                    if (now - lastNextTime < 300) return;
+                    lastNextTime = now;
                     changePadInstrument(padIndex, 1);
+                }
+
+                nextArrow.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+                nextArrow.addEventListener('touchstart', handleNextArrow, { passive: false });
+                nextArrow.addEventListener('touchend', function(e) {
+                    e.stopPropagation();
+                    if (e.cancelable) e.preventDefault();
                 });
+                nextArrow.addEventListener('click', handleNextArrow);
             }
 
             function createRipple(event, button) {
@@ -4550,6 +4631,7 @@
             }
 
             pad.addEventListener('mousedown', function(e) {
+                if (e.target.closest('.pad-arrow, .pad-repeat-btn, .pad-number')) return;
                 createRipple(e, this);
                 // If this note is actively holding a latched repeat, pressing it deactivates it
                 if (latchedRepeats[key]) {
@@ -4580,6 +4662,7 @@
             });
 
             pad.addEventListener('touchstart', function(e) { 
+                if (e.target.closest('.pad-arrow, .pad-repeat-btn, .pad-number')) return;
                 e.preventDefault(); 
                 const touch = e.touches[0]; 
                 createRipple({clientX: touch.clientX, clientY: touch.clientY}, this);
@@ -4600,12 +4683,14 @@
             });
 
             pad.addEventListener('touchend', function(e) { 
+                if (e.target.closest('.pad-arrow, .pad-repeat-btn, .pad-number')) return;
                 e.preventDefault(); 
                 isPressing = false; 
                 cancelPadPress(key);
             });
 
             pad.addEventListener('touchcancel', function(e) { 
+                if (e.target.closest('.pad-arrow, .pad-repeat-btn, .pad-number')) return;
                 isPressing = false; 
                 cancelPadPress(key);
             });
