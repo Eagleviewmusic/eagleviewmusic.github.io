@@ -7,8 +7,17 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
+      *, *::before, *::after {
+        -webkit-touch-callout: none;
+      }
       body {
         font-family: 'Fredoka', sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      input, textarea {
+        -webkit-user-select: auto;
+        user-select: auto;
       }
       .wood-pattern {
         background-color: #d4a373;
@@ -27,7 +36,16 @@
         animation: hit 0.1s ease-in-out;
       }
     </style>
-
+    <script>
+      // Prevent browser right-click context menu (especially on smart boards and touchscreens)
+      window.addEventListener('contextmenu', function (e) {
+        var target = e.target;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+          return;
+        }
+        e.preventDefault();
+      }, { capture: true });
+    </script>
   <script type="importmap">
 {
   "imports": {
@@ -38,9 +56,9 @@
   }
 }
 </script>
-  <script type="module" crossorigin src="./assets/index-CSVUHNf3.js"></script>
 </head>
   <body class="wood-pattern min-h-screen">
     <div id="root"></div>
+  <script type="module" src="./index.tsx"></script>
 </body>
 </html>
