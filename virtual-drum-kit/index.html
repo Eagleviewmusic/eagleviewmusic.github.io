@@ -53,19 +53,33 @@
             --led-glow: rgba(245, 197, 66, 0.6);
         }
         
+        html {
+            scroll-behavior: smooth;
+            -webkit-text-size-adjust: 100%;
+        }
+
         body {
             font-family: 'Fredoka', 'Inter', sans-serif;
             color: var(--cream-head);
             background: var(--bg-page);
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             align-items: center;
             padding: 24px;
-            touch-action: manipulation;
+            touch-action: pan-y manipulation;
             position: relative;
             overflow-x: hidden;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        @media (min-height: 750px) and (min-width: 769px) {
+            body {
+                justify-content: center;
+            }
         }
         
         /* Playful cartoon comic halftone dot pattern */
@@ -94,6 +108,7 @@
             border-radius: 24px;
             background: var(--rack-chassis);
             box-shadow: 0 10px 0 var(--ink-shadow), 0 25px 35px rgba(0, 0, 0, 0.4);
+            touch-action: pan-y manipulation;
         }
         
         /* Playful Cartoon Rack Mounting Ears */
@@ -855,7 +870,7 @@
                         box-shadow 0.1s ease, 
                         background 0.15s ease;
             user-select: none;
-            touch-action: manipulation;
+            touch-action: pan-y manipulation;
             overflow: hidden;
             
             height: 15vh;
@@ -1295,7 +1310,8 @@
         /* Responsive design */
         @media (max-width: 480px) {
             body {
-                padding: 12px 6px;
+                padding: 12px 6px 40px;
+                padding-bottom: max(40px, env(safe-area-inset-bottom, 24px));
             }
             .rack-frame {
                 border-width: 3px;
@@ -1412,7 +1428,8 @@
         
         @media (min-width: 481px) and (max-width: 768px) {
             body {
-                padding: 16px 10px;
+                padding: 16px 10px 36px;
+                padding-bottom: max(36px, env(safe-area-inset-bottom, 20px));
             }
             .rack-ear {
                 width: 32px;
@@ -4630,7 +4647,12 @@
                 setTimeout(() => { ripple.remove(); }, 600);
             }
 
+            let lastPadTouchTime = 0;
+            let touchStartX = 0;
+            let touchStartY = 0;
+
             pad.addEventListener('mousedown', function(e) {
+                if (performance.now() - lastPadTouchTime < 450) return;
                 if (e.target.closest('.pad-arrow, .pad-repeat-btn, .pad-number')) return;
                 createRipple(e, this);
                 // If this note is actively holding a latched repeat, pressing it deactivates it
@@ -4663,9 +4685,12 @@
 
             pad.addEventListener('touchstart', function(e) { 
                 if (e.target.closest('.pad-arrow, .pad-repeat-btn, .pad-number')) return;
-                e.preventDefault(); 
-                const touch = e.touches[0]; 
-                createRipple({clientX: touch.clientX, clientY: touch.clientY}, this);
+                lastPadTouchTime = performance.now();
+                if (e.touches && e.touches[0]) {
+                    touchStartX = e.touches[0].clientX;
+                    touchStartY = e.touches[0].clientY;
+                    createRipple({clientX: e.touches[0].clientX, clientY: e.touches[0].clientY}, this);
+                }
                 // If this note is actively holding a latched repeat, pressing it deactivates it
                 if (latchedRepeats[key]) {
                     stopLatchedRepeat(key);
@@ -4680,24 +4705,38 @@
                         startHoldRepeat(key);
                     }
                 } 
-            });
+            }, { passive: true });
 
             pad.addEventListener('touchend', function(e) { 
                 if (e.target.closest('.pad-arrow, .pad-repeat-btn, .pad-number')) return;
-                e.preventDefault(); 
-                isPressing = false; 
-                cancelPadPress(key);
+                if (isPressing) {
+                    isPressing = false; 
+                    cancelPadPress(key);
+                }
             });
 
             pad.addEventListener('touchcancel', function(e) { 
                 if (e.target.closest('.pad-arrow, .pad-repeat-btn, .pad-number')) return;
-                isPressing = false; 
-                cancelPadPress(key);
+                if (isPressing) {
+                    isPressing = false; 
+                    cancelPadPress(key);
+                }
             });
 
             pad.addEventListener('touchmove', function(e) { 
-                e.preventDefault(); 
-            }, { passive: false });
+                if (e.target.closest('.pad-arrow, .pad-repeat-btn, .pad-number')) return;
+                if (e.touches && e.touches[0]) {
+                    const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
+                    const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
+                    // If user moves finger by more than 8px, it's a scroll gesture - release pad press
+                    if (deltaX > 8 || deltaY > 8) {
+                        if (isPressing) {
+                            isPressing = false; 
+                            cancelPadPress(key);
+                        }
+                    }
+                }
+            }, { passive: true });
 
             // Keyboard accessibility for focused drum pads
             pad.addEventListener('keydown', function(e) {
@@ -4720,13 +4759,6 @@
                 }
             });
         });
-
-        const rackFrame = document.querySelector('.rack-frame');
-        if (rackFrame) {
-            rackFrame.addEventListener('touchmove', function(e) { 
-                e.preventDefault(); 
-            }, { passive: false });
-        }
 
         function playSound(key, options = {}) { 
             initAudio();
