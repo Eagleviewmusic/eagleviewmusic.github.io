@@ -1,0 +1,1549 @@
+/* ============================================================
+   Ostinato Builder 2.0 — Eagle View Music
+
+   The palette and the musical colour language are shared with
+   Rhythm Poetry 2.0 on purpose: a student who has learned that
+   orange means "a sound starts here" should not have to learn
+   it again in a second app.
+   ============================================================ */
+
+:root {
+  /* ----------------------------------------------------------------
+     Deliberately not Rhythm Poetry's palette. That app is warm cream
+     paper and burnt orange — a page you write on. This one is cool
+     slate and indigo — a stage you build on. The two sit side by side
+     in the same folder and were, until this, pixel-identical in colour,
+     which made them easy to mistake for one another at a glance.
+
+     The warm wood-and-brass instrument artwork is the other reason for
+     a cool ground: it has nothing to compete with here.
+     ---------------------------------------------------------------- */
+
+  /* ground & ink */
+  --paper:        #F4F7FC;
+  --paper-2:      #E1E8F4;
+  --surface:      #FFFFFF;
+  --ink:          #1B2340;
+  --ink-2:        #4C5573;
+  --ink-3:        #7C8399;
+  --hairline:     #DCE2EF;
+  --hairline-2:   #C2CADD;
+
+  /* what the notation is drawn in */
+  --notation:     #1B2340;
+
+  /* Musical meaning. The three sounding states run round the cool side
+     of the wheel — violet to azure to teal — so a sound carrying on
+     reads as the same event continuing rather than a new one, and
+     silence is the one that has almost no colour left in it. */
+  --sound:        #5B4BD6;   /* a note begins here         */
+  --sound-soft:   #E3DFFB;
+  --hold:         #2E90D9;   /* the sound is still ringing */
+  --hold-16:      #2FB9A4;   /* held across sixteenths     */
+  --rest:         #C3CADA;   /* silence                    */
+
+  --accent:       #5B4BD6;
+  --accent-soft:  #EAE7FD;
+  --accent-deep:  #4A3BC0;   /* the pressed / hovered accent */
+  --good:         #1E8E7E;
+  --danger:       #D6365C;
+  --danger-soft:  #FCE7EC;
+
+  /* form */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --shadow-1: 0 1px 2px rgba(27,35,64,.06), 0 2px 8px rgba(27,35,64,.06);
+  --shadow-2: 0 4px 12px rgba(27,35,64,.10), 0 12px 32px rgba(27,35,64,.12);
+  --shadow-3: 0 12px 28px rgba(27,35,64,.16), 0 32px 64px rgba(27,35,64,.18);
+
+  --topbar-h: 56px;
+  --toolbar-h: 76px;
+
+  --font: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-round: 'Baloo 2', 'Nunito', system-ui, sans-serif;
+  --font-signature: 'Noto Serif', Georgia, 'Times New Roman', serif;
+
+  /* notation base sizes — the grid is scaled by JS from these */
+  --dot: 22px;
+  --note-h: 62px;
+  --head-w: 142px;           /* the instrument column on the left */
+  --instrument-size: 104px;  /* the picture that labels a track */
+  --track-name-size: 17px;
+  --mini-btn: 34px;          /* mute on the picture, bin beside the name */
+
+  /* Set from script.js, which needs the same numbers to work out how
+     wide a beat has to be before the browser lays it out. */
+  --gutter-l: 22px;
+  --gutter-r: 10px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overscroll-behavior: none;
+  /* A board has no cursor, and the core gesture here — tap the same dot
+     twice to turn a note on and then off again — is indistinguishable
+     from a double-tap. `manipulation` keeps panning and pinch-zoom but
+     drops double-tap-to-zoom, so the second tap lands on the dot instead
+     of zooming the page out from under the class. */
+  touch-action: manipulation;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--paper);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+  /* Not transparent: on a board this tint is the only acknowledgement a
+     tap gets before the :active styles land, and an unacknowledged tap
+     reads as a tap that didn't work. */
+  -webkit-tap-highlight-color: var(--accent-soft);
+}
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; padding: 0; }
+svg { display: block; }
+/* inline icons are stroked line art; the notation opts out below */
+svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+
+/* ============================================================
+   TOP BAR
+   ============================================================ */
+
+.topbar {
+  flex: 0 0 auto;
+  height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+  z-index: 40;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 8px;
+  border-radius: 999px;
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  transition: background .15s, color .15s;
+}
+.home-link svg { width: 17px; height: 17px; }
+.home-link:hover,
+.home-link:active { background: var(--paper-2); color: var(--ink); }
+html.in-iframe .home-link { display: none; }
+
+.app-mark {
+  font-family: var(--font-round);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  color: var(--ink);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 46vw;
+  padding: 8px 12px 8px 14px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  border: 1.5px solid var(--hairline);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  transition: background .15s, border-color .15s;
+}
+.chip:hover,
+.chip:active { background: var(--accent-soft); border-color: var(--accent); }
+.chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip svg { flex: none; color: var(--ink-3); }
+
+
+/* ============================================================
+   STAGE
+   ============================================================ */
+
+.stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 0 8px;
+  background:
+    linear-gradient(var(--paper), var(--paper)) padding-box,
+    var(--paper);
+}
+
+#grid-fit { padding: 0 18px 12px; }
+
+#grid {
+  width: max-content;
+  transform-origin: top left;
+  will-change: transform;
+  transition: transform .22s cubic-bezier(.25,.9,.35,1);
+}
+@media (prefers-reduced-motion: reduce) { #grid { transition: none; } }
+
+.empty-note {
+  margin: 40px auto;
+  max-width: 340px;
+  text-align: center;
+  color: var(--ink-3);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+
+/* ============================================================
+   THE BEAT RULER
+   ------------------------------------------------------------
+   Bar numbers and beat counts across the top. It sits on the
+   same column widths as every track, so the numbers stay over
+   the beats they name however the tracks are subdivided.
+   ============================================================ */
+
+.ruler {
+  display: flex;
+  align-items: flex-end;
+  margin-bottom: 12px;   /* the first track's chains sit in here */
+  height: 22px;
+}
+.ruler-head { flex: 0 0 var(--head-w); }
+.ruler-body { overflow-x: clip; overflow-y: visible; }
+.ruler-inner { position: relative; display: flex; align-items: flex-end; width: max-content; }
+
+.ruler-measure { display: flex; position: relative; }
+.ruler-measure-number {
+  position: absolute;
+  top: -2px;
+  left: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+.ruler-beat {
+  display: grid;
+  place-items: end center;
+  /* boxed exactly like the dots row below it — same gutters, same
+     transparent border, same 3px between beats — so a beat number sits
+     over the slots it counts rather than over the pill's left cap */
+  box-sizing: border-box;
+  margin: 0 3px;
+  border: 1.5px solid transparent;
+  padding-left: var(--gutter-l);
+  padding-right: var(--gutter-r);
+  padding-bottom: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-3);
+  border-bottom: 2px solid transparent;
+  transition: color .12s, border-color .12s;
+}
+.ruler-beat.playing { color: var(--sound); border-bottom-color: var(--sound); }
+.ruler-gap { flex: 0 0 var(--divider-w, 14px); }
+
+
+/* ============================================================
+   A TRACK
+   ============================================================ */
+
+.track {
+  display: flex;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+
+.track.muted .track-body { opacity: .42; }
+
+/* --- the instrument, on the left ---
+   The picture is the row's label, so it is drawn large enough to be read
+   at a glance, and the two things you can do to a track hang off it
+   rather than queueing underneath: mute rides the picture's corner like a
+   badge on an app icon, and the bin sits on the name's line. That keeps
+   the stack to two rows — picture, then name — and lets both rows grow.
+
+   Sat on the floor of the row (justify-content: flex-end) so the block
+   lines up with the notation rather than with the dots above it. */
+.track-head {
+  flex: 0 0 var(--head-w);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-right: 10px;
+}
+
+/* holds the picture and the badge that overhangs it — a button cannot be
+   nested in a button, so the two are siblings and this positions them */
+.instrument-slot {
+  position: relative;
+  flex: none;
+  width: var(--instrument-size);
+  height: var(--instrument-size);
+}
+
+.instrument-btn {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1.5px solid var(--hairline);
+  transition: border-color .14s, transform .12s, box-shadow .14s;
+}
+.instrument-btn:hover,
+.instrument-btn:active {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-1);
+}
+.instrument-btn img {
+  width: 100%;
+  height: 100%;
+  padding: 6px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 0 rgba(0,0,0,.12));
+  pointer-events: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+.track.muted .instrument-btn img { filter: grayscale(1) opacity(.5); }
+
+/* --- mute, on the picture's corner --- */
+.mute-badge {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  border-radius: 50%;
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1.5px solid var(--hairline-2);
+  box-shadow: var(--shadow-1);
+}
+.mute-badge:hover,
+.mute-badge:active { background: var(--paper-2); border-color: var(--ink-3); color: var(--ink); }
+.mute-badge.muted { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+
+/* --- the name, and the one thing you can do to it --- */
+.track-head-side {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+}
+
+.track-name {
+  min-width: 0;
+  font-size: var(--track-name-size);
+  font-weight: 800;
+  letter-spacing: .01em;
+  color: var(--ink-2);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini-btn {
+  flex: none;
+  width: var(--mini-btn);
+  height: var(--mini-btn);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink-3);
+  background: transparent;
+  transition: background .13s, color .13s, border-color .13s;
+}
+.mini-btn svg { width: calc(var(--mini-btn) * 0.56); height: calc(var(--mini-btn) * 0.56); }
+.mini-btn:hover,
+.mini-btn:active { background: var(--paper-2); color: var(--ink); }
+.mini-btn.remove:hover,
+.mini-btn.remove:active { background: var(--danger-soft); color: var(--danger); }
+.mini-btn.muted { color: var(--danger); }
+
+/* --- the beats, on the right ---
+   .track-body is the window a page is seen through; .body-inner holds the
+   whole piece and is slid sideways to bring a page into view. Scrolling
+   across is the same machinery with the window opened to full width and
+   nothing slid. */
+.track-body { overflow-x: clip; overflow-y: visible; }
+/* positioned so a bar's offsetLeft is measured from the strip it sits in,
+   not from whatever happens to be the nearest positioned ancestor further
+   up — page offsets are read straight off these numbers */
+.body-inner { position: relative; display: flex; align-items: flex-start; width: max-content; }
+
+.measure { display: flex; align-items: flex-start; }
+
+
+/* ============================================================
+   ONE BEAT
+   ------------------------------------------------------------
+   The dots and the notation sit on the same column grid, so a
+   note is always directly above the dot that triggers it.
+
+   --beat-w is shared by every track for a given beat, so the
+   grid stays vertically aligned even when one instrument is
+   playing sixteenths against another's quarters. Inside that
+   width each track lays out its own number of slots.
+   ============================================================ */
+
+.group {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 3px;
+  --slots: 2;
+  --beat-w: 110px;
+}
+
+.group .dots,
+.group .notes-box {
+  box-sizing: border-box;
+  padding-left: var(--gutter-l);
+  padding-right: var(--gutter-r);
+  border: 1.5px solid transparent;
+  width: var(--beat-w);
+}
+
+/* --- the tappable dots --- */
+.dots {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--slots), 1fr);
+  align-items: center;
+  justify-items: center;
+  min-height: calc(var(--dot) + 14px);
+  padding-top: 7px;
+  padding-bottom: 7px;
+  border-color: var(--hairline-2);
+  border-radius: 999px;
+  background: var(--surface);
+  transition: border-color .18s, background .18s;
+}
+.dots.playing { border-color: var(--sound); background: var(--sound-soft); }
+
+/* Scoped to the dots row on purpose. The notation engine names its
+   augmentation dots `class="dot"` too, and an unscoped rule here reaches
+   inside the SVG: `transform: scale()` on hover fights the transform
+   attribute that places the glyph, and the dot jumps off its notehead. */
+.dots .dot {
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 50%;
+  background: var(--rest);
+  cursor: pointer;
+  flex: none;
+  transition: background .13s, transform .13s;
+}
+.dots .dot:hover,
+.dots .dot:active { transform: scale(1.14); }
+.dots .dot.active      { background: var(--sound); }
+.dots .dot.sustain     { background: var(--hold); }
+.dots .dot.sustain-16  { background: var(--hold-16); }
+
+/* --- + / − subdivision --- */
+.subdivision-controls {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.subdivision-btn {
+  width: 16px;
+  height: 14px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink-3);
+  background: transparent;
+  transition: background .13s, color .13s;
+}
+.subdivision-btn:hover,
+.subdivision-btn:active { background: var(--paper-2); color: var(--ink); }
+.subdivision-btn.active { background: var(--sound); color: #fff; }
+.subdivision-btn:disabled { opacity: .22; cursor: default; }
+.subdivision-btn:disabled:hover,
+.subdivision-btn:disabled:active { background: transparent; color: var(--ink-3); }
+
+/* --- the printed notation --- */
+.notes-box {
+  position: relative;
+  height: calc(var(--note-h) + var(--note-extra, 0px));
+  margin-top: 6px;
+  overflow: visible;
+}
+
+.rhythm-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+  user-select: none;
+  z-index: 2;
+}
+/* the global icon rule above strokes anything with a viewBox — the
+   notation is filled artwork, so it opts out explicitly */
+.rhythm-svg path,
+.rhythm-svg rect { fill: var(--notation, #1B2340); stroke: none; }
+.rhythm-svg .bracket {
+  fill: none;
+  stroke: var(--notation, #1B2340);
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
+}
+
+
+/* ============================================================
+   BAR LINES
+   ============================================================ */
+
+.measure-divider,
+.final-divider {
+  flex: 0 0 auto;
+  align-self: stretch;
+  margin: 0 5px;
+  width: 4px;
+  position: relative;
+}
+.measure-divider::after {
+  content: '';
+  position: absolute;
+  inset: 2px auto 0 1px;
+  width: 2px;
+  background: var(--hairline-2);
+  border-radius: 2px;
+}
+.final-divider::after,
+.final-divider::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  bottom: 0;
+  background: var(--ink);
+  border-radius: 2px;
+}
+.final-divider::before { left: 0; width: 2px; }
+.final-divider::after  { left: 5px; width: 4px; }
+.final-divider { width: 9px; }
+
+
+/* ============================================================
+   TOOLBAR
+   ============================================================ */
+
+.toolbar {
+  flex: 0 0 auto;
+  min-height: var(--toolbar-h);
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface);
+  border-top: 1px solid var(--hairline);
+  box-shadow: 0 -2px 14px rgba(27,35,64,.05);
+  z-index: 30;
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.play-btn {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: var(--shadow-2);
+  transition: transform .12s, background .14s;
+}
+.play-btn:hover,
+.play-btn:active { transform: scale(1.05); }
+.play-btn:active { transform: scale(.96); }
+.play-btn.playing { background: var(--ink); }
+.play-glyph { font-size: 21px; line-height: 1; margin-left: 2px; }
+.play-btn.playing .play-glyph { margin-left: 0; }
+
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 44px;
+  padding: 0 15px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  transition: background .14s, color .14s, box-shadow .14s;
+}
+.tool-btn:hover,
+.tool-btn:active { background: var(--accent-soft); }
+.tool-btn.active { background: var(--accent); color: #fff; }
+.tool-btn svg { flex: none; }
+
+.bpm-value { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.bpm-unit { font-size: 12px; font-weight: 700; color: var(--ink-3); letter-spacing: .04em; }
+.tool-btn.active .bpm-unit { color: rgba(255,255,255,.8); }
+
+.add-track-btn span { font-size: 14px; }
+
+/* --- time signature ---
+   Two numerals stacked the way they sit on a staff: no fraction bar and
+   nearly touching. A button's line box does not inherit the parent's
+   line-height, so the tight setting has to be stated on .ts-num itself —
+   left to `normal` the numerals drift a third of their height apart. */
+.time-sig {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 44px;
+  height: 48px;
+  border-radius: var(--r-md);
+  background: var(--paper-2);
+  transition: background .13s;
+}
+.time-sig:hover,
+.time-sig:active { background: var(--hairline); }
+.ts-num {
+  font-family: var(--font-signature);
+  font-size: 22px;
+  font-weight: 900;
+  line-height: .78;
+  color: var(--ink);
+  font-variant-numeric: lining-nums tabular-nums;
+  padding: 0 1px;
+  border-radius: 4px;
+  transition: background .13s, color .13s, transform .1s;
+}
+.ts-num:hover,
+.ts-num:active { background: var(--accent-soft); color: var(--accent); transform: scale(1.08); }
+.ts-num:active { transform: scale(.94); }
+
+/* --- measure stepper --- */
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+.step-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink-2);
+  transition: background .13s, color .13s;
+}
+.step-btn:hover,
+.step-btn:active { background: var(--surface); color: var(--accent); }
+.step-btn:disabled { opacity: .3; cursor: default; }
+.step-btn:disabled:hover,
+.step-btn:disabled:active { background: transparent; color: var(--ink-2); }
+.step-body { display: flex; align-items: baseline; gap: 4px; padding: 0 3px; min-width: 56px; justify-content: center; }
+.step-value { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.step-unit { font-size: 12px; font-weight: 700; color: var(--ink-3); }
+
+/* tempo typed in place */
+.inline-input {
+  width: 66px;
+  height: 34px;
+  text-align: center;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink);
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: var(--r-sm);
+  outline: none;
+}
+
+
+/* ============================================================
+   INSTRUMENT PICKER
+   ============================================================ */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(27,35,64,.36);
+  backdrop-filter: blur(2px);
+  z-index: 200;
+}
+.sheet-backdrop.open { display: flex; }
+
+.sheet {
+  width: min(560px, 100%);
+  max-height: min(80vh, 640px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid var(--hairline);
+}
+.sheet-head h2 {
+  margin: 0;
+  font-family: var(--font-round);
+  font-size: 19px;
+  font-weight: 700;
+}
+.sheet-close {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink-3);
+  transition: background .13s, color .13s;
+}
+.sheet-close:hover,
+.sheet-close:active { background: var(--paper-2); color: var(--ink); }
+
+.instrument-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+  padding: 16px 20px 22px;
+  overflow-y: auto;
+}
+
+.instrument-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px 9px;
+  border-radius: var(--r-md);
+  background: var(--paper);
+  border: 2px solid transparent;
+  transition: border-color .14s, background .14s, transform .12s;
+}
+.instrument-card:hover,
+.instrument-card:active { transform: translateY(-2px); background: var(--accent-soft); }
+.instrument-card.selected { border-color: var(--accent); background: var(--accent-soft); }
+.instrument-card img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 0 rgba(0,0,0,.13));
+  pointer-events: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+.instrument-card span {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-2);
+  text-align: center;
+  line-height: 1.2;
+}
+
+
+/* ============================================================
+   JOINING TWO BEATS
+   ------------------------------------------------------------
+   The chain sits on the seam between two beats. Every track has
+   its own, because a bass drum may hold a whole note while the
+   shaker above it plays sixteenths.
+   ============================================================ */
+
+.beat-link-btn {
+  position: absolute;
+  /* Clear of the pill, not on top of it: sitting level with the pill would
+     put the chain straight over the next beat's +/− controls. */
+  right: -10px;
+  top: -15px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1.5px solid var(--hairline-2);
+  color: var(--ink-3);
+  z-index: 3;
+  transition: background .14s, color .14s, border-color .14s, opacity .14s;
+}
+.beat-link-btn svg { width: 12px; height: 12px; }
+.beat-link-btn:hover,
+.beat-link-btn:active { border-color: var(--hold); color: var(--hold); }
+.beat-link-btn.active { background: var(--hold); border-color: var(--hold); color: #fff; }
+
+/* A joined run is one pill-worth of rhythm spread over several beats;
+   the warm border says so without adding another line to read. */
+.dots.linked { border-color: var(--hold); }
+
+.dots.dots-hidden { opacity: 0; pointer-events: none; }
+
+/* --- the beat that is sounding, lit under the notation ---
+   Off by default: the dots row lighting up is the quiet way to follow
+   playback. With the dots turned off there is nothing left to watch, so
+   this puts the same wash behind the notes instead. The border is drawn
+   on the transparent one the box already carries, so nothing shifts when
+   it comes on. */
+.notes-box.playing { transition: background .12s, border-color .12s; }
+body.light-notes .notes-box.playing {
+  background: var(--sound-soft);
+  border-color: var(--sound);
+  border-radius: var(--r-md);
+}
+body.hide-beat-numbers .ruler { display: none; }
+body.show-syllables .track-head { padding-bottom: 28px; }
+
+/* ============================================================
+   BEAT REPEAT (SIMILE MARK) QUICK-COPY
+
+   An invisible hit area sitting on the quarter rest. Hover it and the
+   rest fades out while a simile mark fades in on the same spot, in the
+   same ink — the beat reads as what a click would make it. Move away
+   and the rest comes back. Nothing is drawn until the mouse is there,
+   so a page of rests stays a page of rests.
+   ============================================================ */
+
+.beat-repeat-btn {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  /* a fallback only: the real size is set in staff spaces once the grid
+     has been measured, so the hit area tracks the note size */
+  width: 34px;
+  height: 38px;
+  padding: 0;
+  background: none;
+  border: 0;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+  cursor: pointer;
+}
+
+/* the mark itself — hidden until the rest under it is hovered */
+.simile-svg {
+  display: block;
+  overflow: visible;
+  opacity: 0;
+  transform: scale(.88);
+  transition: opacity .13s ease, transform .13s cubic-bezier(.25,.9,.35,1);
+}
+/* the global icon rule strokes anything with a viewBox; this is filled
+   artwork in the notation's own ink, like the notes beside it */
+.simile-svg path,
+.simile-svg circle { fill: var(--notation, #1B2340); stroke: none; }
+
+.beat-repeat-btn:hover .simile-svg,
+.beat-repeat-btn:active .simile-svg,
+.beat-repeat-btn:focus-visible .simile-svg {
+  opacity: 1;
+  transform: scale(1);
+}
+.beat-repeat-btn:active .simile-svg { transform: scale(.94); }
+
+/* while the mark is showing, the rest steps aside for it */
+.beat-repeat-btn:hover ~ .rhythm-svg .rest,
+.beat-repeat-btn:active ~ .rhythm-svg .rest,
+.beat-repeat-btn:focus-visible ~ .rhythm-svg .rest {
+  opacity: 0;
+  transition: opacity .13s ease;
+}
+.rhythm-svg .rest { transition: opacity .13s ease; }
+
+.beat-repeat-btn:disabled,
+.beat-repeat-btn.disabled {
+  display: none;
+}
+
+
+/* ============================================================
+   SYLLABLES
+   ============================================================ */
+
+.words {
+  box-sizing: border-box;
+  padding-left: var(--gutter-l);
+  padding-right: var(--gutter-r);
+  border: 1.5px solid transparent;
+  width: var(--beat-w);
+  display: grid;
+  grid-template-columns: repeat(var(--slots), 1fr);
+  justify-items: center;
+  align-items: flex-start;
+  margin-top: 4px;
+  min-height: 24px;
+}
+
+.word-container { display: inline-flex; justify-content: center; min-width: 0; }
+
+.word {
+  font-family: var(--font);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ink);
+  text-align: center;
+  white-space: nowrap;
+}
+.word.rest { color: var(--ink-3); opacity: .5; font-weight: 400; }
+
+
+/* ============================================================
+   POPOVER
+   ============================================================ */
+
+.popover {
+  position: fixed;
+  display: none;
+  flex-direction: column;
+  gap: 14px;
+  width: min(300px, calc(100vw - 24px));
+  padding: 16px;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-3);
+  z-index: 150;
+}
+.popover.open { display: flex; }
+
+.popover-section { display: flex; flex-direction: column; gap: 4px; }
+
+.popover-title {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: left;
+  transition: background .13s;
+}
+.switch-row:hover,
+.switch-row:active { background: var(--paper-2); }
+
+.switch {
+  flex: none;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--rest);
+  position: relative;
+  transition: background .16s;
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(27,35,64,.28);
+  transition: transform .16s;
+}
+.switch-row.active .switch { background: var(--accent); }
+.switch-row.active .switch::after { transform: translateX(16px); }
+
+.popover-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 4px 10px 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.popover-field[hidden] { display: none; }
+
+.tool-select {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--hairline-2);
+  background: var(--paper);
+  cursor: pointer;
+}
+.tool-select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+
+/* ============================================================
+   SHEETS: LIBRARY, NAMING, BACKUP
+   ============================================================ */
+
+.sheet-narrow { width: min(420px, 100%); }
+
+.now-editing { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.now-editing-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.now-editing-title {
+  font-family: var(--font-round);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+.sheet-scroll { overflow-y: auto; gap: 0; padding: 0; }
+.sheet-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 4px 20px 18px;
+}
+.sheet-sub { margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.45; }
+
+.sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 15px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background .14s, color .14s, opacity .14s;
+}
+.btn:hover,
+.btn:active { background: var(--accent-soft); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn:disabled:hover,
+.btn:disabled:active { background: var(--paper-2); }
+.btn svg { flex: none; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover,
+.btn-primary:active { background: var(--accent-deep); }
+.btn-danger { background: var(--danger-soft); color: var(--danger); }
+.btn-danger:hover,
+.btn-danger:active { background: var(--danger); color: #fff; }
+
+.text-field {
+  width: 100%;
+  height: 42px;
+  padding: 0 13px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1.5px solid var(--hairline-2);
+  border-radius: var(--r-sm);
+  outline: none;
+}
+.text-field:focus { border-color: var(--accent); }
+.text-field[readonly] { color: var(--ink-2); }
+
+.field-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.status-msg { font-size: 13px; font-weight: 700; color: var(--ink-2); min-height: 17px; }
+.status-msg.error { color: var(--danger); }
+.status-msg.good { color: var(--good); }
+
+/* --- the song list --- */
+.library-list { padding: 12px 14px 20px; overflow-y: auto; }
+
+.library-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 6px 6px;
+}
+.library-group-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.library-group-rule { flex: 1; height: 1px; background: var(--hairline); }
+
+.library-song {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--r-md);
+  transition: background .13s;
+}
+.library-song:hover,
+.library-song:active { background: var(--paper); }
+.library-song.current { background: var(--accent-soft); }
+
+.meter-badge {
+  flex: none;
+  width: 34px;
+  padding: 3px 0;
+  text-align: center;
+  border-radius: 7px;
+  background: var(--paper-2);
+  font-family: var(--font-signature);
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--ink-2);
+}
+.library-song.current .meter-badge { background: #fff; color: var(--accent); }
+
+.library-song-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.library-song-sub {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.library-song-actions { display: flex; align-items: center; gap: 4px; flex: none; }
+
+.lib-btn {
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-2);
+  background: transparent;
+  transition: background .13s, color .13s;
+}
+.lib-btn:hover,
+.lib-btn:active { background: var(--surface); color: var(--accent); }
+.lib-btn.is-current { color: var(--accent); cursor: default; }
+.lib-btn.is-current:hover,
+.lib-btn.is-current:active { background: transparent; }
+.lib-btn.danger { width: 30px; padding: 0; font-size: 17px; }
+.lib-btn.danger:hover,
+.lib-btn.danger:active { background: var(--danger-soft); color: var(--danger); }
+
+.library-empty {
+  padding: 10px 8px 14px;
+  font-size: 14px;
+  color: var(--ink-3);
+}
+
+/* --- backup --- */
+.backup-section {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--hairline);
+}
+.backup-section:last-child { border-bottom: none; }
+.backup-title { margin: 0; font-size: 15px; font-weight: 800; }
+.backup-note { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+.backup-head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; }
+.backup-danger .backup-title { color: var(--danger); }
+
+.text-tools { display: flex; gap: 2px; }
+.text-tool {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-2);
+  transition: background .13s, color .13s;
+}
+.text-tool:hover,
+.text-tool:active { background: var(--paper-2); color: var(--accent); }
+
+.share-row { display: flex; gap: 6px; width: 100%; }
+.share-row .text-field { flex: 1; min-width: 0; }
+
+.export-list {
+  width: 100%;
+  max-height: 190px;
+  overflow-y: auto;
+  border: 1.5px solid var(--hairline);
+  border-radius: var(--r-sm);
+  padding: 4px;
+}
+.export-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.export-row:hover,
+.export-row:active { background: var(--paper); }
+.export-row input { accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
+.export-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- the picture ---
+   html2canvas serialises the page without its stylesheet transforms, so
+   the capture is taken unscaled and the controls are hidden rather than
+   filtered out one by one. */
+body.capturing .subdivision-controls,
+body.capturing .beat-link-btn,
+body.capturing .beat-repeat-btn,
+body.capturing .mini-btn { visibility: hidden; }
+body.capturing .instrument-btn { border-color: transparent; }
+/* a saved picture is a score, not a snapshot of playback: whichever beat
+   happens to be sounding when the button is pressed must not be lit in it */
+body.capturing .dots.playing { background: var(--surface); border-color: var(--hairline-2); }
+body.capturing .notes-box.playing { background: none; border-color: transparent; }
+body.capturing .ruler-beat.playing { color: var(--ink-3); border-bottom-color: transparent; }
+
+
+/* ============================================================
+   PAGING AND SIZE
+   ============================================================ */
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 6px auto 2px;
+  padding: 4px;
+  width: max-content;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1.5px solid var(--hairline);
+  box-shadow: var(--shadow-1);
+}
+.pager[hidden] { display: none; }
+
+.pager-btn {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink-2);
+  transition: background .13s, color .13s, opacity .13s;
+}
+.pager-btn:hover,
+.pager-btn:active { background: var(--paper-2); color: var(--accent); }
+.pager-btn:disabled { opacity: .28; cursor: default; }
+.pager-btn:disabled:hover,
+.pager-btn:disabled:active { background: transparent; color: var(--ink-2); }
+
+.pager-label {
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.seg {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  margin: 0 10px 4px;
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+.seg-btn {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-2);
+  transition: background .14s, color .14s;
+}
+.seg-btn:hover,
+.seg-btn:active { color: var(--ink); }
+.seg-btn.active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow-1); }
+
+.chip-row { display: flex; gap: 4px; flex-wrap: wrap; }
+.chip-btn {
+  min-width: 34px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-2);
+  transition: background .13s, color .13s;
+}
+.chip-btn:hover,
+.chip-btn:active { background: var(--accent-soft); color: var(--accent); }
+.chip-btn.active { background: var(--accent); color: #fff; }
+.chip-btn:disabled { opacity: .3; cursor: default; }
+.chip-btn:disabled:hover,
+.chip-btn:disabled:active { background: var(--paper-2); color: var(--ink-2); }
+
+.slider-row { display: flex; align-items: center; gap: 9px; }
+.slider {
+  flex: 1;
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--hairline-2);
+  outline: none;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fff;
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+}
+.slider::-moz-range-thumb {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fff;
+  cursor: pointer;
+}
+.slider-readout {
+  min-width: 42px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.popover-note {
+  margin: 2px 10px 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-3);
+}
+
+/* the popover has a lot in it now */
+.popover { max-height: min(76vh, 580px); overflow-y: auto; }
+
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--toolbar-h) + 22px);
+  transform: translate(-50%, 14px);
+  padding: 11px 18px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s, transform .2s;
+  z-index: 300;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+
+/* ============================================================
+   SMALL SCREENS
+   ============================================================ */
+
+@media (max-width: 640px) {
+  :root {
+    --head-w: 122px; --dot: 20px; --note-h: 56px;
+    --instrument-size: 84px; --track-name-size: 14.5px; --mini-btn: 29px;
+  }
+  .home-link span { display: none; }
+  .home-link { padding: 7px; }
+  .app-mark { font-size: 17px; }
+  .track-head { gap: 8px; }
+  .add-track-btn span { display: none; }
+  .add-track-btn { padding: 0 13px; }
+}
+
+
+/* ============================================================
+   TOUCH AND SMART BOARD
+
+   A classroom board is a coarse pointer with no cursor. Three things
+   follow from that, and everything in this block is one of them:
+
+   1. Nothing hovers. Anything a mouse only ever discovers by hovering
+      is, on a board, invisible.
+   2. Hover latches. After a tap, :hover stays on the tapped element
+      until something else is tapped, so a hover effect meant to last a
+      moment sits there instead. The :not(:active) guards below let the
+      press itself through and only cancel the state it leaves behind.
+   3. A finger is much wider than a mouse tip, and the board is used
+      standing up, at arm's length, by someone facing a class.
+   ============================================================ */
+
+@media (hover: none), (pointer: coarse) {
+
+  /* --- the beat-repeat mark ---
+     The button is a transparent hit area sitting on a rest, and the
+     simile glyph inside it is the only thing that says so. Revealed on
+     :hover alone, a board gets an invisible control that duplicates the
+     previous beat when it is brushed — and :focus-visible does not stand
+     in for it, because it does not match a touch tap.
+
+     Showing the glyph outright instead is worse: it lands on top of the
+     rest it is offering to replace and the two read as one smudged
+     symbol. So what appears on a board is the button's own outline — a
+     dashed box saying something here is tappable, in the chrome's colour
+     rather than the notation's — and the mark itself still waits for the
+     press, when the rest steps aside for it exactly as it does under a
+     cursor. */
+  .beat-repeat-btn {
+    border: 1.5px dashed var(--hairline-2);
+    border-radius: 7px;
+    opacity: .8;
+  }
+  .beat-repeat-btn:active { border-color: var(--accent); opacity: 1; }
+
+  /* The rest steps aside for a press, not for the hover state left
+     behind by the last one. */
+  .beat-repeat-btn:hover:not(:active) ~ .rhythm-svg .rest { opacity: 1; }
+  .beat-repeat-btn:hover:not(:active) .simile-svg { opacity: 0; }
+
+  /* --- +/− subdivision ---
+     16x14 stacked a pixel apart is a mis-tap waiting to happen. The
+     gutter they sit in is widened to match by GUTTER_L in script.js,
+     which is what the beat-width maths uses. */
+  .subdivision-controls { left: 3px; gap: 2px; }
+  .subdivision-btn { width: 26px; height: 24px; border-radius: 7px; font-size: 15px; }
+  .dots { min-height: calc(var(--dot) + 28px); }
+
+  /* --- dots, link and mute ---
+     The dot's drawn size is what the notation engine measures its
+     centres from, so it stays put and an invisible collar around it
+     takes the tap. COLUMN_MIN (30px) is the tightest the dots ever
+     pack, so a 4px collar meets its neighbour without overlapping. */
+  .dots .dot { position: relative; }
+  .dots .dot::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; }
+
+  .beat-link-btn::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; }
+
+  .mute-badge::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; }
+
+  /* --- the time signature ---
+     Two separate targets stacked inside one 44x48 button; each digit
+     needs to be reachable without catching the other. */
+  .ts-num { padding: 3px 7px; }
+
+  /* --- hover states that would otherwise stay behind ---
+     Only the ones that move or reveal something. A tint left on the last
+     thing tapped is harmless, and undoing it here would need each rule to
+     restate a base colour that a state class (.selected, .muted) is
+     entitled to override. */
+  .dots .dot:hover:not(:active) { transform: none; }
+  .instrument-card:hover:not(:active) { transform: none; }
+  .play-btn:hover:not(:active) { transform: none; }
+  .ts-num:hover:not(:active) { transform: none; }
+}

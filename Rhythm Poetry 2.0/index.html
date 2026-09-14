@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Rhythm &amp; Poetry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Noto+Serif:wght@700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    try {
+      if (window.self !== window.top) document.documentElement.classList.add('in-iframe');
+    } catch (e) {
+      document.documentElement.classList.add('in-iframe');
+    }
+  </script>
+</head>
+<body data-side="rhythm">
+
+<!-- ============ TOP BAR ============ -->
+<header class="topbar">
+  <a href="../index.html" class="home-link" title="Back to Eagle View Music">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    <span>Eagle View</span>
+  </a>
+
+  <div class="side-switch" role="tablist" aria-label="Choose a side">
+    <button class="side-tab" id="rhythm-mode-btn" role="tab" aria-selected="true">
+      <svg class="side-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+      </svg>
+      <span>Rhythm</span>
+    </button>
+    <button class="side-tab" id="poetry-mode-btn" role="tab" aria-selected="false">
+      <svg class="side-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+      </svg>
+      <span>Poetry</span>
+    </button>
+  </div>
+
+  <button class="song-chip" id="song-chip" title="Songs &amp; library">
+    <span class="song-chip-label" id="song-chip-label">Instructions</span>
+    <svg class="song-chip-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+  </button>
+</header>
+
+<!-- ============ PHONE WRITE PANEL (Poetry side) ============ -->
+<section class="write-panel" id="write-panel" aria-label="Write your words">
+  <div class="write-panel-head">
+    <svg class="write-panel-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+    </svg>
+    <span class="write-panel-title">Your words</span>
+    <button class="write-panel-toggle" id="write-panel-toggle" aria-expanded="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 15l-6-6-6 6"/></svg>
+    </button>
+  </div>
+  <div class="write-panel-body" id="write-panel-body">
+    <textarea id="quick-write" class="write-area" rows="3" spellcheck="false"
+              placeholder="Type or paste your words, then tap Set to the beat…"></textarea>
+    <div class="write-panel-actions">
+      <div class="seg" role="group" aria-label="How to apply the words">
+        <button class="seg-btn" id="quick-add-btn">Add</button>
+        <button class="seg-btn active" id="quick-replace-btn">Replace</button>
+      </div>
+      <button class="btn btn-primary" id="quick-apply-btn">Set to the beat</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ NOTATION STAGE ============ -->
+<main class="stage" id="stage">
+  <div id="poem"></div>
+</main>
+
+<!-- ============ PRESENT-MODE TRANSPORT ============ -->
+<div class="present-bar" id="present-bar">
+  <button class="present-play" id="present-play-btn" title="Play / stop">▶</button>
+  <button class="present-exit" id="present-exit-btn" title="Leave present mode (Esc)">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M9 9L4 4m0 0v5m0-5h5"/><path d="M15 9l5-5m0 0v5m0-5h-5"/>
+      <path d="M9 15l-5 5m0 0v-5m0 5h5"/><path d="M15 15l5 5m0 0v-5m0 5h-5"/>
+    </svg>
+    <span>Exit</span>
+  </button>
+</div>
+
+<!-- ============ BOTTOM TOOLBAR ============ -->
+<footer class="toolbar" id="toolbar">
+  <div class="toolbar-inner">
+
+    <button class="play-btn" id="play-button" title="Play / stop (Space)">
+      <span class="play-glyph" id="play-glyph">▶</span>
+    </button>
+
+    <div class="tool-group meter-group">
+      <div class="time-sig" id="time-signature-button" title="Tap the numbers to change the meter">
+        <button class="ts-num" id="time-signature-top-btn">4</button>
+        <button class="ts-num" id="time-signature-bottom-btn">4</button>
+      </div>
+      <button class="tool-btn bpm-btn" id="bpm-button" title="Tap to type a tempo">
+        <span class="bpm-value" id="bpm-value">82</span>
+        <span class="bpm-unit">BPM</span>
+      </button>
+      <button class="tool-btn" id="sound-btn" title="Sound options">
+        <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/>
+        </svg>
+        <span class="tool-label">Sound</span>
+      </button>
+    </div>
+
+    <div class="toolbar-break" aria-hidden="true"></div>
+
+    <div class="tool-group">
+      <select id="rhythm-systems-dropdown" class="tool-select rhythm-only" title="Which syllables to show">
+        <option>Simplified Kodály</option>
+        <option>Beat Centered Kodály</option>
+        <option>Gordon System</option>
+        <option>Takadimi System</option>
+        <option>Fruit Rhythms</option>
+      </select>
+
+      <button class="tool-btn poetry-only" id="textEditorBtn" title="Write or paste your words">
+        <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+        </svg>
+        <span class="tool-label">Write</span>
+      </button>
+
+      <button class="tool-btn" id="view-btn" title="View options">
+        <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+        </svg>
+        <span class="tool-label">View</span>
+      </button>
+    </div>
+
+    <div class="tool-group">
+      <button class="tool-btn" id="library-btn" title="Songs &amp; library">
+        <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        <span class="tool-label">Songs</span>
+      </button>
+      <button class="tool-btn present-btn" id="present-btn" title="Present mode — big and clean for the class">
+        <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/>
+          <path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+        </svg>
+        <span class="tool-label">Present</span>
+      </button>
+    </div>
+
+  </div>
+</footer>
+
+<!-- ============ POPOVER: SOUND ============ -->
+<div class="popover" id="sound-popover" role="dialog" aria-label="Sound options">
+  <div class="popover-title">What you hear</div>
+  <div class="switch-list">
+    <button class="switch-row active" id="beat-toggle">
+      <span class="switch-name">Steady beat</span>
+      <span class="switch-desc">A brush tap on every beat</span>
+      <span class="switch-pill"></span>
+    </button>
+    <button class="switch-row active" id="rhythm-toggle">
+      <span class="switch-name">Rhythm</span>
+      <span class="switch-desc">Sounds the notes you wrote</span>
+      <span class="switch-pill"></span>
+    </button>
+    <button class="switch-row active" id="intro-toggle">
+      <span class="switch-name">Count-in</span>
+      <span class="switch-desc">Four beats before the music starts</span>
+      <span class="switch-pill"></span>
+    </button>
+  </div>
+  <div class="popover-title">Rhythm sound</div>
+  <div class="seg seg-wide" role="group" aria-label="Rhythm sound">
+    <button class="seg-btn active" id="pitch-mode-btn">Pitch</button>
+    <button class="seg-btn" id="drum-mode-btn">Drum</button>
+  </div>
+  <button class="popover-hidden-toggle" id="pitch-toggle" aria-hidden="true" tabindex="-1"></button>
+</div>
+
+<!-- ============ POPOVER: VIEW ============ -->
+<div class="popover popover-wide" id="view-popover" role="dialog" aria-label="View options">
+  <div class="popover-scroll">
+
+    <div class="popover-title">Size</div>
+    <div class="seg seg-wide" role="group" aria-label="How the staff is sized">
+      <button class="seg-btn active" id="fit-mode-btn">Fit&nbsp;width</button>
+      <button class="seg-btn" id="fixed-mode-btn">Fixed</button>
+    </div>
+    <p class="popover-note" id="size-mode-note">The staff resizes itself to fill the screen.</p>
+
+    <div class="zoom-row">
+      <button class="zoom-btn" id="zoom-out-btn" title="Smaller">−</button>
+      <input type="range" class="zoom-slider" id="zoom-slider" min="40" max="300" step="5" value="100"
+             aria-label="Size">
+      <button class="zoom-btn" id="zoom-in-btn" title="Bigger">+</button>
+    </div>
+    <div class="zoom-readout">
+      <span id="zoom-readout-value">100%</span>
+      <button class="text-tool" id="zoom-reset-btn">Reset</button>
+    </div>
+
+    <div class="popover-title">If a line is too wide</div>
+    <div class="seg seg-wide" role="group" aria-label="What happens when a line does not fit">
+      <button class="seg-btn active" id="overflow-scroll-btn">Scroll&nbsp;across</button>
+      <button class="seg-btn" id="overflow-wrap-btn">Wrap&nbsp;to&nbsp;fit</button>
+    </div>
+    <p class="popover-note">Wrap treats the edges as walls — zooming in breaks measures onto new lines instead of running off the side.</p>
+
+    <div class="popover-title">Measures per line</div>
+    <div class="chip-row" id="mpl-row">
+      <button class="chip active" data-mpl="auto">Auto</button>
+      <button class="chip" data-mpl="1">1</button>
+      <button class="chip" data-mpl="2">2</button>
+      <button class="chip" data-mpl="3">3</button>
+      <button class="chip" data-mpl="4">4</button>
+      <button class="chip" data-mpl="5">5</button>
+      <button class="chip" data-mpl="6">6</button>
+      <button class="chip" data-mpl="8">8</button>
+    </div>
+    <p class="popover-note">A maximum, not a rule — you can still split single lines with the <b>↵</b> on any barline.</p>
+
+    <div class="popover-title">Show on screen</div>
+    <div class="switch-list">
+      <button class="switch-row active" id="circle-icon">
+        <span class="switch-name">Beat dots</span>
+        <span class="switch-desc">The tappable circles above each note</span>
+        <span class="switch-pill"></span>
+      </button>
+      <button class="switch-row active" id="measure-num-toggle">
+        <span class="switch-name">Measure numbers</span>
+        <span class="switch-desc">Small numbers above each measure</span>
+        <span class="switch-pill"></span>
+      </button>
+      <button class="switch-row active" id="line-tools-toggle">
+        <span class="switch-name">Line split buttons</span>
+        <span class="switch-desc">The ↵ and ↰ handles on the barlines</span>
+        <span class="switch-pill"></span>
+      </button>
+      <button class="switch-row active" id="follow-toggle">
+        <span class="switch-name">Follow along</span>
+        <span class="switch-desc">Scroll to keep the sounding beat in view</span>
+        <span class="switch-pill"></span>
+      </button>
+      <button class="switch-row" id="pickup-toggle">
+        <span class="switch-name">Pickup measure</span>
+        <span class="switch-desc">Start with a partial measure</span>
+        <span class="switch-pill"></span>
+      </button>
+    </div>
+
+    <div class="popover-divider"></div>
+    <button class="popover-link" id="layout-reset-btn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/></svg>
+      Undo my line splits
+    </button>
+    <button class="popover-link" id="start-clear-btn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      Clear the start-here marker
+    </button>
+    <button class="popover-link" id="help-btn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+      How this works
+    </button>
+  </div>
+</div>
+
+<!-- ============ HOVER GAUGES ============
+     Mouse-only quick-scrub controls. Hovering the BPM or View button reveals
+     a thin slider above it; dragging adjusts tempo or size directly, without
+     opening the popover. Hidden entirely on touch (see the (hover:none) rule
+     in style.css) — the button's normal tap behavior is unchanged there. -->
+<div class="hover-gauge" id="bpm-gauge-wrap" aria-hidden="true">
+  <span class="hover-gauge-label" id="bpm-gauge-label">88 BPM</span>
+  <input type="range" class="zoom-slider" id="bpm-gauge" min="40" max="240" step="1" tabindex="-1" aria-label="Tempo">
+</div>
+
+<div class="hover-gauge" id="size-gauge-wrap" aria-hidden="true">
+  <span class="hover-gauge-label" id="size-gauge-label">100%</span>
+  <input type="range" class="zoom-slider" id="size-gauge" min="40" max="300" step="5" tabindex="-1" aria-label="Size">
+</div>
+
+<!-- ============ SHEET: SONGS / LIBRARY ============ -->
+<div class="sheet-backdrop" id="library-sheet">
+  <div class="sheet sheet-lg">
+    <div class="sheet-head">
+      <h2>Songs</h2>
+      <button class="sheet-close" data-close="library-sheet" title="Close">&times;</button>
+    </div>
+
+    <div class="now-editing">
+      <span class="now-editing-label">Now editing</span>
+      <span class="now-editing-title" id="now-editing-title">Instructions</span>
+      <span class="side-badge" id="now-editing-badge">Rhythm</span>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn btn-primary" id="newSongBtn">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        <span id="newSongBtnLabel">New rhythm</span>
+      </button>
+      <button class="btn" id="saveAsBtn">Save a copy…</button>
+      <button class="btn" id="importExportBtn">Share &amp; backup</button>
+      <button class="btn" id="copy-visual-btn" title="Download a picture of this song">Save picture</button>
+    </div>
+
+    <label class="inline-check" for="picture-color-dots">
+      <input type="checkbox" id="picture-color-dots" />
+      <span>Keep the dot colours in saved pictures <em>(off = plain white, ready to print)</em></span>
+    </label>
+
+    <div class="library-groups" id="librarySongList"></div>
+  </div>
+</div>
+
+<!-- ============ MODAL: NEW / SAVE-AS TITLE ============ -->
+<div class="sheet-backdrop" id="newSongModal">
+  <div class="sheet sheet-sm">
+    <div class="sheet-head">
+      <h2 id="newSongModalHeading">Create a new rhythm</h2>
+      <button class="sheet-close" data-close="newSongModal" title="Close">&times;</button>
+    </div>
+    <p class="sheet-sub" id="newSongModalSubtext">Give it a name so you can find it later.</p>
+    <input type="text" id="newSongTitleInput" class="text-field" placeholder="e.g. Ta and Ti-Ti warm-up" maxlength="60" autocomplete="off" />
+    <div class="sheet-foot">
+      <button class="btn" data-close="newSongModal">Cancel</button>
+      <button class="btn btn-primary" id="confirmNewSongBtn">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: WORDS EDITOR ============ -->
+<div class="sheet-backdrop" id="text-input-modal">
+  <div class="sheet sheet-md">
+    <div class="sheet-head">
+      <h2>Your words</h2>
+      <button class="sheet-close" data-close="text-input-modal" title="Close">&times;</button>
+    </div>
+    <p class="sheet-sub">Each word lands on the next open note. Use a hyphen to split syl&#8209;la&#8209;bles.</p>
+    <textarea id="multi-line-input" class="text-area" placeholder="Hick- o- ry dick- o- ry dock…" spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
+    <div class="sheet-foot sheet-foot-split">
+      <div class="seg" role="group" aria-label="How to apply the words">
+        <button class="seg-btn" id="toggle-add-btn">Add</button>
+        <button class="seg-btn active" id="toggle-replace-btn">Replace</button>
+      </div>
+      <div class="sheet-foot-right">
+        <button class="btn" id="modal-copy-btn" title="Copy this text">Copy</button>
+        <button class="btn" data-close="text-input-modal">Cancel</button>
+        <button class="btn btn-primary" id="modal-submit-btn">Set to the beat</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHEET: SHARE & BACKUP ============ -->
+<div class="sheet-backdrop" id="importExportModal">
+  <div class="sheet sheet-lg">
+    <div class="sheet-head">
+      <h2>Share &amp; backup</h2>
+      <button class="sheet-close" data-close="importExportModal" title="Close">&times;</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        Send this song by link
+      </div>
+      <p class="card-desc">Anyone who opens the link gets a copy in their own library.</p>
+      <button class="btn btn-primary" id="generateShareLinkBtn">Create a link</button>
+      <div class="share-row" id="shareLinkContainer" hidden>
+        <input type="text" id="shareLinkInput" class="text-field" readonly />
+        <button class="btn" id="copyShareLinkBtn"><span id="copyShareLinkBtnText">Copy</span></button>
+        <span class="status-msg" id="shareLinkFeedback"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download a backup
+      </div>
+      <div class="card-head-row">
+        <p class="card-desc">Choose what to include:</p>
+        <div class="text-tools">
+          <button class="text-tool" id="selectAllExportBtn">All</button>
+          <button class="text-tool" id="deselectAllExportBtn">None</button>
+        </div>
+      </div>
+      <div class="export-list" id="exportSongList"></div>
+      <div class="filename-row">
+        <input type="text" id="exportFilenameInput" class="text-field" placeholder="my-library" maxlength="50" autocomplete="off" />
+        <span class="filename-ext">.json</span>
+      </div>
+      <button class="btn btn-primary" id="confirmExportBtn">Download</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Restore from a backup
+      </div>
+      <p class="card-desc">Songs in the file are added to your library.</p>
+      <input type="file" id="jsonFileInput" accept=".json,application/json" hidden />
+      <button class="btn" id="uploadJsonBtn">Choose a file…</button>
+      <span class="status-msg" id="uploadStatusMsg"></span>
+    </div>
+
+    <div class="card card-danger">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Start over
+      </div>
+      <p class="card-desc">Deletes every song you have made and restores the examples.</p>
+      <button class="btn btn-danger" id="resetAllDataBtn">Delete everything</button>
+      <span class="status-msg" id="resetStatusMsg"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHEET: HELP ============ -->
+<div class="sheet-backdrop" id="help-sheet">
+  <div class="sheet sheet-md">
+    <div class="sheet-head">
+      <h2>How this works</h2>
+      <button class="sheet-close" data-close="help-sheet" title="Close">&times;</button>
+    </div>
+
+    <div class="help-side-note" id="help-side-note"></div>
+
+    <ul class="help-list">
+      <li><b class="dot-demo"><i class="dot on"></i><i class="dot off"></i></b>
+        <div><b>Tap a dot</b> to turn that half-beat into a sound or a rest. The notation above redraws itself.</div></li>
+      <li><span class="help-key">+</span>
+        <div><b>Split a beat</b> into four sixteenths. Press <span class="help-key">−</span> to go back to two.</div></li>
+      <li><span class="help-key">🔗</span>
+        <div><b>Link two beats</b> to write dotted rhythms and ties across the beat.</div></li>
+      <li><span class="help-key">▸</span>
+        <div><b>Tap any measure</b> to mark where playback should begin — handy for drilling one spot. Tap it again to clear it.</div></li>
+      <li><span class="help-key">＋</span>
+        <div><b>Add or remove measures</b> with the + and × at the end of the last line.</div></li>
+      <li><span class="help-key">⛶</span>
+        <div><b>Present</b> hides every control and fills the screen. Press <span class="help-key">Esc</span> to come back.</div></li>
+      <li><span class="help-key">␣</span>
+        <div><b>Spacebar</b> starts and pauses playback. Tapping the background does the same.</div></li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============ TOAST ============ -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

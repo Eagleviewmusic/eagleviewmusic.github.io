@@ -1,0 +1,1835 @@
+/* ============================================================
+   Rhythm & Poetry — Eagle View Music
+   ============================================================ */
+
+:root {
+  /* paper & ink */
+  --paper:        #FDF8F0;
+  --paper-2:      #F6EFE3;
+  --surface:      #FFFFFF;
+  --ink:          #1D2B45;
+  --ink-2:        #55637C;
+  --ink-3:        #8A96AB;
+  --hairline:     #E4DACA;
+  --hairline-2:   #D6C9B4;
+
+  /* musical meaning — identical on both sides so students learn one language */
+  --sound:        #E0642F;   /* a note begins here            */
+  --sound-soft:   #F6D9C9;
+  --hold:         #F2A93B;   /* the sound is still ringing    */
+  --hold-16:      #8FC98A;   /* held across sixteenths        */
+  --sync:         #4E9E5F;   /* syncopation                   */
+  --rest:         #C6CEDB;   /* silence                       */
+
+  /* side accents */
+  --rhythm:       #E0642F;
+  --rhythm-soft:  #FDEDE4;
+  --poetry:       #2E8B8B;
+  --poetry-soft:  #E2F1F0;
+
+  --danger:       #C0392B;
+  --danger-soft:  #FBEAE7;
+
+  --accent:       var(--rhythm);
+  --accent-soft:  var(--rhythm-soft);
+
+  /* form */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --shadow-1: 0 1px 2px rgba(29,43,69,.06), 0 2px 8px rgba(29,43,69,.06);
+  --shadow-2: 0 4px 12px rgba(29,43,69,.10), 0 12px 32px rgba(29,43,69,.12);
+  --shadow-3: 0 12px 28px rgba(29,43,69,.16), 0 32px 64px rgba(29,43,69,.18);
+
+  --topbar-h: 60px;
+  --toolbar-h: 72px;
+
+  --font: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-round: 'Baloo 2', 'Nunito', system-ui, sans-serif;
+  /* engraved-looking numerals for the time signature only — everything else
+     in the toolbar stays in the friendly rounded UI font */
+  --font-signature: 'Noto Serif', Georgia, 'Times New Roman', serif;
+
+  --ts-digit: 25px;   /* size of each time-signature numeral */
+
+  /* notation base sizes — the whole staff is scaled by JS from these */
+  --dot: 26px;
+  --note-h: 84px;
+  --word-size: 21px;
+}
+
+body[data-side="poetry"] {
+  --accent: var(--poetry);
+  --accent-soft: var(--poetry-soft);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overscroll-behavior: none;
+  /* A board has no cursor, and the core gesture here — tap the same dot
+     twice to turn a note on and then off again — is indistinguishable
+     from a double-tap. `manipulation` keeps panning and pinch-zoom but
+     drops double-tap-to-zoom, so the second tap lands on the dot instead
+     of zooming the page out from under the class. */
+  touch-action: manipulation;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--paper);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+  /* Not transparent: on a board this tint is the only acknowledgement a
+     tap gets before the :active styles land, and an unacknowledged tap
+     reads as a tap that didn't work. */
+  -webkit-tap-highlight-color: var(--accent-soft);
+}
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; padding: 0; }
+svg { display: block; }
+svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+
+/* ============================================================
+   TOP BAR
+   ============================================================ */
+
+.topbar {
+  flex: 0 0 auto;
+  height: var(--topbar-h);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+  position: relative;
+  z-index: 40;
+}
+
+.home-link {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px 7px 8px;
+  border-radius: 999px;
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 700;
+  transition: background .15s, color .15s;
+}
+.home-link svg { width: 17px; height: 17px; }
+.home-link:hover,
+.home-link:active { background: var(--paper-2); color: var(--ink); }
+html.in-iframe .home-link { display: none; }
+
+/* --- the two sides --- */
+.side-switch {
+  justify-self: center;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--paper-2);
+  border-radius: 999px;
+}
+
+.side-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 20px;
+  border-radius: 999px;
+  font-family: var(--font-round);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink-2);
+  transition: background .18s, color .18s, box-shadow .18s;
+  white-space: nowrap;
+}
+.side-tab-icon { width: 18px; height: 18px; }
+.side-tab:hover,
+.side-tab:active { color: var(--ink); }
+
+.side-tab.active { background: var(--surface); box-shadow: var(--shadow-1); }
+body[data-side="rhythm"] #rhythm-mode-btn.active { color: var(--rhythm); }
+body[data-side="poetry"] #poetry-mode-btn.active { color: var(--poetry); }
+
+/* --- current song --- */
+.song-chip {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 230px;
+  padding: 8px 10px 8px 14px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  transition: background .15s;
+}
+.song-chip:hover,
+.song-chip:active { background: var(--hairline); }
+.song-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.song-chip-caret { width: 15px; height: 15px; flex: none; color: var(--ink-3); }
+
+
+/* ============================================================
+   WRITE PANEL  (phone, poetry side)
+   ============================================================ */
+
+/* Phone only — on bigger screens the toolbar's Write button covers this,
+   and the vertical space belongs to the notation. */
+.write-panel {
+  display: none;
+  flex: 0 0 auto;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+}
+@media (max-width: 720px) {
+  body[data-side="poetry"] .write-panel { display: block; }
+}
+
+.write-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+}
+.write-panel-icon { width: 16px; height: 16px; color: var(--poetry); }
+.write-panel-title {
+  flex: 1;
+  font-family: var(--font-round);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.write-panel-toggle {
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  color: var(--ink-3);
+}
+.write-panel-toggle svg { width: 18px; height: 18px; transition: transform .2s; }
+.write-panel.collapsed .write-panel-toggle svg { transform: rotate(180deg); }
+.write-panel.collapsed .write-panel-body { display: none; }
+
+.write-panel-body { padding: 0 14px 12px; }
+
+.write-area {
+  width: 100%;
+  min-height: 58px;
+  max-height: 30vh;
+  padding: 11px 13px;
+  border: 1.5px solid var(--hairline-2);
+  border-radius: var(--r-md);
+  background: var(--paper);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+  resize: vertical;
+}
+.write-area:focus { outline: none; border-color: var(--poetry); background: var(--surface); }
+
+.write-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.write-panel-actions .btn-primary { flex: 1; justify-content: center; }
+
+
+/* ============================================================
+   STAGE  (the notation surface)
+   ============================================================ */
+
+.stage {
+  flex: 1 1 auto;
+  position: relative;
+  overflow: auto;
+  padding: 26px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* keeps an over-wide staff reachable instead of clipped on the left */
+  align-items: safe center;
+  -webkit-overflow-scrolling: touch;
+}
+
+#poem {
+  width: max-content;
+  max-width: none;
+  /* contains the off-screen probe used to measure measure widths */
+  position: relative;
+  /* column flex left-aligns every line at the same x, so measures stack the
+     way they do on a printed staff — without percentage widths, which would
+     create a sizing cycle against a max-content parent */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  /* the link buttons and measure numbers bleed outside the beat boxes;
+     this padding brings them inside the box we measure for fitting */
+  padding: 18px 16px 0;
+  transform-origin: top center;
+  will-change: transform;
+  /* resizes glide instead of snapping */
+  transition: transform .22s cubic-bezier(.25,.9,.35,1);
+}
+@media (prefers-reduced-motion: reduce) { #poem { transition: none; } }
+
+
+/* ============================================================
+   NOTATION
+   ============================================================ */
+
+.line {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  margin-bottom: 30px;
+}
+
+.measure {
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+}
+
+.measure-number {
+  position: absolute;
+  top: -17px;
+  left: 2px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  color: var(--ink-3);
+  pointer-events: none;
+  user-select: none;
+}
+body.hide-measure-numbers .measure-number { display: none; }
+
+/* --- one beat ---
+   The dots, the notation and the words all sit on the same column grid,
+   so a note is always directly above the dot that triggers it and the
+   word that is sung on it. --slot-w is set per beat by the layout pass:
+   a column is as wide as the widest of the dot, the word, or the room
+   the notation needs. */
+.group {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 3px;
+  --slots: 2;
+  --slot-w: 35px;
+  --gutter-l: 26px;   /* room for the +/- controls inside the pill */
+  --gutter-r: 12px;
+}
+
+/* every row of the beat is boxed identically, so their grids line up */
+.circles, .notes-box, .words {
+  box-sizing: border-box;
+  padding-left: var(--gutter-l);
+  padding-right: var(--gutter-r);
+  border: 1.5px solid transparent;
+  width: calc(var(--slots) * var(--slot-w) + var(--gutter-l) + var(--gutter-r) + 3px);
+}
+
+/* A run tuplet draws all of its circles in the run's first beat box, so
+   the beats it covers stand aside and take no room. */
+.group.swallowed { display: none; }
+
+/* the pill around a tuplet's circles, marked off from the plain beats */
+.group.tuplet-run > .circles {
+  border-style: dashed;
+  border-color: var(--hold);
+}
+
+/* --- the tappable dots --- */
+.circles {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--slots), var(--slot-w));
+  align-items: center;
+  justify-items: center;
+  min-height: calc(var(--dot) + 18px);
+  padding-top: 9px;
+  padding-bottom: 9px;
+  border-color: var(--hairline-2);
+  border-radius: 999px;
+  background: var(--surface);
+  transition: opacity .18s, border-color .18s;
+}
+.circles.circles-hidden { opacity: 0; pointer-events: none; }
+
+.circles.pickup {
+  border-style: dashed;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.circles.linked { border-color: var(--hold); }
+
+.circle {
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 50%;
+  background: var(--rest);
+  cursor: pointer;
+  flex: none;
+  transition: background .13s, transform .13s;
+}
+.circle:hover,
+.circle:active { transform: scale(1.12); }
+.circle.active       { background: var(--sound); }
+.circle.sustain,
+.circle.light-blue,
+.circle.yellow       { background: var(--hold); }
+.circle.sustain-green,
+.circle.light-green  { background: var(--hold-16); }
+.circle.syncopated   { background: var(--sync); }
+
+/* --- + / − subdivision --- */
+.beat-subdivision-controls {
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.subdivision-btn {
+  width: 17px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink-3);
+  background: transparent;
+  transition: background .13s, color .13s;
+}
+.subdivision-btn:hover,
+.subdivision-btn:active { background: var(--paper-2); color: var(--ink); }
+.subdivision-btn.active { background: var(--sound); color: #fff; }
+.subdivision-btn:disabled { opacity: .25; cursor: default; }
+.subdivision-btn:disabled:hover,
+.subdivision-btn:disabled:active { background: transparent; color: var(--ink-3); }
+
+/* --- link two beats --- */
+.beat-link-btn {
+  position: absolute;
+  right: -13px;
+  top: -9px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1.5px solid var(--hairline-2);
+  color: var(--ink-3);
+  z-index: 3;
+  transition: background .14s, color .14s, border-color .14s;
+}
+.beat-link-btn svg { width: 14px; height: 14px; fill: currentColor; stroke: none; }
+.beat-link-btn:hover,
+.beat-link-btn:active { border-color: var(--hold); color: var(--hold); }
+.beat-link-btn.active { background: var(--hold); border-color: var(--hold); color: #fff; }
+
+/* --- the printed notation ---
+   Drawn by the notation engine as one SVG per beat, or per linked run of
+   beats. The SVG is placed on the measured centres of the dots above it,
+   and is allowed to spill past its box so that a beam, a tie or a flag
+   can carry on across a link. */
+.notes-box {
+  position: relative;
+  /* --note-extra is set by the layout pass: extra room above the notes for
+     a tuplet's number, added to every box so the lyrics stay on one line */
+  height: calc(var(--note-h) + var(--note-extra, 0px));
+  margin-top: 12px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  overflow: visible;
+  transition: background .15s, box-shadow .15s;
+}
+.notes-box:hover,
+.notes-box:active { background: rgba(29,43,69,.045); }
+
+.rhythm-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+  user-select: none;
+  /* A linked run's notation lives in the first beat's box but overflows
+     into the boxes of the beats after it. Those are sibling elements that
+     come later in the DOM, so without a lift here their own selected/
+     playing background paints on top of the earlier beat's overflowing
+     svg - the note looks like it's behind the highlight on every beat but
+     the first. z-index: 2 puts the notation above every beat's highlight,
+     not just its own. */
+  z-index: 2;
+}
+/* the icon rule above sets a stroke on anything with a viewBox - the
+   notation is filled artwork, so it has to opt out of that */
+.rhythm-svg path,
+.rhythm-svg rect {
+  fill: var(--notation, #000);
+  stroke: none;
+}
+.rhythm-svg .bracket {
+  fill: none;
+  stroke: var(--notation, #000);
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
+}
+
+/* start-here marker */
+.notes-box.selected {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.notes-box.selected::before {
+  content: '';
+  position: absolute;
+  top: 4px; left: 6px;
+  width: 0; height: 0;
+  border-left: 8px solid var(--accent);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+
+/* currently sounding */
+.notes-box.playing {
+  background: var(--sound-soft);
+  box-shadow: inset 0 0 0 2px var(--sound);
+}
+
+/* --- words & chant syllables --- */
+.words {
+  display: grid;
+  grid-template-columns: repeat(var(--slots), var(--slot-w));
+  justify-items: center;
+  align-items: flex-start;
+  margin-top: 7px;
+  min-height: 30px;
+}
+
+.word-container {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+}
+
+.word {
+  font-family: var(--font);
+  font-size: var(--word-size);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ink);
+  text-align: center;
+  cursor: text;
+  border-radius: 5px;
+  padding: 1px 3px;
+  transition: background .12s;
+  white-space: nowrap;
+}
+.word:hover,
+.word:active { background: var(--accent-soft); }
+.word.rest { color: var(--ink-3); opacity: .5; font-weight: 400; }
+
+/* the rhythm side prints syllables, not words — no edit affordance */
+body[data-side="rhythm"] .word { cursor: default; font-weight: 700; }
+body[data-side="rhythm"] .word:hover,
+body[data-side="rhythm"] .word:active { background: transparent; }
+
+/* a lone word standing for a whole beat has to span every column of the
+   grid to land centred, not just sit in the first one. */
+.words.single-syllable-whole .word-container {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+/* A word naming a note that spans a whole linked run (Fruit Rhythms'
+   Orange/Oreo/Baha honey for a half/dotted-half/whole note) starts under
+   the notehead - the run's very first slot - rather than centring across
+   it. The run's box is never widened to fit these words (see WORD_PAD's
+   skip for .span-word in layoutBeatsAndEngrave): a long word simply spills
+   rightward over the held slots' dashes instead of stretching the staff. */
+.words.span-word {
+  justify-items: start;
+}
+.words.span-word .word-container {
+  grid-column: 1;
+  justify-content: flex-start;
+  min-width: 0;
+  overflow: visible;
+}
+.words.span-word .word { white-space: nowrap; }
+
+.word-input {
+  width: 100%;
+  min-width: 62px;
+  font-family: var(--font);
+  font-size: var(--word-size);
+  font-weight: 600;
+  text-align: center;
+  color: var(--ink);
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: 7px;
+  padding: 1px 4px;
+  outline: none;
+}
+
+/* --- barlines --- */
+.measure-divider,
+.final-measure-divider {
+  position: relative;
+  flex: none;
+  align-self: stretch;
+  min-height: calc(var(--note-h) + var(--note-extra, 0px) + var(--dot) + 66px);
+  margin: 0 9px;
+}
+
+.measure-divider {
+  width: 2px;
+  background: var(--hairline-2);
+  border-radius: 2px;
+}
+
+.final-measure-divider {
+  width: 8px;
+  background:
+    linear-gradient(var(--ink), var(--ink)) left  / 2px 100% no-repeat,
+    linear-gradient(var(--ink), var(--ink)) right / 4px 100% no-repeat;
+}
+
+.add-measure-btn,
+.delete-measure-btn {
+  position: absolute;
+  left: 50%;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1.5px solid var(--hairline-2);
+  color: var(--ink-2);
+  transition: transform .14s, background .14s, color .14s, border-color .14s;
+}
+.add-measure-btn    { top: calc(var(--note-h) * .42); transform: translate(-50%, 0); }
+
+/* line split / rejoin handles */
+.line-tool {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--note-h) * .42 - 44px);
+  transform: translateX(-50%);
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1.5px solid var(--hairline-2);
+  color: var(--ink-3);
+  opacity: .35;
+  z-index: 4;
+  transition: opacity .15s, background .15s, color .15s, border-color .15s, transform .15s;
+}
+.line-tool svg { width: 14px; height: 14px; }
+.measure-divider:hover .line-tool,
+.measure-divider:active .line-tool,
+.final-measure-divider:hover .line-tool,
+.final-measure-divider:active .line-tool,
+.line-tool:hover,
+.line-tool:active { opacity: 1; }
+.line-tool:hover,
+.line-tool:active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  transform: translateX(-50%) scale(1.12);
+}
+
+/* the barline holding the piece back gets a standing invitation */
+.line-tool.suggested {
+  opacity: 1;
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  animation: nudge 2.4s ease-in-out infinite;
+}
+@keyframes nudge {
+  0%, 88%, 100% { transform: translateX(-50%) scale(1); }
+  94%           { transform: translateX(-50%) scale(1.14); }
+}
+
+body.hide-line-tools .line-tool { display: none; }
+.delete-measure-btn { top: calc(var(--note-h) * .42 + 38px); transform: translate(-50%, 0); font-size: 14px; }
+
+.add-measure-btn:hover,
+.add-measure-btn:active {
+  background: var(--sound); border-color: var(--sound); color: #fff;
+  transform: translate(-50%, 0) scale(1.1);
+}
+.delete-measure-btn:hover,
+.delete-measure-btn:active {
+  background: var(--danger); border-color: var(--danger); color: #fff;
+  transform: translate(-50%, 0) scale(1.1);
+}
+
+
+/* ============================================================
+   BOTTOM TOOLBAR
+   ============================================================ */
+
+.toolbar {
+  flex: 0 0 auto;
+  background: var(--surface);
+  border-top: 1px solid var(--hairline);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 40;
+}
+
+.toolbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: var(--toolbar-h);
+  padding: 10px 14px;
+}
+
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border-left: 1px solid var(--hairline);
+}
+.tool-group:first-of-type { border-left: none; }
+
+/* forces a tidy two-row toolbar on phones instead of an orphaned control */
+.toolbar-break { display: none; }
+
+/* --- play --- */
+.play-btn {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 3px 0 rgba(0,0,0,.13);
+  transition: transform .12s, background .18s, box-shadow .12s;
+  flex: none;
+}
+.play-btn:hover,
+.play-btn:active { transform: translateY(-1px); box-shadow: 0 4px 0 rgba(0,0,0,.13); }
+.play-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.13); }
+.play-glyph { font-size: 21px; line-height: 1; margin-left: 2px; }
+.play-btn.playing { background: var(--danger); }
+.play-btn.playing .play-glyph { margin-left: 0; font-size: 19px; }
+.play-btn.paused  { background: var(--hold); }
+
+/* --- generic tool button --- */
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 42px;
+  padding: 0 13px;
+  border-radius: var(--r-md);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  transition: background .14s, color .14s;
+  white-space: nowrap;
+}
+.tool-btn:hover,
+.tool-btn:active { background: var(--hairline); }
+.tool-btn.open  { background: var(--accent); color: #fff; }
+.tool-icon { width: 18px; height: 18px; flex: none; }
+
+.present-btn.tool-btn { background: var(--accent-soft); color: var(--accent); }
+.present-btn.tool-btn:hover,
+.present-btn.tool-btn:active { background: var(--accent); color: #fff; }
+
+/* --- time signature ---
+   Modeled on how it actually sits on a staff: two stacked numerals, no
+   fraction bar, nearly touching, in a bold upright serif rather than the
+   app's rounded UI font — the one place this app deliberately borrows the
+   look of an engraved score. */
+.time-sig {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  height: 54px;
+  min-width: 38px;
+  padding: 2px 9px;
+  border-radius: var(--r-md);
+  background: var(--paper-2);
+  transition: background .13s;
+}
+.time-sig:hover,
+.time-sig:active { background: var(--hairline); }
+
+.ts-num {
+  font-family: var(--font-signature);
+  font-weight: 900;
+  font-size: var(--ts-digit);
+  line-height: 0.78;
+  color: var(--ink);
+  font-variant-numeric: lining-nums tabular-nums;
+  padding: 0 1px;
+  border-radius: 4px;
+  transition: color .13s, background .13s, transform .1s;
+}
+.ts-num:hover,
+.ts-num:active { color: var(--accent); background: rgba(0,0,0,.05); transform: scale(1.08); }
+.ts-num:active { transform: scale(0.94); }
+
+/* --- bpm --- */
+.bpm-btn { gap: 4px; }
+.bpm-value { font-family: var(--font-round); font-size: 16px; font-weight: 700; }
+.bpm-unit  { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--ink-3); }
+.bpm-input {
+  width: 58px;
+  font-family: var(--font-round);
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--ink);
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  outline: none;
+  padding: 3px 2px;
+  -moz-appearance: textfield;
+}
+.bpm-input::-webkit-outer-spin-button,
+.bpm-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* --- select --- */
+.tool-select {
+  height: 42px;
+  max-width: 190px;
+  padding: 0 32px 0 13px;
+  border: none;
+  border-radius: var(--r-md);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238A96AB' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 15px;
+}
+.tool-select:hover,
+.tool-select:active { background-color: var(--hairline); }
+.tool-select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* side-specific controls */
+body[data-side="poetry"] .rhythm-only { display: none; }
+body[data-side="rhythm"] .poetry-only { display: none; }
+
+
+/* ============================================================
+   POPOVERS
+   ============================================================ */
+
+.popover {
+  position: fixed;
+  z-index: 60;
+  display: none;
+  width: 290px;
+  padding: 14px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-3);
+}
+.popover-wide { width: 330px; }
+.popover-scroll { max-height: min(70vh, 620px); overflow-y: auto; }
+
+.popover-note {
+  margin: 7px 2px 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+.popover-note b { color: var(--ink-2); }
+.popover.show { display: block; }
+
+.popover-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 4px 2px 8px;
+}
+.popover-title:not(:first-child) { margin-top: 15px; }
+
+.switch-list { display: flex; flex-direction: column; gap: 3px; }
+
+.switch-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "name pill" "desc pill";
+  align-items: center;
+  gap: 0 12px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  text-align: left;
+  transition: background .13s;
+}
+.switch-row:hover,
+.switch-row:active { background: var(--paper-2); }
+.switch-name { grid-area: name; font-size: 14px; font-weight: 700; color: var(--ink); }
+.switch-desc { grid-area: desc; font-size: 12px; font-weight: 400; color: var(--ink-3); line-height: 1.35; }
+
+.switch-pill {
+  grid-area: pill;
+  position: relative;
+  width: 40px;
+  height: 23px;
+  border-radius: 999px;
+  background: var(--hairline-2);
+  transition: background .18s;
+  flex: none;
+}
+.switch-pill::after {
+  content: '';
+  position: absolute;
+  top: 2.5px; left: 2.5px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.22);
+  transition: transform .18s;
+}
+.switch-row.active .switch-pill { background: var(--accent); }
+.switch-row.active .switch-pill::after { transform: translateX(17px); }
+
+.popover-hidden-toggle { display: none; }
+
+/* segmented control */
+.seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: var(--r-sm);
+  background: var(--paper-2);
+  gap: 2px;
+}
+.seg-wide { display: flex; }
+.seg-wide .seg-btn { flex: 1; }
+.seg-btn {
+  padding: 8px 16px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+  transition: background .14s, color .14s, box-shadow .14s;
+}
+.seg-btn.active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow-1); }
+
+/* zoom */
+.zoom-row { display: flex; align-items: center; gap: 9px; margin-top: 10px; }
+.zoom-btn {
+  width: 38px; height: 36px;
+  flex: none;
+  display: grid; place-items: center;
+  border-radius: var(--r-sm);
+  background: var(--paper-2);
+  font-size: 19px; font-weight: 700; color: var(--ink);
+  transition: background .13s;
+}
+.zoom-btn:hover:not(:disabled),
+.zoom-btn:active:not(:disabled) { background: var(--hairline); }
+.zoom-btn:disabled { opacity: .35; cursor: default; }
+
+.zoom-slider {
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  appearance: none;
+  border-radius: 999px;
+  background: var(--hairline);
+  cursor: pointer;
+}
+.zoom-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--surface);
+  box-shadow: 0 1px 4px rgba(29,43,69,.3);
+  cursor: pointer;
+}
+.zoom-slider::-moz-range-thumb {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--surface);
+  cursor: pointer;
+}
+
+.zoom-readout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 6px 2px 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-2);
+}
+
+/* measures-per-line chips */
+.chip-row { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 9px;
+  background: var(--paper-2);
+  font-size: 13px; font-weight: 700; color: var(--ink-2);
+  transition: background .13s, color .13s;
+}
+.chip:hover,
+.chip:active { background: var(--hairline); color: var(--ink); }
+.chip.active { background: var(--accent); color: #fff; }
+
+/* picture options */
+.inline-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: -6px 0 18px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.inline-check input { width: 17px; height: 17px; margin-top: 1px; accent-color: var(--accent); flex: none; cursor: pointer; }
+.inline-check em { font-style: normal; color: var(--ink-3); }
+
+.popover-divider { height: 1px; background: var(--hairline); margin: 13px 0 9px; }
+
+.popover-link {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  text-align: left;
+  transition: background .13s, color .13s;
+}
+.popover-link svg { width: 16px; height: 16px; flex: none; }
+.popover-link:hover,
+.popover-link:active { background: var(--paper-2); color: var(--ink); }
+
+
+/* ============================================================
+   HOVER GAUGES
+   Quick-scrub controls for a mouse or trackpad: hovering the BPM or View
+   button reveals a thin slider above it, styled like a small floating card
+   (a lighter cousin of the popovers above) rather than overlaying the button
+   itself — so the button's own click still opens the full editor/popover
+   exactly as before, and nothing has to arbitrate between a click and a drag
+   on the same element.
+   ============================================================ */
+.hover-gauge {
+  position: fixed;
+  z-index: 65;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  width: 250px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-3);
+}
+.hover-gauge.show { display: flex; }
+
+.hover-gauge-label {
+  flex: none;
+  min-width: 56px;
+  font-family: var(--font-round);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.hover-gauge .zoom-slider { flex: 1; min-width: 0; }
+
+/* Mouse only — on a touchscreen the button's normal tap behavior is what
+   already reaches this control (the typed BPM editor, the View popover), so
+   there's no hover state to layer a shortcut onto. */
+@media (hover: none), (pointer: coarse) {
+  .hover-gauge { display: none !important; }
+}
+
+
+/* ============================================================
+   SHEETS & MODALS
+   ============================================================ */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: rgba(29,43,69,.40);
+  backdrop-filter: blur(3px);
+}
+.sheet-backdrop.show { display: flex; }
+
+.sheet {
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 22px;
+  border-radius: var(--r-xl);
+  background: var(--paper);
+  box-shadow: var(--shadow-3);
+  animation: sheet-in .2s cubic-bezier(.2,.9,.3,1);
+}
+.sheet-sm { max-width: 420px; }
+.sheet-md { max-width: 620px; }
+.sheet-lg { max-width: 720px; }
+
+@keyframes sheet-in {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.sheet-head h2 {
+  margin: 0;
+  font-family: var(--font-round);
+  font-size: 23px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.sheet-close {
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--ink-3);
+  transition: background .13s, color .13s;
+}
+.sheet-close:hover,
+.sheet-close:active { background: var(--hairline); color: var(--ink); }
+
+.sheet-sub { margin: 0 0 15px; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+
+.sheet-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 16px;
+}
+.sheet-foot-split { justify-content: space-between; align-items: center; flex-wrap: wrap; }
+.sheet-foot-right { display: flex; gap: 9px; }
+
+/* buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 42px;
+  padding: 0 17px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1.5px solid var(--hairline-2);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  transition: background .14s, border-color .14s, color .14s;
+  white-space: nowrap;
+}
+.btn svg { width: 17px; height: 17px; }
+.btn:hover,
+.btn:active { background: var(--paper-2); border-color: var(--ink-3); }
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover,
+.btn-primary:active { filter: brightness(1.07); background: var(--accent); border-color: var(--accent); }
+
+.btn-danger { background: var(--danger-soft); border-color: #E9BFB8; color: var(--danger); }
+.btn-danger:hover,
+.btn-danger:active { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* fields */
+.text-field {
+  width: 100%;
+  height: 44px;
+  padding: 0 13px;
+  border: 1.5px solid var(--hairline-2);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.text-field:focus { outline: none; border-color: var(--accent); }
+.text-field.input-error { border-color: var(--danger); background: var(--danger-soft); }
+
+.text-area {
+  width: 100%;
+  min-height: 170px;
+  padding: 13px 15px;
+  border: 1.5px solid var(--hairline-2);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--ink);
+  resize: vertical;
+}
+.text-area:focus { outline: none; border-color: var(--accent); }
+
+.shake { animation: shake .4s; }
+@keyframes shake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-6px); }
+  40%, 60% { transform: translateX(6px); }
+}
+
+
+/* ============================================================
+   LIBRARY
+   ============================================================ */
+
+.now-editing {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 12px 15px;
+  margin-bottom: 14px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+}
+.now-editing-label {
+  font-size: 11px; font-weight: 800; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.now-editing-title {
+  flex: 1;
+  font-family: var(--font-round);
+  font-size: 17px; font-weight: 700; color: var(--ink);
+  min-width: 100px;
+}
+
+.side-badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--accent);
+}
+.side-badge.badge-rhythm { background: var(--rhythm); }
+.side-badge.badge-poetry { background: var(--poetry); }
+
+.sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 18px;
+}
+
+.library-groups { display: flex; flex-direction: column; gap: 20px; }
+
+.library-group-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 9px;
+}
+.library-group-head svg { width: 16px; height: 16px; }
+.library-group-title {
+  font-size: 12px; font-weight: 800; letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.library-group-rhythm .library-group-title,
+.library-group-rhythm .library-group-head svg { color: var(--rhythm); }
+.library-group-poetry .library-group-title,
+.library-group-poetry .library-group-head svg { color: var(--poetry); }
+.library-group-rule { flex: 1; height: 1px; background: var(--hairline); }
+
+.library-song-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 13px;
+  margin-bottom: 6px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1.5px solid var(--hairline);
+  transition: border-color .14s, box-shadow .14s;
+}
+.library-song-item:hover,
+.library-song-item:active { border-color: var(--hairline-2); }
+/* the ring follows the group it sits in, not the side you happen to be on */
+.library-group-rhythm .library-song-item.active-song {
+  border-color: var(--rhythm); box-shadow: 0 0 0 3px var(--rhythm-soft);
+}
+.library-group-poetry .library-song-item.active-song {
+  border-color: var(--poetry); box-shadow: 0 0 0 3px var(--poetry-soft);
+}
+.library-group-rhythm .lib-action-btn.load-btn { background: var(--rhythm); }
+.library-group-poetry .lib-action-btn.load-btn { background: var(--poetry); }
+.library-group-rhythm .lib-action-btn.is-active { color: var(--rhythm); }
+.library-group-poetry .lib-action-btn.is-active { color: var(--poetry); }
+
+.meter-badge {
+  flex: none;
+  min-width: 42px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: var(--paper-2);
+  font-family: var(--font-round);
+  font-size: 13px; font-weight: 700;
+  text-align: center;
+  color: var(--ink-2);
+}
+
+.library-song-title {
+  flex: 1;
+  font-size: 15px; font-weight: 700; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.library-song-actions { display: flex; gap: 5px; flex: none; }
+
+.lib-action-btn {
+  height: 33px;
+  padding: 0 12px;
+  border-radius: 9px;
+  background: var(--paper-2);
+  font-size: 13px; font-weight: 700; color: var(--ink-2);
+  transition: background .13s, color .13s;
+}
+.lib-action-btn:hover,
+.lib-action-btn:active { background: var(--hairline); color: var(--ink); }
+.lib-action-btn.load-btn { background: var(--accent); color: #fff; }
+.lib-action-btn.load-btn:hover,
+.lib-action-btn.load-btn:active { filter: brightness(1.08); }
+.lib-action-btn.is-active { background: transparent; color: var(--accent); cursor: default; }
+.lib-action-btn.is-active:hover,
+.lib-action-btn.is-active:active { background: transparent; }
+.lib-action-btn.delete-btn-item { width: 33px; padding: 0; font-size: 15px; }
+.lib-action-btn.delete-btn-item:hover,
+.lib-action-btn.delete-btn-item:active { background: var(--danger); color: #fff; }
+
+.library-empty {
+  padding: 26px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--ink-3);
+  background: var(--surface);
+  border: 1.5px dashed var(--hairline-2);
+  border-radius: var(--r-md);
+}
+
+
+/* ============================================================
+   SHARE & BACKUP CARDS
+   ============================================================ */
+
+.card {
+  padding: 17px;
+  margin-bottom: 14px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+}
+.card-danger { background: var(--danger-soft); border-color: #EED4CF; }
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+  font-family: var(--font-round);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.card-title svg { width: 17px; height: 17px; color: var(--accent); }
+.card-danger .card-title svg { color: var(--danger); }
+.card-danger .card-title { color: var(--danger); }
+
+.card-desc { margin: 0 0 12px; font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+.card-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+
+.text-tools { display: flex; gap: 5px; }
+.text-tool {
+  padding: 4px 10px;
+  border-radius: 7px;
+  font-size: 12px; font-weight: 800;
+  color: var(--accent);
+  transition: background .13s;
+}
+.text-tool:hover,
+.text-tool:active { background: var(--accent-soft); }
+
+.export-list {
+  max-height: 210px;
+  overflow-y: auto;
+  padding: 5px;
+  margin-bottom: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--paper);
+}
+.export-song-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background .12s;
+}
+.export-song-item:hover,
+.export-song-item:active { background: var(--paper-2); }
+.export-song-item input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; flex: none; }
+.export-song-title { flex: 1; font-size: 14px; font-weight: 600; color: var(--ink); }
+
+.filename-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.filename-row .text-field { flex: 1; }
+.filename-ext { font-size: 14px; font-weight: 700; color: var(--ink-3); }
+
+.share-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.share-row .text-field { flex: 1; min-width: 200px; font-size: 12.5px; font-weight: 400; }
+
+.status-msg { font-size: 13px; font-weight: 700; color: var(--poetry); }
+.status-msg.error { color: var(--danger); }
+
+
+/* ============================================================
+   HELP
+   ============================================================ */
+
+.help-side-note {
+  padding: 12px 15px;
+  margin-bottom: 16px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.help-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 13px; }
+.help-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.help-list b { color: var(--ink); }
+
+.help-key {
+  flex: none;
+  min-width: 30px; height: 30px;
+  /* inline-grid so the badges used mid-sentence do not become block-level */
+  display: inline-grid; place-items: center;
+  vertical-align: middle;
+  padding: 0 7px;
+  border-radius: 8px;
+  background: var(--paper-2);
+  border: 1px solid var(--hairline-2);
+  font-size: 14px; font-weight: 800; color: var(--ink-2);
+}
+.help-list > li > .help-key { margin-top: 1px; }
+
+.dot-demo { flex: none; display: flex; gap: 4px; align-items: center; height: 30px; }
+.dot-demo .dot { width: 13px; height: 13px; border-radius: 50%; display: block; }
+.dot-demo .dot.on  { background: var(--sound); }
+.dot-demo .dot.off { background: var(--rest); }
+
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--toolbar-h) + 22px);
+  transform: translate(-50%, 14px);
+  z-index: 100;
+  padding: 11px 20px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s, transform .2s;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+
+/* ============================================================
+   PRESENT MODE
+   ============================================================ */
+
+.present-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 70;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 9px 9px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-3);
+  opacity: .32;
+  transition: opacity .25s;
+}
+.present-bar:hover,
+.present-bar:active { opacity: 1; }
+
+body.present-mode .present-bar { display: flex; }
+body.present-mode .topbar,
+body.present-mode .toolbar,
+body.present-mode .write-panel { display: none; }
+body.present-mode .stage { padding: 34px 26px; justify-content: center; }
+body.present-mode .beat-subdivision-controls,
+body.present-mode .beat-link-btn,
+body.present-mode .add-measure-btn,
+body.present-mode .delete-measure-btn,
+body.present-mode .line-tool { display: none; }
+body.present-mode .circle:hover,
+body.present-mode .circle:active { transform: none; }
+body.present-mode .notes-box:hover,
+body.present-mode .notes-box:active { background: transparent; }
+body.present-mode .word:hover,
+body.present-mode .word:active { background: transparent; }
+
+.present-play {
+  width: 50px; height: 50px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 19px;
+  transition: background .18s;
+}
+.present-play.playing { background: var(--danger); }
+.present-play.paused  { background: var(--hold); }
+
+.present-exit {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 42px;
+  padding: 0 16px 0 13px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  font-size: 14px; font-weight: 700; color: var(--ink-2);
+  transition: background .14s, color .14s;
+}
+.present-exit svg { width: 17px; height: 17px; }
+.present-exit:hover,
+.present-exit:active { background: var(--ink); color: #fff; }
+
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+/* ---- tablet ---- */
+@media (max-width: 1000px) {
+  .tool-label { display: none; }
+  .tool-btn { padding: 0 13px; }
+  .tool-select { max-width: 150px; font-size: 13px; }
+}
+
+/* ---- phone ---- */
+@media (max-width: 720px) {
+  :root {
+    --topbar-h: 54px;
+    --toolbar-h: 64px;
+    --dot: 22px;
+    --note-h: 66px;
+    --word-size: 18px;
+    --ts-digit: 20px;
+  }
+
+  .topbar { grid-template-columns: auto 1fr auto; gap: 6px; padding: 0 8px; }
+  .home-link span { display: none; }
+  .home-link { padding: 7px; }
+
+  .side-switch { padding: 3px; gap: 3px; }
+  .side-tab { padding: 8px 14px; font-size: 14px; }
+  .side-tab-icon { width: 15px; height: 15px; }
+
+  .song-chip { max-width: 110px; padding: 7px 8px 7px 11px; font-size: 13px; }
+
+  .stage { padding: 16px 10px 6px; align-items: flex-start; }
+
+  /* one measure per row reads better than a squeezed staff */
+  .line { margin-bottom: 22px; }
+
+  .toolbar-inner { gap: 7px 6px; padding: 8px 10px; min-height: var(--toolbar-h); }
+  .tool-group { padding: 0 5px; gap: 5px; }
+  .toolbar-break { display: block; flex-basis: 100%; height: 0; }
+  .tool-group:nth-of-type(2) { border-left: none; }
+  .tool-select { max-width: 132px; }
+  .play-btn { width: 48px; height: 48px; }
+  .tool-btn, .tool-select { height: 40px; }
+  .tool-btn { padding: 0 11px; }
+  .time-sig { height: 46px; min-width: 32px; padding: 1px 7px; }
+
+  .popover {
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    bottom: calc(var(--toolbar-h) + 12px) !important;
+    top: auto !important;
+  }
+
+  .sheet-backdrop { padding: 0; align-items: flex-end; }
+  .sheet {
+    max-height: 92vh;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+  @keyframes sheet-in {
+    from { opacity: 0; transform: translateY(28px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  .sheet-actions .btn { flex: 1 1 calc(50% - 5px); justify-content: center; }
+  .library-song-actions .lib-action-btn { padding: 0 9px; }
+  .sheet-foot-split { gap: 10px; }
+  .sheet-foot-right { flex: 1; }
+  .sheet-foot-right .btn { flex: 1; justify-content: center; }
+
+  .toast { bottom: calc(var(--toolbar-h) + 14px); }
+}
+
+/* ---- short viewports (Google Sites embeds) ---- */
+@media (max-height: 560px) {
+  :root { --topbar-h: 48px; --toolbar-h: 58px; --note-h: 60px; --dot: 20px; --word-size: 17px; --ts-digit: 19px; }
+  .stage { padding: 12px 12px 4px; }
+  .line { margin-bottom: 16px; }
+  .write-panel { display: none !important; }
+  .time-sig { height: 44px; }
+}
+
+/* ---- smartboard ---- */
+@media (min-width: 1500px) {
+  :root { --toolbar-h: 80px; --ts-digit: 32px; }
+  .toolbar-inner { gap: 14px; }
+  .tool-btn, .tool-select { height: 48px; font-size: 15px; }
+  .time-sig { height: 66px; min-width: 46px; padding: 2px 12px; }
+  .play-btn { width: 62px; height: 62px; }
+  .play-glyph { font-size: 25px; }
+  .side-tab { padding: 11px 26px; font-size: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+
+/* ============================================================
+   SAVED PICTURES
+   Plain line art on white — printable, and students can colour
+   the dots in. "Keep the dot colours" in the Songs sheet opts out.
+   ============================================================ */
+
+/* freeze everything: html2canvas must not catch a colour mid-fade */
+body.capturing *,
+body.capturing *::before,
+body.capturing *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+body.capturing #poem { background: #fff; }
+body.capturing .measure-number { color: #6B7280; }
+
+body.capturing:not(.capture-color) .circles {
+  background: #fff;
+  border-color: #1D2B45;
+}
+body.capturing:not(.capture-color) .circle {
+  background: #fff;
+  box-shadow: inset 0 0 0 2px #1D2B45;
+}
+body.capturing:not(.capture-color) .notes-box.selected,
+body.capturing:not(.capture-color) .notes-box.playing {
+  background: transparent;
+  box-shadow: none;
+}
+body.capturing:not(.capture-color) .notes-box.selected::before { display: none; }
+body.capturing:not(.capture-color) .word { color: #1D2B45; }
+body.capturing:not(.capture-color) .word.rest { color: transparent; }
+
+/* keeping the colours still deserves a white page */
+body.capturing.capture-color .circles { background: #fff; }
+
+
+/* ============================================================
+   TOUCH AND SMART BOARD
+
+   A classroom board is a coarse pointer with no cursor. Two things
+   follow, and everything in this block is one of them:
+
+   1. Hover latches. After a tap, :hover stays on the tapped element
+      until something else is tapped, so an effect meant to last a
+      moment sits there instead. The :not(:active) guards let the press
+      itself through and cancel only the state it leaves behind.
+   2. A finger is much wider than a mouse tip, and the board is used
+      standing up, at arm's length, by someone facing a class.
+
+   The hover gauges are handled separately, further up: they are hidden
+   outright on a coarse pointer because the tap behaviour of the same
+   buttons already reaches what they control.
+   ============================================================ */
+
+@media (hover: none), (pointer: coarse) {
+
+  /* --- +/− subdivision ---
+     17x15 stacked a pixel apart is a mis-tap waiting to happen. Unlike
+     Ostinato, the beat box here does its width arithmetic in CSS from
+     --gutter-l, so widening the gutter carries the box with it — but the
+     variable is declared on .group, not on :root, so that is where it has
+     to be widened or the closer declaration simply wins. */
+  .group { --gutter-l: 34px; }
+  .beat-subdivision-controls { left: 3px; gap: 2px; }
+  .subdivision-btn { width: 26px; height: 24px; border-radius: 7px; font-size: 16px; }
+  .circles { min-height: calc(var(--dot) + 30px); }
+
+  /* --- circles, link and line tools ---
+     The circle's drawn size is what the notation engine measures its
+     centres from, so it stays put and an invisible collar around it
+     takes the tap. COLUMN_MIN (35px) is the tightest the circles ever
+     pack, so a 4px collar stops just short of its neighbour. */
+  .circle { position: relative; }
+  .circle::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; }
+
+  .beat-link-btn::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; }
+
+  /* The split / rejoin handles sit above the barline with nothing else
+     near them, so these can simply grow. */
+  .line-tool { width: 32px; height: 32px; opacity: .5; }
+  .add-measure-btn, .delete-measure-btn { width: 32px; height: 32px; }
+
+  /* --- the time signature ---
+     Two separate targets stacked inside one button; each digit needs to
+     be reachable without catching the other. */
+  .ts-num { padding: 3px 7px; }
+
+  /* --- hover states that would otherwise stay behind ---
+     The ones that move or arm something, plus the one tint that could be
+     mistaken for a real state: a notes-box left shaded looks like the
+     chosen play-start position, so it is cleared — but only on a box that
+     is not actually selected or sounding. */
+  .circle:hover:not(:active) { transform: none; }
+  .play-btn:hover:not(:active) { transform: none; box-shadow: 0 3px 0 rgba(0,0,0,.13); }
+  .ts-num:hover:not(:active) { transform: none; }
+
+  .line-tool:not(.suggested):hover:not(:active) {
+    background: var(--surface);
+    border-color: var(--hairline-2);
+    color: var(--ink-3);
+    opacity: .5;
+    transform: translateX(-50%);
+  }
+  .add-measure-btn:hover:not(:active),
+  .delete-measure-btn:hover:not(:active) {
+    background: var(--surface);
+    border-color: var(--hairline-2);
+    color: var(--ink-2);
+    transform: translate(-50%, 0);
+  }
+  .notes-box:not(.selected):not(.playing):hover:not(:active) { background: transparent; }
+}
