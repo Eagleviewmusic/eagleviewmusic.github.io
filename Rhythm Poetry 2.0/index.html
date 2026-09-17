@@ -46,6 +46,21 @@
   </button>
 </header>
 
+<!-- ============ LESSON TASK STRIP ============
+     One quiet line naming the lesson and what to do in it. Present the
+     whole time a lesson is open, so nobody has to go looking for the
+     instruction, and absent entirely otherwise. -->
+<div class="task-strip" id="task-strip" hidden>
+  <span class="task-strip-title" id="task-strip-title"></span>
+  <span class="task-strip-note" id="task-strip-note"></span>
+</div>
+
+<!-- ============ PREVIEW BAR (teacher only) ============ -->
+<div class="preview-bar" id="preview-bar" hidden>
+  <span>Previewing as a student</span>
+  <button class="btn" id="preview-exit-btn">Leave preview</button>
+</div>
+
 <!-- ============ PHONE WRITE PANEL (Poetry side) ============ -->
 <section class="write-panel" id="write-panel" aria-label="Write your words">
   <div class="write-panel-head">
@@ -93,6 +108,18 @@
 
     <button class="play-btn" id="play-button" title="Play / stop (Space)">
       <span class="play-glyph" id="play-glyph">▶</span>
+    </button>
+
+    <!-- The beat dots, on and off. Its own button rather than a line in a
+         popover, and deliberately outside every tool-group, so nothing a
+         lesson switches off can take it away. The icon is the dot row
+         itself: a rounded box with two circles in it. -->
+    <button class="dots-toggle" id="dots-toggle-btn" aria-pressed="true" title="Hide the beat dots">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2.5" y="7" width="19" height="10" rx="5"/>
+        <circle cx="8.6" cy="12" r="2.3" fill="currentColor" stroke="none"/>
+        <circle cx="15.4" cy="12" r="2.3" fill="currentColor" stroke="none"/>
+      </svg>
     </button>
 
     <div class="tool-group meter-group">
@@ -228,18 +255,8 @@
     </div>
     <p class="popover-note">A maximum, not a rule — you can still split single lines with the <b>↵</b> on any barline.</p>
 
-    <div class="popover-title">Show on screen</div>
+    <div class="popover-title">While you work</div>
     <div class="switch-list">
-      <button class="switch-row active" id="circle-icon">
-        <span class="switch-name">Beat dots</span>
-        <span class="switch-desc">The tappable circles above each note</span>
-        <span class="switch-pill"></span>
-      </button>
-      <button class="switch-row active" id="measure-num-toggle">
-        <span class="switch-name">Measure numbers</span>
-        <span class="switch-desc">Small numbers above each measure</span>
-        <span class="switch-pill"></span>
-      </button>
       <button class="switch-row active" id="line-tools-toggle">
         <span class="switch-name">Line split buttons</span>
         <span class="switch-desc">The ↵ and ↰ handles on the barlines</span>
@@ -250,12 +267,19 @@
         <span class="switch-desc">Scroll to keep the sounding beat in view</span>
         <span class="switch-pill"></span>
       </button>
-      <button class="switch-row" id="pickup-toggle">
-        <span class="switch-name">Pickup measure</span>
-        <span class="switch-desc">Start with a partial measure</span>
-        <span class="switch-pill"></span>
-      </button>
     </div>
+
+    <div class="popover-divider"></div>
+    <button class="popover-link popover-link-strong" id="layout-settings-btn">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/>
+        <circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/>
+        <circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/>
+        <circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>
+      </svg>
+      Layout settings…
+    </button>
+    <p class="popover-note">What is on the page, and which rhythms can be written on it.</p>
 
     <div class="popover-divider"></div>
     <button class="popover-link" id="layout-reset-btn">
@@ -292,7 +316,7 @@
 <div class="sheet-backdrop" id="library-sheet">
   <div class="sheet sheet-lg">
     <div class="sheet-head">
-      <h2>Songs</h2>
+      <h2 id="library-sheet-title">Songs</h2>
       <button class="sheet-close" data-close="library-sheet" title="Close">&times;</button>
     </div>
 
@@ -309,6 +333,7 @@
       </button>
       <button class="btn" id="saveAsBtn">Save a copy…</button>
       <button class="btn" id="importExportBtn">Share &amp; backup</button>
+      <button class="btn" id="lessonSetupBtn">Set up for students</button>
       <button class="btn" id="copy-visual-btn" title="Download a picture of this song">Save picture</button>
     </div>
 
@@ -374,6 +399,10 @@
         Send this song by link
       </div>
       <p class="card-desc">Anyone who opens the link gets a copy in their own library.</p>
+      <label class="inline-check" for="lock-layout-on-share">
+        <input type="checkbox" id="lock-layout-on-share" />
+        <span>Lock my layout settings into the link <em>(they get the same rhythms, meters and count line, and cannot widen them — the beat-dot button still works)</em></span>
+      </label>
       <button class="btn btn-primary" id="generateShareLinkBtn">Create a link</button>
       <div class="share-row" id="shareLinkContainer" hidden>
         <input type="text" id="shareLinkInput" class="text-field" readonly />
@@ -418,9 +447,202 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         Start over
       </div>
-      <p class="card-desc">Deletes every song you have made and restores the examples.</p>
+      <p class="card-desc">Deletes every song you have made, restores the examples, and puts layout settings back to everything-on.</p>
       <button class="btn btn-danger" id="resetAllDataBtn">Delete everything</button>
       <span class="status-msg" id="resetStatusMsg"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHEET: LAYOUT SETTINGS ============
+     What is on the page, and what can be written on it — as against the
+     View popover, which is how big it is and how it scrolls. Everything
+     in here applies straight away, to whoever is using the app, and it is
+     what a student link carries a copy of. -->
+<div class="sheet-backdrop" id="layout-sheet">
+  <div class="sheet sheet-lg">
+    <div class="sheet-head">
+      <h2>Layout settings</h2>
+      <button class="sheet-close" data-close="layout-sheet" title="Close">&times;</button>
+    </div>
+    <p class="sheet-sub">
+      What is on the page, and which rhythms can be written on it. These are
+      your working settings &mdash; anything you send to students carries a copy
+      of them.
+    </p>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        On the page
+      </div>
+      <div class="switch-list" id="layout-show"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v18"/><path d="M16 3v18"/><path d="M3 8h18"/><path d="M3 16h18"/></svg>
+        Meter
+      </div>
+
+      <div class="lesson-sub">Simple time <span class="lesson-sub-note">a beat counted in two</span></div>
+      <div class="chip-row" id="layout-meter-simple"></div>
+
+      <div class="lesson-sub">Compound time <span class="lesson-sub-note">a beat counted in three</span></div>
+      <div class="chip-row" id="layout-meter-compound"></div>
+
+      <p class="card-desc lesson-hint" id="layout-meter-note"></p>
+
+      <div class="lesson-sub">Pickup</div>
+      <div class="switch-list" id="layout-pickup"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M5 8h14"/><path d="M7 14h10"/></svg>
+        How a beat can divide
+      </div>
+      <div class="switch-list" id="layout-divide"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        Rhythms available
+      </div>
+      <p class="card-desc">Turn a whole group on or off with its switch, or tap the single rhythms inside it.</p>
+      <div class="seg seg-wide" id="layout-fam-seg" role="group" aria-label="Which time to set up">
+        <button class="seg-btn active" data-fam="simple">Simple&nbsp;time</button>
+        <button class="seg-btn" data-fam="compound">Compound&nbsp;time</button>
+      </div>
+      <p class="card-desc lesson-hint" id="layout-fam-note"></p>
+      <div id="layout-vocab"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.9 12a3.1 3.1 0 0 1 3.1-3.1h4"/><path d="M20.1 12a3.1 3.1 0 0 0-3.1-3.1h-4"/><path d="M3.9 12a3.1 3.1 0 0 0 3.1 3.1h4"/><path d="M20.1 12a3.1 3.1 0 0 1-3.1 3.1h-4"/></svg>
+        Joining beats
+      </div>
+      <div class="switch-list" id="layout-joins"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHEET: SET UP FOR STUDENTS ============
+     The teacher's side of the lesson system. Most of the controls inside
+     are built by script.js, because what they offer depends on what the
+     app can do rather than on anything fixed. -->
+<div class="sheet-backdrop" id="lesson-setup-sheet">
+  <div class="sheet sheet-lg">
+    <div class="sheet-head">
+      <h2>Set up for students</h2>
+      <button class="sheet-close" data-close="lesson-setup-sheet" title="Close">&times;</button>
+    </div>
+    <p class="sheet-sub">
+      Build the room you want them to work in, then send the link. What you
+      leave out simply isn&rsquo;t there for them &mdash; no locks, no greyed-out
+      buttons, just a smaller app.
+    </p>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        What they can build
+      </div>
+
+      <div class="lesson-sub">Which sides</div>
+      <div class="switch-list" id="lesson-sides"></div>
+
+      <div class="lesson-sub">Rhythms, meters and the count line</div>
+      <div class="layout-summary" id="lesson-layout-summary"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        The task
+      </div>
+      <div class="task-grid" id="lesson-task-grid"></div>
+      <input type="text" id="lesson-task-note" class="text-field" maxlength="160" autocomplete="off" />
+      <p class="card-desc lesson-hint">This sentence sits above their work the whole time. Leave it as it is if it says what you mean.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        Tempo &amp; length
+      </div>
+      <div class="seg seg-wide" id="lesson-tempo-seg" role="group" aria-label="How free the tempo is">
+        <button class="seg-btn active" data-tempo="any">Any&nbsp;tempo</button>
+        <button class="seg-btn" data-tempo="range">A&nbsp;range</button>
+        <button class="seg-btn" data-tempo="locked">Locked</button>
+      </div>
+      <div class="lesson-range" id="lesson-tempo-range" hidden>
+        <label>From <input type="number" id="lesson-tempo-min" class="text-field" min="21" max="600" /></label>
+        <label>to <input type="number" id="lesson-tempo-max" class="text-field" min="21" max="600" /></label>
+        <span class="lesson-unit">BPM</span>
+      </div>
+      <p class="card-desc lesson-hint" id="lesson-tempo-note"></p>
+
+      <div class="lesson-sub">Length</div>
+      <div class="switch-list" id="lesson-length"></div>
+      <div class="lesson-range">
+        <label>At most <input type="number" id="lesson-max-measures" class="text-field" min="1" max="64" placeholder="any" /></label>
+        <span class="lesson-unit">measures</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        The exercises
+      </div>
+      <div class="card-head-row">
+        <p class="card-desc">Tick what goes in this lesson. Students open them in this order.</p>
+        <div class="text-tools">
+          <button class="text-tool" id="lesson-songs-all">All</button>
+          <button class="text-tool" id="lesson-songs-none">None</button>
+        </div>
+      </div>
+      <div class="export-list" id="lesson-song-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        What else they get
+      </div>
+      <div class="switch-list" id="lesson-shell"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        The link
+      </div>
+      <input type="text" id="lesson-title-input" class="text-field" maxlength="60" autocomplete="off" placeholder="Name this lesson &mdash; e.g. Ta and Ti-Ti, Monday" />
+      <p class="card-desc">
+        The link is one-way: it opens the lesson and stays there. Keep working
+        in your own copy here &mdash; nothing you send changes it.
+      </p>
+      <div class="lesson-foot">
+        <button class="btn" id="lesson-preview-btn">Preview as a student</button>
+        <button class="btn btn-primary" id="lesson-link-btn">Create the link</button>
+      </div>
+      <div class="share-row" id="lesson-link-row" hidden>
+        <input type="text" id="lesson-link-input" class="text-field" readonly />
+        <button class="btn" id="lesson-link-copy"><span id="lesson-link-copy-text">Copy</span></button>
+        <span class="status-msg" id="lesson-link-feedback"></span>
+      </div>
+    </div>
+
+    <div class="card" id="lesson-saved-card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/></svg>
+        Lessons you have made
+      </div>
+      <div class="lesson-saved-list" id="lesson-saved-list"></div>
     </div>
   </div>
 </div>
