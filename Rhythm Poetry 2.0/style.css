@@ -1833,3 +1833,341 @@ body.capturing.capture-color .circles { background: #fff; }
   }
   .notes-box:not(.selected):not(.playing):hover:not(:active) { background: transparent; }
 }
+
+/* ============================================================
+   LESSONS
+   A lesson never greys a control out — it takes it away, and the
+   toolbar closes over the gap. The only things that stay are the
+   ones you have to be able to read: the meter and the tempo, which
+   stop being buttons instead.
+   ============================================================ */
+
+/* Wins over the side-switching rules, which also set display. */
+.policy-off { display: none !important; }
+
+/* A group left with nothing in it would still draw its divider, and the
+   group after it would carry a border with nothing to its left. Both are
+   worked out in applyPolicyToShell rather than with :has(), which is one
+   more thing to be wrong on an old school Chromebook. */
+.tool-group.is-first { border-left: none; }
+
+/* ---- the task strip ---- */
+.task-strip {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 7px 16px;
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--hairline);
+  font-size: 14px;
+  line-height: 1.35;
+}
+.task-strip[hidden] { display: none; }
+.task-strip-title {
+  font-family: var(--font-round);
+  font-weight: 700;
+  color: var(--accent);
+  flex: none;
+}
+.task-strip-note { color: var(--ink-2); }
+
+@media (max-width: 720px) {
+  .task-strip { flex-direction: column; gap: 1px; padding: 6px 14px; font-size: 13px; }
+}
+body.present-mode .task-strip { display: none; }
+
+/* ---- previewing as a student (teacher only) ---- */
+.preview-bar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--toolbar-h) + 14px);
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 8px 16px;
+  border-radius: var(--r-xl);
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: var(--shadow-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+.preview-bar[hidden] { display: none; }
+.preview-bar .btn { padding: 6px 13px; font-size: 13px; }
+
+/* ---- what a frozen part of the piece looks like ----
+   Nothing announces itself as locked. The affordances simply go, so
+   there is never a dot that looks tappable and then refuses. */
+.circles.frozen .circle { cursor: default; }
+.circles.frozen .circle:hover,
+.circles.frozen .circle:active { transform: none; }
+.word.frozen { cursor: default; }
+.word.frozen:hover,
+.word.frozen:active { background: transparent; }
+
+/* One subdivision button on its own, where the pair would have sat. */
+.beat-subdivision-controls.single { gap: 0; }
+
+/* A meter or a tempo with nothing left to choose reads as plain text. */
+.time-sig.fixed,
+.bpm-btn.fixed { background: transparent; cursor: default; }
+.time-sig.fixed:hover,
+.time-sig.fixed:active,
+.bpm-btn.fixed:hover,
+.bpm-btn.fixed:active { background: transparent; }
+.time-sig.fixed .ts-num,
+.bpm-btn.fixed .bpm-value { cursor: default; }
+
+/* ============================================================
+   THE SETUP SHEET
+   ============================================================ */
+
+.lesson-sub {
+  font-family: var(--font-round);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+  letter-spacing: .02em;
+  margin: 15px 0 7px;
+}
+.lesson-sub:first-child { margin-top: 0; }
+.lesson-hint { margin: 7px 0 0; }
+
+.lesson-range {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.lesson-range[hidden] { display: none; }
+.lesson-range label { display: flex; align-items: center; gap: 6px; }
+.lesson-range .text-field { width: 84px; padding: 7px 9px; }
+.lesson-unit { color: var(--ink-3); }
+
+.lesson-foot {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+/* ---- the vocabulary ----
+   The teacher picks the notation itself rather than a list of names,
+   and every cell is drawn by the same engraver the staff uses, so
+   what they tick is literally what a student will see. */
+.vocab-block {
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 9px 11px 11px;
+  margin-top: 9px;
+  background: var(--surface);
+}
+.vocab-block.off { background: var(--paper-2); }
+
+.vocab-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 2px 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+.vocab-head-name {
+  font-family: var(--font-round);
+  font-weight: 700;
+  font-size: 15px;
+}
+.vocab-head-text { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.vocab-head-blurb { font-size: 12.5px; color: var(--ink-3); line-height: 1.35; }
+.vocab-head .switch-pill { flex: none; }
+.vocab-head.active .switch-pill { background: var(--accent); }
+.vocab-head.active .switch-pill::after { transform: translateX(17px); }
+/* Part of a group on, part off: the pill sits between its two ends. */
+.vocab-head.partial .switch-pill { background: var(--hold); }
+.vocab-head.partial .switch-pill::after { transform: translateX(8.5px); }
+
+.vocab-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.vocab-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 46px;
+  min-height: 52px;
+  padding: 4px 6px;
+  border: 1.5px solid var(--hairline);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  cursor: pointer;
+  transition: border-color .12s, background .12s, opacity .12s;
+  opacity: .35;
+}
+.vocab-cell .rhythm-svg { position: static; }
+.vocab-cell:hover { border-color: var(--hairline-2); }
+.vocab-cell.picked {
+  opacity: 1;
+  background: var(--surface);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-1);
+}
+
+/* ---- the four tasks ---- */
+.task-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.task-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 13px;
+  border: 1.5px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: border-color .12s, background .12s;
+}
+.task-card:hover { border-color: var(--hairline-2); }
+.task-card.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.task-card-label {
+  font-family: var(--font-round);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink);
+}
+.task-card-desc { font-size: 13px; color: var(--ink-2); line-height: 1.4; }
+
+/* ---- lessons the teacher has kept ---- */
+.lesson-saved-list { display: flex; flex-direction: column; gap: 5px; }
+.lesson-saved-list .library-song-item { padding-left: 13px; }
+
+.lesson-warn {
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-radius: var(--r-sm);
+  /* Literal first, color-mix second: the mix is the nicer colour, and a
+     browser too old for it still gets a sane amber rather than nothing. */
+  background: #FDF1DC;
+  background: color-mix(in srgb, var(--hold) 16%, var(--surface));
+  border: 1px solid #F3D9A6;
+  border-color: color-mix(in srgb, var(--hold) 45%, var(--surface));
+  color: var(--ink-2);
+}
+
+/* ============================================================
+   LAYOUT SETTINGS
+   ============================================================ */
+
+/* ---- the beat-dot button ----
+   Its own control beside Play, not a line in a popover, because a class
+   turns the dots off to read and on to edit several times a lesson. It
+   sits outside every .tool-group on purpose, so nothing a lesson hides
+   can take it with it. */
+.dots-toggle {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: var(--r-md);
+  background: var(--paper-2);
+  color: var(--ink-3);
+  transition: background .13s, color .13s;
+}
+.dots-toggle svg { width: 24px; height: 24px; }
+.dots-toggle:hover,
+.dots-toggle:active { background: var(--hairline); }
+.dots-toggle.active { background: var(--accent-soft); color: var(--accent); }
+
+/* ---- the count line ----
+   Which beat of the measure this is, under the staff where a class reads
+   its counting. Deliberately quiet: it is a reference, not part of the
+   music. */
+.beat-number {
+  margin-top: 4px;
+  font-family: var(--font-round);
+  font-size: calc(var(--word-size) * 0.72);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink-3);
+  opacity: .75;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ---- the sheet ---- */
+.lesson-sub-note {
+  font-weight: 600;
+  color: var(--ink-3);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* A shape the group owns but that is not picked one at a time — the
+   halves and wholes, which are the chain button rather than a beat. */
+.vocab-cell.static { cursor: default; }
+
+/* Something the sheet names but cannot do yet. Shown rather than hidden:
+   a teacher planning a unit is better off knowing it is coming. */
+.switch-row.soon { opacity: .6; cursor: default; }
+.switch-row.soon .switch-pill { opacity: .4; }
+.soon-tag {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin-top: 3px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--hairline);
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+
+/* The line in Set up for students that reports what Layout Settings will
+   send, so nobody has to remember what they set in the other sheet. */
+.layout-summary {
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--paper-2);
+  border: 1px solid var(--hairline);
+}
+.layout-summary .card-desc { margin: 0 0 6px; }
+
+.popover-link-strong { font-weight: 700; color: var(--ink); }
+.popover-link-strong svg { color: var(--accent); }
+
+/* A span is drawn across several beats, so its cell is wider than a
+   single-beat one and sized to the drawing rather than to a slot count. */
+.vocab-cell-span { min-width: 56px; }
+
+/* Illustrations that follow the group switch rather than carrying one. */
+.vocab-grid-extra { align-items: center; margin-top: 8px; }
+.vocab-extra-note {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  margin-right: 2px;
+}
