@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Poetry Ostinato Player</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============================================================
+     TOP BAR
+     The pairing — which poem, which ostinato — and how the two
+     are laid out on the screen. Playing lives in the bar at the
+     bottom, the same place both apps keep theirs.
+     ============================================================ -->
+<header class="topbar">
+  <a href="../index.html" class="home-link" title="Back to Eagle View Music">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+  </a>
+  <div class="brand">
+    <span class="pop-mark" aria-hidden="true"><span class="p1">P</span><span class="o">O</span><span class="p2">P</span></span>
+    <span class="brand-name">Poetry Ostinato Player</span>
+  </div>
+
+  <button class="pair-chip" id="pair-chip" title="Pairings, sharing and starting fresh">
+    <span class="pair-chip-dot poem"></span>
+    <span class="pair-chip-label" id="pair-chip-label">New pairing</span>
+    <span class="pair-chip-dot ost"></span>
+    <svg class="caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+  </button>
+
+  <div class="topbar-right">
+    <div class="seg" role="group" aria-label="Arrangement">
+      <button class="seg-btn" id="arrange-stacked" title="One above the other">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="7" rx="2"/><rect x="3.5" y="13.5" width="17" height="7" rx="2"/></svg>
+        <span class="seg-label">Stacked</span>
+      </button>
+      <button class="seg-btn" id="arrange-side" title="Side by side">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="17" rx="2"/><rect x="13.5" y="3.5" width="7" height="17" rx="2"/></svg>
+        <span class="seg-label">Side by side</span>
+      </button>
+    </div>
+    <button class="tool-btn" id="layout-btn" title="Layout: order, sizes, what to show">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="7" cy="18" r="2" fill="currentColor"/></svg>
+      <span class="tool-label">Layout</span>
+    </button>
+    <button class="tool-btn" id="present-btn" title="Present — the two scores and nothing else">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+      <span class="tool-label">Present</span>
+    </button>
+  </div>
+</header>
+
+<!-- ============================================================
+     THE TWO PANES
+     Each is the real app, in a frame, showing the score and
+     nothing else. The POP decides their size and order; the app
+     decides how its own score fits the room it is given.
+     ============================================================ -->
+<main class="panes" id="panes" data-arrange="stacked" data-first="poem" data-show="both">
+
+  <section class="pane" id="pane-poem" data-side="poem" aria-label="Poem">
+    <div class="pane-head">
+      <span class="pane-dot"></span>
+      <span class="pane-kind">Poem</span>
+      <button class="pane-title" data-pick="poem" title="Choose a different poem">
+        <span class="pane-title-text" id="poem-title">Choose a poem</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <span class="pane-meta" id="poem-meta"></span>
+      <span class="pane-spacer"></span>
+      <button class="icon-btn pane-mute" data-side="poem" title="Mute the poem" aria-pressed="false">
+        <svg class="i-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+        <svg class="i-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="m17 9 4 6"/><path d="m21 9-4 6"/></svg>
+      </button>
+      <button class="icon-btn pane-view" data-side="poem" title="How the poem is shown">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+    <div class="pane-body">
+      <iframe class="pane-frame" id="frame-poem" title="Rhythm Poetry"></iframe>
+      <div class="pane-empty" id="empty-poem">
+        <div class="empty-card">
+          <div class="empty-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </div>
+          <h2>Choose a poem</h2>
+          <p>Open one from your Rhythm Poetry library, or paste the link you shared from it.</p>
+          <div class="empty-actions">
+            <button class="btn btn-primary" data-pick="poem" data-tab="library">Open the library</button>
+            <button class="btn" data-pick="poem" data-tab="link">Paste a link</button>
+          </div>
+          <a class="empty-make" data-make="poem" target="_blank" rel="noopener">Write a new one in Rhythm Poetry ↗</a>
+        </div>
+        <div class="empty-status" id="status-poem" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider" id="divider" role="separator" tabindex="0"
+       aria-label="Drag to resize the two scores. Double-click to size them automatically."
+       title="Drag to resize · double-click to size automatically">
+    <span class="grip"></span>
+  </div>
+
+  <section class="pane" id="pane-ost" data-side="ost" aria-label="Ostinato">
+    <div class="pane-head">
+      <span class="pane-dot"></span>
+      <span class="pane-kind">Ostinato</span>
+      <button class="pane-title" data-pick="ost" title="Choose a different ostinato">
+        <span class="pane-title-text" id="ost-title">Choose an ostinato</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <span class="pane-meta" id="ost-meta"></span>
+      <span class="meter-note" id="meter-note" hidden></span>
+      <span class="pane-spacer"></span>
+      <button class="icon-btn pane-mute" data-side="ost" title="Mute the ostinato" aria-pressed="false">
+        <svg class="i-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+        <svg class="i-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="m17 9 4 6"/><path d="m21 9-4 6"/></svg>
+      </button>
+      <button class="icon-btn pane-view" data-side="ost" title="How the ostinato is shown">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+    <div class="pane-body">
+      <iframe class="pane-frame" id="frame-ost" title="Ostinato Builder"></iframe>
+      <div class="pane-empty" id="empty-ost">
+        <div class="empty-card">
+          <div class="empty-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="15" r="3"/><path d="M9 17V5l12-2v12"/><path d="M9 9l12-2"/></svg>
+          </div>
+          <h2>Choose an ostinato</h2>
+          <p>Open one from your Ostinato Builder library, or paste the link you shared from it.</p>
+          <div class="empty-actions">
+            <button class="btn btn-primary" data-pick="ost" data-tab="library">Open the library</button>
+            <button class="btn" data-pick="ost" data-tab="link">Paste a link</button>
+          </div>
+          <a class="empty-make" data-make="ost" target="_blank" rel="noopener">Build a new one in Ostinato Builder ↗</a>
+        </div>
+        <div class="empty-status" id="status-ost" hidden></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ============================================================
+     TRANSPORT
+     One play button for both sides, one tempo, and the choices
+     about how the two fit together in time.
+     ============================================================ -->
+<footer class="transport" id="transport">
+  <div class="transport-inner">
+    <button class="play-btn" id="play-btn" title="Play / stop (Space)">
+      <span class="play-glyph" id="play-glyph">▶</span>
+    </button>
+
+    <div class="tempo" id="tempo">
+      <button class="step-btn" id="bpm-down" title="Slower (Shift: by 5)">−</button>
+      <label class="bpm-field" title="Tempo — both sides count the same beat">
+        <input id="bpm-input" type="text" inputmode="numeric" maxlength="3" value="92" aria-label="Tempo in beats per minute">
+        <span class="bpm-unit">BPM</span>
+      </label>
+      <button class="step-btn" id="bpm-up" title="Faster (Shift: by 5)">+</button>
+      <button class="tool-btn tempo-more" id="tempo-btn" title="Tempo options">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+
+    <div class="tool-group">
+      <button class="toggle-btn" id="countin-btn" aria-pressed="false" title="Click one bar before the music starts">
+        <span class="toggle-dot"></span>Count-in
+      </button>
+      <button class="tool-btn" id="leadin-btn" title="How many times the ostinato plays before the poem comes in">
+        <span class="tool-label">Intro</span>
+        <span class="tool-value" id="leadin-value">1×</span>
+      </button>
+      <button class="toggle-btn" id="loop-btn" aria-pressed="true" title="Go round again when the poem ends">
+        <span class="toggle-dot"></span>Loop
+      </button>
+    </div>
+
+    <button class="tool-btn mixer-btn" id="mixer-btn" title="Mute and balance each voice">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>
+      <span class="tool-label">Mixer</span>
+    </button>
+
+    <div class="readout" id="readout" aria-live="off">
+      <span class="readout-part poem" id="readout-poem"></span>
+      <span class="readout-part ost" id="readout-ost"></span>
+    </div>
+
+    <button class="present-exit" id="present-exit" title="Leave present mode (Esc)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9L4 4m0 0v5m0-5h5"/><path d="M15 9l5-5m0 0v5m0-5h-5"/><path d="M9 15l-5 5m0 0v-5m0 5h5"/><path d="M15 15l5 5m0 0v-5m0 5h-5"/></svg>
+    </button>
+  </div>
+</footer>
+
+
+<!-- ============================================================
+     POPOVERS
+     ============================================================ -->
+
+<!-- Layout -->
+<div class="popover" id="layout-pop" role="dialog" aria-label="Layout">
+  <div class="pop-section">
+    <div class="pop-label">Order</div>
+    <div class="seg seg-wide" role="group">
+      <button class="seg-btn" id="first-poem">Poem first</button>
+      <button class="seg-btn" id="first-ost">Ostinato first</button>
+    </div>
+  </div>
+  <div class="pop-section">
+    <div class="pop-label">Show</div>
+    <div class="seg seg-wide" role="group">
+      <button class="seg-btn" data-show="both">Both</button>
+      <button class="seg-btn" data-show="poem">Poem</button>
+      <button class="seg-btn" data-show="ost">Ostinato</button>
+    </div>
+  </div>
+  <div class="pop-section">
+    <div class="pop-label">Sizes</div>
+    <div class="seg seg-wide" role="group">
+      <button class="seg-btn" id="split-auto">Automatic</button>
+      <button class="seg-btn" id="split-even">Half and half</button>
+    </div>
+    <p class="pop-note" id="split-note">The ostinato gets the room it needs and the poem gets the rest. Drag the line between them to choose for yourself.</p>
+  </div>
+</div>
+
+<!-- Tempo -->
+<div class="popover" id="tempo-pop" role="dialog" aria-label="Tempo">
+  <div class="pop-section">
+    <div class="pop-label">Tempo <span class="pop-value" id="tempo-pop-value">92</span></div>
+    <input type="range" id="bpm-slider" min="30" max="260" step="1" value="92">
+  </div>
+  <div class="pop-section">
+    <div class="pop-label">Use the tempo saved with</div>
+    <div class="seg seg-wide" role="group">
+      <button class="seg-btn" id="tempo-from-poem">The poem</button>
+      <button class="seg-btn" id="tempo-from-ost">The ostinato</button>
+    </div>
+    <p class="pop-note">Both sides count the same beat: a quarter note in 4/4, a dotted quarter in 6/8.</p>
+  </div>
+</div>
+
+<!-- Intro (lead-in) -->
+<div class="popover" id="leadin-pop" role="dialog" aria-label="Ostinato intro">
+  <div class="pop-section">
+    <div class="pop-label">Ostinato plays first</div>
+    <div class="seg seg-wide" role="group" id="leadin-seg">
+      <button class="seg-btn" data-leadin="0">Off</button>
+      <button class="seg-btn" data-leadin="1">1×</button>
+      <button class="seg-btn" data-leadin="2">2×</button>
+      <button class="seg-btn" data-leadin="4">4×</button>
+    </div>
+    <p class="pop-note">How many times round the ostinato goes on its own before the poem comes in. If the poem starts with a pickup, it comes in on the last beat of the intro.</p>
+  </div>
+</div>
+
+<!-- Mixer -->
+<div class="popover popover-wide" id="mixer-pop" role="dialog" aria-label="Mixer">
+  <div class="mixer-col poem">
+    <div class="mixer-head"><span class="pane-dot"></span>Poem</div>
+    <div class="mixer-voices" id="mixer-poem"></div>
+    <div class="pop-label small">Words sound like</div>
+    <div class="seg seg-wide" role="group">
+      <button class="seg-btn" id="words-tone">A tone</button>
+      <button class="seg-btn" id="words-drum">A drum</button>
+    </div>
+    <label class="vol"><span>Volume</span><input type="range" min="0" max="100" id="vol-poem"></label>
+  </div>
+  <div class="mixer-col ost">
+    <div class="mixer-head"><span class="pane-dot"></span>Ostinato</div>
+    <div class="mixer-voices" id="mixer-ost"></div>
+    <label class="vol"><span>Volume</span><input type="range" min="0" max="100" id="vol-ost"></label>
+  </div>
+</div>
+
+<!-- View: poem -->
+<div class="popover" id="view-poem-pop" role="dialog" aria-label="How the poem is shown">
+  <div class="pop-section">
+    <div class="pop-label">Size</div>
+    <div class="seg seg-wide" role="group">
+      <button class="seg-btn" data-rp-size="page" title="The whole poem fits its pane">Whole poem</button>
+      <button class="seg-btn" data-rp-size="fit" title="Fill the width and scroll down as it plays">Fill the width</button>
+    </div>
+    <label class="slider-row"><span>Scale</span><input type="range" min="50" max="160" step="5" id="rp-zoom"><span class="slider-val" id="rp-zoom-val">100%</span></label>
+  </div>
+  <div class="pop-section">
+    <div class="pop-label">Bars on a line</div>
+    <div class="chips" id="rp-mpl">
+      <button class="chip-btn" data-mpl="auto">Auto</button>
+      <button class="chip-btn" data-mpl="1">1</button>
+      <button class="chip-btn" data-mpl="2">2</button>
+      <button class="chip-btn" data-mpl="3">3</button>
+      <button class="chip-btn" data-mpl="4">4</button>
+      <button class="chip-btn" data-mpl="6">6</button>
+    </div>
+  </div>
+  <div class="pop-section switches">
+    <button class="switch-row" data-rp-switch="showDots"><span>Beat dots</span><span class="switch"></span></button>
+    <button class="switch-row" data-rp-switch="showMeasureNumbers"><span>Bar numbers</span><span class="switch"></span></button>
+    <button class="switch-row" data-rp-switch="followPlayback"><span>Follow while it plays</span><span class="switch"></span></button>
+  </div>
+</div>
+
+<!-- View: ostinato -->
+<div class="popover" id="view-ost-pop" role="dialog" aria-label="How the ostinato is shown">
+  <div class="pop-section">
+    <div class="pop-label">Layout</div>
+    <div class="seg seg-wide" role="group">
+      <button class="seg-btn" data-ob-layout="pages">Pages</button>
+      <button class="seg-btn" data-ob-layout="scroll">Scroll across</button>
+    </div>
+  </div>
+  <div class="pop-section" id="ob-perpage-section">
+    <div class="pop-label">Bars on a page</div>
+    <div class="chips" id="ob-perpage">
+      <button class="chip-btn" data-per-page="1">1</button>
+      <button class="chip-btn" data-per-page="2">2</button>
+      <button class="chip-btn" data-per-page="4">4</button>
+      <button class="chip-btn" data-per-page="8">8</button>
+    </div>
+  </div>
+  <div class="pop-section" id="ob-zoom-section">
+    <label class="slider-row"><span>Size</span><input type="range" min="40" max="180" step="5" id="ob-zoom"><span class="slider-val" id="ob-zoom-val">100%</span></label>
+  </div>
+  <div class="pop-section switches">
+    <button class="switch-row" data-ob-switch="showDots"><span>Beat dots</span><span class="switch"></span></button>
+    <button class="switch-row" data-ob-switch="lightNotes"><span>Light up the notes</span><span class="switch"></span></button>
+    <button class="switch-row" data-ob-switch="showSyllables"><span>Syllables</span><span class="switch"></span></button>
+    <button class="switch-row" data-ob-switch="showBarNumbers"><span>Bar numbers</span><span class="switch"></span></button>
+    <button class="switch-row" data-ob-switch="showBeatNumbers"><span>Beat numbers</span><span class="switch"></span></button>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     SHEETS
+     ============================================================ -->
+
+<!-- Choosing a song for one side -->
+<div class="sheet-backdrop" id="picker-sheet">
+  <div class="sheet" role="dialog" aria-labelledby="picker-heading">
+    <div class="sheet-head">
+      <span class="pane-dot" id="picker-dot"></span>
+      <h2 id="picker-heading">Choose a poem</h2>
+      <button class="icon-btn sheet-close" data-close title="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div class="seg seg-wide sheet-tabs" role="tablist">
+      <button class="seg-btn" id="picker-tab-library" role="tab">From your library</button>
+      <button class="seg-btn" id="picker-tab-link" role="tab">Paste a link</button>
+    </div>
+
+    <div class="picker-pane" id="picker-library">
+      <div class="seg seg-wide picker-filter" id="picker-filter" role="group" hidden>
+        <button class="seg-btn" data-filter="poetry">Poems</button>
+        <button class="seg-btn" data-filter="rhythm">Rhythms</button>
+      </div>
+      <div class="song-list" id="picker-list"></div>
+      <p class="pop-note picker-foot" id="picker-foot"></p>
+    </div>
+
+    <div class="picker-pane" id="picker-link" hidden>
+      <p class="sheet-text">In <span id="picker-app-name">Rhythm Poetry</span>, open the song library and choose <b>Share &amp; backup → Make a link</b>. Paste that link here.</p>
+      <textarea id="link-input" rows="3" spellcheck="false" placeholder="https://…?song=…"></textarea>
+      <div class="sheet-actions">
+        <span class="status-msg" id="link-status"></span>
+        <button class="btn btn-primary" id="link-open">Open it</button>
+      </div>
+      <p class="pop-note">A link from either app works here — it goes to the side it belongs to.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Pairings, sharing, starting fresh -->
+<div class="sheet-backdrop" id="pair-sheet">
+  <div class="sheet" role="dialog" aria-labelledby="pair-heading">
+    <div class="sheet-head">
+      <h2 id="pair-heading">Pairings</h2>
+      <button class="icon-btn sheet-close" data-close title="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <p class="sheet-text">A pairing is a poem and an ostinato kept together, with the tempo, intro and mixer you set for them.</p>
+
+    <div class="pair-current">
+      <label class="field">
+        <span class="field-label">This pairing</span>
+        <input type="text" id="pair-name" maxlength="60" placeholder="Name it to keep it">
+      </label>
+      <div class="sheet-actions">
+        <button class="btn" id="pair-new">Start fresh</button>
+        <button class="btn" id="pair-share">Copy a link</button>
+        <button class="btn btn-primary" id="pair-save">Save pairing</button>
+      </div>
+      <div class="share-row" id="share-row" hidden>
+        <input type="text" id="share-link" readonly>
+        <span class="status-msg" id="share-status"></span>
+      </div>
+    </div>
+
+    <div class="pop-label">Saved</div>
+    <div class="song-list" id="pair-list"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="script.js"></script>
+</body>
+</html>

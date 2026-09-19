@@ -22,9 +22,62 @@
       never contradict the colours a student is looking at.
    ============================================================ */
 
+/* ==================================================================
+   EMBEDDED IN THE POP
+   ------------------------------------------------------------------
+   The Poetry Ostinato Player opens this app in a frame (?embed=pop) to
+   play an ostinato under a poem. There the app is a guest: it may read
+   its library and settings, but nothing it does may write them. Opening a song in the POP must not change which song is open
+   the next time this app is opened on its own, let alone overwrite one.
+
+   Rather than guard every write (there are a dozen, and the next one
+   added would be missed), localStorage itself is swapped for a layer
+   that reads through to the real thing and keeps every write in memory.
+   It runs before the app, so the app never sees the real object.
+
+   Rhythm Poetry 2.0 carries the same block; keep the two in step.
+   See `Poetry Ostinato Player/README.md` for the bridge they serve.
+   ================================================================== */
+(function () {
+  let embedded = false;
+  try {
+    embedded = new URLSearchParams(window.location.search).get('embed') === 'pop'
+      && window.parent !== window;
+  } catch (e) {}
+  if (!embedded) return;
+
+  const real = window.localStorage;
+  const writes = new Map();             // key -> value, or null once removed
+  const layer = {
+    getItem(k) {
+      k = String(k);
+      if (writes.has(k)) return writes.get(k);
+      try { return real.getItem(k); } catch (e) { return null; }
+    },
+    setItem(k, v) { writes.set(String(k), String(v)); },
+    removeItem(k) { writes.set(String(k), null); },
+    clear() { writes.clear(); },
+    key(i) { try { return real.key(i); } catch (e) { return null; } },
+    get length() { try { return real.length; } catch (e) { return 0; } }
+  };
+  try {
+    Object.defineProperty(window, 'localStorage', { value: layer, configurable: true });
+  } catch (e) {}
+
+  /* If the swap did not take, this is not a safe guest: run as the plain
+     app, and the POP will find no bridge and say so. */
+  if (window.localStorage !== layer) return;
+  window.POP_EMBED = {
+    /* Drop what this frame wrote for a key, so the next read is the real,
+       current value — the POP's song picker wants the live library. */
+    forget(k) { writes.delete(String(k)); }
+  };
+})();
+
 (function () {
   'use strict';
 
+  const EMBEDDED = !!window.POP_EMBED;
   const RN = window.RhythmNotation;
   const VI = window.VirtualInstruments;
   /* The glyph file declares `const GLYPHS_LELAND` at the top level of a
@@ -57,15 +110,25 @@
   function isCompound() { return song.timeSignatureDenominator === 8; }
   function beatTicks()  { return isCompound() ? COMPOUND_BEAT : SIMPLE_BEAT; }
 
+  /* How finely a beat may be divided, stated per family rather than for
+     the piece in hand. The three functions under these are the same
+     answers for whichever family is playing; Layout settings has to ask
+     about both at once, so it reads the tables. Keeping the numbers in
+     one place is what stops the switches in that sheet drifting from the
+     buttons on the page. */
+  const NATURAL_SLOTS   = { simple: 2, compound: 3 };   // the plain division
+  const SIXTEENTH_SLOTS = { simple: 4, compound: 6 };   // what + reaches for
+  const TUPLET_LADDER   = { simple: [3, 6], compound: [2, 4] };  // what − walks
+
   /* The plain division of one beat: two eighths, or three in compound. */
-  function defaultSubdivision() { return isCompound() ? 3 : 2; }
+  function defaultSubdivision() { return NATURAL_SLOTS[familyOf()]; }
 
   /* What the + button reaches for: this beat's sixteenth-note level. */
-  function sixteenthSubdivision() { return isCompound() ? 6 : 4; }
+  function sixteenthSubdivision() { return SIXTEENTH_SLOTS[familyOf()]; }
 
   /* What the − button walks through: the opposite feel, then its own
      subdivision, then back off again. */
-  function tupletLadder() { return isCompound() ? [2, 4] : [3, 6]; }
+  function tupletLadder() { return TUPLET_LADDER[familyOf()].slice(); }
 
   /* The numerator is what gets printed; the app counts beats. In compound
      time the numerator counts eighths while a beat is a dotted quarter, so
@@ -286,6 +349,7 @@
   }
 
   function toggleLink(track, leftBeatIndex) {
+    if (!rhythmEditable()) return;
     if (!track.links) track.links = {};
     if (track.links[leftBeatIndex]) delete track.links[leftBeatIndex];
     else track.links[leftBeatIndex] = true;
@@ -540,6 +604,7 @@
     currentPage = 0;
     render();
     syncSettings();
+    applyPolicyToShell();
   }
 
   function updateSongChip() {
@@ -611,7 +676,9 @@
      sound queued up while it is suspended fires at once on resume.
      ================================================================== */
 
-  const kit = VI.createKit();
+  /* Replaced when the POP embeds this app: it hands over its own context
+     and a gain for this side (see the POP BRIDGE below). */
+  let kit = VI.createKit();
   let audioUnlocked = false;
 
   function unlockAudio() {
@@ -796,8 +863,11 @@
   const view = {
     showSyllables: false,
     syllableSystem: 'Simplified Kodály',
-    showLinkButtons: true,
+    /* The dots and the chains that join beats are one switch: both are
+       the editing layer over the notation, so reading the score means
+       putting both away and writing it means bringing both back. */
     showDots: true,
+    showBarNumbers: true,
     showBeatNumbers: true,
 
     /* The dots row lighting up is the quiet way to watch playback, and
@@ -821,6 +891,11 @@
       const raw = JSON.parse(localStorage.getItem(VIEW_PREFS_KEY) || 'null');
       if (raw && typeof raw === 'object') {
         Object.keys(view).forEach(k => { if (raw[k] !== undefined) view[k] = raw[k]; });
+        /* Bar and beat numbers used to be one switch, stored as
+           showBeatNumbers. Someone who had it off wants both off. */
+        if (raw.showBarNumbers === undefined && raw.showBeatNumbers === false) {
+          view.showBarNumbers = false;
+        }
       }
     } catch (e) {}
     if (SYLLABLE_SYSTEMS.indexOf(view.syllableSystem) === -1) {
@@ -836,6 +911,623 @@
   }
 
   loadViewPrefs();
+
+  /* ==================================================================
+     LAYOUT SETTINGS — what is on the page, and what can be written on it
+     ------------------------------------------------------------------
+     One object, always present, deciding two separate things:
+
+       what the score SHOWS   tappable dots, join buttons, bar and beat
+                              numbers, syllables
+       what can be BUILT      which meters, how a beat may divide, which
+                              shapes each division may take, how far a
+                              note may be joined across beats, and which
+                              instruments the kit offers
+
+     This is deliberately not the same question as the Layout section of
+     Settings, which is about how big the score is drawn and whether it
+     turns pages — how you see it, rather than what there is to see.
+
+     It governs the primary user as much as anyone, and that is the
+     point: a student link is a copy of the room the teacher is already
+     working in, not a second set of switches that apply to someone else.
+     Narrow the vocabulary here and every link you send is narrowed with
+     it.
+
+     Defaults are everything-on, so an untouched app is the app that
+     shipped before any of this existed.
+     ================================================================== */
+
+  const LAYOUT_KEY = 'ostinato_builder_layout_v1';
+  const LESSON_KEY = 'ostinato_builder_lessons_v1';
+  const POLICY_VERSION = 1;
+
+  /* The meters each denominator offers, in the order the numeral cycles —
+     the same list the time signature has always walked. */
+  const METER_ORDER = { 4: [2, 3, 4, 5, 6], 8: [6, 9, 12] };
+
+  const METERS = {
+    simple:   METER_ORDER[4].map(n => n + '/4'),
+    compound: METER_ORDER[8].map(n => n + '/8')
+  };
+
+  /* The three rungs past a beat's natural division, named the way the
+     sheet asks about them and read straight off the tables the +/− pair
+     walks. Simple time counts in two and borrows three; compound counts
+     in three and borrows two — so one switch serves both families, which
+     is why the sheet says "triplets / duplets" rather than a number of
+     slots. */
+  const DIVIDE_SLOTS = {
+    sixteenths: SIXTEENTH_SLOTS,
+    tuplets:    { simple: TUPLET_LADDER.simple[0], compound: TUPLET_LADDER.compound[0] },
+    subTuplets: { simple: TUPLET_LADDER.simple[1], compound: TUPLET_LADDER.compound[1] }
+  };
+
+  /* How far a join may reach. A cap rather than a set of lengths: joins
+     are made one beat at a time, so "3 beats but not 2" is a state the
+     chain button could never walk to, and offering it would be offering a
+     dead switch. 1 means no joining at all. */
+  const JOIN_CAP_MAX = 8;          // past any meter this app can count
+  const JOIN_LENGTHS = [2, 3, 4];  // the lengths the sheet draws a picture of
+
+  let layout = null;        // filled in below; never null after that
+  let layoutLocked = false; // a lesson, or a link sent with the layout locked
+  let policy = null;        // the student task, or null outside a lesson
+  let lessonMeta = null;    // { title, songIds } while a lesson is open
+
+  /* Declared up here with the other caches rather than beside the code
+     that fills them: loadLayout() runs at the bottom of this block and
+     clears them. */
+  const offersCache = {};
+  const patternCache = {};
+
+  /* Every on/off pattern of a beat in that many slots, sound-first: XX
+     before XO before OX before OO. This is also the order a dot-tap walks
+     when the vocabulary is too small to honour the tap directly, so it
+     wants to be musical rather than arbitrary — all sound first, silence
+     last. */
+  function patternsFor(slots) {
+    if (patternCache[slots]) return patternCache[slots];
+    const out = [];
+    for (let i = (1 << slots) - 1; i >= 0; i--) {
+      let p = '';
+      for (let b = slots - 1; b >= 0; b--) p += (i & (1 << b)) ? 'X' : 'O';
+      out.push(p);
+    }
+    patternCache[slots] = out;
+    return out;
+  }
+
+  function flagsToPattern(flags) {
+    let p = '';
+    for (let i = 0; i < flags.length; i++) p += flags[i] ? 'X' : 'O';
+    return p;
+  }
+
+  function patternToFlags(pattern) {
+    const out = [];
+    for (let i = 0; i < pattern.length; i++) out.push(pattern[i] === 'X');
+    return out;
+  }
+
+  /* Shapes are only worth choosing one at a time while there are few
+     enough to take in at a glance. Six to a beat is sixty-four of them,
+     well past where a grid helps anyone, so those divisions are offered
+     whole or not at all. */
+  const CELL_PICK_MAX = 4;
+  function cellsArePickable(slots) { return slots <= CELL_PICK_MAX; }
+
+  /* ------------------------------------------------------------------
+     The vocabulary, in the groups a musician thinks in.
+
+     Every shape a beat can take is named once, and only once, by the
+     group it belongs to — the lists below partition each division rather
+     than overlapping it, so a group switch can turn its whole family on
+     or off without touching anything else.
+
+     What each four-slot pattern actually engraves, since the names are
+     not obvious from the Xs and Os: an X starts a note that runs until
+     the next X, so XXOO is a sixteenth then a dotted eighth, and XXOX is
+     the sixteenth–eighth–sixteenth that syncopates the beat.
+
+     Longer notes are not here. A half note is not a shape a beat can
+     take — it is two beats joined — so it lives in its own group, keyed
+     by how many beats the join reaches rather than by slots.
+     ------------------------------------------------------------------ */
+  const VOCAB_GROUPS = [
+    {
+      id: 'basic',
+      label: 'Quarters, eighths & rests',
+      blurb: 'The plain divisions of a beat, and silence.',
+      cells: {
+        simple:   { 2: ['XX', 'XO', 'OO'], 4: ['XOXO', 'XOOO', 'OOOO'] },
+        compound: { 3: 'all' }
+      }
+    },
+    {
+      id: 'sixteenths',
+      label: 'Sixteenths',
+      blurb: 'The four a beat of sixteenths is usually taught with.',
+      needs: 'sixteenths',
+      cells: {
+        simple:   { 4: ['XXXX', 'XOXX', 'XXXO', 'XXOX'] },
+        compound: { 6: 'all' }
+      }
+    },
+    {
+      id: 'sixteenthsAdvanced',
+      label: 'Advanced sixteenths',
+      blurb: 'The rest of them — the ones that start on a rest or carry a dot.',
+      needs: 'sixteenths',
+      cells: {
+        simple: { 4: ['XXOO', 'XOOX', 'OXXX', 'OXXO', 'OXOX', 'OXOO', 'OOXX', 'OOOX'] }
+      }
+    },
+    {
+      id: 'offbeat',
+      label: 'Off-beat eighths',
+      blurb: 'A rest on the beat, and the sound after it — what a backbeat is made of.',
+      cells: { simple: { 2: ['OX'] } }
+    },
+    {
+      id: 'joins',
+      label: 'Halves, dotted halves & wholes',
+      blurb: 'Notes made by joining beats together with the chain button.',
+      joins: true
+    },
+    {
+      id: 'triplets',
+      label: 'Triplets & duplets',
+      blurb: 'The other way to divide a beat — three where the beat counts two, or two where it counts three.',
+      needs: 'tuplets',
+      cells: { simple: { 3: 'all' }, compound: { 2: 'all' } }
+    },
+    {
+      id: 'subTriplets',
+      label: 'Subdivided triplets & duplets',
+      blurb: 'Those borrowed divisions split again.',
+      needs: 'subTuplets',
+      cells: { simple: { 6: 'all' }, compound: { 4: 'all' } }
+    }
+  ];
+
+  /* The shapes a group covers for one family, expanded from 'all'. */
+  function groupCells(group, family) {
+    const spec = group.cells && group.cells[family];
+    if (!spec) return [];
+    const out = [];
+    Object.keys(spec).forEach(k => {
+      const slots = parseInt(k, 10);
+      const list = spec[k] === 'all' ? patternsFor(slots) : spec[k];
+      out.push({ slots: slots, patterns: list });
+    });
+    return out;
+  }
+
+  function blankLayout() {
+    return {
+      v: 1,
+      meters: { simple: METERS.simple.slice(), compound: METERS.compound.slice() },
+      divide: { sixteenths: true, tuplets: true, subTuplets: true },
+      /* {} for a division means nothing has been narrowed there. A stored
+         list is always shorter than the full one; see pruneLayoutCells. */
+      cells: { simple: {}, compound: {} },
+      /* How many beats a join may reach across, per family. JOIN_CAP_MAX
+         is past any meter this app counts, so it is the unnarrowed
+         value; 1 takes the chain button away entirely. */
+      joins: { simple: JOIN_CAP_MAX, compound: JOIN_CAP_MAX },
+      /* Which instruments the kit offers. null means every one of them —
+         an explicit list is always a narrowing. */
+      instruments: null
+    };
+  }
+
+  /* A stored or received layout is filled out rather than rejected, so a
+     link that predates a setting still opens, and a setting a future
+     version adds is simply not there yet rather than a crash. */
+  function normalizeLayout(raw) {
+    const L = blankLayout();
+    if (!raw || typeof raw !== 'object') return L;
+
+    ['simple', 'compound'].forEach(fam => {
+      const list = raw.meters && raw.meters[fam];
+      if (Array.isArray(list)) {
+        L.meters[fam] = METERS[fam].filter(m => list.indexOf(m) !== -1);
+      }
+    });
+    // Somebody has to be able to count something.
+    if (!L.meters.simple.length && !L.meters.compound.length) {
+      L.meters.simple = METERS.simple.slice();
+    }
+
+    if (raw.divide) {
+      Object.keys(L.divide).forEach(k => { L.divide[k] = raw.divide[k] !== false; });
+    }
+
+    ['simple', 'compound'].forEach(fam => {
+      L.cells[fam] = {};
+      const src = raw.cells && raw.cells[fam];
+      if (!src || typeof src !== 'object') return;
+      Object.keys(src).forEach(k => {
+        const slots = parseInt(k, 10);
+        const all = patternsFor(slots);
+        const list = (src[k] || []).filter(x => all.indexOf(x) !== -1);
+        /* Canonical order whatever order it arrived in, so the tap-cycle
+           is the same for everyone who opens the link. */
+        if (list.length && list.length < all.length) {
+          L.cells[fam][slots] = all.filter(x => list.indexOf(x) !== -1);
+        }
+      });
+    });
+
+    if (raw.joins && typeof raw.joins === 'object') {
+      ['simple', 'compound'].forEach(fam => {
+        const n = parseInt(raw.joins[fam], 10);
+        if (!isNaN(n)) L.joins[fam] = Math.max(1, Math.min(JOIN_CAP_MAX, n));
+      });
+    }
+
+    if (Array.isArray(raw.instruments)) {
+      const keep = VI.INSTRUMENT_IDS.filter(id => raw.instruments.indexOf(id) !== -1);
+      /* An empty kit is not a narrowing, it is a broken app; and a full
+         one is not a narrowing either, so it is stored as absent. */
+      L.instruments = (keep.length && keep.length < VI.INSTRUMENT_IDS.length) ? keep : null;
+    }
+
+    return L;
+  }
+
+  function loadLayout() {
+    forgetDivisionOffers();
+    let raw = null;
+    try { raw = JSON.parse(localStorage.getItem(LAYOUT_KEY) || 'null'); } catch (e) {}
+    layout = normalizeLayout(raw);
+    layoutLocked = !!(raw && raw.locked);
+  }
+
+  function saveLayout() {
+    forgetDivisionOffers();
+    try {
+      pruneLayoutCells(layout);
+      const out = JSON.parse(JSON.stringify(layout));
+      out.locked = layoutLocked;
+      localStorage.setItem(LAYOUT_KEY, JSON.stringify(out));
+    } catch (e) {}
+  }
+
+  loadLayout();
+
+  /* What travels in a link: the build rules, plus the four on-screen
+     switches, which live in the view preferences because that is where
+     the rest of the app already reads them. */
+  function layoutSnapshot() {
+    return {
+      layout: JSON.parse(JSON.stringify(layout)),
+      show: {
+        dots: view.showDots,
+        barNumbers: view.showBarNumbers,
+        beatNumbers: view.showBeatNumbers,
+        syllables: view.showSyllables,
+        syllableSystem: view.syllableSystem
+      }
+    };
+  }
+
+  function applyLayoutSnapshot(snap, lock) {
+    if (!snap) {
+      /* A link with no layout in it still locks, if it said to. The
+         alternative is a lesson whose vocabulary is right and whose
+         Layout settings sheet opens anyway. */
+      if (lock) { layoutLocked = true; saveLayout(); }
+      return;
+    }
+    forgetDivisionOffers();
+    layout = normalizeLayout(snap.layout || snap);
+    if (snap.show) {
+      if (snap.show.dots !== undefined) view.showDots = !!snap.show.dots;
+      if (snap.show.beatNumbers !== undefined) view.showBeatNumbers = !!snap.show.beatNumbers;
+      /* A link from before the two were split carries one flag for both. */
+      const bars = snap.show.barNumbers !== undefined ? snap.show.barNumbers : snap.show.beatNumbers;
+      if (bars !== undefined) view.showBarNumbers = !!bars;
+      if (snap.show.syllables !== undefined) view.showSyllables = !!snap.show.syllables;
+      if (SYLLABLE_SYSTEMS.indexOf(snap.show.syllableSystem) !== -1) {
+        view.syllableSystem = snap.show.syllableSystem;
+      }
+      saveViewPrefs();
+    }
+    if (lock) layoutLocked = true;
+    saveLayout();
+  }
+
+  /* ---- the questions the rest of the app asks ---------------------- */
+
+  /* Locked means the Layout Settings sheet cannot be opened — not that
+     nothing on it can move. The dots button and the mute badges are
+     deliberately outside this: going back and forth with the dots, and
+     listening to one instrument on its own, are things a class does
+     constantly, and no lesson has a reason to stop them. */
+  function layoutEditable() { return !layoutLocked; }
+
+  function familyOf() { return isCompound() ? 'compound' : 'simple'; }
+
+  function divisionEnabledIn(fam, slots) {
+    if (slots === NATURAL_SLOTS[fam]) return true;   // a beat has to divide somehow
+    const names = Object.keys(DIVIDE_SLOTS);
+    for (const name of names) {
+      if (DIVIDE_SLOTS[name][fam] === slots) return layout.divide[name] !== false;
+    }
+    return false;
+  }
+
+  /* A division that is switched off has no shapes to narrow, so whatever
+     was stored for it is noise — and expensive noise, since six to a beat
+     is sixty-four patterns that would otherwise ride along in every link.
+     Turning a division back on hands back all of it; narrow it again if
+     that is what you want. */
+  function pruneLayoutCells(L) {
+    ['simple', 'compound'].forEach(fam => {
+      Object.keys(L.cells[fam]).forEach(k => {
+        if (!divisionEnabledIn(fam, parseInt(k, 10))) delete L.cells[fam][k];
+      });
+    });
+  }
+
+  /* The shapes a beat of this many slots may take, or null for all of
+     them. A division with no stored list has not been narrowed. */
+  function cellsFor(slots) {
+    const list = layout.cells[familyOf()][slots];
+    return (Array.isArray(list) && list.length) ? list : null;
+  }
+
+  function cellAllowed(flags, slots) {
+    const list = cellsFor(slots);
+    return !list || list.indexOf(flagsToPattern(flags)) !== -1;
+  }
+
+  /* Tapping a dot proposes a new shape for the beat. When the vocabulary
+     forbids that shape the beat moves to the next one that is allowed,
+     rather than the tap being swallowed — a dead dot is the one thing
+     that would make a narrowed app feel broken instead of simple.
+
+     With a full vocabulary the proposal always stands and this is the
+     plain toggle it has always been. With a two-shape vocabulary it turns
+     into exactly what a first lesson wants: tap the beat, it flips
+     between ta and ti-ti. */
+  function resolveCell(currentFlags, proposedFlags, slots) {
+    if (cellAllowed(proposedFlags, slots)) return proposedFlags;
+    const list = cellsFor(slots);
+    if (!list || !list.length) return currentFlags.slice();
+    const here = list.indexOf(flagsToPattern(currentFlags));
+    return patternToFlags(list[(here + 1) % list.length]);
+  }
+
+  /* ---- joins ------------------------------------------------------- */
+
+  function joinCap(fam) {
+    const n = layout.joins[fam || familyOf()];
+    return (typeof n === 'number' && n >= 1) ? n : JOIN_CAP_MAX;
+  }
+
+  /* The chain button is there while a join can still reach anywhere. */
+  function linkingOffered() { return joinCap() > 1; }
+
+  /* ---- instruments ------------------------------------------------- */
+
+  /* The kit the picker offers, in the kit's own order. Never empty. */
+  function instrumentsOffered() {
+    if (!layout.instruments || !layout.instruments.length) return VI.INSTRUMENT_IDS.slice();
+    const keep = VI.INSTRUMENT_IDS.filter(id => layout.instruments.indexOf(id) !== -1);
+    return keep.length ? keep : VI.INSTRUMENT_IDS.slice();
+  }
+
+  /* Narrowing the kit never rewrites a track that is already playing
+     something the kit no longer lists — see rule two of the README. The
+     picker simply shows what is offered, plus whatever this track is on
+     now, so its own instrument is never missing from its own picker. */
+  function instrumentsOfferedFor(currentId) {
+    const list = instrumentsOffered();
+    if (currentId && list.indexOf(currentId) === -1) {
+      return VI.INSTRUMENT_IDS.filter(id => list.indexOf(id) !== -1 || id === currentId);
+    }
+    return list;
+  }
+
+  function nextOfferedInstrument() {
+    const used = song.tracks.map(t => t.instrument);
+    const offered = instrumentsOffered();
+    return offered.find(id => used.indexOf(id) === -1) || offered[0];
+  }
+
+  /* ---- meters ------------------------------------------------------ */
+
+  /* The numerals this denominator offers, in cycling order. */
+  function meterCycle(denominator) {
+    const fam = denominator === 8 ? 'compound' : 'simple';
+    const list = layout.meters[fam];
+    return (METER_ORDER[denominator] || [4]).filter(n => list.indexOf(n + '/' + denominator) !== -1);
+  }
+
+  function denominatorsOffered() {
+    return [4, 8].filter(d => meterCycle(d).length > 0);
+  }
+
+  function meterIsFixed() {
+    if (!rhythmEditable()) return true;
+    return meterCycle(4).length + meterCycle(8).length <= 1;
+  }
+
+  /* ---- is a finer division worth reaching? ------------------------- */
+
+  /* Is there anything at this division you cannot already write at the
+     beat's natural one?
+
+     This is the question the + and − buttons actually answer, and it is
+     not the same as "is this division switched on". Turning off the
+     Sixteenths and Advanced sixteenths groups leaves the sixteenth grid
+     technically enabled and holding four shapes — but they are the plain
+     quarter, the two eighths and the rests, which are already there at
+     two to a beat. A + that leads only to what you had is a button that
+     does nothing, so it goes. */
+  function divisionOffersSomethingNew(fam, slots) {
+    const natural = NATURAL_SLOTS[fam];
+    if (slots === natural) return true;
+    const key = fam + ':' + slots;
+    if (offersCache[key] !== undefined) return offersCache[key];
+    const answer = familyPictures(fam).some(pic =>
+      pictureIsOn(pic, fam) &&
+      pic.members.some(m => m.slots === slots) &&
+      !pic.members.some(m => m.slots === natural));
+    offersCache[key] = answer;
+    return answer;
+  }
+
+  function forgetDivisionOffers() {
+    Object.keys(offersCache).forEach(k => delete offersCache[k]);
+  }
+
+  function divisionIsReachable(slots) {
+    const fam = familyOf();
+    return divisionEnabledIn(fam, slots) && divisionOffersSomethingNew(fam, slots);
+  }
+
+  /* Only the rungs of the − ladder that are both switched on and worth
+     walking to. */
+  function allowedLadder() {
+    return tupletLadder().filter(s => divisionIsReachable(s));
+  }
+
+  /* ==================================================================
+     THE STUDENT TASK
+
+     Null outside a lesson, and then every question below answers the way
+     the app has always answered. Nothing here duplicates anything the
+     layout already decides: this is only ever about what the student is
+     being asked to do with a room that is already furnished.
+     ================================================================== */
+
+  /* The two locks the four task types are built from. Everything that
+     changes the rhythm asks rhythmEditable(); everything that changes
+     which instruments are playing it asks instrumentsEditable(). */
+  function rhythmEditable()      { return !policy || !policy.task.rhythmLocked; }
+  function instrumentsEditable() { return !policy || !policy.task.instrumentsLocked; }
+
+  function tempoLocked() { return !!policy && policy.tempo.locked; }
+  function tempoMin() { return policy ? policy.tempo.min : BPM_MIN; }
+  function tempoMax() { return policy ? policy.tempo.max : BPM_MAX; }
+  function clampTempo(v) { return Math.max(tempoMin(), Math.min(tempoMax(), v)); }
+
+  /* Adding or removing a bar changes how the piece sounds, so both ask
+     the rhythm lock before they ask their own setting. */
+  function canAddMeasures() {
+    return rhythmEditable() && (!policy || policy.structure.canAdd !== false);
+  }
+  function canRemoveMeasures() {
+    return rhythmEditable() && (!policy || policy.structure.canRemove !== false);
+  }
+  function maxMeasuresAllowed() {
+    const n = policy && policy.structure.maxMeasures;
+    return n ? Math.min(MAX_MEASURES, n) : MAX_MEASURES;
+  }
+  function maxTracksAllowed() {
+    const n = policy && policy.structure.maxTracks;
+    return n ? Math.min(MAX_TRACKS, n) : MAX_TRACKS;
+  }
+
+  function shellAllows(key) { return !policy || policy.shell[key] !== false; }
+  function libraryMode() { return policy ? policy.shell.library : 'full'; }
+
+  function systemsOffered() {
+    if (!policy || !policy.shell.systems || !policy.shell.systems.length) {
+      return SYLLABLE_SYSTEMS.slice();
+    }
+    return SYLLABLE_SYSTEMS.filter(s => policy.shell.systems.indexOf(s) !== -1);
+  }
+
+  function blankPolicy() {
+    return {
+      v: POLICY_VERSION,
+      tempo: { min: 40, max: 240, locked: false },
+      structure: { maxMeasures: null, maxTracks: null, canAdd: true, canRemove: true },
+      task: { rhythmLocked: false, instrumentsLocked: false, note: '' },
+      shell: {
+        view: true,        // the Layout half of Settings — pages, scroll, size
+        present: true,     // present mode
+        picture: true,     // save a picture
+        count: true,       // the metronome
+        systems: null,     // null = every counting system
+        library: 'lesson'  // 'lesson' | 'none'
+      }
+    };
+  }
+
+  function normalizePolicy(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const p = blankPolicy();
+    const src = raw;
+
+    if (src.tempo) {
+      const lo = parseInt(src.tempo.min, 10);
+      const hi = parseInt(src.tempo.max, 10);
+      if (!isNaN(lo)) p.tempo.min = Math.max(BPM_MIN, Math.min(BPM_MAX, lo));
+      if (!isNaN(hi)) p.tempo.max = Math.max(BPM_MIN, Math.min(BPM_MAX, hi));
+      if (p.tempo.min > p.tempo.max) {
+        const t = p.tempo.min; p.tempo.min = p.tempo.max; p.tempo.max = t;
+      }
+      p.tempo.locked = !!src.tempo.locked;
+    }
+
+    if (src.structure) {
+      const mm = parseInt(src.structure.maxMeasures, 10);
+      p.structure.maxMeasures = (isNaN(mm) || mm < 1) ? null : Math.min(MAX_MEASURES, mm);
+      const mt = parseInt(src.structure.maxTracks, 10);
+      p.structure.maxTracks = (isNaN(mt) || mt < 1) ? null : Math.min(MAX_TRACKS, mt);
+      p.structure.canAdd = src.structure.canAdd !== false;
+      p.structure.canRemove = src.structure.canRemove !== false;
+    }
+
+    if (src.task) {
+      p.task.rhythmLocked = !!src.task.rhythmLocked;
+      p.task.instrumentsLocked = !!src.task.instrumentsLocked;
+      p.task.note = typeof src.task.note === 'string' ? src.task.note.slice(0, 160) : '';
+    }
+
+    if (src.shell) {
+      ['view', 'present', 'picture', 'count'].forEach(k => {
+        p.shell[k] = src.shell[k] !== false;
+      });
+      if (Array.isArray(src.shell.systems) && src.shell.systems.length) {
+        const keep = src.shell.systems.filter(s => SYLLABLE_SYSTEMS.indexOf(s) !== -1);
+        p.shell.systems = keep.length ? keep : null;
+      }
+      p.shell.library = src.shell.library === 'none' ? 'none' : 'lesson';
+    }
+
+    return p;
+  }
+
+  /* One sentence naming the task, for the strip above the score. The
+     teacher's own wording wins; these are only the fallback. */
+  const TASK_BLURB = {
+    'free':        'Build whatever you like.',
+    'rhythms':     'The instruments are set — write a part for each of them.',
+    'instruments': 'The rhythms are set — choose which instruments play them.',
+    'read':        'Read and play this one.'
+  };
+
+  function taskKind() {
+    if (!policy) return 'free';
+    const r = policy.task.rhythmLocked, i = policy.task.instrumentsLocked;
+    if (r && i) return 'read';
+    if (i) return 'rhythms';
+    if (r) return 'instruments';
+    return 'free';
+  }
+
+  function taskBlurb() {
+    if (policy && policy.task.note) return policy.task.note;
+    return TASK_BLURB[taskKind()];
+  }
+
 
 
   /* ==================================================================
@@ -867,36 +1559,41 @@
 
   /* Every sound in one pass of the loop, with how long it is until that
      track's next hit — the kit needs the figure to shape fast repeats. */
+  /* Read by group, not by beat: inside a joined run a sound holds over
+     the beat line, so a half note is one onset rather than two. Taking
+     the onsets from the same colours the notation is built from is what
+     keeps the two from ever disagreeing. Each comes with how long it is
+     until the track's next hit, round the loop. */
+  function trackOnsets(track) {
+    const bt = beatTicks();
+    const onsets = [];
+    trackGroups(track).forEach(group => {
+      const colours = groupColours(track, group);
+      let at = 0;
+      for (let b = group.start; b <= group.end; b++) {
+        const beat = track.beats[b];
+        const slotTicks = bt / beat.slots;
+        for (let i = 0; i < beat.slots; i++) {
+          if (colours[at + i] === 'active') onsets.push(b * bt + i * slotTicks);
+        }
+        at += beat.slots;
+      }
+    });
+    const loopTicks = totalTicks();
+    return onsets.map((t, i) => ({
+      tick: t,
+      gapTicks: (i + 1 < onsets.length ? onsets[i + 1] : onsets[0] + loopTicks) - t
+    }));
+  }
+
   function buildTimeline() {
     const events = [];
     const bt = beatTicks();
 
     song.tracks.forEach((track, ti) => {
       if (track.muted) return;
-
-      /* Read by group, not by beat: inside a joined run a sound holds over
-         the beat line, so a half note is one onset rather than two. Taking
-         the onsets from the same colours the notation is built from is what
-         keeps the two from ever disagreeing. */
-      const onsets = [];
-      trackGroups(track).forEach(group => {
-        const colours = groupColours(track, group);
-        let at = 0;
-        for (let b = group.start; b <= group.end; b++) {
-          const beat = track.beats[b];
-          const slotTicks = bt / beat.slots;
-          for (let i = 0; i < beat.slots; i++) {
-            if (colours[at + i] === 'active') onsets.push(b * bt + i * slotTicks);
-          }
-          at += beat.slots;
-        }
-      });
-
-      if (!onsets.length) return;
-      const loopTicks = totalTicks();
-      onsets.forEach((t, i) => {
-        const next = i + 1 < onsets.length ? onsets[i + 1] : onsets[0] + loopTicks;
-        events.push({ tick: t, kind: 'note', track: ti, gapTicks: next - t });
+      trackOnsets(track).forEach(o => {
+        events.push({ tick: o.tick, kind: 'note', track: ti, gapTicks: o.gapTicks });
       });
     });
 
@@ -1141,6 +1838,10 @@
     layoutAndEngrave();
     applyFit();
     if (wasLit >= 0 && wasLit < totalBeats()) highlightBeat(wasLit);
+    /* Room for another instrument is a question about the score, so it is
+       asked again every time the score is rebuilt rather than only when
+       the policy changes. */
+    showHide(addTrackBtn, instrumentsEditable() && song.tracks.length < maxTracksAllowed());
     scheduleAutosave();
   }
 
@@ -1273,7 +1974,12 @@
     img.src = instrumentImage(track.instrument);
     img.alt = meta.alt;
     pick.appendChild(img);
-    pick.addEventListener('click', () => openInstrumentSheet(trackIndex));
+    if (instrumentsEditable()) {
+      pick.addEventListener('click', () => openInstrumentSheet(trackIndex));
+    } else {
+      pick.classList.add('fixed');
+      pick.title = meta.label;
+    }
 
     const mute = document.createElement('button');
     mute.className = 'mini-btn mute-badge' + (track.muted ? ' muted' : '');
@@ -1308,8 +2014,13 @@
     remove.addEventListener('click', () => removeTrack(trackIndex));
 
     side.appendChild(name);
-    side.appendChild(remove);
-    side.appendChild(buildTrackOrderControls(trackIndex));
+    /* Both of these change which instruments are on the page, so both go
+       when that is the thing the lesson has fixed. Mute does not, and
+       stays: hearing one line on its own is how a class reads a score. */
+    if (instrumentsEditable()) {
+      side.appendChild(remove);
+      side.appendChild(buildTrackOrderControls(trackIndex));
+    }
 
     head.appendChild(slot);
     head.appendChild(side);
@@ -1370,22 +2081,21 @@
       + (group.span > 1 ? ' linked' : '')
       + (view.showDots ? '' : ' dots-hidden');
 
-    dots.appendChild(buildSubdivisionControls(track, beatIndex));
+    if (rhythmEditable()) dots.appendChild(buildSubdivisionControls(track, beatIndex));
 
     for (let i = 0; i < beat.slots; i++) {
       const dot = document.createElement('div');
       dot.className = 'dot ' + mine[i];
-      dot.addEventListener('click', () => {
-        beat.cells[i] = !beat.cells[i];
-        if (beat.cells[i]) auditionTrack(track);
-        if (isPlaying) resyncPlayback();
-        render();
-      });
+      if (rhythmEditable()) {
+        dot.addEventListener('click', () => tapDot(track, beatIndex, i));
+      } else {
+        dot.classList.add('fixed');
+      }
       dots.appendChild(dot);
     }
     el.appendChild(dots);
 
-    if (view.showLinkButtons && canLinkBeats(beatIndex)) {
+    if (view.showDots && rhythmEditable() && joinButtonOffered(track, beatIndex)) {
       el.appendChild(buildLinkButton(track, beatIndex));
     }
 
@@ -1401,7 +2111,8 @@
       pendingNotation.push(notes);
     }
     const isQuarterRestBeat = group.span === 1 && !beat.cells.some(Boolean);
-    const repeatable = isQuarterRestBeat ? repeatableGroup(track, beatIndex) : null;
+    const repeatable = (isQuarterRestBeat && rhythmEditable())
+      ? repeatableGroup(track, beatIndex) : null;
     if (repeatable) {
       notes.appendChild(buildBeatRepeatButton(track, beatIndex, repeatable.span));
     }
@@ -1413,6 +2124,47 @@
     }
 
     return el;
+  }
+
+  /* Tapping a dot asks for one slot to change.
+
+     Inside a joined run the answer is always yes. An O there is the
+     sound carrying on rather than a rest, so asking whether the beat's
+     shape is in the single-beat vocabulary would be answering a
+     different question entirely — the run is governed by how far a join
+     may reach, and that was settled when the chain went on.
+
+     Everywhere else the vocabulary decides, and a shape it does not hold
+     moves on to the next one it does. A tap that visibly does nothing is
+     the one thing that would make a narrowed app feel broken rather than
+     simple. */
+  function tapDot(track, beatIndex, slot) {
+    const beat = track.beats[beatIndex];
+    const before = flagsToPattern(beat.cells);
+
+    const proposed = beat.cells.slice();
+    proposed[slot] = !proposed[slot];
+
+    const inRun = linkGroup(track, beatIndex).span > 1;
+    beat.cells = inRun ? proposed : resolveCell(beat.cells, proposed, beat.slots);
+
+    const changed = flagsToPattern(beat.cells) !== before;
+    if (changed && beat.cells.some(Boolean)) auditionTrack(track);
+    if (isPlaying) resyncPlayback();
+    render();
+  }
+
+  /* The chain between this beat and the next is offered while joining
+     them would make a run the layout still allows — and always while
+     they are already joined, so a run the settings have since outgrown
+     can still be taken apart rather than being stranded on the page. */
+  function joinButtonOffered(track, leftBeatIndex) {
+    if (!canLinkBeats(leftBeatIndex)) return false;
+    if (isLinked(track, leftBeatIndex)) return true;
+    if (!linkingOffered()) return false;
+    const left = linkGroup(track, leftBeatIndex);
+    const right = linkGroup(track, leftBeatIndex + 1);
+    return (left.span + right.span) <= joinCap();
   }
 
   /* Syllables are read beat by beat even inside a joined run: the run
@@ -1507,6 +2259,11 @@
     }
     if (!sounds) return null;                 // a rest has nothing to repeat
 
+    /* A run the layout would no longer let anyone build is not a run the
+       mark may write either. It stays on the page where it already is;
+       it just cannot be copied into a fresh beat. */
+    if (source.span > joinCap()) return null;
+
     const last = targetBeatIndex + source.span - 1;
     if (last >= totalBeats()) return null;
 
@@ -1522,6 +2279,7 @@
   }
 
   function duplicateBeat(track, targetBeatIndex) {
+    if (!rhythmEditable()) return;
     const source = repeatableGroup(track, targetBeatIndex);
     if (!source) return;
     if (!track.links) track.links = {};
@@ -1564,7 +2322,20 @@
   }
 
   /* + moves this beat to its sixteenths and back; − walks the opposite
-     feel — a triplet, then a sextuplet — and then off again. */
+     feel — a triplet, then a sextuplet — and then off again.
+
+     Either may be missing. A button is drawn when there is somewhere
+     worth going with it: not merely when the division is switched on,
+     but when something can be written there that cannot already be
+     written at the plain division. Switch off Sixteenths and Advanced
+     sixteenths and the four-slot grid still holds the plain quarter, the
+     two eighths and the rests — all of which are already reachable at
+     two to a beat — so a + leading to them leads nowhere and goes.
+
+     The exception is the beat that is already up there. A rhythm written
+     before the settings narrowed is never rewritten, so the button that
+     walks it back down stays whatever the vocabulary now says; losing it
+     would strand the beat at a division nothing else can reach. */
   function buildSubdivisionControls(track, beatIndex) {
     const wrap = document.createElement('div');
     wrap.className = 'subdivision-controls';
@@ -1572,35 +2343,60 @@
     const beat = track.beats[beatIndex];
     const plain = defaultSubdivision();
     const sixteenth = sixteenthSubdivision();
-    const ladder = tupletLadder();
+    const ladder = allowedLadder();
+    const onSixteenth = beat.slots === sixteenth;
+    const onLadder = tupletLadder().indexOf(beat.slots) !== -1;
 
-    const plus = document.createElement('button');
-    plus.className = 'subdivision-btn' + (beat.slots === sixteenth ? ' active' : '');
-    plus.textContent = '+';
-    plus.title = beat.slots === sixteenth ? 'Back to the plain division' : 'Divide this beat again';
-    plus.addEventListener('click', () => {
-      setBeatSlots(track, beatIndex, beat.slots === sixteenth ? plain : sixteenth);
-      if (isPlaying) resyncPlayback();
-      render();
-    });
+    if (divisionIsReachable(sixteenth) || onSixteenth) {
+      const plus = document.createElement('button');
+      plus.className = 'subdivision-btn' + (onSixteenth ? ' active' : '');
+      plus.textContent = '+';
+      plus.title = onSixteenth ? 'Back to the plain division' : 'Divide this beat again';
+      plus.addEventListener('click', () => {
+        changeBeatSlots(track, beatIndex, onSixteenth ? plain : sixteenth);
+      });
+      wrap.appendChild(plus);
+    }
 
-    const minus = document.createElement('button');
-    const rung = ladder.indexOf(beat.slots);
-    minus.className = 'subdivision-btn' + (rung !== -1 ? ' active' : '');
-    minus.textContent = '−';
-    minus.title = 'The other feel for this beat';
-    minus.addEventListener('click', () => {
-      const next = rung === -1 ? ladder[0]
-                 : rung + 1 < ladder.length ? ladder[rung + 1]
-                 : plain;
-      setBeatSlots(track, beatIndex, next);
-      if (isPlaying) resyncPlayback();
-      render();
-    });
+    if (ladder.length || onLadder) {
+      const rung = ladder.indexOf(beat.slots);
+      const minus = document.createElement('button');
+      minus.className = 'subdivision-btn' + (onLadder ? ' active' : '');
+      minus.textContent = '−';
+      minus.title = onLadder && rung === -1
+        ? 'Back to the plain division'
+        : 'The other feel for this beat';
+      minus.addEventListener('click', () => {
+        /* Off the allowed ladder altogether — either at the plain
+           division or stranded on a rung nobody may reach any more —
+           step on at the bottom, or home if there is no ladder left. */
+        const next = rung === -1 ? (ladder.length ? ladder[0] : plain)
+                   : rung + 1 < ladder.length ? ladder[rung + 1]
+                   : plain;
+        changeBeatSlots(track, beatIndex, next);
+      });
+      wrap.appendChild(minus);
+    }
 
-    wrap.appendChild(plus);
-    wrap.appendChild(minus);
     return wrap;
+  }
+
+  /* Re-dividing a beat moves the sounds it holds onto a different grid,
+     and where they land is not the app's choice — remapCells keeps each
+     one where it was. So the shape that arrives may be one the narrowed
+     vocabulary does not hold. Nudge it to the nearest one that is,
+     rather than leaving a beat nobody could have built by tapping. */
+  function changeBeatSlots(track, beatIndex, slots) {
+    if (!rhythmEditable()) return;
+    setBeatSlots(track, beatIndex, slots);
+
+    const beat = track.beats[beatIndex];
+    if (linkGroup(track, beatIndex).span === 1 && !cellAllowed(beat.cells, beat.slots)) {
+      beat.cells = resolveCell(beat.cells, beat.cells, beat.slots);
+    }
+
+    if (isPlaying) resyncPlayback();
+    render();
   }
 
 
@@ -1849,7 +2645,10 @@
        the last instrument falls off the bottom. Below HEIGHT_FLOOR the
        cure is worse than the illness — ten tracks shrunk to fit a laptop
        would be unreadable — so past that point the stage scrolls instead. */
-    const HEIGHT_FLOOR = 0.55;
+    /* Embedded in the POP the pane is sized by the user, beside a poem,
+       and the whole point is that both stay on screen — so there the
+       score shrinks as far as it must rather than scrolling. */
+    const HEIGHT_FLOOR = EMBEDDED ? FIT_MIN : 0.55;
     const stagePad = getComputedStyle(stage);
     const availableH = stage.clientHeight
       - parseFloat(stagePad.paddingTop) - parseFloat(stagePad.paddingBottom)
@@ -1918,7 +2717,9 @@
   const pageNext  = document.getElementById('page-next');
 
   function updatePager(count, paging) {
-    pager.hidden = !paging || count < 2;
+    /* Embedded, the POP turns the pages as it plays; a pager nobody can
+       click would only take height from the score. */
+    pager.hidden = EMBEDDED || !paging || count < 2;
     pageLabel.textContent = 'Page ' + (currentPage + 1) + ' of ' + count;
     pagePrev.disabled = currentPage <= 0;
     pageNext.disabled = currentPage >= count - 1;
@@ -1942,20 +2743,15 @@
 
   const MAX_TRACKS = 10;
 
-  /* Offer something that is not already on the page, walking the kit in
-     its own order so the suggestions stay musically sensible. */
-  function nextFreeInstrument() {
-    const used = song.tracks.map(t => t.instrument);
-    const free = VI.INSTRUMENT_IDS.find(id => used.indexOf(id) === -1);
-    return free || VI.INSTRUMENT_IDS[0];
-  }
-
   function addTrack() {
-    if (song.tracks.length >= MAX_TRACKS) {
-      toast('Ten instruments is the limit');
+    if (!instrumentsEditable()) return;
+    if (song.tracks.length >= maxTracksAllowed()) {
+      const n = maxTracksAllowed();
+      toast(n === 1 ? 'One instrument is the limit here'
+                    : n + ' instruments is the limit');
       return;
     }
-    const track = makeTrack(nextFreeInstrument(), '');
+    const track = makeTrack(nextOfferedInstrument(), '');
     conformTrack(track);
     song.tracks.push(track);
     if (isPlaying) resyncPlayback();
@@ -1963,6 +2759,7 @@
   }
 
   function removeTrack(index) {
+    if (!instrumentsEditable()) return;
     song.tracks.splice(index, 1);
     if (isPlaying) resyncPlayback();
     render();
@@ -1978,6 +2775,7 @@
      its twin in the row's new home, so a second press keeps going the
      same way instead of needing the mouse to chase the row. */
   function moveTrack(index, delta) {
+    if (!instrumentsEditable()) return;
     const to = index + delta;
     if (to < 0 || to >= song.tracks.length) return;
 
@@ -2000,11 +2798,18 @@
   let pickingTrackIndex = -1;
 
   function openInstrumentSheet(trackIndex) {
+    if (!instrumentsEditable()) return;
     pickingTrackIndex = trackIndex;
     const current = song.tracks[trackIndex].instrument;
 
+    /* Whatever the kit has been narrowed to, plus whatever this track is
+       already playing: a rhythm written for an instrument the layout no
+       longer lists keeps it, and its own picker must not be the one place
+       it cannot be found. */
+    const offered = instrumentsOfferedFor(current);
+
     instrumentGrid.innerHTML = '';
-    VI.INSTRUMENTS.forEach(inst => {
+    VI.INSTRUMENTS.filter(inst => offered.indexOf(inst.id) !== -1).forEach(inst => {
       const card = document.createElement('button');
       card.className = 'instrument-card' + (inst.id === current ? ' selected' : '');
       card.innerHTML = '<img src="' + instrumentImage(inst.id) + '" alt="' + inst.alt + '">'
@@ -2050,8 +2855,9 @@
   const BPM_MIN = 30, BPM_MAX = 260;
 
   function setBpm(value) {
-    const n = Math.round(Number(value));
+    let n = Math.round(Number(value));
     if (!isFinite(n) || n < BPM_MIN || n > BPM_MAX) return false;
+    n = clampTempo(n);
     if (n === song.bpm) return true;
     song.bpm = n;
     if (isPlaying) resyncPlayback();
@@ -2067,6 +2873,10 @@
   }
 
   bpmButton.addEventListener('click', () => {
+    /* A locked tempo still has to be readable — it is part of what the
+       student is being asked to play — so the number stays and only the
+       editor goes. */
+    if (tempoLocked()) return;
     if (bpmButton.querySelector('input')) return;
     const input = document.createElement('input');
     input.type = 'number';
@@ -2074,6 +2884,8 @@
     input.min = String(BPM_MIN);
     input.max = String(BPM_MAX);
     input.value = String(song.bpm);
+    input.min = String(tempoMin());
+    input.max = String(tempoMax());
 
     const before = song.bpm;
     bpmButton.innerHTML = '';
@@ -2090,26 +2902,50 @@
   });
 
   /* ---- meter ---- */
+  const timeSignature = document.getElementById('time-signature');
   const tsTop = document.getElementById('ts-top');
   const tsBottom = document.getElementById('ts-bottom');
 
-  const TOP_VALUES = { 4: [2, 3, 4, 5, 6], 8: [6, 9, 12] };
-
+  /* Which numerals each denominator walks is layout.meters' business
+     now; meterCycle() is the same list filtered by it. With one meter
+     left, or the rhythm locked, the numbers stop being a button and
+     simply read what the piece is in — a student still has to be able to
+     see the meter they are playing. */
   function updateMeterDisplay() {
     tsTop.textContent = String(song.timeSignatureNumerator);
     tsBottom.textContent = String(song.timeSignatureDenominator);
+    const fixed = meterIsFixed();
+    timeSignature.classList.toggle('fixed', fixed);
+    timeSignature.title = fixed ? 'The meter of this piece'
+                                : 'Tap the numbers to change the meter';
+    /* The bottom numeral is its own question: there may be several
+       numerators to walk and still only one denominator to walk to. */
+    tsBottom.classList.toggle('fixed', fixed || denominatorsOffered().length < 2);
   }
 
-  tsTop.addEventListener('click', () => changeMeter(() => {
-    const list = TOP_VALUES[song.timeSignatureDenominator];
-    const i = list.indexOf(song.timeSignatureNumerator);
-    song.timeSignatureNumerator = list[(i + 1) % list.length];
-  }));
+  tsTop.addEventListener('click', () => {
+    if (meterIsFixed()) return;
+    const list = meterCycle(song.timeSignatureDenominator);
+    if (list.length < 2) return;
+    changeMeter(() => {
+      const i = list.indexOf(song.timeSignatureNumerator);
+      // A piece written in a meter the layout no longer lists joins the
+      // cycle at its start rather than being stuck outside it.
+      song.timeSignatureNumerator = i === -1 ? list[0] : list[(i + 1) % list.length];
+    });
+  });
 
-  tsBottom.addEventListener('click', () => changeMeter(() => {
-    song.timeSignatureDenominator = song.timeSignatureDenominator === 4 ? 8 : 4;
-    song.timeSignatureNumerator = song.timeSignatureDenominator === 8 ? 6 : 4;
-  }));
+  tsBottom.addEventListener('click', () => {
+    if (meterIsFixed() || denominatorsOffered().length < 2) return;
+    changeMeter(() => {
+      const next = song.timeSignatureDenominator === 4 ? 8 : 4;
+      const list = meterCycle(next);
+      if (!list.length) return;
+      song.timeSignatureDenominator = next;
+      const preferred = next === 8 ? 6 : 4;
+      song.timeSignatureNumerator = list.indexOf(preferred) !== -1 ? preferred : list[0];
+    });
+  });
 
   /* A new meter re-bars the same music rather than re-cutting it. The
      number of bars is the one thing that cannot stay put: a bar of 6/8 is
@@ -2131,7 +2967,7 @@
     const held = totalBeats();
     apply();
     const need = Math.ceil(held / beatsPerMeasure());
-    song.measures = Math.max(1, Math.min(MAX_MEASURES, need));
+    song.measures = Math.max(1, Math.min(maxMeasuresAllowed(), need));
 
     updateMeterDisplay();
     updateMeasureDisplay();
@@ -2143,8 +2979,10 @@
     /* Eight bars is the ceiling, so a long piece in a meter that counts
        fewer beats to the bar can run past the end. Nothing is lost — the
        surplus beats are waiting, not deleted — but say so. */
-    if (need > MAX_MEASURES) {
-      toast('Eight bars is the limit — the rest is waiting for a wider meter');
+    if (need > maxMeasuresAllowed()) {
+      toast(maxMeasuresAllowed() === 1
+        ? 'One bar is the limit here — the rest is waiting for a wider meter'
+        : maxMeasuresAllowed() + ' bars is the limit — the rest is waiting for a wider meter');
     }
   }
 
@@ -2153,22 +2991,32 @@
   const measuresUnit  = document.getElementById('measures-unit');
   const measuresMinus = document.getElementById('measures-minus');
   const measuresPlus  = document.getElementById('measures-plus');
+  const measureStepper = document.getElementById('measure-stepper');
   const MAX_MEASURES = 8;
 
+  /* Disabled and absent mean different things here, and both are used.
+     A greyed − at one bar is the length of the piece talking: there is
+     nothing below one, and saying so is more use than the button
+     vanishing every time you reach the bottom. A − that a lesson has
+     taken away is not a limit but a rule, and rules are removed rather
+     than greyed, so that button is not drawn at all. */
   function updateMeasureDisplay() {
     measuresValue.textContent = String(song.measures);
     measuresUnit.textContent = song.measures === 1 ? 'bar' : 'bars';
     measuresMinus.disabled = song.measures <= 1;
-    measuresPlus.disabled = song.measures >= MAX_MEASURES;
+    measuresPlus.disabled = song.measures >= maxMeasuresAllowed();
+    showHide(measuresMinus, canRemoveMeasures());
+    showHide(measuresPlus, canAddMeasures());
+    measureStepper.classList.toggle('fixed', !canAddMeasures() && !canRemoveMeasures());
   }
 
   measuresMinus.addEventListener('click', () => {
-    if (song.measures <= 1) return;
+    if (!canRemoveMeasures() || song.measures <= 1) return;
     song.measures--;
     afterLengthChange();
   });
   measuresPlus.addEventListener('click', () => {
-    if (song.measures >= MAX_MEASURES) return;
+    if (!canAddMeasures() || song.measures >= maxMeasuresAllowed()) return;
     song.measures++;
     afterLengthChange();
   });
@@ -2211,8 +3059,7 @@
      only when the page actually looks different afterwards. */
   const SWITCHES = [
     { id: 'syllables-toggle',    key: 'showSyllables' },
-    { id: 'dots-toggle',         key: 'showDots' },
-    { id: 'links-toggle',        key: 'showLinkButtons' },
+    { id: 'bar-numbers-toggle',  key: 'showBarNumbers' },
     { id: 'beat-numbers-toggle', key: 'showBeatNumbers' },
     /* nothing is drawn differently, only a body class — so no render,
        and flipping it mid-playback does not interrupt what is lit */
@@ -2265,8 +3112,11 @@
     SWITCHES.forEach(({ id, key }) => {
       document.getElementById(id).classList.toggle('active', !!view[key]);
     });
+    syncDotsButton();
+    syncSystemOptions();
     systemSelect.value = view.syllableSystem;
-    systemField.hidden = !view.showSyllables;
+    systemField.hidden = !view.showSyllables || systemsOffered().length < 2;
+    document.body.classList.toggle('hide-bar-numbers', !view.showBarNumbers);
     document.body.classList.toggle('hide-beat-numbers', !view.showBeatNumbers);
     document.body.classList.toggle('show-syllables', !!view.showSyllables);
     document.body.classList.toggle('light-notes', !!view.lightNotes);
@@ -2344,6 +3194,586 @@
     if (settingsPopover.classList.contains('open')) positionPopover(settingsBtn, settingsPopover);
   });
 
+
+  /* ==================================================================
+     LAYOUT SETTINGS — the sheet
+     ------------------------------------------------------------------
+     Everything here writes to `layout` (or to the on-screen flags in
+     `view`) and takes effect immediately, for whoever is using the app.
+     There is no draft and no apply button: you are arranging the room
+     you are standing in, and a student link is a photograph of it.
+     ================================================================== */
+
+  const layoutSheet     = document.getElementById('layout-sheet');
+  const layoutSheetBtn  = document.getElementById('layout-settings-btn');
+  const layoutShowList  = document.getElementById('layout-show');
+  const layoutMeterSimple   = document.getElementById('layout-meter-simple');
+  const layoutMeterCompound = document.getElementById('layout-meter-compound');
+  const layoutMeterNote = document.getElementById('layout-meter-note');
+  const layoutKitGrid   = document.getElementById('layout-kit');
+  const layoutKitNote   = document.getElementById('layout-kit-note');
+  const layoutKitAll    = document.getElementById('layout-kit-all');
+  const layoutDivideList = document.getElementById('layout-divide');
+  const layoutFamSeg    = document.getElementById('layout-fam-seg');
+  const layoutFamNote   = document.getElementById('layout-fam-note');
+  const layoutVocabBox  = document.getElementById('layout-vocab');
+
+  let layoutFamily = 'simple';
+
+  const FAMILY_LABEL = {
+    simple:   'A beat counted in two — 2/4, 3/4, 4/4, 5/4, 6/4.',
+    compound: 'A beat counted in three — 6/8, 9/8, 12/8.'
+  };
+
+  const DIVIDE_SWITCHES = [
+    { key: 'sixteenths', name: 'Sixteenth notes',
+      desc: 'The + button, splitting a beat into four' },
+    { key: 'tuplets', name: 'Triplets / duplets',
+      desc: 'The − button, borrowing the other division' },
+    { key: 'subTuplets', name: 'Subdivided triplets / duplets',
+      desc: 'Pressing − again to split the borrowed division' }
+  ];
+
+  const SHOW_SWITCHES = [
+    { key: 'showDots', name: 'Tappable dots',
+      desc: 'The circles above each beat and the chains that join them — the button beside Play flips these too' },
+    { key: 'showBarNumbers', name: 'Bar numbers',
+      desc: 'Which bar is which, along the top of the score' },
+    { key: 'showBeatNumbers', name: 'Beat numbers',
+      desc: 'The count along the top of the score — 1, 2, 3, 4' },
+    { key: 'showSyllables', name: 'Syllables',
+      desc: 'What each beat is counted as, under every track' }
+  ];
+
+  function switchRow(name, desc, on, onClick) {
+    const btn = document.createElement('button');
+    btn.className = 'switch-row' + (on ? ' active' : '');
+    btn.innerHTML =
+      '<span class="switch-text">' +
+        '<span class="switch-name"></span>' +
+        '<span class="switch-desc"></span>' +
+      '</span><span class="switch" aria-hidden="true"></span>';
+    btn.querySelector('.switch-name').textContent = name;
+    btn.querySelector('.switch-desc').textContent = desc;
+    if (onClick) btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  /* ---- drawing one shape of the vocabulary -------------------------
+     Straight through the engraver the score itself uses, and through
+     beatRoles() on the way, so a picture in this sheet can never drift
+     from what the same taps turn into on the page. */
+
+  const CELL_SLOT_W = 15;
+  const CELL_SIZE_H = 40;
+  const JOIN_CELL_W = 70;   // the widest a joined-note picture may grow to
+
+  function cellMap(pattern, slots, compound) {
+    const flags = patternToFlags(pattern);
+    const colours = beatRoles({ slots: slots, cells: flags });
+    return RN.buildMap({
+      compound: compound,
+      beats: [{ slots: slots, roles: rolesToNotation(colours) }]
+    });
+  }
+
+  function engraveCell(pattern, slots, compound) {
+    const map = cellMap(pattern, slots, compound);
+    const sizeH = CELL_SIZE_H;
+    const boxH = sizeH + (map.tuplets.length ? RN.notationHeadroom(sizeH) : 0);
+    const centres = [];
+    for (let i = 0; i < slots; i++) centres.push(CELL_SLOT_W / 2 + i * CELL_SLOT_W);
+    return RN.engrave({
+      roles: map.roles, slotTicks: map.slotTicks, slotBeat: map.slotBeat,
+      slotSubGroup: map.slotSubGroup, tuplets: map.tuplets,
+      slotCentres: centres,
+      width: CELL_SLOT_W * slots,
+      height: boxH,
+      sizeHeight: sizeH
+    });
+  }
+
+  /* A note made by joining beats, drawn the way the score would draw it.
+     The box is only as wide as the drawing needs: a whole note is one
+     notehead and seven silent slots after it, and a cell padded out to
+     four beats would be mostly empty paper. */
+  function engraveJoin(beats, compound) {
+    const plain = compound ? 3 : 2;
+    const flags = [];
+    for (let i = 0; i < beats * plain; i++) flags.push(i === 0);
+    const colours = RN.rolesFromFlags(flags);
+
+    const spec = [];
+    for (let b = 0; b < beats; b++) {
+      spec.push({ slots: plain, roles: colours.slice(b * plain, b * plain + plain) });
+    }
+    const map = RN.buildMap({ compound: compound, beats: spec });
+
+    /* How much of the run the drawing actually uses, asked of the
+       engraver rather than guessed. Most of these are one notehead with
+       several silent slots trailing after it — a box padded out to four
+       beats would be mostly empty paper — but not all: a whole note is
+       the longest value there is, so three dotted-quarter beats joined
+       come out as two notes tied, and a box cut to one notehead would
+       drop the second one over the side. */
+    let last = 0;
+    RN.plan(map).forEach(it => { if (it.slot > last) last = it.slot; });
+    const span = last + 1.5;
+    const slotW = Math.max(4, Math.min(CELL_SLOT_W, JOIN_CELL_W / span));
+
+    const centres = [];
+    for (let i = 0; i < flags.length; i++) centres.push(slotW / 2 + i * slotW);
+    return RN.engrave({
+      roles: map.roles, slotTicks: map.slotTicks, slotBeat: map.slotBeat,
+      slotSubGroup: map.slotSubGroup, tuplets: map.tuplets,
+      slotCentres: centres,
+      width: span * slotW,
+      height: CELL_SIZE_H,
+      sizeHeight: CELL_SIZE_H
+    });
+  }
+
+  /* ---- reading and writing the layout's vocabulary ----------------- */
+
+  function layoutCells(fam, slots) {
+    const stored = layout.cells[fam][slots];
+    return (Array.isArray(stored) && stored.length) ? stored : patternsFor(slots);
+  }
+
+  function setLayoutCells(fam, slots, list) {
+    const all = patternsFor(slots);
+    const ordered = all.filter(x => list.indexOf(x) !== -1);
+    if (ordered.length >= all.length) delete layout.cells[fam][slots];
+    else layout.cells[fam][slots] = ordered;
+  }
+
+  /* What a shape sounds like, independent of the grid it is stored on.
+
+     A quarter note can be written as XO on the eighth grid or XOOO on
+     the sixteenth one, and those engrave to the same picture. A teacher
+     should be asked about it once.
+
+     Engrave the shape at a fixed width, with the notes at their real
+     positions in the beat rather than one per column, and use the
+     drawing itself as the signature. Nothing else is as trustworthy:
+     two shapes are the same picture exactly when they draw the same
+     picture, and that stays true however the engraver's own rules — or
+     beatRoles' deliberate exceptions — change underneath.
+
+     It settles the awkward cases correctly and for the right reason. A
+     quarter written on the triplet grid loses its bracket, because the
+     engraver drops a tuplet with only one note in it, so it folds into
+     the plain quarter. XXOO on sixteenths keeps its eighth rest, because
+     beatRoles says that is what it is, so it does not fold into XXOX.
+
+     The width is generous so the one length that depends on column
+     width, a partial beam's stub, clamps to the same value at every
+     division. */
+  const SIG_W = 240;
+  function soundSignature(pattern, slots, compound) {
+    const beat = compound ? COMPOUND_BEAT : SIMPLE_BEAT;
+    const per = beat / slots;
+    const map = cellMap(pattern, slots, compound);
+    const centres = [];
+    for (let i = 0; i < slots; i++) centres.push((i * per / beat) * SIG_W);
+    return RN.engrave({
+      roles: map.roles, slotTicks: map.slotTicks, slotBeat: map.slotBeat,
+      slotSubGroup: map.slotSubGroup, tuplets: map.tuplets,
+      slotCentres: centres,
+      width: SIG_W,
+      height: CELL_SIZE_H,
+      sizeHeight: CELL_SIZE_H
+    });
+  }
+
+  /* Every shape the app can write in one family, folded down to one
+     entry per distinct sound and drawn from the sparsest grid it fits
+     on, which is the simplest picture.
+
+     The fold runs across the whole family, not group by group, so a
+     quarter note written on the sixteenth grid is the same quarter note
+     that is already in Quarters, eighths & rests — it is offered once,
+     in the group a musician would look for it in, and switching it off
+     there switches it off everywhere it could have been written. */
+  const pictureCache = {};
+  function familyPictures(fam) {
+    if (pictureCache[fam]) return pictureCache[fam];
+    const compound = fam === 'compound';
+    const bySig = {};
+    const order = [];
+    VOCAB_GROUPS.forEach(group => {
+      groupCells(group, fam).forEach(entry => {
+        entry.patterns.forEach(pattern => {
+          const sig = soundSignature(pattern, entry.slots, compound);
+          if (!bySig[sig]) {
+            bySig[sig] = { kind: 'cell', group: group.id, slots: entry.slots,
+                           pattern: pattern, members: [] };
+            order.push(bySig[sig]);
+          }
+          bySig[sig].members.push({ slots: entry.slots, pattern: pattern });
+          if (entry.slots < bySig[sig].slots) {
+            bySig[sig].slots = entry.slots;
+            bySig[sig].pattern = pattern;
+          }
+        });
+      });
+    });
+    pictureCache[fam] = order;
+    return order;
+  }
+
+  /* The join group's pictures are lengths rather than shapes, and they
+     are read as a ladder: two beats, then three, then four. See the note
+     on JOIN_CAP_MAX for why a cap and not a set. */
+  function joinPictures() {
+    return JOIN_LENGTHS.map(n => ({ kind: 'join', group: 'joins', beats: n }));
+  }
+
+  function groupPictures(group, fam) {
+    if (group.joins) return joinPictures();
+    return familyPictures(fam).filter(p => p.group === group.id);
+  }
+
+  function pictureIsOn(pic, fam) {
+    if (pic.kind === 'join') return pic.beats <= joinCap(fam);
+    return pic.members.some(m => divisionEnabledIn(fam, m.slots)
+      && layoutCells(fam, m.slots).indexOf(m.pattern) !== -1);
+  }
+
+  function togglePicture(pic, fam) {
+    if (pic.kind === 'join') {
+      /* Turning a length off takes everything longer off with it, and
+         turning one on brings everything shorter with it. A join is made
+         one beat at a time, so anything else would be a picture nobody
+         could reach by pressing the chain. */
+      layout.joins[fam] = pictureIsOn(pic, fam) ? pic.beats - 1 : pic.beats;
+      saveLayout();
+      return;
+    }
+
+    const turningOff = pictureIsOn(pic, fam);
+    /* Never leave a division with nothing at all: a beat would have no
+       legal shape to fall back to. */
+    if (turningOff) {
+      const blocked = pic.members.some(m =>
+        divisionEnabledIn(fam, m.slots) && layoutCells(fam, m.slots).length <= 1);
+      if (blocked) return;
+    }
+    pic.members.forEach(m => {
+      if (!divisionEnabledIn(fam, m.slots)) return;   // nothing to narrow there
+      const list = layoutCells(fam, m.slots).slice();
+      const at = list.indexOf(m.pattern);
+      if (!turningOff && at === -1) list.push(m.pattern);
+      else if (turningOff && at !== -1) list.splice(at, 1);
+      if (list.length) setLayoutCells(fam, m.slots, list);
+    });
+    saveLayout();
+  }
+
+  /* How much of a group is switched on: 'all', 'none' or 'some'. */
+  function groupState(group, fam) {
+    const pics = groupPictures(group, fam);
+    if (!pics.length) return 'none';
+    let on = 0;
+    pics.forEach(p => { if (pictureIsOn(p, fam)) on++; });
+    return on === 0 ? 'none' : on === pics.length ? 'all' : 'some';
+  }
+
+  function setGroup(group, fam, on) {
+    if (group.joins) {
+      layout.joins[fam] = on ? JOIN_CAP_MAX : 1;
+      saveLayout();
+      return;
+    }
+    groupPictures(group, fam).forEach(pic => {
+      if (pictureIsOn(pic, fam) !== on) togglePicture(pic, fam);
+    });
+  }
+
+  /* A group only appears when the division it needs is switched on — a
+     question about dotted sixteenths is meaningless with the sixteenths
+     turned off — and when it has something of its own left to ask about
+     after the family-wide fold. */
+  function groupIsOffered(group, fam) {
+    if (group.needs && layout.divide[group.needs] === false) return false;
+    return groupPictures(group, fam).length > 0;
+  }
+
+  /* ---- rendering --------------------------------------------------- */
+
+  function renderLayoutShow() {
+    if (!layoutShowList) return;
+    layoutShowList.innerHTML = '';
+    SHOW_SWITCHES.forEach(item => {
+      layoutShowList.appendChild(switchRow(item.name, item.desc, view[item.key], () => {
+        view[item.key] = !view[item.key];
+        saveViewPrefs();
+        syncSettings();
+        renderLayoutShow();
+        render();
+      }));
+    });
+  }
+
+  function renderLayoutMeters() {
+    [['simple', layoutMeterSimple], ['compound', layoutMeterCompound]].forEach(([fam, row]) => {
+      if (!row) return;
+      row.innerHTML = '';
+      METERS[fam].forEach(key => {
+        const on = layout.meters[fam].indexOf(key) !== -1;
+        const chip = document.createElement('button');
+        chip.className = 'chip-btn' + (on ? ' active' : '');
+        chip.textContent = key;
+        chip.addEventListener('click', () => {
+          const list = layout.meters[fam].slice();
+          const at = list.indexOf(key);
+          if (at === -1) list.push(key);
+          else list.splice(at, 1);
+          const next = METERS[fam].filter(m => list.indexOf(m) !== -1);
+          // Between the two families there has to be at least one meter.
+          const other = fam === 'simple' ? 'compound' : 'simple';
+          if (!next.length && !layout.meters[other].length) return;
+          layout.meters[fam] = next;
+          saveLayout();
+          renderLayoutMeters();
+          updateMeterDisplay();
+          render();
+        });
+        row.appendChild(chip);
+      });
+    });
+    renderLayoutMeterNote();
+  }
+
+  function renderLayoutMeterNote() {
+    if (!layoutMeterNote) return;
+    const chosen = layout.meters.simple.concat(layout.meters.compound);
+    const all = METERS.simple.length + METERS.compound.length;
+    layoutMeterNote.textContent = chosen.length === all
+      ? 'Every meter. Tap the numbers on the toolbar to move between them.'
+      : chosen.length === 1
+        ? 'One meter only, so the numbers on the toolbar stop being a button and just read '
+          + chosen[0] + '.'
+        : 'Tapping the numbers on the toolbar walks these ' + chosen.length + '.';
+  }
+
+  function renderLayoutKit() {
+    if (!layoutKitGrid) return;
+    const offered = instrumentsOffered();
+    const narrowed = !!(layout.instruments && layout.instruments.length);
+
+    layoutKitGrid.innerHTML = '';
+    VI.INSTRUMENTS.forEach(inst => {
+      const on = offered.indexOf(inst.id) !== -1;
+      const cell = document.createElement('button');
+      cell.className = 'kit-cell' + (on ? ' picked' : '');
+      cell.innerHTML = '<img alt=""><span></span>';
+      cell.querySelector('img').src = instrumentImage(inst.id);
+      cell.querySelector('span').textContent = inst.label;
+      cell.title = on ? 'Take ' + inst.label + ' out of the kit'
+                      : 'Put ' + inst.label + ' back in the kit';
+      cell.addEventListener('click', () => {
+        const list = instrumentsOffered().slice();
+        const at = list.indexOf(inst.id);
+        if (at === -1) list.push(inst.id);
+        else if (list.length > 1) list.splice(at, 1);
+        else return;                       // somebody has to be playing
+        const keep = VI.INSTRUMENT_IDS.filter(id => list.indexOf(id) !== -1);
+        layout.instruments = keep.length < VI.INSTRUMENT_IDS.length ? keep : null;
+        saveLayout();
+        renderLayoutKit();
+      });
+      layoutKitGrid.appendChild(cell);
+    });
+
+    if (layoutKitNote) {
+      layoutKitNote.textContent = !narrowed
+        ? 'Every instrument. These are what the picker and Add instrument offer.'
+        : offered.length + ' of ' + VI.INSTRUMENT_IDS.length
+          + ' — a track already playing one you have taken out keeps it.';
+    }
+    if (layoutKitAll) layoutKitAll.classList.toggle('policy-off', !narrowed);
+  }
+
+  function renderLayoutDivide() {
+    if (!layoutDivideList) return;
+    layoutDivideList.innerHTML = '';
+    DIVIDE_SWITCHES.forEach(item => {
+      const on = layout.divide[item.key] !== false;
+      /* A division can be switched on and still have nothing to offer,
+         if every group that lives there has been turned off below. The
+         button it controls is hidden in that case, so say why rather
+         than leaving a switch that looks live and does nothing. */
+      const barren = on && !['simple', 'compound'].some(fam =>
+        divisionOffersSomethingNew(fam, DIVIDE_SLOTS[item.key][fam]));
+      layoutDivideList.appendChild(switchRow(
+        item.name,
+        barren ? 'Nothing under Rhythms available uses this, so the button stays hidden'
+               : item.desc,
+        on,
+        () => {
+          layout.divide[item.key] = layout.divide[item.key] === false;
+          saveLayout();
+          renderLayoutDivide();
+          renderLayoutVocab();
+          render();
+        }
+      ));
+    });
+  }
+
+  function renderLayoutFamily() {
+    if (!layoutFamSeg) return;
+    layoutFamSeg.querySelectorAll('.seg-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.fam === layoutFamily);
+    });
+    if (layoutFamNote) layoutFamNote.textContent = FAMILY_LABEL[layoutFamily];
+  }
+
+  function renderLayoutVocab() {
+    if (!layoutVocabBox) return;
+    layoutVocabBox.innerHTML = '';
+    const fam = layoutFamily;
+    const compound = fam === 'compound';
+
+    VOCAB_GROUPS.forEach(group => {
+      if (!groupIsOffered(group, fam)) return;
+      const state = groupState(group, fam);
+      const block = document.createElement('div');
+      block.className = 'vocab-block' + (state === 'none' ? ' off' : '');
+
+      const head = document.createElement('button');
+      head.className = 'vocab-head' + (state === 'all' ? ' active' : state === 'some' ? ' partial' : '');
+      head.innerHTML =
+        '<span class="vocab-head-text">' +
+          '<span class="vocab-head-name"></span>' +
+          '<span class="vocab-head-blurb"></span>' +
+        '</span><span class="switch" aria-hidden="true"></span>';
+      head.querySelector('.vocab-head-name').textContent = group.label;
+      head.querySelector('.vocab-head-blurb').textContent = group.blurb;
+      head.addEventListener('click', () => {
+        setGroup(group, fam, state !== 'all');
+        renderLayoutVocab();
+        renderLayoutDivide();
+        render();
+      });
+      block.appendChild(head);
+
+      /* A division with more shapes than a grid can show is all or
+         nothing. The join lengths never hit that — there are only ever
+         three of them — so the test is about the group's cells alone. */
+      const entries = groupCells(group, fam);
+      const pickable = !entries.length || entries.every(e => cellsArePickable(e.slots));
+
+      if (!pickable) {
+        const widest = entries.reduce((a, e) => Math.max(a, e.patterns.length), 0);
+        const note = document.createElement('p');
+        note.className = 'vocab-note';
+        note.textContent = 'That division has ' + widest +
+          ' different shapes — too many to pick between, so this group is all or nothing.';
+        block.appendChild(note);
+      } else {
+        const grid = document.createElement('div');
+        grid.className = 'vocab-grid';
+        groupPictures(group, fam).forEach(pic => {
+          const cell = document.createElement('button');
+          cell.className = 'vocab-cell' + (pictureIsOn(pic, fam) ? ' picked' : '');
+          if (pic.kind === 'join') {
+            cell.title = pic.beats + ' beats joined';
+            cell.innerHTML = engraveJoin(pic.beats, compound);
+          } else {
+            cell.title = pic.members.map(m => m.pattern).join(' / ');
+            cell.innerHTML = engraveCell(pic.pattern, pic.slots, compound);
+          }
+          cell.addEventListener('click', () => {
+            togglePicture(pic, fam);
+            renderLayoutVocab();
+            renderLayoutDivide();
+            render();
+          });
+          grid.appendChild(cell);
+        });
+        block.appendChild(grid);
+
+        if (group.joins) {
+          const note = document.createElement('p');
+          note.className = 'vocab-note';
+          note.textContent = joinCap(fam) <= 1
+            ? 'No joining — the chain button between beats is not drawn.'
+            : 'Joins reach up to ' + Math.min(joinCap(fam), JOIN_LENGTHS[JOIN_LENGTHS.length - 1])
+              + ' beats. A run already on the page keeps its chain either way.';
+          block.appendChild(note);
+        }
+      }
+
+      layoutVocabBox.appendChild(block);
+    });
+  }
+
+  function renderLayoutSheet() {
+    renderLayoutShow();
+    renderLayoutMeters();
+    renderLayoutKit();
+    renderLayoutDivide();
+    renderLayoutFamily();
+    renderLayoutVocab();
+  }
+
+  function openLayoutSheet() {
+    if (!layoutEditable()) { toast('Your layout settings were set by whoever sent this'); return; }
+    closeSettings();
+    /* The vocabulary is per family, and the family you are working in is
+       almost always the one you want to see first. */
+    layoutFamily = familyOf();
+    openSheet(layoutSheet);
+    renderLayoutSheet();
+  }
+
+  if (layoutSheetBtn) layoutSheetBtn.addEventListener('click', openLayoutSheet);
+  wireSheet(layoutSheet, 'layout-sheet-close');
+
+  if (layoutFamSeg) {
+    layoutFamSeg.addEventListener('click', e => {
+      const btn = e.target.closest('.seg-btn');
+      if (!btn) return;
+      layoutFamily = btn.dataset.fam;
+      renderLayoutFamily();
+      renderLayoutVocab();
+    });
+  }
+
+  if (layoutKitAll) {
+    layoutKitAll.addEventListener('click', () => {
+      layout.instruments = null;
+      saveLayout();
+      renderLayoutKit();
+    });
+  }
+
+  /* ---- the dots button --------------------------------------------
+     Its own control rather than a line in a popover, and deliberately
+     outside everything a lesson can switch off. Turning the dots off to
+     read the notation, and back on to edit it, is something a class does
+     every few minutes. */
+  const dotsBtn = document.getElementById('dots-btn');
+
+  function syncDotsButton() {
+    if (!dotsBtn) return;
+    dotsBtn.classList.toggle('active', view.showDots);
+    dotsBtn.setAttribute('aria-pressed', String(view.showDots));
+    dotsBtn.title = view.showDots ? 'Hide the tappable dots' : 'Show the tappable dots';
+  }
+
+  if (dotsBtn) {
+    dotsBtn.addEventListener('click', () => {
+      view.showDots = !view.showDots;
+      saveViewPrefs();
+      syncSettings();
+      if (layoutShowList && layoutShowList.children.length) renderLayoutShow();
+      render();
+    });
+  }
+
   /* ==================================================================
      PRESENT MODE
 
@@ -2389,7 +3819,8 @@
     if (e.key === 'Escape') {
       /* Close the topmost thing that is open; only stop the music if
          nothing was. */
-      const sheets = [pictureModal, titleModal, backupSheet, librarySheet]
+      const sheets = [pictureModal, titleModal, backupSheet,
+                      layoutSheet, lessonSetupSheet, librarySheet]
         .filter(el => el && el.classList.contains('open'));
       const hadPopover = settingsPopover.classList.contains('open')
                       || instrumentSheet.classList.contains('open');
@@ -2478,6 +3909,30 @@
       });
     }
 
+    /* Inside a lesson the only thing to do to an exercise is put it back
+       the way it arrived. Renaming and deleting belong to a library the
+       student does not own. */
+    if (lessonMeta) {
+      actions.appendChild(open);
+      if (lessonHasSource(id)) {
+        const again = document.createElement('button');
+        again.className = 'lib-btn';
+        again.textContent = 'Start again';
+        again.title = 'Put this one back the way it arrived';
+        again.addEventListener('click', () => {
+          if (!confirm('Start \u201c' + record.title + '\u201d again? Your changes to it are lost.')) return;
+          restoreLessonSong(id);
+          renderLibraryList();
+          toast('Back to the original');
+        });
+        actions.appendChild(again);
+      }
+      row.appendChild(meter);
+      row.appendChild(middle);
+      row.appendChild(actions);
+      return row;
+    }
+
     const rename = document.createElement('button');
     rename.className = 'lib-btn';
     rename.textContent = 'Rename';
@@ -2547,8 +4002,20 @@
 
   function renderLibraryList() {
     const lib = getStoredLibrary();
-    const { mine, starters } = sortedSongIds(lib);
     libraryList.innerHTML = '';
+
+    /* In a lesson the library is the lesson: the exercises that came in
+       the link, in the order the teacher picked them, and nothing else.
+       This is a filter on the same list, not a second store — a
+       student's work is saved exactly where anyone else's is. */
+    if (lessonMeta) {
+      const ids = lessonMeta.songIds.filter(id => lib[id]);
+      libraryList.appendChild(libraryGroup(lessonMeta.title || 'This lesson', ids, lib,
+        'Nothing came with this lesson.'));
+      return;
+    }
+
+    const { mine, starters } = sortedSongIds(lib);
     libraryList.appendChild(libraryGroup('Yours', mine, lib,
       'Nothing yet — press New ostinato, or save a copy of a starter.'));
     libraryList.appendChild(libraryGroup('Starters', starters, lib,
@@ -2624,6 +4091,7 @@
   const importStatus   = document.getElementById('import-status');
   const importFile     = document.getElementById('import-file');
   const resetStatus    = document.getElementById('reset-status');
+  const lockLayoutRow  = document.getElementById('lock-layout-row');
 
   wireSheet(backupSheet, 'backup-close');
 
@@ -2634,6 +4102,8 @@
     importStatus.textContent = '';
     resetStatus.textContent = '';
     exportFilename.value = slugify(song.title || 'ostinatos') + '-backup';
+    if (lockLayoutCheck) lockLayoutCheck.checked = false;
+    showHide(lockLayoutRow, layoutEditable());
     renderExportList();
     openSheet(backupSheet);
   });
@@ -2662,10 +4132,20 @@
     }
   }
 
+  const lockLayoutCheck = document.getElementById('lock-layout-check');
+
   document.getElementById('make-link-btn').addEventListener('click', () => {
     flushAutosave();
     const record = snapshot();
     delete record.id;                 // the receiver files it as their own
+
+    /* The ten-per-cent version of a lesson, for the eighty-per-cent
+       case: no task, no scoped library, none of that machinery — just
+       the sender's own build rules travelling with the piece, locked. */
+    if (lockLayoutCheck && lockLayoutCheck.checked) {
+      record.layout = layoutSnapshot();
+      record.layoutLocked = true;
+    }
     const base = window.location.origin + window.location.pathname;
     const link = base + '?song=' + encodeURIComponent(encodeSong(record));
 
@@ -2859,12 +4339,22 @@
     try {
       localStorage.removeItem(LIBRARY_KEY);
       localStorage.removeItem(ACTIVE_ID_KEY);
+      /* This is deliberately also the only way out of a locked layout.
+         Somebody who tried their own locked link on, or a class machine
+         that needs putting back to factory, has one lever rather than a
+         second unlock mechanism to find and explain. */
+      localStorage.removeItem(LAYOUT_KEY);
+      localStorage.removeItem(LESSON_SOURCE_KEY);
     } catch (e) {}
+    policy = null;
+    lessonMeta = null;
+    loadLayout();
     song.id = null;
     getStoredLibrary();                   // writes the starters back
     openSong(LANDING_SONG);
     renderExportList();
     renderLibraryList();
+    applyPolicyToShell();
     resetStatus.textContent = 'Everything deleted, starters restored.';
     resetStatus.className = 'status-msg good';
   });
@@ -3356,6 +4846,806 @@
 
 
   /* ==================================================================
+     LESSONS
+     ------------------------------------------------------------------
+     Two halves that never meet. The first is the shell: one pass that
+     puts the chrome into whatever state the policy asks for, so no
+     individual control has to remember it is in a lesson. The second is
+     the teacher's setup sheet, which only ever writes a draft policy and
+     turns it into a link.
+
+     The link carries the policy, a copy of the teacher's layout and the
+     ostinatos they picked. It is one-way on purpose: there is nothing in
+     it to unlock, and the teacher keeps working in their own library,
+     which the link never touches.
+     ================================================================== */
+
+  const addTrackBtn       = document.getElementById('add-track-btn');
+  const newSongBtn        = document.getElementById('new-song-btn');
+  const saveCopyBtn       = document.getElementById('save-copy-btn');
+  const shareBackupBtn    = document.getElementById('share-backup-btn');
+  const layoutSettingsSection = document.getElementById('layout-settings-section');
+  const lessonSetupBtn    = document.getElementById('lesson-setup-btn');
+  const taskStrip         = document.getElementById('task-strip');
+  const taskStripTitle    = document.getElementById('task-strip-title');
+  const taskStripNote     = document.getElementById('task-strip-note');
+  const previewBar        = document.getElementById('preview-bar');
+  const previewExitBtn    = document.getElementById('preview-exit-btn');
+
+  /* The half of the Settings popover that is about how the score is
+     drawn, as opposed to the way through to Layout settings. */
+  const settingsViewSections = ['settings-layout', 'settings-onpage', 'settings-play']
+    .map(id => document.getElementById(id));
+
+  /* A class rather than the hidden attribute: some of these already have
+     a display set by their own rules, and a policy has to win. */
+  function showHide(el, on) { if (el) el.classList.toggle('policy-off', !on); }
+
+  /* The counting systems on offer. One system is not a choice, so the
+     dropdown goes and the syllables simply appear in it. */
+  function syncSystemOptions() {
+    if (!systemSelect) return;
+    const offered = systemsOffered();
+    const want = offered.join('|');
+    if (systemSelect.dataset.offered !== want) {
+      systemSelect.dataset.offered = want;
+      systemSelect.innerHTML = '';
+      offered.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        systemSelect.appendChild(opt);
+      });
+    }
+    if (offered.indexOf(view.syllableSystem) === -1) view.syllableSystem = offered[0];
+  }
+
+  function applyPolicyToShell() {
+    const inLesson = !!policy;
+
+    /* Add instrument is two questions at once: may this lesson change
+       which instruments are playing, and is there room for another. */
+    showHide(addTrackBtn, instrumentsEditable() && song.tracks.length < maxTracksAllowed());
+    showHide(presentBtn, shellAllows('present'));
+    showHide(metronomeBtn, shellAllows('count'));
+    showHide(savePictureBtn, shellAllows('picture'));
+
+    /* A student's library is the lesson; none of the authoring lives
+       there. Share & backup goes with it — which is also the one way
+       back out of a locked layout, and deliberately still reachable
+       outside a lesson. */
+    showHide(newSongBtn, !inLesson);
+    showHide(saveCopyBtn, !inLesson);
+    showHide(shareBackupBtn, !inLesson);
+    showHide(lessonSetupBtn, !inLesson);
+    showHide(songChip, libraryMode() !== 'none');
+
+    /* Half the Settings popover is how the score is drawn, which a
+       lesson may take away; the other half is the way in to Layout
+       settings, which a locked layout takes away. The button itself only
+       goes when both have. */
+    settingsViewSections.forEach(el => showHide(el, shellAllows('view')));
+    showHide(layoutSettingsSection, layoutEditable());
+    /* The dots button appears in none of these lists, anywhere, on
+       purpose — see the note on it below. */
+    showHide(settingsBtn, shellAllows('view') || layoutEditable());
+    if (!shellAllows('view') && !layoutEditable()) closeSettings();
+
+    bpmButton.classList.toggle('fixed', tempoLocked());
+    bpmButton.title = tempoLocked() ? 'The tempo of this piece' : 'Tap to type a tempo';
+
+    if (taskStrip) {
+      taskStrip.hidden = !inLesson;
+      if (inLesson) {
+        taskStripTitle.textContent = (lessonMeta && lessonMeta.title) || 'Lesson';
+        taskStripNote.textContent = taskBlurb();
+      }
+    }
+
+    updateMeterDisplay();
+    updateMeasureDisplay();
+    syncSettings();
+  }
+
+  /* ---- opening a lesson link -------------------------------------- */
+
+  const LESSON_SOURCE_KEY = 'ostinato_builder_lesson_sources_v1';
+
+  function lessonSlug(text) {
+    return String(text || 'lesson').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '').slice(0, 32) || 'lesson';
+  }
+
+  function checkUrlForLesson() {
+    let raw = null;
+    if (window.location.hash) {
+      const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      if (params.has('lesson')) raw = params.get('lesson');
+    }
+    if (!raw) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('lesson')) raw = params.get('lesson');
+    }
+    if (!raw) return null;
+    const payload = decodeSong(raw);
+    return (payload && payload.lesson) ? payload : null;
+  }
+
+  function readLessonSources() {
+    try { return JSON.parse(localStorage.getItem(LESSON_SOURCE_KEY) || '{}') || {}; }
+    catch (e) { return {}; }
+  }
+
+  function writeLessonSources(map) {
+    try { localStorage.setItem(LESSON_SOURCE_KEY, JSON.stringify(map)); } catch (e) {}
+  }
+
+  /* The exercises land in the student's own library under ids derived
+     from the lesson, so opening the same link twice is not two copies —
+     and, more to the point, a student who comes back tomorrow finds
+     yesterday's work rather than a blank page. The teacher's untouched
+     original is kept alongside under its own key, which is what "Start
+     this one again" restores. */
+  function openLesson(payload) {
+    const p = normalizePolicy(payload.policy);
+    if (!p) return null;
+
+    const title = (payload.title && String(payload.title).trim()) || 'Lesson';
+    const stem = 'lesson_' + lessonSlug(title) + '_';
+    const lib = getStoredLibrary();
+    const sources = readLessonSources();
+    const ids = [];
+
+    (payload.songs || []).forEach((record, i) => {
+      const id = stem + i;
+      const fresh = normalizeSong(Object.assign({}, record, {
+        id: id, isCustom: true, createdAt: Date.now() + i
+      }));
+      if (!fresh.tracks.length) return;
+      sources[id] = fresh;                                     // always pristine
+      if (!lib[id]) lib[id] = JSON.parse(JSON.stringify(fresh)); // seeded once only
+      ids.push(id);
+    });
+
+    if (!ids.length) return null;
+
+    saveStoredLibrary(lib);
+    writeLessonSources(sources);
+
+    policy = p;
+    lessonMeta = { title: title, songIds: ids };
+
+    /* The lesson brings the teacher's layout with it, and locks it.
+       There would be no point narrowing the vocabulary in Layout
+       settings if the first thing a student could do was open that sheet
+       and widen it again. The dots button is not part of this. */
+    applyLayoutSnapshot(payload.layout, true);
+
+    try { window.history.replaceState(null, document.title, window.location.pathname); } catch (e) {}
+    return ids[0];
+  }
+
+  /* Put one exercise back the way the teacher sent it. */
+  function restoreLessonSong(id) {
+    const sources = readLessonSources();
+    if (!sources[id]) return false;
+    const lib = getStoredLibrary();
+    lib[id] = JSON.parse(JSON.stringify(sources[id]));
+    saveStoredLibrary(lib);
+    if (id === song.id) { clearTimeout(autosaveTimer); openSong(id); }
+    return true;
+  }
+
+  function lessonHasSource(id) { return !!readLessonSources()[id]; }
+
+
+  /* ==================================================================
+     SET UP FOR STUDENTS
+     ------------------------------------------------------------------
+     What is left once Layout settings owns the vocabulary: what the
+     class is being asked to do, how much of the piece they may move, and
+     how much of the app comes along. The rhythms themselves are whatever
+     the teacher has already built.
+     ================================================================== */
+
+  const TASK_TYPES = [
+    { id: 'free',        label: 'Explore',
+      desc: 'The rhythms and the instruments are both theirs.',   r: false, i: false },
+    { id: 'rhythms',     label: 'Write the parts',
+      desc: 'Your instruments are fixed. They write a rhythm for each.', r: false, i: true },
+    { id: 'instruments', label: 'Orchestrate it',
+      desc: 'Your rhythms are fixed. They choose who plays them.', r: true,  i: false },
+    { id: 'read',        label: 'Read and play',
+      desc: 'Nothing changes — for reading and performing.',  r: true,  i: true }
+  ];
+
+  const SHELL_SWITCHES = [
+    { key: 'view',    name: 'View options',   desc: 'Pages or scrolling, bars to a page, size, syllables' },
+    { key: 'count',   name: 'Count the beat', desc: 'The metronome button' },
+    { key: 'present', name: 'Present mode',   desc: 'Fills the screen for performing' },
+    { key: 'picture', name: 'Save a picture', desc: 'Downloads the score as an image' }
+  ];
+
+  const LENGTH_SWITCHES = [
+    { key: 'canAdd',    name: 'Add bars',    desc: 'The + on the bar stepper' },
+    { key: 'canRemove', name: 'Remove bars', desc: 'The − on the bar stepper' }
+  ];
+
+  let draft = null;           // { id, title, policy, songIds }
+  let previewing = false;
+  let previewLayoutLock = false;
+
+  function newDraft() {
+    return { title: '', policy: blankPolicy(), songIds: [] };
+  }
+
+  const lessonSetupSheet  = document.getElementById('lesson-setup-sheet');
+  const taskGrid          = document.getElementById('lesson-task-grid');
+  const taskNoteInput     = document.getElementById('lesson-task-note');
+  const tempoSeg          = document.getElementById('lesson-tempo-seg');
+  const tempoRangeBox     = document.getElementById('lesson-tempo-range');
+  const tempoMinInput     = document.getElementById('lesson-tempo-min');
+  const tempoMaxInput     = document.getElementById('lesson-tempo-max');
+  const tempoNote         = document.getElementById('lesson-tempo-note');
+  const lengthList        = document.getElementById('lesson-length');
+  const maxMeasuresInput  = document.getElementById('lesson-max-measures');
+  const maxTracksInput    = document.getElementById('lesson-max-tracks');
+  const lessonSongList    = document.getElementById('lesson-song-list');
+  const lessonSongsAll    = document.getElementById('lesson-songs-all');
+  const lessonSongsNone   = document.getElementById('lesson-songs-none');
+  const shellList         = document.getElementById('lesson-shell');
+  const lessonTitleInput  = document.getElementById('lesson-title-input');
+  const lessonPreviewBtn  = document.getElementById('lesson-preview-btn');
+  const lessonLinkBtn     = document.getElementById('lesson-link-btn');
+  const lessonLinkRow     = document.getElementById('lesson-link-row');
+  const lessonLinkInput   = document.getElementById('lesson-link-input');
+  const lessonLinkCopy    = document.getElementById('lesson-link-copy');
+  const lessonLinkCopyText = document.getElementById('lesson-link-copy-text');
+  const lessonLinkFeedback = document.getElementById('lesson-link-feedback');
+  const lessonSavedList   = document.getElementById('lesson-saved-list');
+  const lessonSavedCard   = document.getElementById('lesson-saved-card');
+  const lessonLayoutSummary = document.getElementById('lesson-layout-summary');
+
+  /* A short, honest account of what the link will carry out of Layout
+     settings, so nobody has to remember what they set up in there. */
+  function renderLayoutSummary() {
+    if (!lessonLayoutSummary) return;
+    const meters = layout.meters.simple.concat(layout.meters.compound);
+    const allMeters = METERS.simple.length + METERS.compound.length;
+    const bits = [];
+
+    bits.push(meters.length === allMeters ? 'every meter'
+      : meters.length === 1 ? meters[0] + ' only'
+      : meters.join(', '));
+
+    const divides = [];
+    if (layout.divide.sixteenths !== false) divides.push('sixteenths');
+    if (layout.divide.tuplets !== false) divides.push('triplets');
+    if (layout.divide.subTuplets !== false) divides.push('subdivided triplets');
+    bits.push(divides.length ? divides.join(', ') : 'no beat splitting');
+
+    const cap = joinCap();
+    bits.push(cap <= 1 ? 'no joining beats' : 'joins up to ' + Math.min(cap, 4) + ' beats');
+
+    const kit = instrumentsOffered();
+    bits.push(kit.length === VI.INSTRUMENT_IDS.length
+      ? 'every instrument'
+      : kit.length + ' of ' + VI.INSTRUMENT_IDS.length + ' instruments');
+
+    const narrowed = [];
+    ['simple', 'compound'].forEach(fam => {
+      Object.keys(layout.cells[fam]).forEach(slots => {
+        narrowed.push(layout.cells[fam][slots].length + ' of ' + patternsFor(+slots).length
+          + ' shapes at ' + slots + ' to a beat');
+      });
+    });
+
+    lessonLayoutSummary.innerHTML = '';
+    const line = document.createElement('p');
+    line.className = 'card-desc';
+    line.textContent = 'Students get what you have set up: ' + bits.join(' · ') + '.'
+      + (narrowed.length ? ' Narrowed to ' + narrowed.join(', ') + '.' : '');
+    lessonLayoutSummary.appendChild(line);
+
+    const open = document.createElement('button');
+    open.className = 'text-tool';
+    open.textContent = 'Change in Layout settings';
+    open.addEventListener('click', () => {
+      closeSheet(lessonSetupSheet);
+      openLayoutSheet();
+    });
+    lessonLayoutSummary.appendChild(open);
+  }
+
+  function renderTask() {
+    if (!taskGrid) return;
+    taskGrid.innerHTML = '';
+    const current = TASK_TYPES.find(t =>
+      t.r === draft.policy.task.rhythmLocked && t.i === draft.policy.task.instrumentsLocked);
+
+    TASK_TYPES.forEach(type => {
+      const card = document.createElement('button');
+      card.className = 'task-card' + (current && current.id === type.id ? ' active' : '');
+      card.innerHTML = '<span class="task-card-label"></span><span class="task-card-desc"></span>';
+      card.querySelector('.task-card-label').textContent = type.label;
+      card.querySelector('.task-card-desc').textContent = type.desc;
+      card.addEventListener('click', () => {
+        draft.policy.task.rhythmLocked = type.r;
+        draft.policy.task.instrumentsLocked = type.i;
+        renderSetupSheet();
+      });
+      taskGrid.appendChild(card);
+    });
+
+    if (taskNoteInput) {
+      taskNoteInput.placeholder = TASK_BLURB[current ? current.id : 'free'];
+      taskNoteInput.value = draft.policy.task.note || '';
+    }
+  }
+
+  function renderTempo() {
+    if (!tempoSeg) return;
+    const t = draft.policy.tempo;
+    const mode = t.locked ? 'locked' : (t.min > 40 || t.max < 240) ? 'range' : 'any';
+    tempoSeg.querySelectorAll('.seg-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tempo === mode);
+    });
+    if (tempoRangeBox) tempoRangeBox.hidden = mode !== 'range';
+    if (tempoMinInput) tempoMinInput.value = t.min;
+    if (tempoMaxInput) tempoMaxInput.value = t.max;
+    if (tempoNote) {
+      tempoNote.textContent = mode === 'locked'
+        ? 'The tempo reads as plain text at whatever each ostinato was saved at.'
+        : mode === 'range'
+          ? 'Typing outside ' + t.min + '–' + t.max + ' is pulled back into it.'
+          : 'They can set any tempo.';
+    }
+  }
+
+  function renderLength() {
+    if (!lengthList) return;
+    lengthList.innerHTML = '';
+    LENGTH_SWITCHES.forEach(item => {
+      lengthList.appendChild(switchRow(item.name, item.desc, draft.policy.structure[item.key], () => {
+        draft.policy.structure[item.key] = !draft.policy.structure[item.key];
+        renderLength();
+      }));
+    });
+    if (maxMeasuresInput) maxMeasuresInput.value = draft.policy.structure.maxMeasures || '';
+    if (maxTracksInput) maxTracksInput.value = draft.policy.structure.maxTracks || '';
+  }
+
+  function renderShell() {
+    if (!shellList) return;
+    shellList.innerHTML = '';
+    SHELL_SWITCHES.forEach(item => {
+      shellList.appendChild(switchRow(item.name, item.desc, draft.policy.shell[item.key], () => {
+        draft.policy.shell[item.key] = !draft.policy.shell[item.key];
+        renderShell();
+      }));
+    });
+    shellList.appendChild(switchRow(
+      'Move between the ostinatos',
+      draft.songIds.length > 1
+        ? 'The name at the top, holding this lesson’s ' + draft.songIds.length + ' ostinatos'
+        : 'The name at the top — with one ostinato there is nothing to move to',
+      draft.policy.shell.library !== 'none',
+      () => {
+        draft.policy.shell.library = draft.policy.shell.library === 'none' ? 'lesson' : 'none';
+        renderShell();
+      }
+    ));
+
+    const sub = document.createElement('div');
+    sub.className = 'lesson-sub';
+    sub.textContent = 'Counting systems';
+    shellList.appendChild(sub);
+
+    const row = document.createElement('div');
+    row.className = 'chip-row';
+    const chosen = draft.policy.shell.systems || SYLLABLE_SYSTEMS;
+    SYLLABLE_SYSTEMS.forEach(name => {
+      const on = chosen.indexOf(name) !== -1;
+      const chip = document.createElement('button');
+      chip.className = 'chip-btn' + (on ? ' active' : '');
+      chip.textContent = name;
+      chip.addEventListener('click', () => {
+        let list = chosen.slice();
+        const at = list.indexOf(name);
+        if (at === -1) list.push(name);
+        else if (list.length > 1) list.splice(at, 1);
+        else return;
+        list = SYLLABLE_SYSTEMS.filter(x => list.indexOf(x) !== -1);
+        draft.policy.shell.systems = list.length === SYLLABLE_SYSTEMS.length ? null : list;
+        renderShell();
+      });
+      row.appendChild(chip);
+    });
+    shellList.appendChild(row);
+  }
+
+  function renderLessonSongs() {
+    if (!lessonSongList) return;
+    const lib = getStoredLibrary();
+    const ids = sortedSongIds(lib).all.filter(id => !lessonMeta || lessonMeta.songIds.indexOf(id) === -1);
+    lessonSongList.innerHTML = '';
+
+    if (!ids.length) {
+      const empty = document.createElement('div');
+      empty.className = 'library-empty';
+      empty.textContent = 'Nothing in your library yet.';
+      lessonSongList.appendChild(empty);
+      return;
+    }
+
+    ids.forEach(id => {
+      const record = normalizeSong(lib[id]);
+      const label = document.createElement('label');
+      label.className = 'inline-check';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = draft.songIds.indexOf(id) !== -1;
+      box.addEventListener('change', () => {
+        const at = draft.songIds.indexOf(id);
+        if (box.checked && at === -1) draft.songIds.push(id);
+        else if (!box.checked && at !== -1) draft.songIds.splice(at, 1);
+        renderLessonSongs();
+        renderShell();
+      });
+      const text = document.createElement('span');
+      text.innerHTML = '<b></b> <em></em>';
+      text.querySelector('b').textContent = record.title;
+      text.querySelector('em').textContent =
+        record.timeSignatureNumerator + '/' + record.timeSignatureDenominator
+        + ' · ' + describeSong(record);
+      label.appendChild(box);
+      label.appendChild(text);
+      lessonSongList.appendChild(label);
+    });
+
+    renderLessonMismatch(lib);
+  }
+
+  /* An ostinato keeps the meter and the instruments it was written with,
+     whatever the layout now allows — nothing here rewrites content. That
+     is right, but it makes it easy to tick a 6/8 piece into a lesson set
+     up entirely in simple time, or one full of congas after narrowing
+     the kit down to hand percussion, and not notice. Say so here rather
+     than letting it be discovered in a classroom. */
+  function renderLessonMismatch(lib) {
+    const meters = layout.meters.simple.concat(layout.meters.compound);
+    const kit = instrumentsOffered();
+    const strayMeter = [], strayKit = [];
+
+    draft.songIds.forEach(id => {
+      const raw = lib[id];
+      if (!raw) return;
+      const record = normalizeSong(raw);
+      const key = record.timeSignatureNumerator + '/' + record.timeSignatureDenominator;
+      if (meters.indexOf(key) === -1) strayMeter.push(record.title);
+      if (record.tracks.some(t => kit.indexOf(t.instrument) === -1)) strayKit.push(record.title);
+    });
+
+    const lines = [];
+    if (strayMeter.length) {
+      lines.push(strayMeter.map(t => '“' + t + '”').join(', ')
+        + (strayMeter.length > 1 ? ' are' : ' is')
+        + ' in a meter your layout settings do not list. It opens as written, and its meter'
+        + (strayMeter.length > 1 ? 's' : '') + ' simply cannot be changed.');
+    }
+    if (strayKit.length) {
+      lines.push(strayKit.map(t => '“' + t + '”').join(', ')
+        + (strayKit.length > 1 ? ' use' : ' uses')
+        + ' an instrument you have taken out of the kit. It plays and prints as written,'
+        + ' and stays in its own picker — but nothing else can be changed to it.');
+    }
+    lines.forEach(text => {
+      const warn = document.createElement('p');
+      warn.className = 'card-desc lesson-warn';
+      warn.textContent = text;
+      lessonSongList.appendChild(warn);
+    });
+  }
+
+  function getStoredLessons() {
+    try { return JSON.parse(localStorage.getItem(LESSON_KEY) || '{}') || {}; }
+    catch (e) { return {}; }
+  }
+
+  function renderSavedLessons() {
+    if (!lessonSavedList) return;
+    const saved = getStoredLessons();
+    const ids = Object.keys(saved).sort((a, b) => (saved[b].savedAt || 0) - (saved[a].savedAt || 0));
+    if (lessonSavedCard) showHide(lessonSavedCard, ids.length > 0);
+    lessonSavedList.innerHTML = '';
+
+    ids.forEach(id => {
+      const item = saved[id];
+      const row = document.createElement('div');
+      row.className = 'lesson-saved-row';
+
+      const title = document.createElement('span');
+      title.className = 'lesson-saved-title';
+      title.textContent = item.title || 'Untitled lesson';
+
+      const actions = document.createElement('div');
+      actions.className = 'library-song-actions';
+
+      const edit = document.createElement('button');
+      edit.className = 'lib-btn';
+      edit.textContent = 'Edit';
+      edit.addEventListener('click', () => {
+        draft = {
+          id: id,
+          title: item.title || '',
+          policy: normalizePolicy(item.policy) || blankPolicy(),
+          songIds: (item.songIds || []).slice()
+        };
+        renderSetupSheet();
+      });
+
+      const del = document.createElement('button');
+      del.className = 'lib-btn danger';
+      del.innerHTML = '&times;';
+      del.title = 'Delete this lesson';
+      del.addEventListener('click', () => {
+        if (!confirm('Delete the lesson “' + (item.title || 'Untitled') + '”?')) return;
+        const all = getStoredLessons();
+        delete all[id];
+        try { localStorage.setItem(LESSON_KEY, JSON.stringify(all)); } catch (e) {}
+        if (draft && draft.id === id) draft.id = null;
+        renderSavedLessons();
+      });
+
+      actions.appendChild(edit);
+      actions.appendChild(del);
+      row.appendChild(title);
+      row.appendChild(actions);
+      lessonSavedList.appendChild(row);
+    });
+  }
+
+  /* An ostinato the teacher has since deleted must not ship as a dead
+     entry in the link. */
+  function pruneDraftSongs() {
+    const lib = getStoredLibrary();
+    draft.songIds = draft.songIds.filter(id => lib[id]);
+  }
+
+  function renderSetupSheet() {
+    if (!draft) draft = newDraft();
+    pruneDraftSongs();
+    renderLayoutSummary();
+    renderTask();
+    renderTempo();
+    renderLength();
+    renderLessonSongs();
+    renderShell();
+    renderSavedLessons();
+    if (lessonTitleInput) lessonTitleInput.value = draft.title || '';
+    if (lessonLinkRow) lessonLinkRow.hidden = true;
+    if (lessonLinkFeedback) lessonLinkFeedback.textContent = '';
+  }
+
+  function storeLesson() {
+    const all = getStoredLessons();
+    const id = draft.id || ('lsn_' + Date.now());
+    draft.id = id;
+    all[id] = {
+      id: id,
+      title: draft.title,
+      policy: draft.policy,
+      songIds: draft.songIds.slice(),
+      savedAt: Date.now()
+    };
+    try { localStorage.setItem(LESSON_KEY, JSON.stringify(all)); } catch (e) {}
+  }
+
+  function buildLessonPayload() {
+    const lib = getStoredLibrary();
+    const songs = draft.songIds.filter(id => lib[id]).map(id => {
+      const record = normalizeSong(JSON.parse(JSON.stringify(lib[id])));
+      delete record.id;
+      delete record.createdAt;
+      return record;
+    });
+    return {
+      lesson: 1,
+      v: POLICY_VERSION,
+      title: draft.title || 'Lesson',
+      policy: draft.policy,
+      layout: layoutSnapshot(),
+      songs: songs
+    };
+  }
+
+  /* ---- preview ----------------------------------------------------- */
+
+  function startPreview() {
+    if (!draft.songIds.length) { toast('Tick at least one ostinato first'); return; }
+    flushAutosave();
+    policy = normalizePolicy(draft.policy);
+    lessonMeta = { title: draft.title || 'Lesson preview', songIds: draft.songIds.slice() };
+    previewing = true;
+    previewLayoutLock = layoutLocked;
+    layoutLocked = true;
+    if (previewBar) previewBar.hidden = false;
+    closeSheet(lessonSetupSheet);
+    closeSheet(librarySheet);
+
+    applyPolicyToShell();
+    openSong(draft.songIds[0]);   // its afterSongChange sweeps the shell again
+  }
+
+  function endPreview() {
+    if (!previewing) return;
+    previewing = false;
+    flushAutosave();
+    policy = null;
+    lessonMeta = null;
+    layoutLocked = previewLayoutLock;
+    if (previewBar) previewBar.hidden = true;
+    applyPolicyToShell();
+    render();
+    openSheet(lessonSetupSheet);
+    renderSetupSheet();
+  }
+
+  if (previewExitBtn) previewExitBtn.addEventListener('click', endPreview);
+
+  /* ---- wiring ------------------------------------------------------ */
+
+  wireSheet(lessonSetupSheet, 'lesson-setup-close');
+
+  if (lessonSetupBtn) {
+    lessonSetupBtn.addEventListener('click', () => {
+      flushAutosave();
+      closeSettings();
+      if (!draft) {
+        draft = newDraft();
+        if (song.id) draft.songIds = [song.id];
+        draft.title = song.title || '';
+      }
+      closeSheet(librarySheet);
+      openSheet(lessonSetupSheet);
+      renderSetupSheet();
+    });
+  }
+
+  if (tempoSeg) {
+    tempoSeg.addEventListener('click', e => {
+      const btn = e.target.closest('.seg-btn');
+      if (!btn) return;
+      const t = draft.policy.tempo;
+      if (btn.dataset.tempo === 'any') { t.locked = false; t.min = 40; t.max = 240; }
+      else if (btn.dataset.tempo === 'locked') { t.locked = true; }
+      else { t.locked = false; if (t.min === 40 && t.max === 240) { t.min = 60; t.max = 120; } }
+      renderTempo();
+    });
+  }
+
+  [[tempoMinInput, 'min'], [tempoMaxInput, 'max']].forEach(([input, key]) => {
+    if (!input) return;
+    input.addEventListener('change', () => {
+      const v = parseInt(input.value, 10);
+      if (!isNaN(v)) draft.policy.tempo[key] = Math.max(BPM_MIN, Math.min(BPM_MAX, v));
+      const t = draft.policy.tempo;
+      if (t.min > t.max) { const swap = t.min; t.min = t.max; t.max = swap; }
+      renderTempo();
+    });
+  });
+
+  if (maxMeasuresInput) {
+    maxMeasuresInput.addEventListener('change', () => {
+      const v = parseInt(maxMeasuresInput.value, 10);
+      draft.policy.structure.maxMeasures =
+        (isNaN(v) || v < 1) ? null : Math.min(MAX_MEASURES, v);
+      renderLength();
+    });
+  }
+
+  if (maxTracksInput) {
+    maxTracksInput.addEventListener('change', () => {
+      const v = parseInt(maxTracksInput.value, 10);
+      draft.policy.structure.maxTracks =
+        (isNaN(v) || v < 1) ? null : Math.min(MAX_TRACKS, v);
+      renderLength();
+    });
+  }
+
+  if (taskNoteInput) {
+    taskNoteInput.addEventListener('input', () => {
+      draft.policy.task.note = taskNoteInput.value.slice(0, 160);
+    });
+  }
+
+  if (lessonTitleInput) {
+    lessonTitleInput.addEventListener('input', () => { draft.title = lessonTitleInput.value; });
+  }
+
+  if (lessonSongsAll) {
+    lessonSongsAll.addEventListener('click', () => {
+      draft.songIds = sortedSongIds(getStoredLibrary()).all.slice();
+      renderLessonSongs();
+      renderShell();
+    });
+  }
+
+  if (lessonSongsNone) {
+    lessonSongsNone.addEventListener('click', () => {
+      draft.songIds = [];
+      renderLessonSongs();
+      renderShell();
+    });
+  }
+
+  if (lessonPreviewBtn) lessonPreviewBtn.addEventListener('click', startPreview);
+
+  function offerLink(link, input, row, textEl, feedbackEl) {
+    if (input) input.value = link;
+    if (row) row.hidden = false;
+    if (window.location.protocol === 'file:') {
+      if (feedbackEl) {
+        feedbackEl.textContent = 'This page is open from a folder, so the link only works on this computer.';
+        feedbackEl.className = 'status-msg error';
+      }
+      return;
+    }
+    writeToClipboard(link).then(ok => {
+      if (ok) {
+        if (textEl) textEl.textContent = 'Copied';
+        if (feedbackEl) {
+          feedbackEl.textContent = 'Link copied to your clipboard.';
+          feedbackEl.className = 'status-msg good';
+        }
+        setTimeout(() => { if (textEl) textEl.textContent = 'Copy'; }, 2500);
+      } else if (input) {
+        input.focus();
+        input.select();
+        if (feedbackEl) {
+          feedbackEl.textContent = 'Select and copy the link above.';
+          feedbackEl.className = 'status-msg';
+        }
+      }
+    });
+  }
+
+  if (lessonLinkBtn) {
+    lessonLinkBtn.addEventListener('click', () => {
+      if (!draft.songIds.length) { toast('Tick at least one ostinato first'); return; }
+      if (!draft.title.trim()) draft.title = song.title || 'Lesson';
+      if (lessonTitleInput) lessonTitleInput.value = draft.title;
+
+      storeLesson();
+      renderSavedLessons();
+
+      /* In the hash, not the query: the payload carries whole ostinatos
+         and has no business being sent to a server, or landing in its
+         logs on the way past. */
+      const encoded = encodeSong(buildLessonPayload());
+      const link = window.location.origin + window.location.pathname
+        + '#lesson=' + encodeURIComponent(encoded);
+      offerLink(link, lessonLinkInput, lessonLinkRow, lessonLinkCopyText, lessonLinkFeedback);
+    });
+  }
+
+  if (lessonLinkCopy) {
+    lessonLinkCopy.addEventListener('click', () => {
+      if (!lessonLinkInput || !lessonLinkInput.value) return;
+      writeToClipboard(lessonLinkInput.value).then(ok => {
+        if (ok) {
+          if (lessonLinkCopyText) lessonLinkCopyText.textContent = 'Copied';
+          setTimeout(() => { if (lessonLinkCopyText) lessonLinkCopyText.textContent = 'Copy'; }, 2500);
+        } else {
+          lessonLinkInput.focus();
+          lessonLinkInput.select();
+        }
+      });
+    });
+  }
+
+
+  /* ==================================================================
      A SHARED LINK
      ================================================================== */
 
@@ -3372,6 +5662,10 @@
       toast('That link could not be read');
       return false;
     }
+
+    /* Read before normalizing: the layout rides alongside the piece and
+       is not part of it. */
+    if (decoded.layout) applyLayoutSnapshot(decoded.layout, !!decoded.layoutLocked);
 
     const record = normalizeSong(decoded);
     record.id = newSongId();
@@ -3468,6 +5762,207 @@
 
 
   /* ==================================================================
+     THE POP BRIDGE
+     ------------------------------------------------------------------
+     Embedded in the Poetry Ostinato Player, this app draws the ostinato
+     and makes its sounds, and the POP does everything else: it keeps the
+     one clock both sides play to, owns the tempo and the mutes, and tells
+     this frame which beat to light. So the bridge is small — read the
+     piece, hand over its timeline, sound one track now, light one beat.
+
+     Nothing here runs outside the POP, and nothing the POP asks for can
+     reach this app's own storage (see the block at the top of the file).
+     The contract is written up in `Poetry Ostinato Player/README.md`;
+     Rhythm Poetry 2.0 exposes the same one.
+     ================================================================== */
+
+  if (EMBEDDED) {
+    document.body.classList.add('embedded', 'present-mode');
+
+    /* A guest shows the score and takes no input yet: the POP is a player.
+       Everything is stopped at the window, ahead of every handler in the
+       app, except scrolling, which the browser does on its own. Keys are
+       passed up, so Space still starts the POP while this frame has focus.
+       `bridge.editable` is the switch minimal editing will turn on. */
+    const swallow = e => {
+      if (bridge.editable) return;
+      e.stopImmediatePropagation();
+      if (e.type === 'click' || e.type === 'dblclick' || e.type === 'contextmenu') e.preventDefault();
+    };
+    ['click', 'dblclick', 'contextmenu', 'pointerdown', 'mousedown', 'touchstart']
+      .forEach(type => window.addEventListener(type, swallow, { capture: true, passive: false }));
+    window.addEventListener('keydown', e => {
+      if (bridge.editable) return;
+      e.stopImmediatePropagation();
+      if (e.code === 'Space' || e.key === ' ') e.preventDefault();
+      if (typeof bridge.onHostKey === 'function') {
+        bridge.onHostKey({ key: e.key, code: e.code, shiftKey: e.shiftKey,
+                           metaKey: e.metaKey, ctrlKey: e.ctrlKey, altKey: e.altKey });
+      }
+    }, true);
+
+    const VIEW_KEYS = ['layout', 'measuresPerPage', 'zoomPct', 'showDots', 'showSyllables',
+                       'syllableSystem', 'lightNotes', 'showBarNumbers', 'showBeatNumbers'];
+
+    function songSummary(id, rec, starter) {
+      return {
+        id: id,
+        title: rec.title || 'Untitled ostinato',
+        kind: 'ostinato',
+        meter: [rec.timeSignatureNumerator, rec.timeSignatureDenominator],
+        bpm: rec.bpm,
+        measures: rec.measures,
+        instruments: (rec.tracks || []).map(t => t.instrument),
+        isCustom: !starter,
+        createdAt: rec.createdAt || 0,
+        preview: (rec.tracks || []).map(t => instrumentMeta(t.instrument).label).join(' · ')
+      };
+    }
+
+    /* The live library, read past anything this frame has written. */
+    function liveLibrary() {
+      window.POP_EMBED.forget(LIBRARY_KEY);
+      return getStoredLibrary();
+    }
+
+    const bridge = {
+      app: 'ostinato-builder',
+      version: 1,
+      editable: false,
+      onHostKey: null,
+      /* where this app keeps its library, so the POP can tell when a song
+         it is showing has been edited in the app in another tab */
+      libraryKey: LIBRARY_KEY,
+
+      listSongs() {
+        const lib = liveLibrary();
+        const ids = sortedSongIds(lib);
+        return ids.all.map(id => songSummary(id, lib[id], ids.starters.indexOf(id) !== -1));
+      },
+
+      openLibrarySong(id) {
+        const lib = liveLibrary();
+        if (!lib[id]) return null;
+        adoptSong(normalizeSong(lib[id]));
+        afterSongChange();
+        return bridge.info();
+      },
+
+      /* A piece that is not in the library — from a share link, or kept
+         by the POP. normalizeSong() is the same door every file and link
+         comes through in the app itself. */
+      loadSong(raw) {
+        if (!raw || typeof raw !== 'object' || !Array.isArray(raw.tracks)) return null;
+        adoptSong(normalizeSong(raw));
+        afterSongChange();
+        return bridge.info();
+      },
+
+      snapshot() { return snapshot(); },
+
+      info() {
+        return {
+          app: 'ostinato-builder',
+          kind: 'ostinato',
+          title: song.title || 'Untitled ostinato',
+          meter: [song.timeSignatureNumerator, song.timeSignatureDenominator],
+          bpm: song.bpm,
+          beatsPerMeasure: beatsPerMeasure(),
+          beatTicks: beatTicks(),
+          pickupBeats: 0,
+          totalBeats: totalBeats(),
+          measures: song.measures,
+          voices: song.tracks.map((t, i) => ({
+            id: i,
+            label: instrumentMeta(t.instrument).label,
+            instrument: t.instrument,
+            muted: !!t.muted,
+            image: new URL(instrumentImage(t.instrument), window.location.href).href
+          }))
+        };
+      },
+
+      /* Every hit in one pass, in ticks from the first beat, muted tracks
+         included — the POP owns the mutes. `gapTicks` is how long until
+         that track's next hit, which the kit needs to shape fast repeats. */
+      timeline() {
+        const notes = [];
+        song.tracks.forEach((track, ti) => {
+          trackOnsets(track).forEach(o => {
+            notes.push({ tick: o.tick, voice: ti, gapTicks: o.gapTicks });
+          });
+        });
+        notes.sort((a, b) => a.tick - b.tick);
+        return { beatTicks: beatTicks(), totalBeats: totalBeats(), notes: notes };
+      },
+
+      attachAudio(ctx, out) {
+        kit = VI.createKit({ audioContext: ctx, destination: out || undefined });
+        kit.unlock();
+        audioUnlocked = true;
+      },
+
+      sound(voice, opts) {
+        const track = song.tracks[voice];
+        if (track) playInstrument(track.instrument, (opts && opts.gapMs) || 0);
+      },
+
+      highlight(beat) {
+        if (beat == null || beat < 0) { clearHighlights(); return; }
+        highlightBeat(beat);
+      },
+
+      /* Back to the top of the piece, the way a stopped score sits. */
+      stop() {
+        clearHighlights();
+        if (currentPage !== 0) goToPage(0);
+        if (stage.scrollLeft) stage.scrollTo({ left: 0 });
+      },
+
+      getView() {
+        const out = {};
+        VIEW_KEYS.forEach(k => { out[k] = view[k]; });
+        return out;
+      },
+
+      setView(partial) {
+        if (!partial) return;
+        VIEW_KEYS.forEach(k => { if (partial[k] !== undefined) view[k] = partial[k]; });
+        if (PER_PAGE_CHOICES.indexOf(view.measuresPerPage) === -1) view.measuresPerPage = 4;
+        currentPage = 0;
+        syncSettings();
+        render();
+      },
+
+      /* What the POP needs to share the room out fairly: one page's size
+         at scale 1, the padding around it, and how it scales — pages
+         shrink to fit both ways, scrolling across is one fixed size. */
+      sizing() {
+        const pad = getComputedStyle(gridFit);
+        const sp = getComputedStyle(stage);
+        const paged = view.layout === 'pages';
+        const pages = paged ? pageGeometry() : null;
+        const headW = parseFloat(getComputedStyle(grid).getPropertyValue('--head-w')) || 0;
+        return {
+          w: pages ? headW + pages.reduce((w, p) => Math.max(w, p.width), 1) : grid.scrollWidth,
+          h: grid.scrollHeight,
+          padW: parseFloat(pad.paddingLeft) + parseFloat(pad.paddingRight),
+          padH: parseFloat(pad.paddingTop) + parseFloat(pad.paddingBottom)
+              + parseFloat(sp.paddingTop) + parseFloat(sp.paddingBottom) + 2,
+          maxScale: FIT_MAX,
+          mode: pages ? 'page' : 'fixed',
+          fixedScale: Math.max(FIT_MIN, Math.min(FIT_MAX, view.zoomPct / 100))
+        };
+      },
+
+      refit() { syncHeadColumn(); applyLayout(); }
+    };
+
+    window.PopBridge = bridge;
+  }
+
+
+  /* ==================================================================
      GO
      ================================================================== */
 
@@ -3476,9 +5971,22 @@
 
   syncSettings();
 
-  /* A shared link wins over whatever was open last: following one is a
-     deliberate act, and it files the piece in the library on the way in. */
-  if (!offerSharedSong()) restoreLastSong();
+  /* A lesson link wins over everything else: it is the reason the page
+     was opened at all, and it decides which ostinatos the rest of this
+     can even see. Then a shared song, which also beats whatever was open
+     last — following a link is a deliberate act, and it files the piece
+     in the library on the way in. */
+  let openedFromLesson = false;
+  /* Embedded in the POP there is no link to read — the POP sends the song. */
+  const lessonPayload = EMBEDDED ? null : checkUrlForLesson();
+  if (lessonPayload) {
+    const landing = openLesson(lessonPayload);
+    if (landing) openedFromLesson = openSong(landing);
+    if (!openedFromLesson) toast('That lesson link could not be read');
+  }
+  if (!openedFromLesson && (EMBEDDED || !offerSharedSong())) restoreLastSong();
+
+  applyPolicyToShell();
 
   /* The artwork loads after the first layout; a beat's width does not
      depend on it, but the fit does, so settle again once it is in. */

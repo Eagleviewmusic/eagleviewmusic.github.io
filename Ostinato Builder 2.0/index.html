@@ -29,6 +29,16 @@
 <!-- ============================================================
      THE GRID
      ============================================================ -->
+<!-- ============================================================
+     THE TASK
+     One line naming the lesson and what is being asked, for a student
+     who arrived here by link and has nothing else telling them why.
+     ============================================================ -->
+<div class="task-strip" id="task-strip" hidden>
+  <span class="task-strip-title" id="task-strip-title"></span>
+  <span class="task-strip-note" id="task-strip-note"></span>
+</div>
+
 <main class="stage" id="stage">
   <!-- #grid is scaled with a transform to fit the window; #grid-fit is
        given the size that leaves behind, so the page still scrolls to
@@ -68,12 +78,33 @@
 </div>
 
 <!-- ============================================================
+     PREVIEW BAR
+     Shown while a teacher is trying their own lesson on.
+     ============================================================ -->
+<div class="preview-bar" id="preview-bar" hidden>
+  <span>You are looking at the lesson as a student would.</span>
+  <button class="btn" id="preview-exit-btn">Back to setting it up</button>
+</div>
+
+<!-- ============================================================
      TOOLBAR
      ============================================================ -->
 <footer class="toolbar" id="toolbar">
   <div class="toolbar-row">
     <button class="play-btn" id="play-button" title="Play / stop (Space)">
       <span class="play-glyph" id="play-glyph">▶</span>
+    </button>
+
+    <!-- Beside Play, and deliberately outside everything a lesson can
+         switch off: turning the dots off to read the notation and back on
+         to edit it is something a class does every few minutes. The chains
+         that join beats belong to the dots, so they come and go with them. -->
+    <button class="tool-btn dots-btn active" id="dots-btn" title="Hide the tappable dots"
+            aria-pressed="true">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+           stroke-width="2" aria-hidden="true">
+        <circle cx="7.5" cy="12" r="3.2"/><circle cx="16.5" cy="12" r="3.2"/>
+      </svg>
     </button>
 
     <div class="time-sig" id="time-signature" title="Tap the numbers to change the meter">
@@ -106,6 +137,7 @@
       </svg>
     </button>
 
+
     <button class="tool-btn" id="settings-btn" title="What to show on the page">
       <svg viewBox="0 0 24 24" width="20" height="20"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
     </button>
@@ -121,19 +153,7 @@
      SETTINGS
      ============================================================ -->
 <div class="popover" id="settings-popover" role="dialog" aria-label="What to show">
-  <div class="popover-section">
-    <h3 class="popover-title">Syllables</h3>
-    <button class="switch-row" id="syllables-toggle">
-      <span>Show syllables</span>
-      <span class="switch" aria-hidden="true"></span>
-    </button>
-    <label class="popover-field" id="syllable-system-field">
-      <span>Counting system</span>
-      <select id="syllable-system" class="tool-select"></select>
-    </label>
-  </div>
-
-  <div class="popover-section">
+  <div class="popover-section" id="settings-layout">
     <h3 class="popover-title">Layout</h3>
     <div class="seg" role="group" aria-label="How the score is laid out">
       <button class="seg-btn active" id="layout-pages">Pages</button>
@@ -156,29 +176,41 @@
     <p class="popover-note" id="layout-note">Each page is scaled to fill the screen.</p>
   </div>
 
-  <div class="popover-section">
+  <div class="popover-section" id="settings-onpage">
     <h3 class="popover-title">On the page</h3>
-    <button class="switch-row active" id="dots-toggle">
-      <span>Tappable dots</span>
-      <span class="switch" aria-hidden="true"></span>
-    </button>
-    <button class="switch-row active" id="links-toggle">
-      <span>Join-beat buttons</span>
+    <button class="switch-row active" id="bar-numbers-toggle">
+      <span>Bar numbers</span>
       <span class="switch" aria-hidden="true"></span>
     </button>
     <button class="switch-row active" id="beat-numbers-toggle">
-      <span>Bar and beat numbers</span>
+      <span>Beat numbers</span>
       <span class="switch" aria-hidden="true"></span>
     </button>
+    <button class="switch-row" id="syllables-toggle">
+      <span>Syllables</span>
+      <span class="switch" aria-hidden="true"></span>
+    </button>
+    <label class="popover-field" id="syllable-system-field">
+      <span>Counting system</span>
+      <select id="syllable-system" class="tool-select"></select>
+    </label>
   </div>
 
-  <div class="popover-section">
+  <div class="popover-section" id="settings-play">
     <h3 class="popover-title">While it plays</h3>
     <button class="switch-row" id="light-notes-toggle">
       <span>Light up the notes</span>
       <span class="switch" aria-hidden="true"></span>
     </button>
     <p class="popover-note">The beat that is sounding lights under the notation — worth turning on when the dots are off.</p>
+  </div>
+
+  <div class="popover-section popover-foot" id="layout-settings-section">
+    <button class="popover-link" id="layout-settings-btn">
+      <span>Layout settings…</span>
+      <svg viewBox="0 0 24 24" width="16" height="16"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+    <p class="popover-note">Meters, instruments and which rhythms the dots can be tapped into.</p>
   </div>
 </div>
 
@@ -219,6 +251,9 @@
       </button>
       <button class="btn" id="save-copy-btn">Save a copy…</button>
       <button class="btn" id="share-backup-btn">Share &amp; backup</button>
+      <button class="btn" id="lesson-setup-btn" title="Send a link that opens with just the task you set">
+        Set up for students…
+      </button>
       <button class="btn" id="save-picture-btn" title="Download a picture of this ostinato">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
         <span>Save picture</span>
@@ -323,6 +358,11 @@
       <section class="backup-section">
         <h3 class="backup-title">Send this ostinato to someone</h3>
         <p class="backup-note">The whole piece travels inside the link — nothing is uploaded anywhere.</p>
+        <label class="inline-check" id="lock-layout-row">
+          <input type="checkbox" id="lock-layout-check" />
+          <span>Lock my layout settings into the link — they get the same meters, rhythms,
+                joins and instruments, and cannot widen them. The dots button still works.</span>
+        </label>
         <button class="btn btn-primary" id="make-link-btn">Create a link</button>
         <div class="share-row" id="share-row" hidden>
           <input type="text" id="share-link" class="text-field" readonly />
@@ -360,6 +400,170 @@
         <p class="backup-note">Deletes every ostinato you have made and puts the starters back. This cannot be undone.</p>
         <button class="btn btn-danger" id="reset-btn">Delete everything</button>
         <span class="status-msg" id="reset-status"></span>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     LAYOUT SETTINGS
+     The room the teacher works in, and the room a link hands on.
+     ============================================================ -->
+<div class="sheet-backdrop" id="layout-sheet">
+  <div class="sheet sheet-wide" role="dialog" aria-label="Layout settings">
+    <div class="sheet-head">
+      <h2>Layout settings</h2>
+      <button class="sheet-close" id="layout-sheet-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="sheet-body sheet-scroll">
+      <section class="settings-card">
+        <h3 class="card-title">On the page</h3>
+        <p class="card-desc">What is drawn over and under the notation. Nothing here changes what can be written.</p>
+        <div class="switch-list" id="layout-show"></div>
+      </section>
+
+      <section class="settings-card">
+        <h3 class="card-title">Meters</h3>
+        <p class="card-desc">Which time signatures the numbers on the toolbar walk.</p>
+        <div class="chip-row" id="layout-meter-simple"></div>
+        <div class="chip-row" id="layout-meter-compound"></div>
+        <p class="card-desc" id="layout-meter-note"></p>
+      </section>
+
+      <section class="settings-card">
+        <h3 class="card-title">Instruments</h3>
+        <div class="card-head-row">
+          <p class="card-desc" id="layout-kit-note"></p>
+          <span class="text-tools">
+            <button class="text-tool" id="layout-kit-all">All</button>
+          </span>
+        </div>
+        <div class="kit-grid" id="layout-kit"></div>
+      </section>
+
+      <section class="settings-card">
+        <h3 class="card-title">How a beat may divide</h3>
+        <p class="card-desc">The + and − buttons above each beat.</p>
+        <div class="switch-list" id="layout-divide"></div>
+      </section>
+
+      <section class="settings-card">
+        <h3 class="card-title">Rhythms available</h3>
+        <p class="card-desc">
+          Tapping a dot walks the shapes that are switched on here. Turn a group off and
+          those rhythms stop being reachable — anything already written keeps them.
+        </p>
+        <div class="seg" id="layout-fam-seg" role="group" aria-label="Which family of meters">
+          <button class="seg-btn active" data-fam="simple">Simple time</button>
+          <button class="seg-btn" data-fam="compound">Compound time</button>
+        </div>
+        <p class="card-desc" id="layout-fam-note"></p>
+        <div class="vocab-list" id="layout-vocab"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SET UP FOR STUDENTS
+     ============================================================ -->
+<div class="sheet-backdrop" id="lesson-setup-sheet">
+  <div class="sheet sheet-wide" role="dialog" aria-label="Set up for students">
+    <div class="sheet-head">
+      <h2>Set up for students</h2>
+      <button class="sheet-close" id="lesson-setup-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="sheet-body sheet-scroll">
+      <section class="settings-card">
+        <label class="field-label" for="lesson-title-input">Lesson name</label>
+        <input type="text" id="lesson-title-input" class="text-field"
+               placeholder="e.g. Layering a groove" maxlength="60" autocomplete="off" />
+      </section>
+
+      <section class="settings-card">
+        <h3 class="card-title">What comes from your layout settings</h3>
+        <div id="lesson-layout-summary"></div>
+      </section>
+
+      <section class="settings-card">
+        <h3 class="card-title">The task</h3>
+        <p class="card-desc">Which half of the score is already yours, and which half is theirs.</p>
+        <div class="task-grid" id="lesson-task-grid"></div>
+        <label class="field-label" for="lesson-task-note">What the strip at the top says</label>
+        <input type="text" id="lesson-task-note" class="text-field" maxlength="160" autocomplete="off" />
+      </section>
+
+      <section class="settings-card">
+        <h3 class="card-title">Tempo</h3>
+        <div class="seg" id="lesson-tempo-seg" role="group" aria-label="Tempo">
+          <button class="seg-btn active" data-tempo="any">Any</button>
+          <button class="seg-btn" data-tempo="range">Between</button>
+          <button class="seg-btn" data-tempo="locked">Locked</button>
+        </div>
+        <div class="range-row" id="lesson-tempo-range" hidden>
+          <input type="number" id="lesson-tempo-min" class="text-field num" min="30" max="260" />
+          <span class="range-dash">to</span>
+          <input type="number" id="lesson-tempo-max" class="text-field num" min="30" max="260" />
+          <span class="range-unit">BPM</span>
+        </div>
+        <p class="card-desc" id="lesson-tempo-note"></p>
+      </section>
+
+      <section class="settings-card">
+        <h3 class="card-title">How much they can change</h3>
+        <div class="switch-list" id="lesson-length"></div>
+        <div class="limit-row">
+          <label class="field-label" for="lesson-max-measures">Most bars</label>
+          <input type="number" id="lesson-max-measures" class="text-field num" min="1" max="8"
+                 placeholder="8" />
+          <label class="field-label" for="lesson-max-tracks">Most instruments</label>
+          <input type="number" id="lesson-max-tracks" class="text-field num" min="1" max="10"
+                 placeholder="10" />
+        </div>
+      </section>
+
+      <section class="settings-card">
+        <div class="card-head-row">
+          <h3 class="card-title">Which ostinatos they get</h3>
+          <span class="text-tools">
+            <button class="text-tool" id="lesson-songs-all">All</button>
+            <button class="text-tool" id="lesson-songs-none">None</button>
+          </span>
+        </div>
+        <div class="lesson-song-list" id="lesson-song-list"></div>
+      </section>
+
+      <section class="settings-card">
+        <h3 class="card-title">What else comes with it</h3>
+        <div class="switch-list" id="lesson-shell"></div>
+      </section>
+
+      <section class="settings-card">
+        <div class="lesson-actions">
+          <button class="btn" id="lesson-preview-btn">Try it as a student</button>
+          <button class="btn btn-primary" id="lesson-link-btn">Create the link</button>
+        </div>
+        <div class="share-row" id="lesson-link-row" hidden>
+          <input type="text" id="lesson-link-input" class="text-field" readonly />
+          <button class="btn" id="lesson-link-copy"><span id="lesson-link-copy-text">Copy</span></button>
+        </div>
+        <span class="status-msg" id="lesson-link-feedback"></span>
+        <p class="card-desc">
+          The link carries the task, your layout settings and a copy of each ostinato you tick.
+          Nothing is uploaded anywhere — and nothing in it is secret: it is a focusing device
+          for a class, not a lock.
+        </p>
+      </section>
+
+      <section class="settings-card" id="lesson-saved-card">
+        <h3 class="card-title">Lessons you have made</h3>
+        <div class="lesson-saved-list" id="lesson-saved-list"></div>
       </section>
     </div>
   </div>

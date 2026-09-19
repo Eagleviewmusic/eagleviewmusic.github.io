@@ -2171,3 +2171,23 @@ body.present-mode .task-strip { display: none; }
   color: var(--ink-3);
   margin-right: 2px;
 }
+
+
+/* ============================================================
+   EMBEDDED IN THE POP  (?embed=pop)
+   The Poetry Ostinato Player shows this app in a frame as a score
+   and nothing else. The body carries `present-mode` as well, so
+   everything present mode already hides stays hidden; this only
+   removes present mode's own transport, which the POP replaces,
+   and gives the pane back the room a projector needed.
+   ============================================================ */
+body.embedded .present-bar,
+body.embedded .task-strip,
+body.embedded .preview-bar,
+body.embedded .toast { display: none !important; }
+/* Narrow screens start the stage at the left so an over-wide staff can
+   be scrolled to; in a pane the poem is fitted, so it can sit centred. */
+body.embedded .stage { padding: 14px 12px 10px; align-items: safe center; }
+body.embedded .circle,
+body.embedded .notes-box,
+body.embedded .word { cursor: default; }

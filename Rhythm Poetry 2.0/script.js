@@ -1,5 +1,59 @@
+/* ==================================================================
+   EMBEDDED IN THE POP
+   ------------------------------------------------------------------
+   The Poetry Ostinato Player opens this app in a frame (?embed=pop) to
+   show and play a poem beside an ostinato. There the app is a guest: it
+   may read its library and settings, but nothing it does may write
+   them. Opening a song in the POP must not change which song is open
+   the next time this app is opened on its own, let alone overwrite one.
+
+   Rather than guard every write (there are a dozen, and the next one
+   added would be missed), localStorage itself is swapped for a layer
+   that reads through to the real thing and keeps every write in memory.
+   It runs before the app, so the app never sees the real object.
+
+   Ostinato Builder 2.0 carries the same block; keep the two in step.
+   See `Poetry Ostinato Player/README.md` for the bridge they serve.
+   ================================================================== */
+(function () {
+  let embedded = false;
+  try {
+    embedded = new URLSearchParams(window.location.search).get('embed') === 'pop'
+      && window.parent !== window;
+  } catch (e) {}
+  if (!embedded) return;
+
+  const real = window.localStorage;
+  const writes = new Map();             // key -> value, or null once removed
+  const layer = {
+    getItem(k) {
+      k = String(k);
+      if (writes.has(k)) return writes.get(k);
+      try { return real.getItem(k); } catch (e) { return null; }
+    },
+    setItem(k, v) { writes.set(String(k), String(v)); },
+    removeItem(k) { writes.set(String(k), null); },
+    clear() { writes.clear(); },
+    key(i) { try { return real.key(i); } catch (e) { return null; } },
+    get length() { try { return real.length; } catch (e) { return 0; } }
+  };
+  try {
+    Object.defineProperty(window, 'localStorage', { value: layer, configurable: true });
+  } catch (e) {}
+
+  /* If the swap did not take, this is not a safe guest: run as the plain
+     app, and the POP will find no bridge and say so. */
+  if (window.localStorage !== layer) return;
+  window.POP_EMBED = {
+    /* Drop what this frame wrote for a key, so the next read is the real,
+       current value — the POP's song picker wants the live library. */
+    forget(k) { writes.delete(String(k)); }
+  };
+})();
+
 (function() {
   const container = document.getElementById('poem');
+  const EMBEDDED = !!window.POP_EMBED;
 
   const DEFAULT_SONGS = {
     'instructions': {
@@ -1129,6 +1183,11 @@
 
   // Audio context for generating sounds
   let audioContext = null;
+  /* Where the sounds go. Left null, that is the speakers; embedded in the
+     POP it is the POP's own gain for this side, on the POP's own context,
+     so both apps sound on one clock and each side has its own volume. */
+  let audioOut = null;
+  function audioDestination(ctx) { return audioOut || ctx.destination; }
 
   function getActiveState() {
     return currentMode === 'rhythm' ? rhythmState : poetryState;
@@ -1416,19 +1475,24 @@
     return buffer;
   }
 
+  /* Every voice reads the clock once and starts from that reading, never
+     with a bare start(). On its own that is the same thing; embedded in
+     the POP, the clock it reads is the moment the note is due, so the
+     note is scheduled to the sample rather than to a timer. */
   function playBrushDrum() {
     if (!beatEnabled) return;
     const ctx = initAudioContext();
+    const time = ctx.currentTime;
     const source = ctx.createBufferSource();
     const gainNode = ctx.createGain();
     source.buffer = createBrushDrumSound();
     source.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    gainNode.gain.setValueAtTime(0, ctx.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.01);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-    source.start();
-    source.stop(ctx.currentTime + 0.1);
+    gainNode.connect(audioDestination(ctx));
+    gainNode.gain.setValueAtTime(0, time);
+    gainNode.gain.linearRampToValueAtTime(0.5, time + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+    source.start(time);
+    source.stop(time + 0.1);
   }
 
   function playBassDrum() {
@@ -1481,7 +1545,7 @@
     attackGain.connect(mainGain);
     noiseGain.connect(mainGain);
     filter.connect(mainGain);
-    mainGain.connect(ctx.destination);
+    mainGain.connect(audioDestination(ctx));
 
     bodyOsc.start(time);
     attackOsc.start(time);
@@ -1495,18 +1559,19 @@
   function playTriangleTone(duration = 0.2) {
     if (!rhythmEnabled) return;
     const ctx = initAudioContext();
+    const time = ctx.currentTime;
     const oscillator = ctx.createOscillator();
     const gainNode = ctx.createGain();
     oscillator.type = 'triangle';
-    oscillator.frequency.setValueAtTime(110, ctx.currentTime);
+    oscillator.frequency.setValueAtTime(110, time);
     oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    gainNode.gain.setValueAtTime(0, ctx.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.02);
-    gainNode.gain.linearRampToValueAtTime(0.1, ctx.currentTime + duration - 0.05);
-    gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
-    oscillator.start();
-    oscillator.stop(ctx.currentTime + duration);
+    gainNode.connect(audioDestination(ctx));
+    gainNode.gain.setValueAtTime(0, time);
+    gainNode.gain.linearRampToValueAtTime(0.3, time + 0.02);
+    gainNode.gain.linearRampToValueAtTime(0.1, time + duration - 0.05);
+    gainNode.gain.linearRampToValueAtTime(0, time + duration);
+    oscillator.start(time);
+    oscillator.stop(time + duration);
   }
 
   /*
@@ -2764,9 +2829,14 @@
   // you split a line. Past this the user has to ask, with the slider.
   const FIT_MAX = 1.8;
 
-  function effectiveScale(naturalW, availableW) {
+  function effectiveScale(naturalW, availableW, naturalH, availableH) {
     if (view.sizeMode === 'fixed') return view.zoomPct / 100;
     fitScale = Math.min(FIT_MAX, availableW / naturalW);
+    /* 'page' is only ever set by the POP: the whole poem fits its pane
+       both ways, so it stays on screen beside the ostinato. */
+    if (view.sizeMode === 'page' && naturalH > 0 && availableH > 0) {
+      fitScale = Math.min(fitScale, availableH / naturalH);
+    }
     return fitScale * (view.zoomPct / 100);
   }
 
@@ -2774,7 +2844,9 @@
     const styles = getComputedStyle(stage);
     return {
       availW: stage.clientWidth
-        - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight) - 4
+        - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight) - 4,
+      availH: stage.clientHeight
+        - parseFloat(styles.paddingTop) - parseFloat(styles.paddingBottom) - 4
     };
   }
 
@@ -2792,9 +2864,9 @@
     const naturalH = container.offsetHeight;
     if (!naturalW || !naturalH) return;
 
-    const { availW } = stageMetrics();
+    const { availW, availH } = stageMetrics();
 
-    const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, effectiveScale(naturalW, availW)));
+    const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, effectiveScale(naturalW, availW, naturalH, availH)));
     appliedScale = scale;
 
     container.style.transform = scale === 1 ? 'none' : `scale(${scale})`;
@@ -7709,15 +7781,322 @@
   }
 
 
+  /* ==================================================================
+     THE POP BRIDGE
+     ------------------------------------------------------------------
+     Embedded in the Poetry Ostinato Player, this app draws the poem and
+     makes its sounds, and the POP does everything else: it keeps the one
+     clock both sides play to, owns the tempo and the mutes, and tells
+     this frame which beat to light. So the bridge is small — read the
+     piece, hand over its timeline, sound one voice now, light one beat.
+
+     Nothing here runs outside the POP, and nothing the POP asks for can
+     reach this app's own storage (see the block at the top of the file).
+     The contract is written up in `Poetry Ostinato Player/README.md`;
+     Ostinato Builder 2.0 exposes the same one.
+     ================================================================== */
+  if (EMBEDDED) {
+    document.body.classList.add('embedded', 'present-mode');
+
+    /* A guest shows the score and takes no input yet: the POP is a player.
+       Everything is stopped at the window, ahead of every handler in the
+       app, except scrolling, which the browser does on its own. Keys are
+       passed up, so Space still starts the POP while this frame has focus.
+       `bridge.editable` is the switch minimal editing will turn on. */
+    const swallow = e => {
+      if (bridge.editable) return;
+      e.stopImmediatePropagation();
+      if (e.type === 'click' || e.type === 'dblclick' || e.type === 'contextmenu') e.preventDefault();
+    };
+    ['click', 'dblclick', 'contextmenu', 'pointerdown', 'mousedown', 'touchstart']
+      .forEach(type => window.addEventListener(type, swallow, { capture: true, passive: false }));
+    window.addEventListener('keydown', e => {
+      if (bridge.editable) return;
+      e.stopImmediatePropagation();
+      if (e.code === 'Space' || e.key === ' ') e.preventDefault();
+      if (typeof bridge.onHostKey === 'function') {
+        bridge.onHostKey({ key: e.key, code: e.code, shiftKey: e.shiftKey,
+                           metaKey: e.metaKey, ctrlKey: e.ctrlKey, altKey: e.altKey });
+      }
+    }, true);
+
+    const VIEW_KEYS = ['sizeMode', 'zoomPct', 'overflow',
+                       'showDots', 'showMeasureNumbers', 'followPlayback'];
+
+    /* Bars on a line, chosen for the pane. This app's own 'auto' reads the
+       width of the screen, which in a pane beside an ostinato is the wrong
+       question: a short, wide pane wants long lines, a tall narrow one
+       short lines. When the POP leaves it to us and the whole poem is to
+       fit, each choice is tried on paper — how big would the poem be with
+       n bars to a line? — and the biggest wins. The sizes come from the
+       poem as it is drawn now, so it costs one extra render at most. */
+    let linesAuto = false;
+
+    /* Every sensible way to set the poem, as its natural size at scale 1 —
+       estimated from the poem as it is drawn now: the widest bar, and the
+       height of a line. Only balanced settings count: for each number of
+       lines, the shortest line that holds every bar. Eight bars are 8,
+       4+4, 3+3+2 or 2+2+2+2 — never 7+1, which is no shorter than 4+4
+       and a great deal wider. */
+    function lineLayouts() {
+      const lines = [...container.querySelectorAll('.line')];
+      const measures = container.querySelectorAll('.measure').length;
+      if (!lines.length || !measures) return [];
+
+      let barW = 0;
+      lines.forEach(line => {
+        const n = line.querySelectorAll('.measure').length;
+        if (n) barW = Math.max(barW, line.offsetWidth / n);
+      });
+      const cs = getComputedStyle(container);
+      const padW = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+      const padH = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      const rowH = (container.offsetHeight - padH) / lines.length;
+      const zoom = view.zoomPct / 100;
+      const out = [];
+      for (let rows = Math.ceil(measures / 8); rows <= measures; rows++) {
+        const n = Math.ceil(measures / rows);
+        if (out.length && out[out.length - 1].n === n) continue;
+        out.push({ n: n,
+                   w: (n * barW + padW) * zoom,
+                   h: (Math.ceil(measures / n) * rowH + padH) * zoom });
+      }
+      return out.reverse();     // shortest lines first, as the tie-breaks expect
+    }
+
+    function fitLines() {
+      if (!linesAuto) return;
+      if (view.sizeMode !== 'page') {
+        if (view.measuresPerLine !== 'auto') { view.measuresPerLine = 'auto'; render(); }
+        return;
+      }
+      const { availW, availH } = stageMetrics();
+      let best = null;
+      lineLayouts().forEach(L => {
+        const scale = Math.min(FIT_MAX, availW / L.w, availH / L.h);
+        /* a near-tie goes to the longer line: it reads more like verse */
+        if (!best || scale >= best.scale * 0.98) best = { n: L.n, scale: scale };
+      });
+      if (best && best.n !== view.measuresPerLine) {
+        view.measuresPerLine = best.n;
+        render();
+      }
+    }
+
+    let fitLinesTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(fitLinesTimer);
+      fitLinesTimer = setTimeout(fitLines, 200);   // after the app's own re-render
+    });
+
+    function songSummary(id, song) {
+      const side = songSide(song);
+      const st = (side === 'rhythm' ? song.rhythmState : song.poetryState) || {};
+      const words = side === 'poetry'
+        ? (st.rawLyrics && st.rawLyrics.length ? st.rawLyrics
+           : (st.words || []).filter(w => w && w !== '-' && String(w).trim()))
+        : [];
+      return {
+        id: id,
+        title: song.title || 'Untitled',
+        kind: side,
+        meter: [st.timeSignatureNumerator || 4, st.timeSignatureDenominator || 4],
+        bpm: st.BPM || 82,
+        isCustom: !!song.isCustom,
+        createdAt: song.createdAt || 0,
+        preview: words.slice(0, 14).join(' ')
+      };
+    }
+
+    /* The live library, read past anything this frame has written. */
+    function liveLibrary() {
+      window.POP_EMBED.forget(STORAGE_KEY);
+      return getStoredLibrary();
+    }
+
+    const bridge = {
+      app: 'rhythm-poetry',
+      version: 1,
+      editable: false,
+      onHostKey: null,
+      /* where this app keeps its library, so the POP can tell when a song
+         it is showing has been edited in the app in another tab */
+      libraryKey: STORAGE_KEY,
+
+      listSongs() {
+        const lib = liveLibrary();
+        return getSortedSongIds(lib).map(id => songSummary(id, lib[id]));
+      },
+
+      openLibrarySong(id) {
+        const lib = liveLibrary();
+        if (!lib[id]) return null;
+        loadSongById(id);
+        fitLines();
+        return bridge.info();
+      },
+
+      /* A song that is not in the library — from a share link, or kept
+         by the POP. Filed in this frame's in-memory library under a
+         throwaway id and opened the ordinary way, so it goes through
+         exactly the path a song opened in the app itself does. */
+      loadSong(raw) {
+        if (!raw || typeof raw !== 'object' ||
+            !(raw.poetryState || raw.rhythmState || Array.isArray(raw.words))) return null;
+        const id = 'pop_' + Date.now();
+        const lib = getStoredLibrary();
+        lib[id] = normalizeSong({
+          id: id,
+          title: (typeof raw.title === 'string' && raw.title.trim()) ? raw.title.trim() : 'Shared poem',
+          side: songSide(raw),
+          isCustom: true,
+          createdAt: Date.now(),
+          poetryState: raw.poetryState,
+          rhythmState: raw.rhythmState,
+          words: raw.words
+        });
+        saveStoredLibrary(lib);
+        loadSongById(id);
+        fitLines();
+        return bridge.info();
+      },
+
+      snapshot() {
+        return buildSongSnapshot(getCurrentSongId(), getCurrentSongTitle() || 'Untitled', currentMode);
+      },
+
+      info() {
+        const st = getActiveState();
+        return {
+          app: 'rhythm-poetry',
+          kind: currentMode,
+          title: getCurrentSongTitle() || 'Untitled',
+          meter: [st.timeSignatureNumerator, st.timeSignatureDenominator],
+          bpm: st.BPM,
+          beatsPerMeasure: getLayoutConfig().beatsPerMeasure,
+          beatTicks: beatTicks(st),
+          pickupBeats: st.hasPickupMeasure ? 1 : 0,
+          totalBeats: notesBoxElements.length,
+          voices: [
+            { id: 'rhythm', label: currentMode === 'poetry' ? 'Words' : 'Rhythm' },
+            { id: 'beat', label: 'Steady beat' }
+          ]
+        };
+      },
+
+      /* Every sound in one pass, in ticks from the first beat — read off
+         the same slot maps schedulePlayback() plays from, so the POP hears
+         exactly what this app would. The steady beat is a voice like any
+         other, one event on every beat. */
+      timeline() {
+        const st = getActiveState();
+        const bt = beatTicks(st);
+        const total = notesBoxElements.length;
+        const words = currentMode === 'rhythm' ? [] : poetryState.words;
+        const notes = [];
+        for (let b = 0; b < total; b++) notes.push({ tick: b * bt, voice: 'beat' });
+
+        for (const grp of enumerateRhythmGroups(total)) {
+          const map = buildSlotMap(grp.start, grp.end, words);
+          let offset = 0;
+          for (let i = 0; i < map.roles.length; i++) {
+            const at = grp.start * bt + offset;
+            offset += map.slotTicks[i];
+            if (map.roles[i] !== 'note') continue;
+            let held = map.slotTicks[i];
+            for (let j = i + 1; j < map.roles.length && map.roles[j] === 'hold'; j++) {
+              held += map.slotTicks[j];
+            }
+            notes.push({ tick: at, voice: 'rhythm', holdTicks: held });
+          }
+        }
+        notes.sort((a, b) => a.tick - b.tick);
+        return { beatTicks: bt, totalBeats: total, notes: notes };
+      },
+
+      attachAudio(ctx, out) {
+        audioContext = ctx;
+        audioOut = out || null;
+      },
+
+      /* Sounds one voice now. `style` is the POP's choice of tone or drum
+         for the words — this app's own pitch/drum switch, made from there. */
+      sound(voice, opts) {
+        const o = opts || {};
+        if (voice === 'beat') { playBrushDrum(); return; }
+        if (o.style === 'drum') playBassDrum();
+        else playTriangleTone(Math.max(0.06, Math.min((o.holdMs || 300) * 0.92, 3000) / 1000));
+      },
+
+      highlight(beat) {
+        if (beat == null || beat < 0) { clearHighlights(); return; }
+        highlightNotesBox(beat);
+      },
+
+      stop() {
+        clearHighlights();
+        stopFollowing();
+      },
+
+      getView() {
+        const out = {};
+        VIEW_KEYS.forEach(k => { out[k] = view[k]; });
+        out.measuresPerLine = linesAuto ? 'auto' : view.measuresPerLine;
+        return out;
+      },
+
+      /* `measuresPerLine: 'auto'` here means fitLines(), not the app's own
+         screen-width rule. */
+      setView(partial) {
+        if (!partial) return;
+        VIEW_KEYS.forEach(k => { if (partial[k] !== undefined) view[k] = partial[k]; });
+        if (partial.measuresPerLine !== undefined) {
+          linesAuto = partial.measuresPerLine === 'auto';
+          if (!linesAuto) view.measuresPerLine = partial.measuresPerLine;
+        }
+        syncViewControls();
+        render();
+        fitLines();
+      },
+
+      /* What the POP needs to share the room out fairly: the poem's size
+         at scale 1, the padding around it, and how it scales —
+           'page'  shrinks to fit both ways (the POP's default)
+           'fit'   always fills the width, and scrolls down if it must
+           'fixed' one size, whatever the room */
+      sizing() {
+        const cs = getComputedStyle(stage);
+        const zoom = view.sizeMode === 'fixed' ? 1 : view.zoomPct / 100;
+        return {
+          w: container.offsetWidth * zoom,
+          h: container.offsetHeight * zoom,
+          padW: parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 4,
+          padH: parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + 4,
+          maxScale: FIT_MAX,
+          mode: view.sizeMode === 'fixed' || view.sizeMode === 'fit' ? view.sizeMode : 'page',
+          fixedScale: view.zoomPct / 100,
+          /* when the bars on a line are ours to choose, every way of
+             setting them, so the POP can weigh them against the ostinato */
+          layouts: linesAuto && view.sizeMode === 'page' ? lineLayouts() : null
+        };
+      },
+
+      refit() { render(); }
+    };
+
+    window.PopBridge = bridge;
+  }
+
   // --- INITIALIZATION ---
   /* A lesson link wins over everything else: it is the reason the page was
-     opened at all, and it decides which songs the rest of this can see. */
+     opened at all, and it decides which songs the rest of this can see.
+     Embedded in the POP there is no link to read — the POP sends the song. */
   let songIdToLoad = null;
-  const lessonPayload = checkUrlForLesson();
+  const lessonPayload = EMBEDDED ? null : checkUrlForLesson();
   if (lessonPayload) songIdToLoad = openLesson(lessonPayload);
 
   const library = getStoredLibrary();
-  const sharedSong = songIdToLoad ? null : checkUrlForSharedSong();
+  const sharedSong = (songIdToLoad || EMBEDDED) ? null : checkUrlForSharedSong();
   if (sharedSong && (sharedSong.poetryState || sharedSong.rhythmState || sharedSong.words || sharedSong.title)) {
     const title = (sharedSong.title && sharedSong.title.trim()) ? sharedSong.title.trim() : 'Shared Song';
     const sharedId = 'shared_' + Date.now();

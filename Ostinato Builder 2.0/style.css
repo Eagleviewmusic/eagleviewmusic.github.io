@@ -877,7 +877,14 @@ body.light-notes .notes-box.playing {
   border-color: var(--sound);
   border-radius: var(--r-md);
 }
-body.hide-beat-numbers .ruler { display: none; }
+/* Bar and beat numbers are two switches on one row. Either can go on its
+   own and the row keeps its height, so the tracks do not jump; only with
+   both off does the row itself go. A beat number that is hidden takes its
+   playing underline with it — a line under nothing reads as a glitch. */
+body.hide-bar-numbers .ruler-measure-number { display: none; }
+body.hide-beat-numbers .ruler-beat,
+body.hide-beat-numbers .ruler-beat.playing { color: transparent; border-bottom-color: transparent; }
+body.hide-bar-numbers.hide-beat-numbers .ruler { display: none; }
 body.show-syllables .track-head { padding-bottom: 28px; }
 
 /* ============================================================
@@ -1736,3 +1743,337 @@ body.present-mode .instrument-btn:active {
   .play-btn:hover:not(:active) { transform: none; }
   .ts-num:hover:not(:active) { transform: none; }
 }
+
+
+/* ============================================================
+   LAYOUT SETTINGS & LESSONS
+
+   Two sheets built out of the pieces the app already has — the
+   same cards, chips, switches and segmented controls — so the
+   place where the room is arranged does not look like a
+   different program from the room.
+   ============================================================ */
+
+/* Removed, not disabled. Everything a layout or a lesson takes
+   away goes entirely: a greyed button with a lock on it is an
+   invitation to wonder what is behind it, which is the opposite of
+   what a narrowed app is for. */
+.policy-off { display: none !important; }
+
+.sheet-wide { width: min(620px, 100%); }
+
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--hairline);
+}
+.settings-card:last-child { border-bottom: none; }
+.card-title { margin: 0; font-size: 15px; font-weight: 800; }
+.card-desc { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+.card-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.card-head-row .card-title,
+.card-head-row .card-desc { flex: 1; min-width: 0; }
+
+.switch-list { display: flex; flex-direction: column; gap: 2px; }
+
+/* The switch rows in these sheets carry a line of explanation under
+   the name; the popover's carry only a name. Same pill either way. */
+.switch-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.switch-name { font-size: 15px; font-weight: 700; }
+.switch-desc { font-size: 12px; font-weight: 600; color: var(--ink-3); line-height: 1.35; }
+.switch-row .switch { flex: none; }
+
+.settings-card .seg,
+.settings-card .chip-row { margin: 0; }
+.settings-card .seg { margin: 2px 0; }
+
+/* A way through to another sheet, reading as a line of the popover
+   rather than as a button competing with the switches above it. */
+.popover-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border-radius: var(--r-sm);
+  background: var(--paper-2);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+  text-align: left;
+  transition: background .13s, color .13s;
+}
+.popover-link:hover,
+.popover-link:active { background: var(--accent-soft); color: var(--accent); }
+.popover-link svg { flex: none; color: var(--ink-3); }
+.popover-link:hover svg { color: var(--accent); }
+
+/* ---- the kit ---- */
+.kit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  gap: 6px;
+}
+.kit-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px 6px;
+  border: 2px solid transparent;
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  transition: background .13s, border-color .13s, opacity .13s;
+  opacity: .42;
+}
+.kit-cell img { width: 40px; height: 40px; object-fit: contain; filter: grayscale(1); }
+.kit-cell span { font-size: 11px; font-weight: 700; color: var(--ink-2); text-align: center; }
+.kit-cell.picked { opacity: 1; background: var(--accent-soft); border-color: var(--accent); }
+.kit-cell.picked img { filter: none; }
+.kit-cell.picked span { color: var(--ink); }
+.kit-cell:hover { background: var(--paper-2); }
+.kit-cell.picked:hover { background: var(--accent-soft); }
+
+/* ---- the rhythm vocabulary ---- */
+.vocab-list { display: flex; flex-direction: column; gap: 8px; }
+
+.vocab-block {
+  padding: 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--paper);
+  transition: opacity .14s;
+}
+.vocab-block.off { opacity: .55; }
+
+.vocab-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 6px 8px;
+  text-align: left;
+}
+.vocab-head-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.vocab-head-name { font-size: 15px; font-weight: 800; color: var(--ink); }
+.vocab-head-blurb { font-size: 12px; font-weight: 600; color: var(--ink-3); line-height: 1.35; }
+.vocab-head .switch { flex: none; }
+.vocab-head.active .switch { background: var(--accent); }
+.vocab-head.active .switch::after { transform: translateX(16px); }
+/* Half a group on: the pill sits halfway, which is the only honest
+   place for it and needs no third colour to say so. */
+.vocab-head.partial .switch { background: var(--hairline-2); }
+.vocab-head.partial .switch::after { transform: translateX(8px); }
+
+.vocab-grid { display: flex; flex-wrap: wrap; gap: 5px; align-items: flex-end; }
+
+.vocab-cell {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  padding: 4px 8px 2px;
+  border: 2px solid transparent;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  opacity: .34;
+  transition: opacity .13s, border-color .13s, background .13s;
+}
+.vocab-cell.picked { opacity: 1; border-color: var(--accent); background: var(--accent-soft); }
+.vocab-cell:hover { background: var(--paper-2); }
+.vocab-cell.picked:hover { background: var(--accent-soft); }
+.vocab-cell.static { cursor: default; }
+.vocab-cell .rhythm-svg { position: static; }
+
+.vocab-note {
+  margin: 4px 6px 2px;
+  font-size: 12px;
+  color: var(--ink-3);
+  line-height: 1.4;
+}
+
+/* ---- the task cards ---- */
+.task-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px;
+}
+.task-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 2px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--paper);
+  text-align: left;
+  transition: border-color .13s, background .13s;
+}
+.task-card:hover { background: var(--paper-2); }
+.task-card.active { border-color: var(--accent); background: var(--accent-soft); }
+.task-card-label { font-size: 14px; font-weight: 800; color: var(--ink); }
+.task-card-desc { font-size: 12px; font-weight: 600; color: var(--ink-2); line-height: 1.35; }
+
+/* ---- small number fields ---- */
+.text-field.num { width: 84px; flex: none; text-align: center; }
+.range-row, .limit-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.range-row[hidden] { display: none; }
+.limit-row .field-label { margin: 0; }
+.range-dash, .range-unit { font-size: 13px; font-weight: 700; color: var(--ink-2); }
+
+.inline-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  width: 100%;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  line-height: 1.45;
+  cursor: pointer;
+}
+.inline-check input { accent-color: var(--accent); width: 16px; height: 16px; flex: none; margin-top: 2px; }
+
+.lesson-song-list { display: flex; flex-direction: column; gap: 2px; }
+.lesson-song-list .inline-check {
+  padding: 7px 8px;
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  transition: background .13s;
+}
+.lesson-song-list .inline-check:hover { background: var(--paper); }
+.lesson-song-list .inline-check em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.lesson-warn {
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.lesson-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.lesson-actions .btn { flex: 1; min-width: 150px; justify-content: center; }
+
+.lesson-saved-list { display: flex; flex-direction: column; gap: 2px; }
+.lesson-saved-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  transition: background .13s;
+}
+.lesson-saved-row:hover { background: var(--paper); }
+.lesson-saved-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.lesson-sub {
+  margin: 6px 2px 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+
+/* ============================================================
+   IN A LESSON
+
+   The strip that says what the task is, the bar a teacher gets
+   while trying their own link on, and the handful of controls
+   that stop being controls.
+   ============================================================ */
+
+.task-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 18px;
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--hairline);
+}
+.task-strip[hidden] { display: none; }
+.task-strip-title { font-size: 14px; font-weight: 800; color: var(--accent-deep); }
+.task-strip-note { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+body.present-mode .task-strip { display: none; }
+
+.preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 9px 18px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.preview-bar[hidden] { display: none; }
+.preview-bar .btn { background: rgba(255,255,255,.14); color: #fff; }
+.preview-bar .btn:hover,
+.preview-bar .btn:active { background: rgba(255,255,255,.26); }
+
+/* A value that cannot be changed still has to be readable. These stop
+   being buttons and become the plain text of what the piece is set to,
+   rather than disappearing and leaving a student guessing. */
+.time-sig.fixed { cursor: default; background: transparent; }
+.time-sig.fixed:hover,
+.time-sig.fixed:active { background: transparent; }
+.time-sig.fixed .ts-num,
+.ts-num.fixed { cursor: default; pointer-events: none; }
+.stepper.fixed .step-body { min-width: 0; padding: 0 8px; }
+
+.dots .dot.fixed { cursor: default; }
+.dots .dot.fixed:hover,
+.dots .dot.fixed:active { transform: none; }
+.instrument-btn.fixed { cursor: default; }
+.instrument-btn.fixed:hover,
+.instrument-btn.fixed:active { background: var(--surface); border-color: var(--hairline); transform: none; }
+
+@media (max-width: 640px) {
+  .settings-card { padding: 14px 16px; }
+  .kit-grid { grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); }
+}
+
+/* A tempo a lesson has fixed: still the same readout, no longer a button. */
+.tool-btn.fixed { cursor: default; }
+.tool-btn.fixed:hover,
+.tool-btn.fixed:active { background: transparent; }
+
+/* The way through to Layout settings closes the Settings popover, set
+   apart from the switches above it by a rule. */
+.popover-foot { padding-top: 12px; border-top: 1px solid var(--hairline); }
+
+
+/* ============================================================
+   EMBEDDED IN THE POP  (?embed=pop)
+   The Poetry Ostinato Player shows this app in a frame as a score
+   and nothing else. The body carries `present-mode` as well, so
+   everything present mode already hides stays hidden; this only
+   removes present mode's own transport, which the POP replaces,
+   and gives the pane back the room a projector needed.
+   ============================================================ */
+body.embedded .present-bar,
+body.embedded .task-strip,
+body.embedded .pager,
+body.embedded .toast { display: none !important; }
+body.embedded .stage { padding: 14px 0 6px; }
+body.embedded .dots .dot,
+body.embedded .instrument-btn { cursor: default; }
+/* centred in its pane, the way a page sits on a stand */
+body.embedded #grid-fit { margin: 0 auto; }
