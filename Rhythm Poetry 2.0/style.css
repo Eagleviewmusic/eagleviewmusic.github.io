@@ -1670,7 +1670,13 @@ body.present-mode .present-bar { display: flex; }
 body.present-mode .topbar,
 body.present-mode .toolbar,
 body.present-mode .write-panel { display: none; }
-body.present-mode .stage { padding: 34px 26px; justify-content: center; }
+/* `safe` is load-bearing, not decoration: a poem taller than the stage,
+   centred, starts above the scroll origin — and there is no scrolling to
+   a negative position, so the top of the music is simply gone. `safe`
+   drops the centring exactly when it would crop, and the staff sits from
+   the top and scrolls like anything else. The same word is on
+   `align-items` above, for the same reason across. */
+body.present-mode .stage { padding: 34px 26px; justify-content: safe center; }
 body.present-mode .beat-subdivision-controls,
 body.present-mode .beat-link-btn,
 body.present-mode .add-measure-btn,

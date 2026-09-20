@@ -40,6 +40,10 @@
 
   <div class="topbar-right">
     <div class="seg" role="group" aria-label="Arrangement">
+      <button class="seg-btn" id="arrange-auto" title="Let the stand choose whichever draws both scores larger">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>
+        <span class="seg-label">Automatic</span>
+      </button>
       <button class="seg-btn" id="arrange-stacked" title="One above the other">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="7" rx="2"/><rect x="3.5" y="13.5" width="17" height="7" rx="2"/></svg>
         <span class="seg-label">Stacked</span>
@@ -239,7 +243,7 @@
       <button class="seg-btn" id="split-auto">Automatic</button>
       <button class="seg-btn" id="split-even">Half and half</button>
     </div>
-    <p class="pop-note" id="split-note">The ostinato gets the room it needs and the poem gets the rest. Drag the line between them to choose for yourself.</p>
+    <p class="pop-note" id="split-note">Each score is drawn as large as it can be: the stand chooses how many bars go on a line, and shares the room so neither comes out smaller than it has to. Drag the line between them to choose for yourself.</p>
   </div>
 </div>
 
@@ -283,11 +287,19 @@
       <button class="seg-btn" id="words-tone">A tone</button>
       <button class="seg-btn" id="words-drum">A drum</button>
     </div>
+    <div class="pop-label small">Strength</div>
+    <div class="seg seg-wide" role="group" aria-label="How full the words sound">
+      <button class="seg-btn" data-strength="1">&times;1</button>
+      <button class="seg-btn" data-strength="2">&times;2</button>
+      <button class="seg-btn" data-strength="3">&times;3</button>
+    </div>
+    <p class="pop-note" id="strength-note">One voice on every note.</p>
     <label class="vol"><span>Volume</span><input type="range" min="0" max="100" id="vol-poem"></label>
   </div>
   <div class="mixer-col ost">
     <div class="mixer-head"><span class="pane-dot"></span>Ostinato</div>
     <div class="mixer-voices" id="mixer-ost"></div>
+    <p class="pop-note" id="mixer-ost-note" hidden>Tap a picture to change the instrument.</p>
     <label class="vol"><span>Volume</span><input type="range" min="0" max="100" id="vol-ost"></label>
   </div>
 </div>
@@ -335,18 +347,21 @@
   <div class="pop-section">
     <div class="pop-label">Layout</div>
     <div class="seg seg-wide" role="group">
+      <button class="seg-btn" data-ob-layout="systems">Lines</button>
       <button class="seg-btn" data-ob-layout="pages">Pages</button>
       <button class="seg-btn" data-ob-layout="scroll">Scroll across</button>
     </div>
   </div>
   <div class="pop-section" id="ob-perpage-section">
-    <div class="pop-label">Bars on a page</div>
+    <div class="pop-label" id="ob-perpage-label">Bars on a line</div>
     <div class="chips" id="ob-perpage">
+      <button class="chip-btn" data-per-page="auto">Auto</button>
       <button class="chip-btn" data-per-page="1">1</button>
       <button class="chip-btn" data-per-page="2">2</button>
       <button class="chip-btn" data-per-page="4">4</button>
       <button class="chip-btn" data-per-page="8">8</button>
     </div>
+    <p class="pop-note" id="ob-perpage-note">The stand picks the number that draws both scores largest in the room it has.</p>
   </div>
   <div class="pop-section" id="ob-zoom-section">
     <label class="slider-row"><span>Size</span><input type="range" min="40" max="180" step="5" id="ob-zoom"><span class="slider-val" id="ob-zoom-val">100%</span></label>
@@ -401,6 +416,21 @@
   </div>
 </div>
 
+<!-- Choosing an instrument for one ostinato line -->
+<div class="sheet-backdrop" id="instrument-sheet">
+  <div class="sheet" role="dialog" aria-labelledby="instrument-heading">
+    <div class="sheet-head">
+      <span class="pane-dot"></span>
+      <h2 id="instrument-heading">Choose an instrument</h2>
+      <button class="icon-btn sheet-close" data-close title="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div class="instrument-grid" id="instrument-grid"></div>
+    <p class="pop-note">Tap one to hear it. It changes this ostinato on the stand — the one in Ostinato Builder is not touched.</p>
+  </div>
+</div>
+
 <!-- Pairings, sharing, starting fresh -->
 <div class="sheet-backdrop" id="pair-sheet">
   <div class="sheet" role="dialog" aria-labelledby="pair-heading">
@@ -435,6 +465,8 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<script src="lib/instruments/js/virtual-instruments.js"></script>
+<script src="lib/instruments/js/instrument-icons.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

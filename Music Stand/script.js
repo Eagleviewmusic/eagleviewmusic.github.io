@@ -91,6 +91,11 @@
     leadIn: 1,            // times round the ostinato goes before the poem
     loop: true,
     wordsSound: 'tone',   // 'tone' | 'drum'
+    /* How full the poem's voice is — 1, 2 or 3 deep. The complaint it
+       answers is one only a stand can hear: on its own the poem is fine,
+       and under an ostinato it is thin. Rhythm Poetry has the same
+       switch, and this one is simply that switch reached from here. */
+    wordsStrength: 1,
     mute: { poem: false, ost: false },
     /* per voice, keyed by the voice id the bridge gives. The steady beat
        starts muted: with an ostinato underneath, it is already there. */
@@ -103,13 +108,23 @@
     editing: false,
     /* the split is kept per arrangement: a size chosen for two scores one
        above the other means nothing once they sit side by side */
-    layout: { arrange: 'stacked', first: 'poem', show: 'both',
+    /* `auto` lets the stand choose one above the other or side by side,
+       whichever draws the two scores larger — see FITTING TWO SCORES
+       INTO ONE SCREEN. The split is kept per arrangement still: a size
+       chosen for two scores one above the other means nothing once they
+       sit side by side. */
+    layout: { arrange: 'auto', first: 'poem', show: 'both',
               split: { stacked: 'auto', side: 'auto' } },
     views: {
       poem: { sizeMode: 'page', zoomPct: 100, measuresPerLine: 'auto',
               textPct: 100, lyricFont: 'rounded',
               showDots: true, showMeasureNumbers: true, followPlayback: true },
-      ost:  { layout: 'pages', measuresPerPage: 4, zoomPct: 100, showDots: true,
+      /* `Lines` with the number left to the stand: in a pane the whole
+         ostinato should be on show — a pane that turns its own pages
+         under a stand that is already turning them is one page too many
+         — and how many bars to a line is a question about the pane,
+         which is the stand's to answer. */
+      ost:  { layout: 'systems', measuresPerPage: 'auto', zoomPct: 100, showDots: true,
               lightNotes: true, showSyllables: false, showBarNumbers: true, showBeatNumbers: true }
     },
     /* { src: 'library' | 'data', id, title, data, edited?, origin? } —
@@ -164,6 +179,7 @@
     return {
       bpm: state.bpm, countIn: state.countIn, leadIn: state.leadIn, loop: state.loop,
       wordsSound: state.wordsSound,
+      wordsStrength: state.wordsStrength,
       mute: Object.assign({}, state.mute),
       voiceMute: JSON.parse(JSON.stringify(state.voiceMute)),
       vol: Object.assign({}, state.vol)
@@ -191,6 +207,7 @@
     if ([0, 1, 2, 4].indexOf(src.leadIn) !== -1) state.leadIn = src.leadIn;
     if (typeof src.loop === 'boolean') state.loop = src.loop;
     if (src.wordsSound === 'drum' || src.wordsSound === 'tone') state.wordsSound = src.wordsSound;
+    if ([1, 2, 3].indexOf(src.wordsStrength) !== -1) state.wordsStrength = src.wordsStrength;
     SIDES.forEach(side => {
       if (src.mute && typeof src.mute[side] === 'boolean') state.mute[side] = src.mute[side];
       if (src.voiceMute && src.voiceMute[side] && typeof src.voiceMute[side] === 'object') {
@@ -203,7 +220,7 @@
   function adoptLayout(src) {
     if (!src || typeof src !== 'object') return;
     const L = state.layout;
-    if (src.arrange === 'side' || src.arrange === 'stacked') L.arrange = src.arrange;
+    if (['auto', 'side', 'stacked'].indexOf(src.arrange) !== -1) L.arrange = src.arrange;
     if (src.first === 'poem' || src.first === 'ost') L.first = src.first;
     if (['both', 'poem', 'ost'].indexOf(src.show) !== -1) L.show = src.show;
     const ok = v => v === 'auto' || (typeof v === 'number' && v > 0 && v < 1);
@@ -224,6 +241,19 @@
         });
       }
     });
+    upgradeOstDefault(src && src.ost);
+  }
+
+  /* The ostinato used to be shown in pages, four bars at a time, and a
+     saved session still says so. A default that has been replaced should
+     not outlive it — but a choice someone made should. So only the old
+     default itself is moved on: pages, four to a page, and nothing else. */
+  function upgradeOstDefault(saved) {
+    if (!saved) return;
+    if (saved.layout === 'pages' && saved.measuresPerPage === 4) {
+      state.views.ost.layout = 'systems';
+      state.views.ost.measuresPerPage = 'auto';
+    }
   }
 
 
@@ -257,10 +287,21 @@
     }
 
     s.bridge = bridge;
+    forgetShapes();
     bridge.onHostKey = handleKey;
     bridge.onEdit = () => paneEdited(side);
+    /* A badge pressed in a pane. Not an edit — the piece is untouched;
+       what moved is this stand's mixer, so that is all that is written
+       down. The pane has already changed its own badge. */
+    bridge.onVoiceMute = (id, muted) => {
+      const k = String(id);
+      if (muted) state.voiceMute[side][k] = true;
+      else delete state.voiceMute[side][k];
+      renderMixer();
+      saveSession();
+    };
     attachSide(side);
-    safe(() => bridge.setView(state.views[side]));
+    safe(() => bridge.setView(viewFor(side)));
     safe(() => { bridge.editable = state.editing; });
     showStatus(side, '');
 
@@ -369,6 +410,7 @@
 
     refreshHeads();
     renderMixer();
+    pushVoiceMutes(side);
     scheduleSplit();
     saveSession();
     return true;
@@ -658,6 +700,47 @@
 
 
   /* ==================================================================
+     THE SOUND LIBRARY
+     ------------------------------------------------------------------
+     The stand keeps its own copy of the shared instrument engine — the
+     same one Ostinato Builder plays and Rhythm Poetry now sounds its
+     rhythm on — so it can let a sound be heard without a frame having to
+     make it. Today that is the fourteen percussion voices; the apps that
+     join this stand later bring pitched instruments with them, and they
+     go here, which is why what follows asks the library what it holds
+     rather than naming anything.
+
+     It is not a second way of playing the music. A pane plays its own
+     score, through the same context, on the same clock — see attachAudio.
+     This is for the stand's own sounds: an instrument heard in a picker
+     before it is chosen, and whatever comes next.
+     ================================================================== */
+
+  const VI = window.VirtualInstruments || null;
+  let library = null;
+
+  /* Built on the stand's context, straight on to the master — a preview
+     is the stand speaking, not either side, so neither side's volume and
+     neither side's gate should touch it. */
+  function sounds() {
+    if (!VI) return null;
+    if (!library) {
+      const ctx = ensureAudio();
+      if (!ctx) return null;
+      library = VI.createKit({ audioContext: ctx, destination: audio.master, volume: 0.9 });
+      library.unlock();
+    }
+    return library;
+  }
+
+  /* One instrument, now. `id` is the library's own — 'tom', 'shaker'. */
+  function previewSound(id) {
+    const k = sounds();
+    if (k && k.has(id)) k.play(id, {});
+  }
+
+
+  /* ==================================================================
      THE CONDUCTOR
      ------------------------------------------------------------------
      Time is counted in beats from the moment Play is pressed. Each side
@@ -874,7 +957,8 @@
     if (state.mute.poem || state.voiceMute.poem[ev.key]) return;
     const b = sides.poem.bridge;
     if (!b) return;
-    const opts = { holdMs: ev.hold * play.spb * 1000, style: state.wordsSound };
+    const opts = { holdMs: ev.hold * play.spb * 1000, style: state.wordsSound,
+                   strength: state.wordsStrength };
     safe(() => audio.timed.soundAt(time, () => b.sound(ev.voice, opts)));
   }
 
@@ -1083,17 +1167,55 @@
      MIXER
      ================================================================== */
 
-  function voiceButton(side, voice) {
-    const btn = document.createElement('button');
-    btn.className = 'voice-btn';
+  /* Whether the ostinato's instruments may be changed from here. The app
+     answers, not this file: a lesson can lock the instruments, and a
+     locked line has to stay locked wherever it is being looked at.
+     Asked once a render, because every row asks. */
+  let swapOffered = false;
+
+  function refreshSwapOffered() {
+    const b = sides.ost.bridge;
+    if (!b || typeof b.instruments !== 'function' || !state.songs.ost) {
+      swapOffered = false;
+      return;
+    }
+    const got = safe(() => b.instruments(null), null);
+    swapOffered = !!(got && got.editable && got.items && got.items.length > 1);
+  }
+
+  function canSwapInstrument(side) { return side === 'ost' && swapOffered; }
+
+  /* One voice, as it reads in the mixer: a picture and a name. The
+     picture is the instrument and the name is the switch — the same two
+     things, in the same order, as the track head in Ostinato Builder, so
+     a line muted in a pane and a line muted here are plainly the one
+     line. A voice with no picture (the poem's two) is only the switch. */
+  function voiceRow(side, voice) {
+    const row = document.createElement('div');
+    row.className = 'voice-row';
+
     const muted = !!state.voiceMute[side][String(voice.id)];
-    btn.classList.toggle('muted', muted);
+
     if (voice.image) {
+      const pic = document.createElement(canSwapInstrument(side) ? 'button' : 'div');
+      pic.className = 'voice-pic' + (muted ? ' muted' : '');
       const img = document.createElement('img');
       img.src = voice.image;
       img.alt = '';
-      btn.appendChild(img);
+      pic.appendChild(img);
+      if (canSwapInstrument(side)) {
+        pic.title = 'Change this instrument';
+        pic.setAttribute('aria-label', 'Change ' + voice.label);
+        pic.addEventListener('click', () => openInstrumentSheet(voice.id));
+      } else {
+        pic.title = voice.label;
+      }
+      row.appendChild(pic);
     }
+
+    const btn = document.createElement('button');
+    btn.className = 'voice-btn';
+    btn.classList.toggle('muted', muted);
     const label = document.createElement('span');
     label.className = 'voice-label';
     label.textContent = voice.label;
@@ -1102,17 +1224,42 @@
     st.textContent = muted ? 'Off' : 'On';
     btn.append(label, st);
     btn.title = (muted ? 'Turn on ' : 'Turn off ') + voice.label;
-    btn.addEventListener('click', () => {
-      const k = String(voice.id);
-      if (state.voiceMute[side][k]) delete state.voiceMute[side][k];
-      else state.voiceMute[side][k] = true;
-      renderMixer();
-      saveSession();
+    btn.addEventListener('click', () => setVoiceMute(side, voice.id, !muted));
+    row.appendChild(btn);
+
+    return row;
+  }
+
+  /* The one place a voice is muted, wherever the asking came from — the
+     mixer here or the badge on the instrument in the pane. The pane is
+     told either way, so the two never show different answers. */
+  function setVoiceMute(side, id, muted) {
+    const k = String(id);
+    if (muted) state.voiceMute[side][k] = true;
+    else delete state.voiceMute[side][k];
+    pushVoiceMute(side, id, muted);
+    renderMixer();
+    saveSession();
+  }
+
+  function pushVoiceMute(side, id, muted) {
+    const b = sides[side].bridge;
+    if (b && typeof b.setVoiceMuted === 'function') safe(() => b.setVoiceMuted(id, muted));
+  }
+
+  /* After a song is opened, the whole picture at once: the pane has just
+     seeded itself from the piece's own mutes, and this puts back anything
+     the stand is keeping on top of them (a pairing's, a session's). */
+  function pushVoiceMutes(side) {
+    const info = sides[side].info;
+    if (!info) return;
+    (info.voices || []).forEach(v => {
+      pushVoiceMute(side, v.id, !!state.voiceMute[side][String(v.id)]);
     });
-    return btn;
   }
 
   function renderMixer() {
+    refreshSwapOffered();
     SIDES.forEach(side => {
       const box = $('mixer-' + side);
       box.innerHTML = '';
@@ -1123,12 +1270,34 @@
         empty.textContent = side === 'poem' ? 'No poem chosen yet.' : 'No ostinato chosen yet.';
         box.appendChild(empty);
       } else {
-        info.voices.forEach(v => box.appendChild(voiceButton(side, v)));
+        info.voices.forEach(v => box.appendChild(voiceRow(side, v)));
       }
       $('vol-' + side).value = String(state.vol[side]);
     });
     $('words-tone').classList.toggle('active', state.wordsSound === 'tone');
     $('words-drum').classList.toggle('active', state.wordsSound === 'drum');
+    syncStrength();
+    $('mixer-ost-note').hidden = !(state.songs.ost && canSwapInstrument('ost'));
+  }
+
+  /* What x2 means depends on which sound is playing, so it is written
+     out rather than left as a number to be tried. The words are Rhythm
+     Poetry's own — one switch, said the same way in both places. */
+  const STRENGTH_WORDS = {
+    tone: ['One voice on every note.',
+           'The note, and the octave above it.',
+           'The note, and the two octaves above it.'],
+    drum: ['Tom and shaker together.',
+           'Tom, shaker and snare.',
+           'Tom, shaker, snare and claves.']
+  };
+
+  function syncStrength() {
+    document.querySelectorAll('#mixer-pop [data-strength]').forEach(b => {
+      b.classList.toggle('active', Number(b.dataset.strength) === state.wordsStrength);
+    });
+    $('strength-note').textContent =
+      STRENGTH_WORDS[state.wordsSound][state.wordsStrength - 1];
   }
 
   SIDES.forEach(side => {
@@ -1140,6 +1309,61 @@
   });
   $('words-tone').addEventListener('click', () => { state.wordsSound = 'tone'; renderMixer(); saveSession(); });
   $('words-drum').addEventListener('click', () => { state.wordsSound = 'drum'; renderMixer(); saveSession(); });
+  document.querySelectorAll('#mixer-pop [data-strength]').forEach(b => {
+    b.addEventListener('click', () => {
+      state.wordsStrength = Number(b.dataset.strength);
+      syncStrength();
+      saveSession();
+    });
+  });
+
+  /* ---- changing an instrument ----
+     The kit is the app's, and so is the answer about which of it this
+     piece may use — the stand only draws it and plays the one tapped, so
+     an instrument can be heard before it is taken. What comes back is an
+     edit like any other made in a pane: the ostinato on this stand
+     becomes its own copy, and the one in the library is not touched. */
+  const instrumentSheet = $('instrument-sheet');
+  let pickingVoice = null;
+
+  function openInstrumentSheet(voiceId) {
+    const b = sides.ost.bridge;
+    if (!b || typeof b.instruments !== 'function') return;
+    const got = safe(() => b.instruments(voiceId), null);
+    if (!got || !got.editable || !got.items || !got.items.length) return;
+
+    pickingVoice = voiceId;
+    const grid = $('instrument-grid');
+    grid.innerHTML = '';
+    got.items.forEach(item => {
+      const card = document.createElement('button');
+      card.className = 'instrument-card' + (item.id === got.current ? ' selected' : '');
+      const img = document.createElement('img');
+      img.src = item.image;
+      img.alt = item.alt || '';
+      const name = document.createElement('span');
+      name.textContent = item.label;
+      card.append(img, name);
+      card.addEventListener('click', () => chooseInstrument(item.id));
+      grid.appendChild(card);
+    });
+    instrumentSheet.querySelector('.sheet').style.setProperty('--side', 'var(--ost)');
+    openSheet(instrumentSheet);
+  }
+
+  function chooseInstrument(id) {
+    const b = sides.ost.bridge;
+    if (!b) return;
+    previewSound(id);                       // heard as it is taken
+    const info = safe(() => b.setInstrument(pickingVoice, id), null);
+    if (!info) return;
+    pickingVoice = null;
+    closeSheet(instrumentSheet);
+    /* The stand asked for the change, so the pane will not report it —
+       nothing in there was reached for. It is still an edit. */
+    paneEdited('ost');
+    togglePopover($('mixer-pop'), $('mixer-btn'));
+  }
 
   document.querySelectorAll('.pane-mute').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1168,20 +1392,42 @@
   const panesEl = $('panes');
   const divider = $('divider');
 
-  function effectiveArrange() {
-    return window.innerWidth <= 640 ? 'stacked' : state.layout.arrange;
+  /* Below this a screen is a column and nothing else will do, whatever
+     anyone has asked for: two scores side by side on a phone are two
+     scores nobody can read. */
+  const NARROW_W = 640;
+
+  /* What is actually on screen. With the arrangement left to the stand
+     this is the solver's answer, so it cannot be read back off the
+     setting — and everything that measures the room needs the answer,
+     not the setting. */
+  let liveArrange = 'stacked';
+
+  function effectiveArrange() { return liveArrange; }
+
+  function isNarrow() { return window.innerWidth <= NARROW_W; }
+
+  function applyArrangeAttrs(arrange) {
+    if (isNarrow()) arrange = 'stacked';
+    liveArrange = arrange;
+    document.body.classList.toggle('narrow', isNarrow());
+    panesEl.dataset.arrange = arrange;
+    document.body.classList.toggle('arrange-side', arrange === 'side');
+    divider.setAttribute('aria-orientation', arrange === 'side' ? 'vertical' : 'horizontal');
   }
 
   function applyArrangement() {
+    /* Left to the stand, the arrangement on screen stands until the
+       solver says otherwise — applySplit() is a moment away, and
+       flicking to a default in between would be a visible twitch. */
+    applyArrangeAttrs(state.layout.arrange === 'auto' ? liveArrange : state.layout.arrange);
     const arrange = effectiveArrange();
-    panesEl.dataset.arrange = arrange;
     panesEl.dataset.first = state.layout.first;
     panesEl.dataset.show = state.layout.show;
-    document.body.classList.toggle('arrange-side', arrange === 'side');
-    divider.setAttribute('aria-orientation', arrange === 'side' ? 'vertical' : 'horizontal');
 
-    $('arrange-stacked').classList.toggle('active', arrange === 'stacked');
-    $('arrange-side').classList.toggle('active', arrange === 'side');
+    $('arrange-auto').classList.toggle('active', state.layout.arrange === 'auto');
+    $('arrange-stacked').classList.toggle('active', state.layout.arrange === 'stacked');
+    $('arrange-side').classList.toggle('active', state.layout.arrange === 'side');
     $('first-poem').classList.toggle('active', state.layout.first === 'poem');
     $('first-ost').classList.toggle('active', state.layout.first === 'ost');
     document.querySelectorAll('#layout-pop [data-show]').forEach(b => {
@@ -1192,43 +1438,84 @@
     applySplit();
   }
 
+  /* ==================================================================
+     FITTING TWO SCORES INTO ONE SCREEN
+     ------------------------------------------------------------------
+     The hard part of a stand is not sharing the room out. It is that a
+     score has a shape, and the room has a shape, and they are usually
+     not the same shape: a band of eight instruments over one bar is a
+     tall, narrow thing, and a poem is a long, thin one, and a screen is
+     neither. Giving a tall score a wide, short band leaves most of the
+     band empty however the line between the panes is moved.
+
+     So a score is not asked how big it is. It is asked what shapes it
+     can be — `sizing().layouts`, one entry per number of bars to a line
+     — and the stand chooses. Ostinato Builder answers with its Lines
+     layout (bars across, then again underneath); Rhythm Poetry with its
+     bars to a line. Three things are chosen together, because each one
+     changes what the others are worth:
+
+        arrangement  one above the other, or side by side
+        shape        how many bars to a line, for each score
+        split        where the line between the panes goes
+
+     Every combination is tried and scored by the size of the SMALLER of
+     the two scores — the one that decides whether a class at the back of
+     the room can read this. Everything is worked out from the box the
+     panes share, not measured off the frames, so an arrangement can be
+     judged without first being committed to and undone.
+
+     This is the part that has to hold when a third app arrives. Nothing
+     here knows what a poem or an ostinato is: an app publishes a menu of
+     shapes and is handed a box, and that is the whole of the contract.
+     ================================================================== */
+
   /* The room the two panes share along the split, less the line between. */
   function splitRoom() {
-    const cs = getComputedStyle(panesEl);
-    const side = effectiveArrange() === 'side';
-    const size = side
-      ? panesEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
-      : panesEl.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-    return Math.max(1, size - divider.offsetHeight * (side ? 0 : 1) - divider.offsetWidth * (side ? 1 : 0));
+    return paneGeometry(effectiveArrange()).room;
   }
 
-  /* The two scores should come out with notes of about the same size, so
-     the room is shared by scale, not by a fixed ratio. Each app reports
-     its natural size and how it scales (sizing()); from that, the size
-     along the split is a function of one common scale s. The largest s
-     at which both fit is found by bisection, each side gets what it
-     needs at that scale, and the spare is split evenly between them.
+  function paneHeadHeight() {
+    const head = sides.poem.pane.querySelector('.pane-head');
+    return (head && head.offsetParent ? head.offsetHeight : 0) + 2;
+  }
 
-     A side can never be drawn wider (stacked) or taller (side by side)
-     than its pane allows, whatever s is — that cap is `room` below.
-     A poem set to fill the width is its own fixed height when stacked.
+  /* The two boxes an arrangement would make, without making it.
+       room   the length the two panes share, along the split
+       cross  each pane's other side, which neither of them shares
+       chrome what each pane's heading takes off the split */
+  function paneGeometry(arrange) {
+    const cs = getComputedStyle(panesEl);
+    const W = panesEl.clientWidth  - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const H = panesEl.clientHeight - parseFloat(cs.paddingTop)  - parseFloat(cs.paddingBottom);
+    const side = arrange === 'side';
+    /* The line between the panes is the same thickness whichever way it
+       lies, and the one that is *not* its thickness is the whole width of
+       the stand — so reading the wrong one takes the entire room away and
+       the arrangement being judged can never win. Its thickness is simply
+       the smaller of the two, whatever it is lying as right now. */
+    const gap = Math.min(divider.offsetWidth, divider.offsetHeight);
+    const head = paneHeadHeight();
+    return {
+      side: side,
+      room:  Math.max(1, (side ? W : H) - gap),
+      cross: Math.max(1, side ? H - head : W),
+      chrome: side ? 0 : head
+    };
+  }
 
-     When the poem may choose how many bars go on a line, it offers every
-     choice (`layouts`), and the one that lets both be drawn largest wins;
-     the poem then makes the same choice itself in the pane it is given. */
-  /* For one side: its size along the split at common scale s, and the
-     scale it is actually drawn at then (it stops growing at its cap). */
-  function sizeCurve(side, sz, stacked) {
-    const frame = sides[side].frame;
-    const along  = stacked ? sz.h : sz.w,    padAlong  = stacked ? sz.padH : sz.padW;
-    const across = stacked ? sz.w : sz.h,    padAcross = stacked ? sz.padW : sz.padH;
-    const room = (stacked ? frame.clientWidth : frame.clientHeight) - padAcross;
-    const cap = Math.min(sz.maxScale, Math.max(0.05, room / across));
+  /* One score's demand on the split, as a function of a common scale s,
+     and the scale it is actually drawn at then — it stops growing once it
+     has filled the side it does not share. */
+  function sizeCurve(sz, geo) {
+    const along  = geo.side ? sz.w : sz.h,    padAlong  = geo.side ? sz.padW : sz.padH;
+    const across = geo.side ? sz.h : sz.w,    padAcross = geo.side ? sz.padH : sz.padW;
+    const cap = Math.min(sz.maxScale, Math.max(0.05, (geo.cross - padAcross) / across));
 
     if (sz.mode === 'fixed') {
       return { size: () => along * sz.fixedScale + padAlong, drawn: () => sz.fixedScale };
     }
-    if (sz.mode === 'fit' && stacked) {
+    if (sz.mode === 'fit' && !geo.side) {
       return { size: () => along * cap + padAlong, drawn: () => cap };
     }
     const top = sz.mode === 'fit' ? sz.maxScale : cap;
@@ -1241,16 +1528,37 @@
     return sz && sz.w && sz.h ? sz : null;
   }
 
+  /* Whether the shape of a score is the stand's to choose. Asking for
+     `auto` is what hands it over; naming a number in the View menu takes
+     it back, and then there is one shape and it is the user's. */
+  function shapeFree(side) {
+    return side === 'poem'
+      ? state.views.poem.measuresPerLine === 'auto'
+      : state.views.ost.measuresPerPage === 'auto' && state.views.ost.layout === 'systems';
+  }
+
+  /* The shapes a score offers, as whole sizings. A score that offers
+     none, or whose shape is not ours to choose, has exactly one: the one
+     it is already in. */
+  function shapeMenu(side, sz) {
+    if (!shapeFree(side) || !sz.layouts || !sz.layouts.length) {
+      return [Object.assign({ n: null }, sz)];
+    }
+    return sz.layouts.map(L => Object.assign({}, sz, { n: L.n, w: L.w, h: L.h }));
+  }
+
   /* The largest common scale both fit at, the poem's share of the room
      there, and how big the smaller of the two is then drawn — which is
-     what a choice between layouts is judged by. */
-  function solveSplit(cp, co, chromeP, chromeO, room) {
-    const total = s => cp.size(s) + co.size(s) + chromeP + chromeO;
+     what every choice here is judged by. */
+  function solveSplit(cp, co, geo) {
+    const chrome = geo.chrome * 2;
+    const total = s => cp.size(s) + co.size(s) + chrome;
+    const room = geo.room;
     let lo = 0.05, hi = 1.8, s;
     if (total(hi) <= room) s = hi;
     else if (total(lo) > room) {
       /* even tiny does not fit: share by what each asks for at that size */
-      return { s: lo, least: 0, share: (cp.size(lo) + chromeP) / total(lo) };
+      return { least: 0, share: (cp.size(lo) + geo.chrome) / total(lo) };
     } else {
       for (let i = 0; i < 28; i++) {
         const mid = (lo + hi) / 2;
@@ -1260,40 +1568,150 @@
     }
     const spare = Math.max(0, room - total(s));
     return {
-      s: s,
       least: Math.min(cp.drawn(s), co.drawn(s)),
-      share: (cp.size(s) + chromeP + spare / 2) / room
+      share: (cp.size(s) + geo.chrome + spare / 2) / room
     };
   }
 
-  function autoSplit() {
-    if (!state.songs.poem || !state.songs.ost) return 0.5;
-    const stacked = effectiveArrange() !== 'side';
+  /* Which arrangements are on the table. A narrow screen is a column and
+     that is that; otherwise it is the user's, unless they have left it to
+     the stand. */
+  function arrangeChoices() {
+    if (window.innerWidth <= NARROW_W) return ['stacked'];
+    return state.layout.arrange === 'auto' ? ['stacked', 'side'] : [state.layout.arrange];
+  }
+
+  /* Near enough is a tie, and a tie must not make the screen jump about:
+     it goes to what is already on screen, and then to the longer line,
+     which is the choice a reader would make. */
+  const TIE = 0.02;
+
+  function better(cand, best) {
+    if (!best) return true;
+    if (cand.least > best.least * (1 + TIE)) return true;
+    if (cand.least < best.least * (1 - TIE)) return false;
+    const now = effectiveArrange();
+    if (cand.arrange !== best.arrange) return cand.arrange === now;
+    if (cand.poemN !== best.poemN) return (cand.poemN || 0) > (best.poemN || 0);
+    return (cand.ostN || 0) > (best.ostN || 0);
+  }
+
+  function solveLayout() {
+    if (!state.songs.poem || !state.songs.ost) return null;
     const sp = sizingOf('poem'), so = sizingOf('ost');
-    if (!sp || !so) return 0.5;
+    if (!sp || !so) return null;
 
-    const chromeOf = side => {
-      const head = sides[side].pane.querySelector('.pane-head');
-      return (stacked && head && head.offsetParent ? head.offsetHeight : 0) + 2;
-    };
-    const chromeP = chromeOf('poem'), chromeO = chromeOf('ost');
-    const room = splitRoom();
-    const co = sizeCurve('ost', so, stacked);
-
-    const options = sp.layouts && sp.layouts.length
-      ? sp.layouts.map(L => Object.assign({}, sp, { w: L.w, h: L.h }))
-      : [sp];
+    const poems = shapeMenu('poem', sp), osts = shapeMenu('ost', so);
     let best = null;
-    options.forEach(opt => {
-      const r = solveSplit(sizeCurve('poem', opt, stacked), co, chromeP, chromeO, room);
-      /* a near-tie goes to the longer line, as the poem itself decides */
-      if (!best || r.least >= best.least * 0.98) best = r;
+    arrangeChoices().forEach(arrange => {
+      const geo = paneGeometry(arrange);
+      poems.forEach(P => {
+        const cp = sizeCurve(P, geo);
+        osts.forEach(O => {
+          const r = solveSplit(cp, sizeCurve(O, geo), geo);
+          const cand = { arrange: arrange, poemN: P.n, ostN: O.n,
+                         least: r.least, share: clamp(r.share, 0.15, 0.85) };
+          if (better(cand, best)) best = cand;
+        });
+      });
     });
-    return clamp(best.share, 0.15, 0.85);
+    return best;
   }
 
+  /* The shape each score was promised. Asked for only when it changes —
+     a setView rebuilds the score in the frame, and rebuilding it on every
+     re-fit would make a drag of the line into a slideshow. */
+  const shownShape = { poem: null, ost: null };
+
+  function askForShape(side, n) {
+    if (n == null || shownShape[side] === n) return;
+    const b = sides[side].bridge;
+    if (!b) return;
+    shownShape[side] = n;
+    /* Sent, never written down: the stand's own view keeps saying `auto`,
+       so the user's setting survives a shape being chosen for them. */
+    safe(() => b.setView(side === 'poem'
+      ? { measuresPerLine: n }
+      : { layout: 'systems', measuresPerPage: n }));
+  }
+
+  function forgetShapes() { shownShape.poem = null; shownShape.ost = null; }
+
+  /* ---- a narrow screen ----
+     Nothing is shared, so there is nothing to solve: each score is drawn
+     as large as the width allows and given exactly the height that takes,
+     and the column scrolls. The shape is chosen on the same principle as
+     everywhere else, only against one dimension — the widest line that
+     still comes out big enough to read, which on a phone usually means
+     one bar to a line.
+
+     The height has to be worked out here rather than left to the frame:
+     a frame in a column has no height of its own to fit into, so it
+     would fit to whatever it was last given and never grow. */
+  const COMFORT = 1;   /* big enough; past this, prefer fewer lines */
+
+  function widthFit(sz, w) {
+    return Math.max(0.05, Math.min(sz.maxScale, (w - sz.padW) / sz.w));
+  }
+
+  function narrowShape(side, sz, w) {
+    let best = null;
+    shapeMenu(side, sz).forEach(S => {
+      const s = widthFit(S, w);
+      /* the widest line that still reads: past COMFORT the extra size is
+         worth less than the scrolling it costs */
+      const score = Math.min(s, COMFORT);
+      if (!best || score > best.score + 1e-4
+               || (Math.abs(score - best.score) <= 1e-4 && (S.n || 0) > (best.n || 0))) {
+        best = { n: S.n, score: score, scale: s, h: S.h * s + S.padH };
+      }
+    });
+    return best;
+  }
+
+  function applyNarrow() {
+    const headH = paneHeadHeight();
+    SIDES.forEach(side => {
+      const pane = sides[side].pane;
+      if (!state.songs[side]) { pane.style.height = ''; return; }
+      const sz = sizingOf(side);
+      if (!sz) { pane.style.height = ''; return; }
+      const shape = narrowShape(side, sz, sides[side].frame.clientWidth);
+      if (!shape) { pane.style.height = ''; return; }
+      askForShape(side, shape.n);
+      /* Read the score again, because asking for a shape changed it: a
+         poem set to fewer bars a line re-flows its words, and the height
+         that follows from the shape we asked for is not the height of
+         the shape we got. Measuring the promise instead of the thing was
+         worth 140% of the pane's width. */
+      const now = sizingOf(side) || sz;
+      const w = sides[side].frame.clientWidth;
+      pane.style.height = Math.ceil(now.h * widthFit(now, w) + now.padH + headH) + 'px';
+    });
+  }
+
+  function clearNarrow() {
+    SIDES.forEach(side => { sides[side].pane.style.height = ''; });
+  }
+
+  /* Put the answer on the screen. The arrangement is an attribute and the
+     split is a number, so neither reloads a frame; the shapes are asked
+     for last, because a frame that has just been handed a new shape is
+     about to re-fit anyway. */
   function applySplit() {
-    const split = currentSplit() === 'auto' ? autoSplit() : currentSplit();
+    if (isNarrow()) { applyNarrow(); return; }
+    clearNarrow();
+    let split = currentSplit();
+    if (split === 'auto' || state.layout.arrange === 'auto') {
+      const best = solveLayout();
+      if (best) {
+        if (state.layout.arrange === 'auto') applyArrangeAttrs(best.arrange);
+        if (split === 'auto') split = best.share;
+        askForShape('poem', best.poemN);
+        askForShape('ost', best.ostN);
+      }
+    }
+    if (split === 'auto') split = 0.5;
     panesEl.style.setProperty('--split', String(clamp(split, 0.12, 0.88)));
   }
 
@@ -1302,17 +1720,32 @@
      what it asks for. So the auto size is worked out once the apps have
      settled, and once more after that answer has settled in turn. */
   let splitTimer = null, settleTimer = null;
+
+  /* Fit each score to the box it has just been given. A frame does notice
+     its own size changing, but only after its own delay, and the stand
+     works out the next answer from what the frames report — so waiting
+     for them means solving against sizes that are one step out of date.
+     Asking is cheap and it is exact. */
+  function refitAll() {
+    SIDES.forEach(side => {
+      if (sides[side].bridge && state.songs[side]) safe(() => sides[side].bridge.refit());
+    });
+  }
+
   function scheduleSplit() {
     clearTimeout(splitTimer);
     clearTimeout(settleTimer);
     splitTimer = setTimeout(() => {
-      if (sides.ost.bridge && state.songs.ost) safe(() => sides.ost.bridge.refit());
       applySplit();
-      if (currentSplit() === 'auto') {
-        settleTimer = setTimeout(() => { applySplit(); setTimeout(endBooting, 350); }, 450);
-      } else {
-        setTimeout(endBooting, 300);
-      }
+      refitAll();
+      /* Round again: a score re-fitted into its new box may be a
+         different size — a poem re-flows its words — and the room is
+         shared out from what the scores are, not what they were. */
+      settleTimer = setTimeout(() => {
+        applySplit();
+        refitAll();
+        setTimeout(endBooting, 350);
+      }, 450);
     }, 180);
   }
 
@@ -1329,6 +1762,7 @@
     saveSession();
   }
 
+  $('arrange-auto').addEventListener('click', () => setLayout({ arrange: 'auto' }));
   $('arrange-stacked').addEventListener('click', () => setLayout({ arrange: 'stacked' }));
   $('arrange-side').addEventListener('click', () => setLayout({ arrange: 'side' }));
   $('first-poem').addEventListener('click', () => setLayout({ first: 'poem' }));
@@ -1387,7 +1821,10 @@
     }
     e.preventDefault();
     e.stopPropagation();
-    const current = currentSplit() === 'auto' ? autoSplit() : currentSplit();
+    const solved = solveLayout();
+    const current = currentSplit() === 'auto'
+      ? (solved ? solved.share : 0.5)
+      : currentSplit();
     const towardFirst = e.key === back ? -0.03 : 0.03;
     const delta = state.layout.first === 'poem' ? towardFirst : -towardFirst;
     setLayout({ split: Math.round(clamp(current + delta, 0.12, 0.88) * 1000) / 1000 });
@@ -1409,10 +1846,22 @@
      how the app looks when it is opened on its own.
      ================================================================== */
 
+  /* The view as the frame should hear it. `auto` is a word the stand says
+     to itself — the app is told a number, by askForShape(), once one has
+     been worked out. Sent through, it would land as a guess. */
+  function viewFor(side) {
+    const out = Object.assign({}, state.views[side]);
+    if (side === 'ost' && out.measuresPerPage === 'auto') delete out.measuresPerPage;
+    return out;
+  }
+
   function setView(side, patch) {
     Object.assign(state.views[side], patch);
     const b = sides[side].bridge;
-    if (b) safe(() => b.setView(patch));
+    if (b) safe(() => b.setView(viewFor(side)));
+    /* A view the user chose outranks a shape the stand chose for them,
+       so the next solve starts again rather than assuming what is up. */
+    forgetShapes();
     syncViewPops();
     scheduleSplit();
     if (side === 'poem' && 'lyricFont' in patch) resplitWhenFontsSettle('poem');
@@ -1451,11 +1900,17 @@
     document.querySelectorAll('[data-ob-layout]').forEach(b => {
       b.classList.toggle('active', b.dataset.obLayout === ob.layout);
     });
-    $('ob-perpage-section').hidden = ob.layout !== 'pages';
-    $('ob-zoom-section').hidden = ob.layout === 'pages';
+    const obBlocks = ob.layout === 'pages' || ob.layout === 'systems';
+    $('ob-perpage-section').hidden = !obBlocks;
+    $('ob-zoom-section').hidden = obBlocks;
+    $('ob-perpage-label').textContent = ob.layout === 'systems' ? 'Bars on a line' : 'Bars on a page';
     document.querySelectorAll('#ob-perpage [data-per-page]').forEach(b => {
-      b.classList.toggle('active', Number(b.dataset.perPage) === ob.measuresPerPage);
+      const v = b.dataset.perPage === 'auto' ? 'auto' : Number(b.dataset.perPage);
+      b.classList.toggle('active', v === ob.measuresPerPage);
     });
+    /* Auto is only ever the stand's answer, and the stand only answers
+       when it is drawing both scores. */
+    $('ob-perpage-note').hidden = ob.measuresPerPage !== 'auto';
     $('ob-zoom').value = String(ob.zoomPct);
     $('ob-zoom-val').textContent = ob.zoomPct + '%';
     document.querySelectorAll('[data-ob-switch]').forEach(b => {
@@ -1493,7 +1948,9 @@
     b.addEventListener('click', () => setView('ost', { layout: b.dataset.obLayout }));
   });
   document.querySelectorAll('#ob-perpage [data-per-page]').forEach(b => {
-    b.addEventListener('click', () => setView('ost', { measuresPerPage: Number(b.dataset.perPage) }));
+    b.addEventListener('click', () => setView('ost', {
+      measuresPerPage: b.dataset.perPage === 'auto' ? 'auto' : Number(b.dataset.perPage)
+    }));
   });
   $('ob-zoom').addEventListener('input', e => {
     $('ob-zoom-val').textContent = e.target.value + '%';

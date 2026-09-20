@@ -222,6 +222,13 @@
     <button class="seg-btn active" id="pitch-mode-btn">Pitch</button>
     <button class="seg-btn" id="drum-mode-btn">Drum</button>
   </div>
+  <div class="popover-title">Strength</div>
+  <div class="seg seg-wide" role="group" aria-label="How full the rhythm sound is">
+    <button class="seg-btn active" id="strength-1-btn">&times;1</button>
+    <button class="seg-btn" id="strength-2-btn">&times;2</button>
+    <button class="seg-btn" id="strength-3-btn">&times;3</button>
+  </div>
+  <p class="popover-note" id="strength-note">One voice on every note.</p>
   <button class="popover-hidden-toggle" id="pitch-toggle" aria-hidden="true" tabindex="-1"></button>
 </div>
 
@@ -715,6 +722,7 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="lib/instruments/js/virtual-instruments.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

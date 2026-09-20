@@ -489,6 +489,24 @@ svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap
 
 
 /* ============================================================
+   A SYSTEM  (the Lines layout)
+   ------------------------------------------------------------
+   One block of bars, with the whole instrument column beside it,
+   and the next block underneath — a printed score's line, and the
+   reason a tall band of instruments can be read on a wide screen
+   without being shrunk to fit one long row.
+
+   The gap is larger than the one between tracks on purpose: a
+   reader has to see at a glance where one line ends and the next
+   begins, and 16px (the track gap) would read as just another
+   instrument. The last line does not need it.
+   ============================================================ */
+.system + .system { margin-top: 26px; }
+/* the bottom margin of a system's last track, inside the block */
+.system > .track:last-child { margin-bottom: 0; }
+
+
+/* ============================================================
    ONE BEAT
    ------------------------------------------------------------
    The dots and the notation sit on the same column grid, so a
@@ -2253,10 +2271,25 @@ body.embedded.editing .dots .dot { cursor: pointer; }
 body.embedded.editing .instrument-btn:hover,
 body.embedded.editing .instrument-btn:active { transform: none; }
 
-/* Which instrument plays a line, whether that line is muted, and how the
-   lines are ordered are the Music Stand's to say — the mixer there is
-   already showing an answer, and a second answer in the pane would make
-   a liar of one of them. The marks are left visible so the score still
-   reads; they simply do not answer. */
-body.embedded .instrument-btn,
-body.embedded .mute-badge { pointer-events: none; }
+/* How the lines are ordered is the Music Stand's to say, so the arrows
+   stay away (present mode already hides them). The other two on a track
+   head do answer, and each answers to the mixer rather than instead of
+   it:
+
+     the mute badge   always — a mute is a mixer's job, and the mixer is
+                      live whether or not the score is being edited. It
+                      sets the stand's mute for that voice, so the badge
+                      and the mixer button are one switch seen twice.
+     the instrument   only while editing, because which instrument plays
+                      a line is part of the piece, not of this
+                      performance of it.
+
+   Both are the same size they are in the app; a track head in a pane is
+   small enough already. */
+body.embedded .instrument-btn { pointer-events: none; }
+body.embedded.editing .instrument-btn { pointer-events: auto; cursor: pointer; }
+
+/* The picker is a sheet, and a pane can be short — let it use the room
+   it has rather than run off the bottom of the frame. */
+body.embedded .sheet-backdrop { padding: 10px; }
+body.embedded .sheet { max-height: 100%; }

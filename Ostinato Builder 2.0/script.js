@@ -711,6 +711,7 @@
   /* Everything the toolbar shows belongs to the song, so all of it is
      refreshed together whenever the song underneath changes. */
   function afterSongChange() {
+    seedHostMutes();
     conformAllTracks();
     updateMeterDisplay();
     updateMeasureDisplay();
@@ -1063,6 +1064,8 @@
   };
 
   const PER_PAGE_CHOICES = [1, 2, 4, 8];
+  /* Three ways to read a long ostinato — see LAYING THE SCORE OUT. */
+  const LAYOUT_MODES = ['pages', 'systems', 'scroll'];
 
   function loadViewPrefs() {
     try {
@@ -1079,7 +1082,7 @@
     if (SYLLABLE_SYSTEMS.indexOf(view.syllableSystem) === -1) {
       view.syllableSystem = SYLLABLE_SYSTEMS[0];
     }
-    if (view.layout !== 'scroll') view.layout = 'pages';
+    if (LAYOUT_MODES.indexOf(view.layout) === -1) view.layout = 'pages';
     if (PER_PAGE_CHOICES.indexOf(view.measuresPerPage) === -1) view.measuresPerPage = 4;
     view.zoomPct = Math.max(40, Math.min(220, Math.round(Number(view.zoomPct) || 100)));
   }
@@ -1896,9 +1899,11 @@
 
     /* Follow the music across a page turn. Only the page changes — the
        score is already drawn, so this costs a transform, not a render. */
-    if (view.layout === 'pages') {
+    if (isPaged()) {
       const want = pageOfBeat(index);
       if (want !== currentPage) goToPage(want);
+    } else if (isSystems()) {
+      followBeatDown(index);
     } else {
       followBeatAcross(index);
     }
@@ -1915,6 +1920,23 @@
     document.querySelectorAll('.notes-box.playing').forEach(el => el.classList.remove('playing'));
     document.querySelectorAll('.ruler-beat.playing').forEach(el => el.classList.remove('playing'));
     litBeat = -1;
+  }
+
+  /* Systems have no page to turn and nothing to slide: every bar is
+     already drawn. Usually every bar is already on screen too, and this
+     does nothing at all — it is only when the stack is taller than the
+     stage (standalone, where the score is allowed to be too big to fit)
+     that the system being played has to be brought into view. */
+  function followBeatDown(index) {
+    if (stage.scrollHeight <= stage.clientHeight + 2) return;
+    const el = grid.querySelector('.group[data-beat="' + index + '"]');
+    const system = el && el.closest('.system');
+    if (!system) return;
+    const top = absOffsetY(system) * gridScale;
+    const bottom = top + system.offsetHeight * gridScale;
+    if (top < stage.scrollTop || bottom > stage.scrollTop + stage.clientHeight) {
+      stage.scrollTo({ top: Math.max(0, top - 12), behavior: 'smooth' });
+    }
   }
 
   /* Scroll across has no pages to turn, so the window is the page: the
@@ -1987,6 +2009,9 @@
      makes render() the one place the host can be told without a new kind
      of edit being able to forget to say so. */
   let standAfterRender = null;
+  /* Set by the Music Stand bridge: told when a badge in a pane is pressed,
+     so the mixer and the pane never show two different answers. */
+  let standVoiceMuted = null;
 
   function icon(path, size) {
     return '<svg viewBox="0 0 24 24" width="' + (size || 15) + '" height="' + (size || 15) + '">'
@@ -2001,6 +2026,29 @@
 
   function instrumentMeta(id) {
     return VI.INSTRUMENT_MAP[id] || VI.INSTRUMENTS[0];
+  }
+
+  /* ---- who is muted -------------------------------------------------
+     Standalone, a track's mute is part of the piece and is saved with it.
+     In a pane it is not: the Music Stand owns the mutes, because its
+     mixer is already showing an answer and the ostinato on the stand is
+     a performance rather than a file. So the badge in a pane reads and
+     writes the stand's mute, and the piece is left exactly as it was —
+     muting there never counts as an edit. The stand seeds itself from
+     the piece's own mutes when it opens one, so the two still agree. */
+  const hostMutes = {};
+
+  function trackMuted(track, trackIndex) {
+    return EMBEDDED ? !!hostMutes[trackIndex] : !!track.muted;
+  }
+
+  /* A piece arriving in a pane brings its own mutes with it: they are the
+     answer until the stand says otherwise, and the stand reads them back
+     out of info() to start its mixer from the same place. */
+  function seedHostMutes() {
+    if (!EMBEDDED) return;
+    Object.keys(hostMutes).forEach(k => { delete hostMutes[k]; });
+    song.tracks.forEach((t, i) => { if (t.muted) hostMutes[i] = true; });
   }
   function instrumentImage(id) {
     if (typeof INSTRUMENT_ICONS !== 'undefined' && INSTRUMENT_ICONS[id]) {
@@ -2024,8 +2072,21 @@
 
     emptyNote.hidden = song.tracks.length > 0;
 
-    grid.appendChild(buildRuler());
-    song.tracks.forEach((track, index) => grid.appendChild(buildTrack(track, index)));
+    /* Systems are the whole score over again, a few bars at a time, the
+       way a printed score runs a line across the page and starts another
+       underneath — instrument column and all, because a line of music
+       nobody can put a name to is no use. Every other layout is one
+       block holding every bar, and the window on to it does the rest. */
+    blockRanges().forEach(([from, to], i) => {
+      const host = isSystems() ? document.createElement('div') : grid;
+      if (host !== grid) {
+        host.className = 'system';
+        host.dataset.system = String(i);
+      }
+      host.appendChild(buildRuler(from, to));
+      song.tracks.forEach((track, index) => host.appendChild(buildTrack(track, index, from, to)));
+      if (host !== grid) grid.appendChild(host);
+    });
 
     syncHeadColumn();
     layoutAndEngrave();
@@ -2053,7 +2114,9 @@
     if (widest) grid.style.setProperty('--head-w', widest + 'px');
   }
 
-  function buildRuler() {
+  function buildRuler(from, to) {
+    from = from || 0;
+    if (to == null) to = song.measures;
     const row = document.createElement('div');
     row.className = 'ruler';
 
@@ -2068,7 +2131,7 @@
     body.appendChild(inner);
 
     const perMeasure = beatsPerMeasure();
-    for (let m = 0; m < song.measures; m++) {
+    for (let m = from; m < to; m++) {
       const measure = document.createElement('div');
       measure.className = 'ruler-measure';
 
@@ -2102,9 +2165,11 @@
     return gap;
   }
 
-  function buildTrack(track, trackIndex) {
+  function buildTrack(track, trackIndex, from, to) {
+    from = from || 0;
+    if (to == null) to = song.measures;
     const row = document.createElement('div');
-    row.className = 'track' + (track.muted ? ' muted' : '');
+    row.className = 'track' + (trackMuted(track, trackIndex) ? ' muted' : '');
     row.dataset.track = String(trackIndex);
 
     row.appendChild(buildTrackHead(track, trackIndex));
@@ -2130,21 +2195,27 @@
     });
 
     const perMeasure = beatsPerMeasure();
+    /* Kept by measure number, not by position in this block, so every
+       lookup below reads the same whether the score is in one piece or
+       cut into systems. */
     const measureEls = [], dividerEls = [];
-    for (let m = 0; m < song.measures; m++) {
+    for (let m = from; m < to; m++) {
       const measure = document.createElement('div');
       measure.className = 'measure';
+      measure.dataset.measure = String(m);
       for (let b = 0; b < perMeasure; b++) {
         const beatIndex = m * perMeasure + b;
         measure.appendChild(buildBeat(track, beatIndex, groupOf[beatIndex]));
       }
       inner.appendChild(measure);
-      measureEls.push(measure);
+      measureEls[m] = measure;
 
       const bar = document.createElement('div');
+      /* The piece's closing line is the piece's, wherever it falls; a
+         system that ends mid-piece closes with an ordinary bar line. */
       bar.className = m === song.measures - 1 ? 'final-divider' : 'measure-divider';
       inner.appendChild(bar);
-      dividerEls.push(bar);
+      dividerEls[m] = bar;
     }
 
     /* How long the piece is belongs to the piece, not to one drum, so the
@@ -2153,7 +2224,7 @@
        in the toolbar says the same thing in words; this is the same
        control where the music is. Rhythm Poetry carries the identical
        pair on its final bar line. */
-    if (trackIndex === 0) {
+    if (trackIndex === 0 && to === song.measures) {
       const closing = dividerEls[song.measures - 1];
       const last = measureEls[song.measures - 1];
       const offer = [];
@@ -2166,9 +2237,11 @@
       });
     }
 
-    /* The bar-line marks, once both bars either side of a line exist. */
+    /* The bar-line marks, once both bars either side of a line exist —
+       and both in this block: a mark copies the bar before it across the
+       line it sits on, and there is no line to sit on between systems. */
     if (rhythmEditable()) {
-      for (let m = 1; m < song.measures; m++) {
+      for (let m = Math.max(1, from + 1); m < to; m++) {
         if (!repeatableMeasure(track, m)) continue;
         const divider = dividerEls[m - 1];
         const emptyBar = measureEls[m];
@@ -2213,12 +2286,19 @@
       pick.title = meta.label;
     }
 
+    const muted = trackMuted(track, trackIndex);
     const mute = document.createElement('button');
-    mute.className = 'mini-btn mute-badge' + (track.muted ? ' muted' : '');
-    mute.title = track.muted ? 'Unmute' : 'Mute';
-    mute.setAttribute('aria-label', track.muted ? 'Unmute ' + meta.label : 'Mute ' + meta.label);
-    mute.innerHTML = icon(track.muted ? ICON_SOUND_OFF : ICON_SOUND_ON);
+    mute.className = 'mini-btn mute-badge' + (muted ? ' muted' : '');
+    mute.title = muted ? 'Unmute' : 'Mute';
+    mute.setAttribute('aria-label', (muted ? 'Unmute ' : 'Mute ') + meta.label);
+    mute.innerHTML = icon(muted ? ICON_SOUND_OFF : ICON_SOUND_ON);
     mute.addEventListener('click', () => {
+      if (EMBEDDED) {
+        hostMutes[trackIndex] = !muted;
+        render();
+        if (typeof standVoiceMuted === 'function') standVoiceMuted(trackIndex, !muted);
+        return;
+      }
       track.muted = !track.muted;
       if (isPlaying) resyncPlayback();   // rebuild the loop without it, in place
       render();
@@ -2970,28 +3050,61 @@
                scale comes from the widest page, not from the page being
                looked at, so turning a page does not change the note size.
 
+       Systems a fixed number of bars to a line, and the lines stacked
+               down the page — the same cut as Pages, but shown all at
+               once instead of turned. A score of eight instruments is a
+               tall, narrow thing and a screen is a wide, short one; this
+               is how the two are made to meet. It is also the only
+               layout whose shape can be chosen, which is what lets the
+               Music Stand ask for a score that fits the pane it has.
+
        Scroll  the whole piece on one line at a size the user picks, and
                the stage scrolls sideways.
 
-     Both are the same machinery: every track's bars live in .body-inner,
-     .track-body is the window onto it, and a page is brought into view by
-     sliding the inner element. Sliding is a transform, so it never moves
-     anything the engraver measured with offsetLeft.
+     Pages and Scroll are the same machinery: every track's bars live in
+     .body-inner, .track-body is the window onto it, and a page is brought
+     into view by sliding the inner element. Sliding is a transform, so it
+     never moves anything the engraver measured with offsetLeft. Systems
+     needs no window at all — each block is simply built, and drawn, in
+     full.
      ================================================================== */
 
   const FIT_MIN = 0.25;
   const FIT_MAX = 1.8;
 
   let currentPage = 0;
+  /* What applyLayout() last drew the score at. Anything measuring the
+     laid-out grid against the stage has to multiply by it: #grid is
+     transform-scaled, so offsets read off it are in unscaled pixels. */
+  let gridScale = 1;
+
+  /* Pages and systems are the same cut of the piece — so many bars to a
+     block — and differ only in what is done with the blocks: pages show
+     one and turn, systems show them all, stacked. Everything that counts
+     blocks is therefore shared. */
+  function isPaged()   { return view.layout === 'pages'; }
+  function isSystems() { return view.layout === 'systems'; }
+  function inBlocks()  { return isPaged() || isSystems(); }
 
   function measuresPerPage() {
-    return view.layout === 'pages'
+    return inBlocks()
       ? Math.min(view.measuresPerPage, Math.max(1, song.measures))
       : Math.max(1, song.measures);
   }
 
   function pageCount() {
     return Math.max(1, Math.ceil(song.measures / measuresPerPage()));
+  }
+
+  /* The blocks as measure ranges: [from, to). One block holding the whole
+     piece when the layout does not cut it up. */
+  function blockRanges() {
+    const per = measuresPerPage();
+    const out = [];
+    for (let m = 0; m < song.measures; m += per) {
+      out.push([m, Math.min(song.measures, m + per)]);
+    }
+    return out.length ? out : [[0, song.measures]];
   }
 
   function pageOfMeasure(m) {
@@ -3050,20 +3163,31 @@
        and the whole point is that both stay on screen — so there the
        score shrinks as far as it must rather than scrolling. */
     const HEIGHT_FLOOR = EMBEDDED ? FIT_MIN : 0.55;
+    /* #grid-fit's own padding has to come off as well as the stage's.
+       Left in, the score is fitted to a height it then adds 12px to, and
+       the stage grows a scrollbar for those 12px — which is exactly what
+       a stand promising both scores fit on one screen must not do. It is
+       the height twin of the `available` note above. */
     const stagePad = getComputedStyle(stage);
     const availableH = stage.clientHeight
       - parseFloat(stagePad.paddingTop) - parseFloat(stagePad.paddingBottom)
+      - parseFloat(pad.paddingTop) - parseFloat(pad.paddingBottom)
       - (pager.hidden ? 0 : 44);
     const naturalH = grid.scrollHeight;
     const heightFit = naturalH > 0 && availableH > 0
       ? Math.max(HEIGHT_FLOOR, availableH / naturalH) : Infinity;
 
     const headW = parseFloat(getComputedStyle(grid).getPropertyValue('--head-w')) || 0;
-    const pages = pageGeometry();
-    const paging = view.layout === 'pages' && pages && pages.length > 0;
+    const pages = isPaged() ? pageGeometry() : null;
+    const paging = isPaged() && pages && pages.length > 0;
 
     let scale;
-    if (paging) {
+    if (isSystems()) {
+      /* Nothing is hidden, so the whole stack has to fit: as wide as the
+         widest system and as tall as all of them together. The same two
+         limits as a page, read off the score as it stands. */
+      scale = Math.max(FIT_MIN, Math.min(FIT_MAX, available / grid.scrollWidth, heightFit));
+    } else if (paging) {
       currentPage = Math.max(0, Math.min(currentPage, pages.length - 1));
       /* The size comes from the widest page, not from the page being
          looked at, so turning to a sparser page does not blow the notes up
@@ -3082,6 +3206,7 @@
       scale = Math.max(FIT_MIN, Math.min(FIT_MAX, view.zoomPct / 100));
     }
 
+    gridScale = scale;
     grid.style.transform = 'scale(' + scale + ')';
 
     /* A transform does not change the box the page is laid out in, so the
@@ -3099,6 +3224,59 @@
 
   /* Kept for the places that only ever wanted the size settled. */
   function applyFit() { applyLayout(); }
+
+  /* ---- what shapes this piece can be drawn in ----
+     A host with a pane to fill needs to know more than how big this score
+     is: it needs to know what else it could be. Every number of bars to a
+     line is a different shape — four bars across is a wide, short thing
+     and one bar across is a tall, narrow one — and the right one depends
+     entirely on the room, which only the host can see.
+
+     Worked out from the score as it stands rather than by drawing each
+     one: a bar's width and a block's height are already on the page, and
+     a bar is the same width whichever line it lands on, because widths
+     are settled per beat across the whole piece. */
+  const SYSTEM_GAP = 26;   /* must match `.system + .system` in the stylesheet */
+
+  function measureAdvances() {
+    const adv = [];
+    for (let m = 0; m < song.measures; m++) {
+      const el = grid.querySelector('.measure[data-measure="' + m + '"]');
+      if (!el) { adv[m] = 0; continue; }
+      const bar = el.nextElementSibling;
+      adv[m] = el.offsetWidth + (bar ? bar.offsetWidth : 0);
+    }
+    return adv;
+  }
+
+  function shapeOptions() {
+    if (!song.tracks.length || !song.measures) return [];
+    const headW = parseFloat(getComputedStyle(grid).getPropertyValue('--head-w')) || 0;
+    const adv = measureAdvances();
+    if (!adv.length) return [];
+    /* one block's height: a system when there are systems, the whole grid
+       when the piece is in one piece — either way, a ruler and every track */
+    const blockH = (grid.querySelector('.system') || grid).scrollHeight;
+    if (!blockH) return [];
+
+    const choices = PER_PAGE_CHOICES.filter(n => n < song.measures);
+    choices.push(song.measures);
+
+    return choices.map(per => {
+      let widest = 0, blocks = 0;
+      for (let m = 0; m < song.measures; m += per) {
+        let w = 0;
+        for (let k = m; k < Math.min(song.measures, m + per); k++) w += adv[k];
+        widest = Math.max(widest, w);
+        blocks++;
+      }
+      return {
+        n: per,
+        w: headW + widest,
+        h: blockH * blocks + SYSTEM_GAP * (blocks - 1)
+      };
+    });
+  }
 
   let fitTimer = null;
   window.addEventListener('resize', () => {
@@ -3468,7 +3646,9 @@
   ];
 
   const layoutPagesBtn  = document.getElementById('layout-pages');
+  const layoutSystemsBtn = document.getElementById('layout-systems');
   const layoutScrollBtn = document.getElementById('layout-scroll');
+  const perPageLabel    = document.getElementById('per-page-label');
   const perPageField    = document.getElementById('per-page-field');
   const perPageRow      = document.getElementById('per-page-row');
   const zoomField       = document.getElementById('zoom-field');
@@ -3483,23 +3663,31 @@
     chip.textContent = String(n);
     chip.addEventListener('click', () => {
       view.measuresPerPage = n;
-      view.layout = 'pages';
+      /* The number belongs to both block layouts, so asking for one from
+         Scroll lands on Pages — the layout the number first meant. */
+      if (!inBlocks()) view.layout = 'pages';
       currentPage = 0;
       saveViewPrefs();
       syncSettings();
-      applyLayout();
+      /* Systems redraw: how many bars to a line changes what is built,
+         not just what is looked at. */
+      if (isSystems()) render(); else applyLayout();
     });
     perPageRow.appendChild(chip);
   });
 
+  /* Going in or out of systems rebuilds the score — it is cut into
+     blocks as it is built — where the other two only change the window. */
   function setLayout(mode) {
+    const was = view.layout;
     view.layout = mode;
     currentPage = 0;
     saveViewPrefs();
     syncSettings();
-    applyLayout();
+    if (mode === 'systems' || was === 'systems') render(); else applyLayout();
   }
   layoutPagesBtn.addEventListener('click', () => setLayout('pages'));
+  layoutSystemsBtn.addEventListener('click', () => setLayout('systems'));
   layoutScrollBtn.addEventListener('click', () => setLayout('scroll'));
 
   zoomSlider.addEventListener('input', () => {
@@ -3522,11 +3710,13 @@
     document.body.classList.toggle('show-syllables', !!view.showSyllables);
     document.body.classList.toggle('light-notes', !!view.lightNotes);
 
-    const paged = view.layout === 'pages';
+    const paged = isPaged(), systems = isSystems(), blocks = inBlocks();
     layoutPagesBtn.classList.toggle('active', paged);
-    layoutScrollBtn.classList.toggle('active', !paged);
-    perPageField.hidden = !paged;
-    zoomField.hidden = paged;
+    layoutSystemsBtn.classList.toggle('active', systems);
+    layoutScrollBtn.classList.toggle('active', !blocks);
+    perPageField.hidden = !blocks;
+    perPageLabel.textContent = systems ? 'Bars on a line' : 'Bars on a page';
+    zoomField.hidden = blocks;
 
     /* Every choice stays live, even one larger than the piece. The setting
        follows the person rather than the song: someone who reads four bars
@@ -3534,7 +3724,7 @@
        piece simply fills a single page in the meantime. */
     perPageRow.querySelectorAll('.chip-btn').forEach(chip => {
       const n = Number(chip.dataset.perPage);
-      chip.classList.toggle('active', paged && n === view.measuresPerPage);
+      chip.classList.toggle('active', blocks && n === view.measuresPerPage);
     });
 
     zoomSlider.value = String(view.zoomPct);
@@ -3544,7 +3734,12 @@
       ? (pageCount() > 1
           ? 'Every page is drawn the same size, and the music turns the page as it plays.'
           : 'The whole piece fits on one page.')
-      : 'The whole piece on one line — drag sideways to see the rest, and it comes along on its own while it plays.';
+      : systems
+        ? (pageCount() > 1
+            ? 'The piece runs across and starts again underneath, like a printed score — so a wide screen '
+              + 'can hold a tall band of instruments without shrinking them.'
+            : 'The whole piece fits on one line.')
+        : 'The whole piece on one line — drag sideways to see the rest, and it comes along on its own while it plays.';
   }
 
   SWITCHES.forEach(({ id, key, soft }) => {
@@ -6292,6 +6487,11 @@
 
     const swallow = e => {
       if (hostEditable) { touched = true; return; }
+      /* One exception, and only one: the mute badge. Muting is the
+         mixer's job and the mixer is live whether or not the score has
+         been handed to the pointer — it changes what is heard, never the
+         piece. Everything else in here stays behind the glass. */
+      if (e.target && e.target.closest && e.target.closest('.mute-badge')) return;
       e.stopImmediatePropagation();
       if (e.type === 'click' || e.type === 'dblclick' || e.type === 'contextmenu') e.preventDefault();
     };
@@ -6443,7 +6643,7 @@
             id: i,
             label: instrumentMeta(t.instrument).label,
             instrument: t.instrument,
-            muted: !!t.muted,
+            muted: trackMuted(t, i),
             image: new URL(instrumentImage(t.instrument), window.location.href).href
           }))
         };
@@ -6474,6 +6674,57 @@
         if (track) playInstrument(track.instrument, (opts && opts.gapMs) || 0);
       },
 
+      /* ---- the mixer's two jobs, done from the pane ------------------
+         The badge on an instrument and the button in the stand's mixer
+         are the same switch seen twice, so each has to be able to move
+         the other. The stand sets them when it opens a piece (from the
+         piece's own mutes) and again whenever its mixer is used;
+         `onVoiceMute` is the pane answering back. A mute is not an edit
+         — the piece is not touched by either path. */
+      setVoiceMuted(voice, muted) {
+        const i = Number(voice);
+        if (!song.tracks[i]) return;
+        if (!!hostMutes[i] === !!muted) return;
+        hostMutes[i] = !!muted;
+        render();
+      },
+      onVoiceMute: null,
+
+      /* Which instruments this piece may be played on, and the picture
+         for each — the stand's picker shows what the app's own picker
+         would show, lesson policy and all, rather than the whole kit.
+         `editable` false means a lesson has locked them. */
+      instruments(voice) {
+        const current = song.tracks[Number(voice)];
+        const offered = instrumentsOfferedFor(current ? current.instrument : null);
+        return {
+          editable: instrumentsEditable(),
+          current: current ? current.instrument : null,
+          items: VI.INSTRUMENTS
+            .filter(inst => offered.indexOf(inst.id) !== -1)
+            .map(inst => ({
+              id: inst.id,
+              label: inst.label,
+              alt: inst.alt,
+              image: new URL(instrumentImage(inst.id), window.location.href).href
+            }))
+        };
+      },
+
+      /* Changing an instrument does change the piece, so it comes back as
+         an edit — but the stand asked for it, so nothing in the pane was
+         reached for and afterRender() will not speak. The stand reports
+         it itself; see the Music Stand's changeInstrument(). */
+      setInstrument(voice, id) {
+        const i = Number(voice);
+        const track = song.tracks[i];
+        if (!track || !instrumentsEditable()) return null;
+        if (instrumentsOfferedFor(track.instrument).indexOf(id) === -1) return null;
+        track.instrument = id;
+        render();
+        return bridge.info();
+      },
+
       highlight(beat) {
         if (beat == null || beat < 0) { clearHighlights(); return; }
         highlightBeat(beat);
@@ -6495,20 +6746,31 @@
       setView(partial) {
         if (!partial) return;
         VIEW_KEYS.forEach(k => { if (partial[k] !== undefined) view[k] = partial[k]; });
-        if (PER_PAGE_CHOICES.indexOf(view.measuresPerPage) === -1) view.measuresPerPage = 4;
+        if (LAYOUT_MODES.indexOf(view.layout) === -1) view.layout = 'pages';
+        /* The stand may ask for any number of bars to a line, including
+           one the app's own chips do not offer (a five-bar piece, all on
+           one line) — it is choosing a shape, not pressing a button. */
+        const n = Number(view.measuresPerPage);
+        view.measuresPerPage = n >= 1 ? Math.min(n, MAX_MEASURES) : 4;
         currentPage = 0;
         syncSettings();
         render();
       },
 
-      /* What the Music Stand needs to share the room out fairly: one page's size
-         at scale 1, the padding around it, and how it scales — pages
-         shrink to fit both ways, scrolling across is one fixed size. */
+      /* What the Music Stand needs to share the room out fairly: the size
+         of what is on show at scale 1, the padding around it, and how it
+         scales — blocks shrink to fit both ways, scrolling across is one
+         fixed size.
+
+         `layouts` is the rest of the answer: every other shape this score
+         could be drawn in, one per number of bars to a line. The stand
+         picks one and asks for it with setView({ measuresPerPage }), and
+         the shape it was promised is the shape it gets, because both are
+         worked out from the same measured bars. */
       sizing() {
         const pad = getComputedStyle(gridFit);
         const sp = getComputedStyle(stage);
-        const paged = view.layout === 'pages';
-        const pages = paged ? pageGeometry() : null;
+        const pages = isPaged() ? pageGeometry() : null;
         const headW = parseFloat(getComputedStyle(grid).getPropertyValue('--head-w')) || 0;
         return {
           w: pages ? headW + pages.reduce((w, p) => Math.max(w, p.width), 1) : grid.scrollWidth,
@@ -6517,12 +6779,19 @@
           padH: parseFloat(pad.paddingTop) + parseFloat(pad.paddingBottom)
               + parseFloat(sp.paddingTop) + parseFloat(sp.paddingBottom) + 2,
           maxScale: FIT_MAX,
-          mode: pages ? 'page' : 'fixed',
-          fixedScale: Math.max(FIT_MIN, Math.min(FIT_MAX, view.zoomPct / 100))
+          mode: inBlocks() ? 'page' : 'fixed',
+          fixedScale: Math.max(FIT_MIN, Math.min(FIT_MAX, view.zoomPct / 100)),
+          layouts: shapeOptions()
         };
       },
 
       refit() { syncHeadColumn(); applyLayout(); }
+    };
+
+    /* The badge in a pane answers to the stand, editing or not: a mute is
+       the mixer's, and the mixer is always live. */
+    standVoiceMuted = (voice, muted) => {
+      if (typeof bridge.onVoiceMute === 'function') bridge.onVoiceMute(voice, muted);
     };
 
     window.MusicStandBridge = bridge;

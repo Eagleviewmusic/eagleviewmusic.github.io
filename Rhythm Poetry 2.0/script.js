@@ -494,6 +494,24 @@
   let textImportMode = 'replace'; // 'add' or 'replace'
   let savedTextInput = ''; // Store the text from the modal
   let pitchMode = 'pitch'; // 'pitch' or 'drum'
+
+  /* How full the rhythm sound is: 1, 2 or 3 voices deep. A pitch gains the
+     octave above it, then the one above that; percussion gains another
+     instrument from the kit. It answers a complaint about the room rather
+     than about the piece — next to an ostinato a single voice can sound
+     thin — so unlike the switches around it, it is remembered. */
+  const SOUND_PREFS_KEY = 'rhythm_poetry_sound_prefs_v1';
+  let soundStrength = 1;
+  try {
+    const raw = JSON.parse(localStorage.getItem(SOUND_PREFS_KEY) || 'null');
+    if (raw && (raw.strength === 1 || raw.strength === 2 || raw.strength === 3)) {
+      soundStrength = raw.strength;
+    }
+  } catch (e) {}
+  function saveSoundPrefs() {
+    try { localStorage.setItem(SOUND_PREFS_KEY, JSON.stringify({ strength: soundStrength })); }
+    catch (e) {}
+  }
   let presentMode = false;
 
   /*
@@ -1513,83 +1531,91 @@
     source.stop(time + 0.1);
   }
 
-  function playBassDrum() {
-    if (!rhythmEnabled) return;
-    const ctx = initAudioContext();
-    const time = ctx.currentTime;
+  /* ---- the kit ------------------------------------------------------
+     The same percussion engine Ostinato Builder plays, so a rhythm here
+     and an ostinato there are the same instruments in the same room.
+     That is the point of it: beside an ostinato, this app's homemade
+     bass drum was the thing that sounded thin.
 
-    const bodyOsc = ctx.createOscillator();
-    bodyOsc.type = 'sine';
-    bodyOsc.frequency.setValueAtTime(150, time);
-    bodyOsc.frequency.exponentialRampToValueAtTime(40, time + 0.15);
+     Built on whichever context the app is using — its own, or the Music
+     Stand's when it is embedded — so attachAudio drops it and the next
+     note builds it again on the shared clock. */
+  const VI = window.VirtualInstruments || null;
+  let kit = null;
 
-    const attackOsc = ctx.createOscillator();
-    attackOsc.type = 'triangle';
-    attackOsc.frequency.setValueAtTime(200, time);
-    attackOsc.frequency.exponentialRampToValueAtTime(50, time + 0.03);
-
-    const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.1, ctx.sampleRate);
-    const noiseData = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < noiseData.length; i++) {
-        noiseData[i] = Math.random() * 2 - 1;
+  function getKit() {
+    if (!VI) return null;
+    if (!kit) {
+      kit = VI.createKit({
+        audioContext: initAudioContext(),
+        destination: audioOut || undefined,
+        volume: 0.9
+      });
+      kit.unlock();
     }
-    const noiseSource = ctx.createBufferSource();
-    noiseSource.buffer = noiseBuffer;
-
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.15, time);
-    noiseGain.gain.exponentialRampToValueAtTime(0.01, time + 0.05);
-
-    const attackGain = ctx.createGain();
-    attackGain.gain.setValueAtTime(0.6, time);
-    attackGain.gain.exponentialRampToValueAtTime(0.01, time + 0.04);
-
-    const mainGain = ctx.createGain();
-    mainGain.gain.setValueAtTime(0, time);
-    mainGain.gain.linearRampToValueAtTime(0.8, time + 0.005);
-    mainGain.gain.exponentialRampToValueAtTime(0.3, time + 0.1);
-    mainGain.gain.exponentialRampToValueAtTime(0.01, time + 0.4);
-    mainGain.gain.linearRampToValueAtTime(0, time + 0.45);
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(800, time);
-    filter.Q.setValueAtTime(1, time);
-
-    bodyOsc.connect(filter);
-    attackOsc.connect(attackGain);
-    noiseSource.connect(noiseGain);
-    
-    attackGain.connect(mainGain);
-    noiseGain.connect(mainGain);
-    filter.connect(mainGain);
-    mainGain.connect(audioDestination(ctx));
-
-    bodyOsc.start(time);
-    attackOsc.start(time);
-    noiseSource.start(time);
-    
-    bodyOsc.stop(time + 0.45);
-    attackOsc.stop(time + 0.45);
-    noiseSource.stop(time + 0.45);
+    return kit;
   }
+  function dropKit() { kit = null; }
+
+  /* How the rhythm is voiced at each strength. A pitch gains the octave
+     above it and then the one above that; percussion gains another
+     instrument. Both read the same 1/2/3, so one switch answers for both
+     and the piece sounds the same shape either way.
+
+     The percussion stack starts as a pair on purpose: a tom carries the
+     weight and the shaker puts an edge on the front of it, which is what
+     a single drum was missing. */
+  const PERCUSSION_STACK = ['tom', 'shaker', 'snare', 'claves'];
+
+  function percussionVoices(strength) {
+    /* one more instrument than the pitch stack has octaves — the extra
+       one is the shaker, which is colour rather than another note */
+    return PERCUSSION_STACK.slice(0, Math.max(1, Math.min(3, strength)) + 1);
+  }
+
+  /* The rhythm, as percussion. Every voice in the stack is struck at the
+     same reading of the clock, so embedded in the Music Stand the whole
+     stack lands on the one moment the note is due rather than smearing
+     across the callback. */
+  function playPercussion() {
+    if (!rhythmEnabled) return;
+    const k = getKit();
+    /* No kit means the library did not load. A rhythm that cannot be
+       heard is worse than one heard on the wrong instrument, so the
+       pitch takes over rather than the beat going missing. */
+    if (!k) { playTriangleTone(0.12); return; }
+    percussionVoices(soundStrength).forEach(id => k.play(id, {}));
+  }
+
+  /* The rhythm, as a pitch. At full strength it is three of the same
+     note an octave apart — a single 110 Hz triangle is a weak thing to
+     put under an ostinato, and an octave doubling is the oldest way of
+     making one line sound like more of one without changing the note.
+     The doublings are quieter the higher they go, so what is added is
+     brightness rather than a second melody. */
+  const OCTAVE_LEVELS = [1, 0.55, 0.3];   // how loud each octave is, relative
 
   function playTriangleTone(duration = 0.2) {
     if (!rhythmEnabled) return;
     const ctx = initAudioContext();
     const time = ctx.currentTime;
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-    oscillator.type = 'triangle';
-    oscillator.frequency.setValueAtTime(110, time);
-    oscillator.connect(gainNode);
-    gainNode.connect(audioDestination(ctx));
-    gainNode.gain.setValueAtTime(0, time);
-    gainNode.gain.linearRampToValueAtTime(0.3, time + 0.02);
-    gainNode.gain.linearRampToValueAtTime(0.1, time + duration - 0.05);
-    gainNode.gain.linearRampToValueAtTime(0, time + duration);
-    oscillator.start(time);
-    oscillator.stop(time + duration);
+    const layers = Math.max(1, Math.min(3, soundStrength));
+    const out = audioDestination(ctx);
+    for (let i = 0; i < layers; i++) {
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      const peak = 0.3 * OCTAVE_LEVELS[i];
+      oscillator.type = 'triangle';
+      oscillator.frequency.setValueAtTime(110 * Math.pow(2, i), time);
+      oscillator.connect(gainNode);
+      gainNode.connect(out);
+      gainNode.gain.setValueAtTime(0, time);
+      gainNode.gain.linearRampToValueAtTime(peak, time + 0.02);
+      gainNode.gain.linearRampToValueAtTime(peak / 3, time + duration - 0.05);
+      gainNode.gain.linearRampToValueAtTime(0, time + duration);
+      oscillator.start(time);
+      oscillator.stop(time + duration);
+    }
   }
 
   /*
@@ -4762,9 +4788,46 @@
     pitchMode = mode;
     if (pitchModeBtn) pitchModeBtn.classList.toggle('active', mode === 'pitch');
     if (drumModeBtn) drumModeBtn.classList.toggle('active', mode === 'drum');
+    syncStrengthControl();
   }
   if (pitchModeBtn) pitchModeBtn.addEventListener('click', () => setPitchMode('pitch'));
   if (drumModeBtn) drumModeBtn.addEventListener('click', () => setPitchMode('drum'));
+
+  /* ---- strength ----
+     Written out rather than left as a number, because what x2 means
+     depends on which sound is playing and the answer should not be a
+     thing you have to try. */
+  const strengthNote = document.getElementById('strength-note');
+  const STRENGTH_WORDS = {
+    pitch: ['One voice on every note.',
+            'The note, and the octave above it.',
+            'The note, and the two octaves above it.'],
+    drum:  ['Tom and shaker together.',
+            'Tom, shaker and snare.',
+            'Tom, shaker, snare and claves.']
+  };
+
+  function syncStrengthControl() {
+    for (let i = 1; i <= 3; i++) {
+      const btn = document.getElementById('strength-' + i + '-btn');
+      if (btn) btn.classList.toggle('active', soundStrength === i);
+    }
+    if (strengthNote) strengthNote.textContent = STRENGTH_WORDS[pitchMode][soundStrength - 1];
+  }
+
+  function setSoundStrength(n, opts) {
+    n = Math.max(1, Math.min(3, Number(n) || 1));
+    if (n === soundStrength) return;
+    soundStrength = n;
+    syncStrengthControl();
+    if (!(opts && opts.quiet)) saveSoundPrefs();
+  }
+
+  for (let i = 1; i <= 3; i++) {
+    const btn = document.getElementById('strength-' + i + '-btn');
+    if (btn) btn.addEventListener('click', () => setSoundStrength(i));
+  }
+  syncStrengthControl();
 
   // Copy Visual button
   if (copyVisualBtn) copyVisualBtn.addEventListener('click', captureVisual);
@@ -5018,7 +5081,7 @@
             if (pitchMode === 'pitch') {
               playTriangleTone(Math.min(holdMs * 0.92, 3000) / 1000);
             } else {
-              playBassDrum();
+              playPercussion();
             }
           }
         }, timeDelay);
@@ -7660,7 +7723,7 @@
   ];
 
   const SHELL_SWITCHES = [
-    { key: 'sound',   name: 'Sound options',  desc: 'Steady beat, count-in, pitch or drum' },
+    { key: 'sound',   name: 'Sound options',  desc: 'Steady beat, count-in, pitch or drum, strength' },
     { key: 'view',    name: 'View options',   desc: 'Size, line length, how it scrolls' },
     { key: 'present', name: 'Present mode',   desc: 'Fills the screen for performing' },
     { key: 'picture', name: 'Save a picture', desc: 'Downloads the notation as an image' }
@@ -8568,14 +8631,19 @@
       attachAudio(ctx, out) {
         audioContext = ctx;
         audioOut = out || null;
+        /* The kit is built around a context and a destination, so one made
+           before this would be playing to the speakers on its own clock. */
+        dropKit();
       },
 
       /* Sounds one voice now. `style` is the Music Stand's choice of tone or drum
-         for the words — this app's own pitch/drum switch, made from there. */
+         for the words, and `strength` how many voices deep to play it —
+         this app's own two sound switches, made from there. */
       sound(voice, opts) {
         const o = opts || {};
         if (voice === 'beat') { playBrushDrum(); return; }
-        if (o.style === 'drum') playBassDrum();
+        if (o.strength) setSoundStrength(o.strength, { quiet: true });
+        if (o.style === 'drum') playPercussion();
         else playTriangleTone(Math.max(0.06, Math.min((o.holdMs || 300) * 0.92, 3000) / 1000));
       },
 
@@ -8629,9 +8697,14 @@
           maxScale: FIT_MAX,
           mode: view.sizeMode === 'fixed' || view.sizeMode === 'fit' ? view.sizeMode : 'page',
           fixedScale: view.zoomPct / 100,
-          /* when the bars on a line are ours to choose, every way of
-             setting them, so the Music Stand can weigh them against the ostinato */
-          layouts: linesAuto && view.sizeMode === 'page' ? lineLayouts() : null
+          /* Every way the bars could be set on a line, so the Music Stand
+             can weigh them against the ostinato. It is a list of what
+             this poem *could* look like, not of what it currently does,
+             so it must not depend on whether the stand has already
+             chosen one — a menu that empties as soon as something is
+             ordered from it leaves the stand with the first shape it
+             happened to pick, for good. */
+          layouts: view.sizeMode === 'page' ? lineLayouts() : null
         };
       },
 

@@ -664,9 +664,24 @@ body.dragging .grip { background: var(--ink-2); transform: scale(1.15); }
   margin-bottom: 8px;
 }
 .mixer-voices { display: flex; flex-direction: column; gap: 4px; }
+/* The picture and the switch, in that order — the same pair, the same
+   way round, as a track head in Ostinato Builder. */
+.voice-row { display: flex; align-items: center; gap: 6px; }
+.voice-pic {
+  flex: none;
+  display: flex; align-items: center; justify-content: center;
+  width: 38px; height: 34px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--hairline);
+}
+button.voice-pic { cursor: pointer; }
+button.voice-pic:hover { border-color: var(--side); background: var(--side-soft); }
+.voice-pic img { width: 26px; height: 26px; object-fit: contain; }
+.voice-pic.muted img { opacity: .4; filter: grayscale(1); }
 .voice-btn {
   display: flex; align-items: center; gap: 10px;
-  width: 100%;
+  flex: 1; min-width: 0;
   padding: 6px 8px;
   border-radius: 10px;
   border: 1px solid var(--hairline);
@@ -675,7 +690,6 @@ body.dragging .grip { background: var(--ink-2); transform: scale(1.15); }
   text-align: left;
 }
 .voice-btn:hover { border-color: var(--hairline-2); }
-.voice-btn img { width: 26px; height: 26px; object-fit: contain; flex: none; }
 .voice-btn .voice-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .voice-btn .voice-state {
   font-size: 11.5px;
@@ -685,7 +699,6 @@ body.dragging .grip { background: var(--ink-2); transform: scale(1.15); }
   color: var(--good);
 }
 .voice-btn.muted { background: var(--ground); color: var(--ink-3); }
-.voice-btn.muted img { opacity: .4; filter: grayscale(1); }
 .voice-btn.muted .voice-state { color: var(--danger); }
 .mixer-empty { font-size: 13px; color: var(--ink-3); padding: 6px 2px; }
 .vol {
@@ -739,6 +752,36 @@ body.dragging .grip { background: var(--ink-2); transform: scale(1.15); }
   overflow: auto;
   min-height: 60px;
   padding: 2px;
+}
+
+/* the instrument picker — the app's own grid, at the stand's size */
+.instrument-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 10px;
+  overflow: auto;
+  padding: 2px;
+}
+.instrument-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px 8px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.instrument-card img { width: 46px; height: 46px; object-fit: contain; }
+.instrument-card:hover { border-color: var(--ost); background: var(--ost-soft); }
+.instrument-card.selected {
+  border-color: var(--ost);
+  background: var(--ost-soft);
+  color: var(--ost);
 }
 .song-row {
   display: flex; align-items: center; gap: 12px;
@@ -888,6 +931,26 @@ body.present .present-exit svg { width: 20px; height: 20px; }
   .popover-wide.open { flex-direction: column; }
   /* one screen too narrow for two scores side by side */
   #arrange-side { display: none; }
+
+  /* ---- a phone is a column ----
+     Sharing one short screen between two scores makes two scores nobody
+     can read. So on a narrow screen the stand stops being a split view
+     and becomes a page: each score is drawn as large as the WIDTH allows,
+     is given exactly the height that takes, and the two of them scroll.
+     Reading a stand on a phone means scrolling; reading two postage
+     stamps does not mean anything.
+
+     The heights come from the stand, which asks each score how tall it
+     is at the size the width allows — see mobileHeights(). */
+  body.narrow .panes {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: var(--gutter);
+  }
+  body.narrow #pane-poem,
+  body.narrow #pane-ost { flex: 0 0 auto; }
+  /* nothing to drag when nothing is being shared */
+  body.narrow .divider { display: none; }
 }
 
 .field input.input-error { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(199,58,78,.12); }
