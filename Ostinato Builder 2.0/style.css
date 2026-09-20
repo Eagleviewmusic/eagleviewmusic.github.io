@@ -1023,6 +1023,64 @@ body.show-syllables .track-head { padding-bottom: 28px; }
 }
 .measure.repeat-preview .rhythm-svg .rest { opacity: 0; }
 
+/* ---- how long the piece is, on the closing bar line ----
+   + adds a bar, × takes the last one away. One pair for the whole score,
+   drawn on the top line only, because the length is the piece's and not
+   one instrument's. Faint until the score is hovered, so the end of the
+   music stays the end of the music until someone reaches for it — and
+   fully lit from the moment either is touched or focused.
+   Sized in staff spaces by placeEndMarks(); the numbers here are the
+   fallback for the moment before the grid has been measured. */
+.measure-add-btn,
+.measure-cut-btn {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  line-height: 1;
+  font-weight: 800;
+  font-family: inherit;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1.5px solid var(--hairline-2);
+  color: var(--ink-3);
+  transform: translate(-50%, -50%);
+  opacity: .32;
+  z-index: 7;
+  cursor: pointer;
+  transition: opacity .15s, background .15s, color .15s, border-color .15s, transform .15s;
+}
+#grid:hover .measure-add-btn,
+#grid:hover .measure-cut-btn { opacity: .8; }
+.measure-add-btn:hover,
+.measure-add-btn:focus-visible,
+.measure-cut-btn:hover,
+.measure-cut-btn:focus-visible { opacity: 1; }
+.measure-add-btn:hover,
+.measure-add-btn:focus-visible {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+  transform: translate(-50%, -50%) scale(1.1);
+}
+.measure-cut-btn:hover,
+.measure-cut-btn:focus-visible {
+  background: var(--danger); border-color: var(--danger); color: #fff;
+  transform: translate(-50%, -50%) scale(1.1);
+}
+/* The bar that is about to go, going — on every line at once. It is the
+   last `.measure` in each row, which is the child before the closing bar
+   line, the one element that always follows it. */
+#grid.cutting .body-inner > .measure:nth-last-child(2) { opacity: .26; }
+.body-inner > .measure { transition: opacity .13s ease; }
+
+/* A finger has no hover to show it the pair with, so on a touch screen
+   they simply stand there. */
+@media (pointer: coarse) {
+  .measure-add-btn,
+  .measure-cut-btn { opacity: .8; }
+}
+
 .beat-repeat-btn:disabled,
 .beat-repeat-btn.disabled {
   display: none;
@@ -1543,6 +1601,8 @@ body.present-mode .subdivision-controls,
 body.present-mode .beat-link-btn,
 body.present-mode .beat-repeat-btn,
 body.present-mode .measure-repeat-btn,
+body.present-mode .measure-add-btn,
+body.present-mode .measure-cut-btn,
 body.present-mode .track-move,
 body.present-mode .mini-btn.remove { visibility: hidden; }
 
@@ -2172,3 +2232,31 @@ body.embedded .dots .dot,
 body.embedded .instrument-btn { cursor: default; }
 /* centred in its pane, the way a page sits on a stand */
 body.embedded #grid-fit { margin: 0 auto; }
+
+/* ---- editing in a pane ----
+   The Music Stand can hand the score back to the pointer. What comes
+   back is the score's own controls and nothing else: the divisions, the
+   joins, the two repeat marks and the pair that changes the length. The
+   topbar and toolbar stay away — what is in them either belongs to the
+   Music Stand now (the tempo, the mutes, the count) or has no meaning in
+   a pane (Auto-save, the library, sharing).
+
+   These undo present mode's own hiding, so they have to out-weigh it:
+   one class deeper is enough, and both live on the body. */
+body.embedded.editing .subdivision-controls,
+body.embedded.editing .beat-link-btn,
+body.embedded.editing .beat-repeat-btn,
+body.embedded.editing .measure-repeat-btn,
+body.embedded.editing .measure-add-btn,
+body.embedded.editing .measure-cut-btn { visibility: visible; }
+body.embedded.editing .dots .dot { cursor: pointer; }
+body.embedded.editing .instrument-btn:hover,
+body.embedded.editing .instrument-btn:active { transform: none; }
+
+/* Which instrument plays a line, whether that line is muted, and how the
+   lines are ordered are the Music Stand's to say — the mixer there is
+   already showing an answer, and a second answer in the pane would make
+   a liar of one of them. The marks are left visible so the score still
+   reads; they simply do not answer. */
+body.embedded .instrument-btn,
+body.embedded .mute-badge { pointer-events: none; }

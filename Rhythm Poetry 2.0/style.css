@@ -2287,3 +2287,29 @@ body.embedded .stage { padding: 14px 12px 10px; align-items: safe center; }
 body.embedded .circle,
 body.embedded .notes-box,
 body.embedded .word { cursor: default; }
+
+/* ---- editing in a pane ----
+   The Music Stand can hand the score back to the pointer. What comes
+   back is the score's own controls and nothing else: the divisions, the
+   joins, the pair on the final bar line, and a word you can tap and
+   retype. The topbar, the toolbar and 'Your words' stay away — what is
+   in them either belongs to the Music Stand now (the tempo, the sounds)
+   or has no meaning in a pane (Auto-save, the library, sharing).
+
+   The line handles stay away too, and for a different reason: how many
+   bars go on a line is the Music Stand's answer, worked out from how
+   much room each score has been given. A handle here would be overruled
+   by the next re-fit.
+
+   These undo present mode's own hiding, so they have to out-weigh it:
+   one class deeper is enough, and both live on the body. */
+body.embedded.editing .beat-subdivision-controls { display: flex; }
+body.embedded.editing .beat-link-btn,
+body.embedded.editing .add-measure-btn,
+body.embedded.editing .delete-measure-btn { display: grid; }
+body.embedded.editing .circle,
+body.embedded.editing .word { cursor: pointer; }
+body.embedded.editing .circle:hover,
+body.embedded.editing .circle:active { transform: scale(1.12); }
+body.embedded.editing .word:hover,
+body.embedded.editing .word:active { background: var(--accent-soft); }

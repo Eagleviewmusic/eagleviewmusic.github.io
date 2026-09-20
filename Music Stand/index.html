@@ -53,6 +53,11 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="7" cy="18" r="2" fill="currentColor"/></svg>
       <span class="tool-label">Layout</span>
     </button>
+    <button class="tool-btn" id="edit-btn" aria-pressed="false"
+            title="Edit — change either score here, without changing it in its own app">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      <span class="tool-label">Edit</span>
+    </button>
     <button class="tool-btn" id="present-btn" title="Present — the two scores and nothing else">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
       <span class="tool-label">Present</span>
@@ -77,6 +82,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <span class="pane-meta" id="poem-meta"></span>
+      <button class="edited-chip" id="poem-edited" data-side="poem" hidden>Edited here</button>
       <span class="pane-spacer"></span>
       <button class="icon-btn pane-mute" data-side="poem" title="Mute the poem" aria-pressed="false">
         <svg class="i-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
@@ -121,6 +127,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <span class="pane-meta" id="ost-meta"></span>
+      <button class="edited-chip" id="ost-edited" data-side="ost" hidden>Edited here</button>
       <span class="meter-note" id="meter-note" hidden></span>
       <span class="pane-spacer"></span>
       <button class="icon-btn pane-mute" data-side="ost" title="Mute the ostinato" aria-pressed="false">

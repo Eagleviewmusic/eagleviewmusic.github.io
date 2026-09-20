@@ -183,6 +183,16 @@ svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap
 }
 .tool-btn:hover .tool-value, .tool-btn.open .tool-value { background: var(--surface); }
 
+/* Edit is a mode, not an errand: while it is on it stays lit, because
+   everything the panes will now answer follows from it. The stand has no
+   accent of its own on purpose — the two sides carry the colour — so the
+   lit state is the ink, which belongs to neither. */
+#edit-btn[aria-pressed="true"],
+#edit-btn[aria-pressed="true"]:hover {
+  background: var(--ink);
+  color: var(--surface);
+}
+
 .icon-btn {
   display: grid; place-items: center;
   width: 30px; height: 30px;
@@ -326,6 +336,27 @@ svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap
   text-overflow: ellipsis;
   min-width: 0;
 }
+
+/* This score is no longer the one in its own app. Said quietly, beside
+   the meter, and only while it is true. Where there is a saved version to
+   go back to it is also the way back; where there is not — a song that
+   came by link, or in a pairing — it is only a label, and says so by not
+   answering the pointer. */
+.edited-chip {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--side, var(--ink-2));
+  background: var(--side-soft, var(--ground));
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
+  flex: none;
+  cursor: default;
+}
+.edited-chip.revertable { cursor: pointer; }
+.edited-chip.revertable:hover { background: var(--side, var(--ink)); color: #fff; }
+.edited-chip.confirm,
+.edited-chip.confirm:hover { background: var(--danger); color: #fff; }
 .pane-mute .i-off { display: none; }
 .pane-mute[aria-pressed="true"] { color: var(--danger); }
 .pane-mute[aria-pressed="true"] .i-on { display: none; }

@@ -482,6 +482,12 @@
   let currentPlayPosition = 0;
   let notesBoxElements = []; // Store references to notes boxes for highlighting
   let pendingNotation = [];  // notes boxes waiting to be engraved after layout
+
+  /* Set by the Music Stand bridge while a pane is being edited, and null
+     at every other time. Every edit in this app ends in render(), which
+     makes render() the one place the host can be told without a new kind
+     of edit being able to forget to say so. */
+  let standAfterRender = null;
   let beatEnabled = true; // Beat toggle state
   let rhythmEnabled = true; // Rhythm toggle state
   let introEnabled = true; // Intro count-in state
@@ -6656,6 +6662,7 @@
 
     if (!isRhythm) syncQuickWrite();
     watchImagesForRelayout();
+    if (standAfterRender) standAfterRender();
   }
 
   /*
@@ -8260,20 +8267,39 @@
   if (EMBEDDED) {
     document.body.classList.add('embedded', 'present-mode');
 
-    /* A guest shows the score and takes no input yet: the Music Stand is a player.
-       Everything is stopped at the window, ahead of every handler in the
-       app, except scrolling, which the browser does on its own. Keys are
-       passed up, so Space still starts the Music Stand while this frame has focus.
-       `bridge.editable` is the switch minimal editing will turn on. */
+    /* A guest shows the score and, until the Music Stand says otherwise,
+       takes no input: the Music Stand is a player. Everything is stopped at
+       the window, ahead of every handler in the app, except scrolling,
+       which the browser does on its own. Keys are passed up, so Space
+       still starts the Music Stand while this frame has focus.
+
+       `bridge.editable` opens the score to the pointer. It does not open
+       the app: the chrome stays away and the stylesheet decides what may
+       be touched. Every touch is noted, because an edit is only reported
+       when something was reached for — see afterRender().
+
+       Ostinato Builder 2.0 carries the same block; keep the two in step. */
+    let hostEditable = false;
+    let touched = false;
+    let toldHost = null;
+
     const swallow = e => {
-      if (bridge.editable) return;
+      if (hostEditable) { touched = true; return; }
       e.stopImmediatePropagation();
       if (e.type === 'click' || e.type === 'dblclick' || e.type === 'contextmenu') e.preventDefault();
     };
     ['click', 'dblclick', 'contextmenu', 'pointerdown', 'mousedown', 'touchstart']
       .forEach(type => window.addEventListener(type, swallow, { capture: true, passive: false }));
     window.addEventListener('keydown', e => {
-      if (bridge.editable) return;
+      if (hostEditable) {
+        touched = true;
+        /* A word being typed keeps its own keys, Space included — Space in
+           a lyric box moves on to the next word, and the Music Stand must
+           not start playing instead. */
+        const t = e.target;
+        if ((t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName || '')))
+            || document.querySelector('.word-input')) return;
+      }
       e.stopImmediatePropagation();
       if (e.code === 'Space' || e.key === ' ') e.preventDefault();
       if (typeof bridge.onHostKey === 'function') {
@@ -8281,6 +8307,34 @@
                            metaKey: e.metaKey, ctrlKey: e.ctrlKey, altKey: e.altKey });
       }
     }, true);
+
+    function fingerprint() {
+      try { return stableStringify(bridge.snapshot()); } catch (e) { return null; }
+    }
+
+    /* render() is the end of every edit — and of every re-fit and every
+       change of view, which are not edits. render() also pads the piece
+       out to whole bars as it draws, so the poem can differ from the one
+       that was loaded without anybody having touched it. Two gates keep
+       all of that out: the pane must have been reached for since the last
+       word to the host, and the piece must actually have come out
+       different. */
+    function afterRender() {
+      if (!hostEditable || !touched || typeof bridge.onEdit !== 'function') return;
+      const now = fingerprint();
+      if (now === null || now === toldHost) return;
+      toldHost = now;
+      touched = false;
+      bridge.onEdit();
+    }
+
+    /* A poem the Music Stand has just put here is where it meant to put
+       it: this is the version to measure the next edit against, and
+       nothing has been reached for yet. */
+    function settled() {
+      touched = false;
+      toldHost = fingerprint();
+    }
 
     const VIEW_KEYS = ['sizeMode', 'zoomPct', 'textPct', 'lyricFont', 'overflow',
                        'showDots', 'showMeasureNumbers', 'followPlayback'];
@@ -8379,8 +8433,25 @@
     const bridge = {
       app: 'rhythm-poetry',
       version: 1,
-      editable: false,
       onHostKey: null,
+      onEdit: null,
+
+      /* Editing in a pane. The app's own storage is already out of reach
+         (see the block at the top of the file), so an edit here changes
+         what is on this stand and nothing else — the poem in the library
+         is not touched, and cannot be. The Music Stand keeps the result
+         and saves it with the pairing. */
+      get editable() { return hostEditable; },
+      set editable(on) {
+        on = !!on;
+        if (on === hostEditable) return;
+        hostEditable = on;
+        document.body.classList.toggle('editing', on);
+        touched = false;
+        toldHost = fingerprint();
+        standAfterRender = on ? afterRender : null;
+        render();
+      },
       /* where this app keeps its library, so the Music Stand can tell when a song
          it is showing has been edited in the app in another tab */
       libraryKey: STORAGE_KEY,
@@ -8409,6 +8480,7 @@
         if (!lib[id]) return null;
         loadSongById(id);
         fitLines();
+        settled();
         return bridge.info();
       },
 
@@ -8434,6 +8506,7 @@
         saveStoredLibrary(lib);
         loadSongById(id);
         fitLines();
+        settled();
         return bridge.info();
       },
 

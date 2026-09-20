@@ -96,6 +96,11 @@
        starts muted: with an ostinato underneath, it is already there. */
     voiceMute: { poem: { beat: true }, ost: {} },
     vol: { poem: 100, ost: 100 },
+    /* Editing in the panes. A mode of the stand rather than of a pane:
+       what is being worked on is the pairing, and reaching for the other
+       score is part of that. Kept with the session, not with the pairing
+       — a pairing opened to be played should open ready to play. */
+    editing: false,
     /* the split is kept per arrangement: a size chosen for two scores one
        above the other means nothing once they sit side by side */
     layout: { arrange: 'stacked', first: 'poem', show: 'both',
@@ -107,8 +112,11 @@
       ost:  { layout: 'pages', measuresPerPage: 4, zoomPct: 100, showDots: true,
               lightNotes: true, showSyllables: false, showBarNumbers: true, showBeatNumbers: true }
     },
-    /* { src: 'library' | 'data', id, title, data } — `data` is always the
-       latest snapshot, `id` only means something while src is 'library' */
+    /* { src: 'library' | 'data', id, title, data, edited?, origin? } —
+       `data` is always the latest snapshot and `id` only means something
+       while src is 'library'. A song edited here is no longer the library
+       song, so it becomes 'data': `origin` remembers where it came from,
+       which is all that is needed to put it back. */
     songs: { poem: null, ost: null }
   };
 
@@ -167,6 +175,7 @@
       v: 1,
       name: state.name,
       pairingId: state.pairingId,
+      editing: state.editing,
       layout: JSON.parse(JSON.stringify(state.layout)),
       views: JSON.parse(JSON.stringify(state.views)),
       songs: JSON.parse(JSON.stringify(state.songs))
@@ -249,8 +258,10 @@
 
     s.bridge = bridge;
     bridge.onHostKey = handleKey;
+    bridge.onEdit = () => paneEdited(side);
     attachSide(side);
     safe(() => bridge.setView(state.views[side]));
+    safe(() => { bridge.editable = state.editing; });
     showStatus(side, '');
 
     if (s.pending) {
@@ -315,7 +326,8 @@
          so a page closed before then does not forget it. */
       s.pending = () => loadInto(side, entry, opts);
       state.songs[side] = { src: entry.src || 'data', id: entry.id || null,
-                            title: entry.title || '', data: entry.data || null };
+                            title: entry.title || '', data: entry.data || null,
+                            edited: !!entry.edited, origin: entry.origin || null };
       s.empty.classList.add('opening');
       return true;
     }
@@ -338,7 +350,13 @@
       src: src,
       id: src === 'library' ? entry.id : null,
       title: info.title,
-      data: safe(() => s.bridge.snapshot(), entry.data || null)
+      data: safe(() => s.bridge.snapshot(), entry.data || null),
+      /* An edited song is opened here again every time the page is — from
+         the session, or from a pairing that kept it. It has to come back
+         still wearing both, or it would look like the library version and
+         the way back to that version would be lost. */
+      edited: !!entry.edited,
+      origin: entry.origin || null
     };
     s.info = info;
 
@@ -363,6 +381,78 @@
       const m = {};
       (info.voices || []).forEach(v => { if (v.muted) m[v.id] = true; });
       state.voiceMute.ost = m;
+    }
+  }
+
+  /* ==================================================================
+     EDITING IN THE PANES
+     The frames hold the whole app, and an app in a frame cannot reach
+     its own storage (each swaps localStorage for a read-through layer on
+     the way in), so a score edited here is edited here and nowhere else.
+     That is the whole of the guarantee: the poem in Rhythm Poetry and the
+     ostinato in Ostinato Builder are not touched, and cannot be. What the
+     Music Stand keeps is the edited version, and a pairing saves it whole.
+     ================================================================== */
+
+  function setEditing(on) {
+    on = !!on;
+    if (on === state.editing) return;
+    state.editing = on;
+    document.body.classList.toggle('editing', on);
+    $('edit-btn').setAttribute('aria-pressed', String(on));
+    /* Editing while the music runs would be writing under the plan the
+       conductor is already reading from. */
+    if (on && isPlaying()) stopPlayback();
+    SIDES.forEach(side => {
+      const b = sides[side].bridge;
+      if (b) safe(() => { b.editable = on; });
+    });
+    /* Controls appear on the score and the score changes size with them. */
+    SIDES.forEach(side => safe(() => sides[side].bridge && sides[side].bridge.refit()));
+    scheduleSplit();
+    saveSession();
+  }
+
+  /* A pane says its score came out different. The song here is now that
+     score: the snapshot is taken again, and a song that came from a
+     library stops being the library's — it keeps where it came from so it
+     can be put back, but it is a copy from this moment on. Left as
+     'library' it would be reopened from the library the next time that
+     app saved anything in another tab, and the edit would vanish. */
+  function paneEdited(side) {
+    const s = sides[side], song = state.songs[side];
+    if (!s.bridge || !song) return;
+    if (isPlaying()) stopPlayback();
+
+    if (!song.edited) {
+      song.edited = true;
+      if (song.src === 'library' && song.id) song.origin = { src: 'library', id: song.id };
+      song.src = 'data';
+      song.id = null;
+    }
+    s.stale = false;
+    const info = safe(() => s.bridge.info());
+    if (info) { s.info = info; song.title = info.title; }
+    song.data = safe(() => s.bridge.snapshot(), song.data);
+
+    refreshHeads();
+    renderMixer();
+    scheduleSplit();
+    saveSession();
+  }
+
+  /* Back to the version the score was opened from. Only ever offered for
+     a song that came from a library — one that arrived by link or in a
+     pairing has no other version to go back to, so its chip only says
+     that it has been edited. */
+  function revertSide(side) {
+    const song = state.songs[side];
+    if (!song || !song.origin) return;
+    const from = song.origin;
+    if (loadInto(side, { src: from.src, id: from.id }, { keepTempo: true, keepMutes: true })) {
+      toast('Back to the saved ' + APPS[side].noun);
+    } else {
+      toast('That ' + APPS[side].noun + ' is no longer in the library');
     }
   }
 
@@ -401,6 +491,22 @@
              + (info.pickupBeats ? ' + pickup' : '');
       }
       $(side + '-meta').textContent = meta;
+
+      /* Said in the heading rather than left to be noticed: from here on
+         this is not the song that is in the app, and anyone coming back
+         to the stand later needs to know that before they wonder why. */
+      const song = state.songs[side];
+      const chip = $(side + '-edited');
+      const revertable = !!(song && song.edited && song.origin);
+      chip.hidden = !(song && song.edited);
+      chip.classList.toggle('revertable', revertable);
+      chip.classList.remove('confirm');
+      chip.textContent = 'Edited here';
+      chip.title = revertable
+        ? 'Changed on the stand. The ' + APPS[side].noun + ' in '
+          + APPS[side].name + ' is untouched — press to go back to it.'
+        : 'Changed on the stand. Save the pairing to keep these changes.';
+
       sides[side].pane.classList.toggle('muted', state.mute[side]);
       const muteBtn = sides[side].pane.querySelector('.pane-mute');
       muteBtn.setAttribute('aria-pressed', String(state.mute[side]));
@@ -1915,6 +2021,10 @@
 
   function setPresent(on) {
     presenting = !!on;
+    /* Present mode is the two scores and nothing else, and the way back
+       out of editing is in the bar it hides. Showing and editing are two
+       different jobs anyway. */
+    if (presenting) setEditing(false);
     document.body.classList.toggle('present', presenting);
     closePopovers();
     if (presenting && document.documentElement.requestFullscreen && !document.fullscreenElement) {
@@ -1924,6 +2034,25 @@
     }
     requestAnimationFrame(() => { applySplit(); scheduleSplit(); });
   }
+
+  $('edit-btn').addEventListener('click', () => setEditing(!state.editing));
+
+  /* Two taps to undo a piece of work: the first turns the chip into the
+     question, the way the pairing list's delete does. */
+  SIDES.forEach(side => {
+    const chip = $(side + '-edited');
+    chip.addEventListener('click', () => {
+      const song = state.songs[side];
+      if (!song || !song.origin) return;
+      if (!chip.classList.contains('confirm')) {
+        chip.classList.add('confirm');
+        chip.textContent = 'Undo my changes?';
+        setTimeout(() => { if (chip.isConnected) refreshHeads(); }, 3000);
+        return;
+      }
+      revertSide(side);
+    });
+  });
 
   $('present-btn').addEventListener('click', () => setPresent(true));
   $('present-exit').addEventListener('click', () => setPresent(false));
@@ -2018,6 +2147,13 @@
     adoptSettings(session);
     adoptLayout(session.layout);
     adoptViews(session.views);
+  }
+
+  /* Before the frames are booted, so each connects already knowing. */
+  if (session && session.editing === true) {
+    state.editing = true;
+    document.body.classList.add('editing');
+    $('edit-btn').setAttribute('aria-pressed', 'true');
   }
 
   let linkPair = null;

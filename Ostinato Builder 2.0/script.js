@@ -1977,6 +1977,16 @@
   /* Bar-line simile marks, placed in the same pass: they sit on the
      notation's own line, which is not known until the grid is measured. */
   let pendingBarMarks = [];
+  /* The + and X on the closing bar line. Placed in the same pass and for
+     the same reason: they line up with the notes, so they cannot be put
+     anywhere until the notes have been measured. */
+  let pendingEndMarks = [];
+
+  /* Set by the Music Stand bridge while a pane is being edited, and null
+     at every other time. Every edit in this app ends in render(), which
+     makes render() the one place the host can be told without a new kind
+     of edit being able to forget to say so. */
+  let standAfterRender = null;
 
   function icon(path, size) {
     return '<svg viewBox="0 0 24 24" width="' + (size || 15) + '" height="' + (size || 15) + '">'
@@ -2008,6 +2018,7 @@
     grid.innerHTML = '';
     pendingNotation = [];
     pendingBarMarks = [];
+    pendingEndMarks = [];
     litBeat = -1;
     conformAllTracks();
 
@@ -2025,6 +2036,7 @@
        the policy changes. */
     showHide(addTrackBtn, instrumentsEditable() && song.tracks.length < maxTracksAllowed());
     scheduleAutosave();
+    if (standAfterRender) standAfterRender();
   }
 
   /* The instrument column is as wide as the widest head needs to be — a
@@ -2133,6 +2145,25 @@
       bar.className = m === song.measures - 1 ? 'final-divider' : 'measure-divider';
       inner.appendChild(bar);
       dividerEls.push(bar);
+    }
+
+    /* How long the piece is belongs to the piece, not to one drum, so the
+       pair that changes it is drawn once — on the top line's closing bar
+       line, where a reader's eye already goes to find the end. The stepper
+       in the toolbar says the same thing in words; this is the same
+       control where the music is. Rhythm Poetry carries the identical
+       pair on its final bar line. */
+    if (trackIndex === 0) {
+      const closing = dividerEls[song.measures - 1];
+      const last = measureEls[song.measures - 1];
+      const offer = [];
+      if (canAddMeasures() && song.measures < maxMeasuresAllowed()) offer.push('add');
+      if (canRemoveMeasures() && song.measures > 1) offer.push('cut');
+      offer.forEach(kind => {
+        const btn = buildLengthButton(kind);
+        closing.appendChild(btn);
+        pendingEndMarks.push({ btn: btn, divider: closing, measure: last, row: kind });
+      });
     }
 
     /* The bar-line marks, once both bars either side of a line exist. */
@@ -2582,6 +2613,63 @@
     return btn;
   }
 
+  /* A bar on, or the last bar off. The same two words the toolbar's
+     stepper says, put where the music ends so the length can be changed
+     without leaving the score — which is the only way to change it at all
+     in the Music Stand, where the toolbar is not there. */
+  function buildLengthButton(kind) {
+    const add = kind === 'add';
+    const what = add ? 'Add a bar' : 'Delete the last bar';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = add ? 'measure-add-btn' : 'measure-cut-btn';
+    btn.textContent = add ? '+' : '×';
+    btn.title = what;
+    btn.setAttribute('aria-label', what);
+    /* The bar about to go is shown as going, the way the simile mark shows
+       the bar it is about to fill — and on every line, because a bar is
+       not one instrument's: taking it away takes it from all of them. */
+    if (!add) {
+      const mark = on => grid.classList.toggle('cutting', on);
+      ['mouseenter', 'focus'].forEach(t => btn.addEventListener(t, () => mark(true)));
+      ['mouseleave', 'blur'].forEach(t => btn.addEventListener(t, () => mark(false)));
+    }
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (add) {
+        if (!canAddMeasures() || song.measures >= maxMeasuresAllowed()) return;
+        song.measures++;
+      } else {
+        if (!canRemoveMeasures() || song.measures <= 1) return;
+        song.measures--;
+      }
+      afterLengthChange();
+    });
+    return btn;
+  }
+
+  /* On the closing bar line, stacked: + on the line the notes sit on, ×
+     under it in the room between this line and the next instrument. The
+     sizes are in staff spaces, like every other mark, so the pair grows
+     and shrinks with the notes instead of swelling on a small score. */
+  function placeEndMarks(sizeH, boxH) {
+    if (!pendingEndMarks.length) return;
+    const SS = RN.staffSpace(sizeH);
+    /* about the size of a link button — chrome beside the notes, not a
+       third voice on the staff */
+    const size = Math.round(SS * 1.3);
+    pendingEndMarks.forEach(mark => {
+      const box = mark.measure.querySelector('.notes-box');
+      if (!box) return;
+      const line = (absOffsetY(box) - absOffsetY(mark.divider)) + boxH - SS * 1.70;
+      mark.btn.style.left = Math.round(mark.divider.offsetWidth / 2) + 'px';
+      mark.btn.style.top = Math.round(mark.row === 'add' ? line : line + size + SS * 0.3) + 'px';
+      mark.btn.style.width = size + 'px';
+      mark.btn.style.height = size + 'px';
+      mark.btn.style.fontSize = Math.round(size * 0.62) + 'px';
+    });
+  }
+
   const SPAN_WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
 
   function buildBeatRepeatButton(track, beatIndex, span) {
@@ -2867,6 +2955,7 @@
     }
 
     placeBarMarks(sizeH, boxH);
+    placeEndMarks(sizeH, boxH);
   }
 
 
@@ -6187,20 +6276,35 @@
   if (EMBEDDED) {
     document.body.classList.add('embedded', 'present-mode');
 
-    /* A guest shows the score and takes no input yet: the Music Stand is a player.
-       Everything is stopped at the window, ahead of every handler in the
-       app, except scrolling, which the browser does on its own. Keys are
-       passed up, so Space still starts the Music Stand while this frame has focus.
-       `bridge.editable` is the switch minimal editing will turn on. */
+    /* A guest shows the score and, until the Music Stand says otherwise,
+       takes no input: the Music Stand is a player. Everything is stopped at
+       the window, ahead of every handler in the app, except scrolling,
+       which the browser does on its own. Keys are passed up, so Space
+       still starts the Music Stand while this frame has focus.
+
+       `bridge.editable` opens the score to the pointer. It does not open
+       the app: the chrome stays away and the stylesheet decides what may
+       be touched. Every touch is noted, because an edit is only reported
+       when something was reached for — see afterRender(). */
+    let hostEditable = false;
+    let touched = false;
+    let toldHost = null;
+
     const swallow = e => {
-      if (bridge.editable) return;
+      if (hostEditable) { touched = true; return; }
       e.stopImmediatePropagation();
       if (e.type === 'click' || e.type === 'dblclick' || e.type === 'contextmenu') e.preventDefault();
     };
     ['click', 'dblclick', 'contextmenu', 'pointerdown', 'mousedown', 'touchstart']
       .forEach(type => window.addEventListener(type, swallow, { capture: true, passive: false }));
     window.addEventListener('keydown', e => {
-      if (bridge.editable) return;
+      if (hostEditable) {
+        touched = true;
+        /* Something being typed into keeps its own keys, Space included —
+           otherwise the Music Stand would start playing mid-word. */
+        const t = e.target;
+        if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName || ''))) return;
+      }
       e.stopImmediatePropagation();
       if (e.code === 'Space' || e.key === ' ') e.preventDefault();
       if (typeof bridge.onHostKey === 'function') {
@@ -6208,6 +6312,31 @@
                            metaKey: e.metaKey, ctrlKey: e.ctrlKey, altKey: e.altKey });
       }
     }, true);
+
+    function fingerprint() {
+      try { return stableStringify(snapshot()); } catch (e) { return null; }
+    }
+
+    /* render() is the end of every edit — and of every re-fit and every
+       change of view, which are not edits. Two gates keep those out: the
+       pane must have been reached for since the last word to the host,
+       and the piece must actually have come out different. */
+    function afterRender() {
+      if (!hostEditable || !touched || typeof bridge.onEdit !== 'function') return;
+      const now = fingerprint();
+      if (now === null || now === toldHost) return;
+      toldHost = now;
+      touched = false;
+      bridge.onEdit();
+    }
+
+    /* A piece the Music Stand has just put here is where it meant to put
+       it: this is the version to measure the next edit against, and
+       nothing has been reached for yet. */
+    function settled() {
+      touched = false;
+      toldHost = fingerprint();
+    }
 
     const VIEW_KEYS = ['layout', 'measuresPerPage', 'zoomPct', 'showDots', 'showSyllables',
                        'syllableSystem', 'lightNotes', 'showBarNumbers', 'showBeatNumbers'];
@@ -6236,8 +6365,25 @@
     const bridge = {
       app: 'ostinato-builder',
       version: 1,
-      editable: false,
       onHostKey: null,
+      onEdit: null,
+
+      /* Editing in a pane. The app's own storage is already out of reach
+         (see the block at the top of the file), so an edit here changes
+         what is on this stand and nothing else — the ostinato in the
+         library is not touched, and cannot be. The Music Stand keeps the
+         result and saves it with the pairing. */
+      get editable() { return hostEditable; },
+      set editable(on) {
+        on = !!on;
+        if (on === hostEditable) return;
+        hostEditable = on;
+        document.body.classList.toggle('editing', on);
+        touched = false;
+        toldHost = fingerprint();
+        standAfterRender = on ? afterRender : null;
+        render();
+      },
       /* where this app keeps its library, so the Music Stand can tell when a song
          it is showing has been edited in the app in another tab */
       libraryKey: LIBRARY_KEY,
@@ -6264,6 +6410,7 @@
         if (!lib[id]) return null;
         adoptSong(normalizeSong(lib[id]));
         afterSongChange();
+        settled();
         return bridge.info();
       },
 
@@ -6274,6 +6421,7 @@
         if (!raw || typeof raw !== 'object' || !Array.isArray(raw.tracks)) return null;
         adoptSong(normalizeSong(raw));
         afterSongChange();
+        settled();
         return bridge.info();
       },
 

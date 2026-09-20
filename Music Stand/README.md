@@ -93,6 +93,33 @@ on a line; it offers every balanced choice and the Music Stand picks the one tha
 the smaller of the two scores largest. Drag the line to choose by hand;
 double-click it to give it back.
 
+## Editing
+
+**Edit**, in the top bar, hands both scores back to the pointer. What you
+can reach is the score's own controls: the beat divisions, the joins, the
+repeat marks, a word you tap and retype, and a **+** and **×** on the
+closing bar line for adding and removing bars. The apps' own chrome stays
+away — the tempo, the sounds and the mutes belong to the Music Stand now,
+and Auto-save, the library and sharing mean nothing in a pane.
+
+**Nothing you do here reaches the apps.** Each app, opened in a frame,
+has its `localStorage` swapped for a layer that reads the real thing and
+keeps every write in memory, so the poem in Rhythm Poetry and the
+ostinato in Ostinato Builder cannot be touched from here — not by
+editing, and not by anything else. That is what makes this safe to
+offer: the score on the stand is yours to pull about.
+
+What it does change is the pairing. A score edited here stops being the
+library's copy and becomes this stand's own: the heading says **Edited
+here**, and **Save pairing** keeps it, changes and all. Where the score
+came from a library, the chip is also the way back — press it twice to
+throw the changes away and open the saved version again.
+
+Editing stops the music, because the plan the conductor is reading from
+was built from the old score. Present mode turns editing off: showing
+and working are two different jobs, and the way out of editing is in the
+bar present mode hides.
+
 ## The bridge — `window.MusicStandBridge`, version 1
 
 Both apps expose the same object when embedded. A third app joins by exposing
@@ -115,8 +142,9 @@ it too and adding an entry to `APPS`.
 | `getView()` / `setView(patch)` | how the score is shown (see `VIEW_KEYS` in each app). Rhythm Poetry's include `textPct` (words 60–250 %) and `lyricFont` (`rounded`, `reader`, `clear`, `story`); the Music Stand's own View menu for the poem sets both, per pane, without touching the app's settings |
 | `sizing()` | `{ w, h, padW, padH, maxScale, mode: 'page'\|'fit'\|'fixed', fixedScale, layouts? }` |
 | `refit()` | re-fit to the frame |
-| `editable` | `false`: all input is swallowed. The switch for minimal editing later |
+| `editable` | `false`: all input is swallowed. Set it to `true` and the score answers the pointer — see **Editing** below |
 | `onHostKey` | set by the Music Stand; the frame passes keys up so Space works everywhere |
+| `onEdit` | set by the Music Stand; the frame calls it when the score has come out different. Take `snapshot()` and `info()` again on hearing it |
 
 ## What embedded mode changes in the apps
 
@@ -133,23 +161,42 @@ block. Outside the Music Stand none of it runs. Inside it:
 - Rhythm Poetry gains a `'page'` size (fit both ways) and chooses its own bars
   per line for the pane; Ostinato Builder shrinks past its usual 55% floor
   rather than scrolling, and centres its grid.
-- Everything an app added for editing stays out of the pane. Present mode hides
-  the beat- and bar-line simile marks, the join and division buttons and the
-  top bar (which is where the Auto-save switch lives), so a new editing control
-  must be added to that list or it will show up, and answer a hover, in the
-  Music Stand.
+- Everything an app added for editing stays out of the pane until the Music
+  Stand asks for it. Present mode hides the beat- and bar-line simile marks,
+  the join and division buttons, the bar-line +/× and the top bar (which is
+  where the Auto-save switch lives), so a new editing control must be added to
+  that list or it will show up, and answer a hover, in the Music Stand.
+- `bridge.editable = true` puts `editing` on the body as well. Each stylesheet
+  then lets present mode's hiding back off again, control by control — which is
+  where the answer to "what may be edited in a pane" is actually written. Left
+  hidden on purpose: Ostinato Builder's instruments, mutes and track order
+  (the Music Stand's mixer is already showing an answer for those) and Rhythm
+  Poetry's line handles (the Music Stand chooses the bars per line itself, and
+  would overrule a handle at the next re-fit).
+- Every edit in both apps ends in `render()`, so that is where the frame tells
+  the Music Stand. It only speaks when the pane has been touched since it last
+  spoke *and* the piece has actually come out different — `render()` is also
+  the end of a re-fit and of a change of view, and Rhythm Poetry's pads the
+  poem out to whole bars as it draws.
 - When the poem's lyric font changes, the words are measured again once the
   face has arrived and the Music Stand works out the split again after that; a face
   measured in its fallback would leave the bars the wrong width.
 
-Two small changes also apply outside the Music Stand and do not change behaviour there:
-Rhythm Poetry's brush and tone voices now read the clock once like every other
-voice, and Ostinato Builder's `buildTimeline()` reads each track through a new
-`trackOnsets()`, which the bridge shares.
+Three changes also apply outside the Music Stand. Two do not change behaviour
+there: Rhythm Poetry's brush and tone voices now read the clock once like every
+other voice, and Ostinato Builder's `buildTimeline()` reads each track through a
+new `trackOnsets()`, which the bridge shares. The third does: Ostinato Builder
+has gained the **+** and **×** on its closing bar line, in the app itself as
+well as in a pane, because Rhythm Poetry has had them all along and the length
+of a piece should be changeable where the music is and not only in the toolbar.
+They are drawn once, on the top line, since the length belongs to the piece
+rather than to one instrument; the toolbar's stepper still says the same thing
+in words.
 
 ## Not built yet
 
-- **Editing in the panes.** `bridge.editable` is the switch; the frames already
-  hold the full apps.
+- Editing the time signature, the instruments or the tracks in a pane. Those
+  are the pieces of the apps the Music Stand deliberately keeps for itself or
+  leaves to the app proper.
 - Starting from a chosen bar; a pause that resumes where it left off.
 - Other apps. The protocol above is the whole of what one needs to provide.
