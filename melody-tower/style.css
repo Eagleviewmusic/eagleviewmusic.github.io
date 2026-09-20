@@ -42,8 +42,8 @@ html, body, #app-wrapper, .main-content {
 
 .app-title {
   font-family: 'Pacifico', cursive;
-  margin: 4px 0 4px 0;
-  font-size: 24px;
+  margin: clamp(2px, 0.6vh, 4px) 0;
+  font-size: clamp(16px, 3.5vh, 24px);
   font-weight: normal;
   color: white;
   text-align: center;
@@ -52,16 +52,16 @@ html, body, #app-wrapper, .main-content {
 }
 
 .controls-bar {
-  width: 270px;
+  width: clamp(190px, 30vw, 270px);
   max-width: 85vw;
   box-sizing: border-box;
-  padding: 16px 14px;
+  padding: clamp(8px, 1.8vh, 16px) clamp(8px, 1.5vw, 14px);
   background: #001f3f; /* Default color */
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   align-items: stretch;
-  gap: 16px;
+  gap: clamp(8px, 1.8vh, 16px);
   border-right: 2px solid #001a33;
   z-index: 10;
   flex-shrink: 0;
@@ -74,13 +74,13 @@ html, body, #app-wrapper, .main-content {
 .sidebar-section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: clamp(4px, 1vh, 6px);
   width: 100%;
 }
 
 .sidebar-section-title {
   font-family: 'EB Garamond', Garamond, 'Times New Roman', Times, serif;
-  font-size: 1.1rem;
+  font-size: clamp(0.8rem, 1.8vh, 1.1rem);
   font-weight: bold;
   color: rgba(255, 255, 255, 0.95);
   text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
@@ -107,7 +107,7 @@ html, body, #app-wrapper, .main-content {
   overflow: hidden; 
   position: relative;
   margin-top: 0;
-  padding: clamp(16px, 3.5vh, 32px) 16px;
+  padding: clamp(6px, 2vh, 24px) clamp(6px, 2vw, 16px);
   box-sizing: border-box;
 }
 
@@ -162,12 +162,12 @@ html, body, #app-wrapper, .main-content {
 
 .control-area {
   outline: none;
-  border-radius: 8px;
+  border-radius: clamp(5px, 1vmin, 8px);
   display: flex; 
   align-items: center; 
   justify-content: center;
-  font-size: 1rem;
-  padding: 0.45em 0.6em;
+  font-size: clamp(0.78rem, 1.6vh, 1rem);
+  padding: clamp(0.25em, 0.8vh, 0.45em) clamp(0.35em, 0.8vw, 0.6em);
   background: #fff;
   color: #333;
   white-space: nowrap;
@@ -185,18 +185,18 @@ html, body, #app-wrapper, .main-content {
   min-width: 0;
   display: flex;
   justify-content: space-between;
-  padding: 0.4em 0.5em;
+  padding: clamp(0.25em, 0.8vh, 0.4em) clamp(0.3em, 0.8vw, 0.5em);
 }
 
 .key-control #key-name {
   font-weight: bold;
-  font-size: 1.15rem;
+  font-size: clamp(0.85rem, 1.8vh, 1.15rem);
 }
 
 .scale-control {
   flex: 1.4;
   min-width: 0;
-  padding: 0.4em 0.5em;
+  padding: clamp(0.25em, 0.8vh, 0.4em) clamp(0.3em, 0.8vw, 0.5em);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -205,7 +205,7 @@ html, body, #app-wrapper, .main-content {
 .scale-dropdown {
   background: transparent;
   border: none;
-  font-size: 0.95rem;
+  font-size: clamp(0.75rem, 1.5vh, 0.95rem);
   font-family: inherit;
   color: inherit;
   cursor: pointer;
@@ -232,24 +232,25 @@ select.scale-dropdown {
   width: 100%;
   display: flex;
   justify-content: space-between;
-  padding: 0.5em 0.8em;
+  padding: clamp(0.3em, 0.8vh, 0.5em) clamp(0.4em, 1vw, 0.8em);
 }
 
 .timbre-control #waveform-name {
   font-weight: 600;
   text-transform: capitalize;
+  font-size: clamp(0.75rem, 1.5vh, 0.95rem);
 }
 
 .keyboard-button {
   width: 100%;
-  padding: 0.65em 0.8em;
+  padding: clamp(0.35em, 1vh, 0.65em) clamp(0.4em, 1vw, 0.8em);
   background-color: #ffffff;
   color: #111;
-  font-size: 0.95rem;
+  font-size: clamp(0.75rem, 1.6vh, 0.95rem);
   font-weight: 600;
   cursor: pointer;
   text-align: center;
-  border-radius: 8px;
+  border-radius: clamp(5px, 1vmin, 8px);
   border: 1px solid #ddd;
   transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
   box-shadow: 0 2px 4px rgba(0,0,0,0.08);
@@ -270,14 +271,14 @@ select.scale-dropdown {
 
 .share-button {
   width: 100%;
-  padding: 0.65em 0.8em;
+  padding: clamp(0.35em, 1vh, 0.65em) clamp(0.4em, 1vw, 0.8em);
   background-color: #ffffff;
   color: #111;
-  font-size: 0.95rem;
+  font-size: clamp(0.75rem, 1.6vh, 0.95rem);
   font-weight: 600;
   cursor: pointer;
   text-align: center;
-  border-radius: 8px;
+  border-radius: clamp(5px, 1vmin, 8px);
   border: 1px solid #ddd;
   transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
   box-shadow: 0 2px 4px rgba(0,0,0,0.08);
@@ -637,8 +638,8 @@ select.scale-dropdown {
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 9999px;
-  padding: 6px 12px;
-  font-size: 13px;
+  padding: clamp(4px, 0.8vh, 6px) clamp(8px, 1.2vw, 12px);
+  font-size: clamp(11px, 1.8vh, 13px);
   font-weight: 600;
   cursor: pointer;
   margin-bottom: 4px;
@@ -680,17 +681,17 @@ select.scale-dropdown {
 /* When menu is collapsed, display toggle button as a fixed 'Expand' button on the left */
 .menu-hidden .menu-toggle-btn {
   position: fixed;
-  top: 12px;
-  left: 12px;
+  top: clamp(6px, 1.5vh, 12px);
+  left: clamp(6px, 1.5vw, 12px);
   width: auto;
   z-index: 10000;
   background: rgba(255, 255, 255, 0.95);
   color: #111827;
   border: 1px solid rgba(0, 0, 0, 0.15);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 14px;
+  padding: clamp(4px, 1vh, 8px) clamp(8px, 1.5vw, 16px);
+  border-radius: clamp(5px, 1vmin, 8px);
+  font-size: clamp(11px, 1.8vh, 14px);
   pointer-events: auto;
 }
 
@@ -702,9 +703,52 @@ select.scale-dropdown {
 
 @media (max-width: 550px) {
   .controls-bar {
-    width: 230px;
+    width: 220px;
   }
   .menu-hidden .controls-bar {
-    margin-left: -230px;
+    margin-left: -220px;
   }
+}
+
+@media (max-height: 500px) {
+  .controls-bar {
+    gap: 8px;
+    padding: 8px 10px;
+  }
+  .modal-content {
+    margin: 2% auto;
+    padding: 10px;
+  }
+  #simulated-keyboard {
+    padding: 6px;
+    gap: 2px;
+  }
+  .key {
+    padding: 4px;
+    font-size: 0.75rem;
+    min-width: 15px;
+  }
+}
+
+/* --- Shared Tower styles (Melody Tower / Chord Tower) --- */
+
+/* Cell that frames the note-naming toggle button */
+.toggle-cell-border {
+  border: 2px solid #ddd;
+  box-sizing: border-box;
+}
+
+/* Roman-numeral variant of the stepped toggle labels (Chord Tower) */
+.stepped-romans .step {
+  font-size: 0.46em;
+  display: inline-block;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/* Superscript accidentals inside chord names (Chord Tower) */
+.accidental {
+  font-size: 0.75em;
+  position: relative;
+  top: -0.15em;
 }

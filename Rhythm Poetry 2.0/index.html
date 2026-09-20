@@ -6,7 +6,7 @@
   <title>Rhythm &amp; Poetry</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Noto+Serif:wght@700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Noto+Serif:wght@700;900&family=Andika:wght@400;700&family=Atkinson+Hyperlegible:wght@400;700&family=Literata:opsz,wght@7..72,600;7..72,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script>
     try {
@@ -40,10 +40,22 @@
     </button>
   </div>
 
+  <div class="chip-cluster">
+    <!-- Auto-save. Absent in the sandbox (scratch work always keeps
+         itself) and in a lesson (a student's work is always kept). -->
+    <button class="autosave-toggle" id="autosave-toggle" aria-pressed="true" hidden>
+      <svg class="autosave-icon" viewBox="0 0 24 24" aria-hidden="true"></svg>
+      <span class="autosave-label" id="autosave-label">Auto-save</span>
+    </button>
+
   <button class="song-chip" id="song-chip" title="Songs &amp; library">
-    <span class="song-chip-label" id="song-chip-label">Instructions</span>
+    <span class="song-chip-text">
+      <span class="song-chip-kicker" id="song-chip-kicker">Library</span>
+      <span class="song-chip-label" id="song-chip-label">Instructions</span>
+    </span>
     <svg class="song-chip-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
   </button>
+  </div>
 </header>
 
 <!-- ============ LESSON TASK STRIP ============
@@ -235,6 +247,28 @@
       <button class="text-tool" id="zoom-reset-btn">Reset</button>
     </div>
 
+    <div class="popover-title">Text size</div>
+    <div class="zoom-row">
+      <button class="zoom-btn" id="text-smaller-btn" title="Smaller words">−</button>
+      <input type="range" class="zoom-slider" id="text-size-slider" min="60" max="250" step="5" value="100"
+             aria-label="Text size">
+      <button class="zoom-btn" id="text-bigger-btn" title="Bigger words">+</button>
+    </div>
+    <div class="zoom-readout">
+      <span id="text-size-value">100%</span>
+      <button class="text-tool" id="text-size-reset-btn">Reset</button>
+    </div>
+    <p class="popover-note">Only the words and counts change. The beats widen or narrow to make room, so the notes may shift.</p>
+
+    <div class="popover-title">Lyric font</div>
+    <div class="chip-row" id="lyric-font-row" role="group" aria-label="Lyric font">
+      <button class="chip font-chip active" data-font="rounded">Rounded</button>
+      <button class="chip font-chip" data-font="reader">Early reader</button>
+      <button class="chip font-chip" data-font="clear">Big &amp; clear</button>
+      <button class="chip font-chip" data-font="story">Storybook</button>
+    </div>
+    <p class="popover-note" id="lyric-font-note">Friendly and round — the app’s own font.</p>
+
     <div class="popover-title">If a line is too wide</div>
     <div class="seg seg-wide" role="group" aria-label="What happens when a line does not fit">
       <button class="seg-btn active" id="overflow-scroll-btn">Scroll&nbsp;across</button>
@@ -324,6 +358,7 @@
       <span class="now-editing-label">Now editing</span>
       <span class="now-editing-title" id="now-editing-title">Instructions</span>
       <span class="side-badge" id="now-editing-badge">Rhythm</span>
+      <span class="now-editing-note" id="now-editing-note"></span>
     </div>
 
     <div class="sheet-actions">
@@ -331,7 +366,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
         <span id="newSongBtnLabel">New rhythm</span>
       </button>
-      <button class="btn" id="saveAsBtn">Save a copy…</button>
+      <button class="btn" id="saveAsBtn">Save as…</button>
       <button class="btn" id="importExportBtn">Share &amp; backup</button>
       <button class="btn" id="lessonSetupBtn">Set up for students</button>
       <button class="btn" id="copy-visual-btn" title="Download a picture of this song">Save picture</button>

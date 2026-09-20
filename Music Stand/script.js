@@ -1,5 +1,5 @@
 /* ============================================================
-   Poetry Ostinato Player — "the POP"
+   Music Stand
    ------------------------------------------------------------
    A bridge between Rhythm Poetry 2.0 and Ostinato Builder 2.0:
    a poem on one side, an ostinato on the other, one play button.
@@ -7,12 +7,12 @@
    Three ideas carry it:
 
    1. Each side is the real app, in a frame, in an embedded mode
-      (?embed=pop). The app draws its own score and makes its own
+      (?embed=music-stand). The app draws its own score and makes its own
       sounds, so nothing here can drift from what the app shows.
-      The POP talks to each through a small bridge
-      (window.PopBridge) — see README.md for the contract.
+      The Music Stand talks to each through a small bridge
+      (window.MusicStandBridge) — see README.md for the contract.
 
-   2. There is one clock. The POP owns the only AudioContext and
+   2. There is one clock. The Music Stand owns the only AudioContext and
       hands it to both apps, and a single scheduler here sounds
       both sides: events that land together are fired from the
       same timer callback, so they reach the speakers in the same
@@ -25,7 +25,7 @@
       again with each pass of it.
 
    The frames are guests. The apps swap their storage for an
-   in-memory layer when embedded, so nothing the POP does can
+   in-memory layer when embedded, so nothing the Music Stand does can
    change a library or a setting in either app.
    ============================================================ */
 
@@ -57,8 +57,19 @@
   };
 
   const BPM_MIN = 30, BPM_MAX = 260;
-  const SESSION_KEY  = 'pop_session_v1';
-  const PAIRINGS_KEY = 'pop_pairings_v1';
+  const SESSION_KEY  = 'music_stand_session_v1';
+  const PAIRINGS_KEY = 'music_stand_pairings_v1';
+
+  /* This app was the Poetry Ostinato Player ("the POP") and kept its work
+     under pop_*. Carry that over once; the old keys are left in place so
+     nothing is destroyed. */
+  [['pop_session_v1', SESSION_KEY], ['pop_pairings_v1', PAIRINGS_KEY]].forEach(([from, to]) => {
+    try {
+      if (localStorage.getItem(to) === null && localStorage.getItem(from) !== null) {
+        localStorage.setItem(to, localStorage.getItem(from));
+      }
+    } catch (e) {}
+  });
 
   const $ = id => document.getElementById(id);
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -67,7 +78,7 @@
 
   /* ==================================================================
      STATE
-     Everything the POP decides. The songs themselves live in the
+     Everything the Music Stand decides. The songs themselves live in the
      frames; this keeps where each came from and a copy of it, so a
      pairing still opens if the original is later deleted.
      ================================================================== */
@@ -91,6 +102,7 @@
               split: { stacked: 'auto', side: 'auto' } },
     views: {
       poem: { sizeMode: 'page', zoomPct: 100, measuresPerLine: 'auto',
+              textPct: 100, lyricFont: 'rounded',
               showDots: true, showMeasureNumbers: true, followPlayback: true },
       ost:  { layout: 'pages', measuresPerPage: 4, zoomPct: 100, showDots: true,
               lightNotes: true, showSyllables: false, showBarNumbers: true, showBeatNumbers: true }
@@ -162,7 +174,7 @@
   }
 
   /* Whatever was read goes through here, so a hand-edited or old record
-     cannot put the POP into a state it has no controls for. */
+     cannot put the Music Stand into a state it has no controls for. */
   function adoptSettings(src) {
     if (!src || typeof src !== 'object') return;
     if (Number(src.bpm)) state.bpm = clamp(Math.round(Number(src.bpm)), BPM_MIN, BPM_MAX);
@@ -211,7 +223,7 @@
      ================================================================== */
 
   function frameUrl(side) {
-    return encodeURI(APPS[side].url) + '?embed=pop';
+    return encodeURI(APPS[side].url) + '?embed=music-stand';
   }
 
   function bootFrame(side) {
@@ -226,11 +238,11 @@
   function connect(side) {
     const s = sides[side];
     let bridge = null;
-    try { bridge = s.frame.contentWindow.PopBridge || null; } catch (e) { bridge = null; }
+    try { bridge = s.frame.contentWindow.MusicStandBridge || null; } catch (e) { bridge = null; }
 
     if (!bridge || bridge.version !== 1) {
       s.bridge = null;
-      showStatus(side, 'Could not reach ' + APPS[side].name + '. The POP has to be opened from the same '
+      showStatus(side, 'Could not reach ' + APPS[side].name + '. The Music Stand has to be opened from the same '
         + 'website as ' + APPS[side].name + ' — not from a file on this computer.');
       return;
     }
@@ -252,6 +264,10 @@
       if (song) loadInto(side, song, { keepTempo: true, keepMutes: true, quiet: true });
     }
   }
+
+  /* The apps' sandboxes are scratch work kept beside the library, under
+     ids of their own ('sandbox-poetry', 'sandbox-rhythm', 'sandbox'). */
+  function isSandboxId(id) { return typeof id === 'string' && id.indexOf('sandbox') === 0; }
 
   /* A song opened from an app's library is the live one: edited in that
      app in another tab, it is opened again here — straight away when
@@ -331,6 +347,7 @@
 
     s.empty.hidden = true;
     requestAnimationFrame(() => safe(() => s.bridge.refit()));
+    if (side === 'poem') resplitWhenFontsSettle('poem');
 
     refreshHeads();
     renderMixer();
@@ -413,15 +430,15 @@
 
     const titles = SIDES.map(side => state.songs[side] && state.songs[side].title).filter(Boolean);
     $('pair-chip-label').textContent = state.name || (titles.length ? titles.join(' + ') : 'New pairing');
-    document.title = (state.name || titles.join(' + ') || 'Poetry Ostinato Player')
-      + (titles.length || state.name ? ' — POP' : '');
+    document.title = (state.name || titles.join(' + ') || 'Music Stand')
+      + (titles.length || state.name ? ' — Music Stand' : '');
   }
 
 
   /* ==================================================================
      SOUND
      ------------------------------------------------------------------
-     The POP owns the only AudioContext. Each side has its own gain on it
+     The Music Stand owns the only AudioContext. Each side has its own gain on it
      (the mixer's volume), and in front of that a gate that lasts one
      play: the apps connect to the gate in place of the speakers. Notes
      are scheduled a little ahead of time, so on Stop some are already
@@ -430,7 +447,7 @@
 
      The apps' sound code reads `currentTime` once per note and schedules
      everything from that reading. What they are handed is a view of the
-     context whose `currentTime` the POP can set: while a note is being
+     context whose `currentTime` the Music Stand can set: while a note is being
      sounded it reads as the moment the note is due. So a note is placed
      on the audio clock to the sample, not left to when a timer fires —
      without either app, or the shared instrument library, knowing.
@@ -1281,7 +1298,7 @@
   /* ==================================================================
      HOW EACH SCORE IS SHOWN
      Handed straight to the app, which already knows how to do all of
-     it; the POP only remembers the choices, separately from the app's
+     it; the Music Stand only remembers the choices, separately from the app's
      own settings, so a pane can be set up for the room without touching
      how the app looks when it is opened on its own.
      ================================================================== */
@@ -1292,7 +1309,17 @@
     if (b) safe(() => b.setView(patch));
     syncViewPops();
     scheduleSplit();
+    if (side === 'poem' && 'lyricFont' in patch) resplitWhenFontsSettle('poem');
     saveSession();
+  }
+
+  /* A typeface that has not arrived yet is measured in its fallback, and
+     the poem's natural size changes when it does — so once the frame has
+     its fonts, the split is worked out again. */
+  function resplitWhenFontsSettle(side) {
+    const doc = safe(() => sides[side].frame.contentDocument, null);
+    if (!doc || !doc.fonts || !doc.fonts.ready) return;
+    doc.fonts.ready.then(() => setTimeout(scheduleSplit, 80)).catch(() => {});
   }
 
   function syncViewPops() {
@@ -1302,6 +1329,11 @@
     });
     $('rp-zoom').value = String(rp.zoomPct);
     $('rp-zoom-val').textContent = rp.zoomPct + '%';
+    $('rp-text').value = String(rp.textPct);
+    $('rp-text-val').textContent = rp.textPct + '%';
+    document.querySelectorAll('#rp-font [data-font]').forEach(b => {
+      b.classList.toggle('active', b.dataset.font === rp.lyricFont);
+    });
     document.querySelectorAll('#rp-mpl [data-mpl]').forEach(b => {
       b.classList.toggle('active', String(rp.measuresPerLine) === b.dataset.mpl);
     });
@@ -1331,6 +1363,13 @@
   $('rp-zoom').addEventListener('input', e => {
     $('rp-zoom-val').textContent = e.target.value + '%';
     setView('poem', { zoomPct: Number(e.target.value) });
+  });
+  $('rp-text').addEventListener('input', e => {
+    $('rp-text-val').textContent = e.target.value + '%';
+    setView('poem', { textPct: Number(e.target.value) });
+  });
+  document.querySelectorAll('#rp-font [data-font]').forEach(b => {
+    b.addEventListener('click', () => setView('poem', { lyricFont: b.dataset.font }));
   });
   document.querySelectorAll('#rp-mpl [data-mpl]').forEach(b => {
     b.addEventListener('click', () => {
@@ -1526,8 +1565,9 @@
     if (side === 'poem') songs = songs.filter(s => s.kind === picker.filter);
 
     const current = state.songs[side];
-    const mine = songs.filter(s => s.isCustom);
-    const theirs = songs.filter(s => !s.isCustom);
+    const scratch = songs.filter(s => s.sandbox);
+    const mine = songs.filter(s => !s.sandbox && s.isCustom);
+    const theirs = songs.filter(s => !s.sandbox && !s.isCustom);
     const group = (label, items) => {
       if (!items.length) return;
       const h = document.createElement('div');
@@ -1541,12 +1581,14 @@
         }));
       });
     };
+    group('Sandbox — scratch work', scratch);
     group(side === 'poem' ? 'Yours' : 'Your ostinatos', mine);
     group(side === 'poem' ? 'Examples' : 'Starters', theirs);
     if (!songs.length) {
       list.innerHTML = '<div class="list-empty">Nothing here yet.</div>';
     }
-    foot.textContent = 'This is your ' + APPS[side].name + ' library in this browser. Songs are opened, never changed.';
+    foot.textContent = 'This is your ' + APPS[side].name + ' library in this browser. Songs are opened, never changed. '
+      + 'The sandbox is the scratch page from the app itself, and is shown as it is there right now.';
   }
 
   /* ---- a pasted link ---- */
@@ -1580,7 +1622,7 @@
     if (!data || typeof data !== 'object') {
       return { error: 'That link could not be read — it may have been cut short when it was copied.' };
     }
-    if (key === 'pair' || data.pop) return { kind: 'pair', data: data };
+    if (key === 'pair' || data.stand || data.pop) return { kind: 'pair', data: data };
     if (Array.isArray(data.tracks)) return { kind: 'ost', data: data };
     if (data.poetryState || data.rhythmState || Array.isArray(data.words)) return { kind: 'poem', data: data };
     return { error: 'That link opened, but it is not a poem or an ostinato.' };
@@ -1648,7 +1690,7 @@
   /* ==================================================================
      PAIRINGS
      A poem and an ostinato kept together, with the tempo, intro and
-     mixer that suit them. Stored by the POP, apart from both apps.
+     mixer that suit them. Stored by the Music Stand, apart from both apps.
      ================================================================== */
 
   const pairSheet = $('pair-sheet');
@@ -1724,6 +1766,19 @@
     });
   }
 
+  /* A pairing is a saved moment. A sandbox is scratch work that gets
+     cleared and rewritten, so a pairing keeps the copy it had rather than
+     the sandbox's id — which would open whatever the sandbox holds by the
+     time the pairing is next used. The session itself stays live. */
+  function pairingSongs() {
+    const songs = JSON.parse(JSON.stringify(state.songs));
+    SIDES.forEach(side => {
+      const song = songs[side];
+      if (song && isSandboxId(song.id)) { song.src = 'data'; song.id = null; }
+    });
+    return songs;
+  }
+
   function applyPairing(songs, settings) {
     if (isPlaying()) stopPlayback();
     adoptSettings(settings);
@@ -1775,7 +1830,7 @@
     all[id] = {
       title: name,
       savedAt: Date.now(),
-      songs: JSON.parse(JSON.stringify(state.songs)),
+      songs: pairingSongs(),
       settings: settingsRecord()
     };
     if (writeJSON(PAIRINGS_KEY, all)) {
@@ -1807,7 +1862,7 @@
       return;
     }
     const payload = {
-      pop: 1,
+      stand: 1,
       title: $('pair-name').value.trim() || state.name || '',
       poem: state.songs.poem ? state.songs.poem.data : null,
       ost: state.songs.ost ? state.songs.ost.data : null,
@@ -1881,7 +1936,7 @@
   /* ==================================================================
      KEYS
      Also called by the frames, which pass their keys up — Space starts
-     the POP wherever focus happens to be.
+     the Music Stand wherever focus happens to be.
      ================================================================== */
 
   function isSpace(k) { return k.code === 'Space' || k.key === ' ' || k.key === 'Spacebar'; }

@@ -57,6 +57,12 @@
   --dot: 26px;
   --note-h: 84px;
   --word-size: 21px;
+  /* the user's Text size (View popover), applied on top of --word-size.
+     Lyrics and counts only: the layout pass measures the words, so the
+     beats widen or narrow around them and the notes follow. */
+  --text-scale: 1;
+  /* the user's Lyric font (View popover) — words on the staff only */
+  --lyric-font: var(--font);
 }
 
 body[data-side="poetry"] {
@@ -165,6 +171,45 @@ body[data-side="rhythm"] #rhythm-mode-btn.active { color: var(--rhythm); }
 body[data-side="poetry"] #poetry-mode-btn.active { color: var(--poetry); }
 
 /* --- current song --- */
+.chip-cluster {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+/* --- auto-save ---
+   On, it is quiet: this is the ordinary state and it should not shout.
+   Off, it is the one thing on the bar that is not normal, so it says so
+   in the warning ink and keeps a dashed edge, like the sandbox chip. */
+.autosave-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  height: 42px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  background: var(--paper-2);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  color: var(--ink-3);
+  transition: background .15s, color .15s, border-color .15s;
+}
+.autosave-toggle[hidden] { display: none; }
+.autosave-toggle:hover,
+.autosave-toggle:active { background: var(--hairline); color: var(--ink-2); }
+.autosave-icon { width: 15px; height: 15px; flex: none; }
+.autosave-toggle.is-off {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--danger, #C2413B);
+  color: var(--danger, #C2413B);
+}
+
 .song-chip {
   justify-self: end;
   display: inline-flex;
@@ -181,7 +226,22 @@ body[data-side="poetry"] #poetry-mode-btn.active { color: var(--poetry); }
 }
 .song-chip:hover,
 .song-chip:active { background: var(--hairline); }
+.song-chip-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.1; text-align: left; }
 .song-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* where the work is going: Library, Lesson or Sandbox */
+.song-chip-kicker {
+  font-size: 9.5px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+/* the sandbox reads as unfiled: a dashed edge and no fill */
+.song-chip.is-sandbox {
+  background: transparent;
+  border: 1.5px dashed var(--accent);
+  padding: 6.5px 8.5px 6.5px 12.5px;
+  min-height: 42px;
+}
+.song-chip-kicker[hidden] { display: none; }
+.song-chip.is-sandbox .song-chip-label { color: var(--accent); }
 .song-chip-caret { width: 15px; height: 15px; flex: none; color: var(--ink-3); }
 
 
@@ -543,8 +603,8 @@ body.hide-measure-numbers .measure-number { display: none; }
 }
 
 .word {
-  font-family: var(--font);
-  font-size: var(--word-size);
+  font-family: var(--lyric-font);
+  font-size: calc(var(--word-size) * var(--text-scale));
   font-weight: 600;
   line-height: 1.2;
   color: var(--ink);
@@ -591,8 +651,8 @@ body[data-side="rhythm"] .word:active { background: transparent; }
 .word-input {
   width: 100%;
   min-width: 62px;
-  font-family: var(--font);
-  font-size: var(--word-size);
+  font-family: var(--lyric-font);
+  font-size: calc(var(--word-size) * var(--text-scale));
   font-weight: 600;
   text-align: center;
   color: var(--ink);
@@ -1039,6 +1099,13 @@ body[data-side="rhythm"] .poetry-only { display: none; }
 .chip:active { background: var(--hairline); color: var(--ink); }
 .chip.active { background: var(--accent); color: #fff; }
 
+/* lyric font choices: each chip is set in the face it picks */
+.font-chip { height: 38px; font-size: 16px; }
+.font-chip[data-font="rounded"]  { font-family: 'Nunito', sans-serif; }
+.font-chip[data-font="reader"]   { font-family: 'Andika', sans-serif; }
+.font-chip[data-font="clear"]    { font-family: 'Atkinson Hyperlegible', sans-serif; }
+.font-chip[data-font="story"]    { font-family: 'Literata', Georgia, serif; }
+
 /* picture options */
 .inline-check {
   display: flex;
@@ -1292,6 +1359,12 @@ body[data-side="rhythm"] .poetry-only { display: none; }
   min-width: 100px;
 }
 
+.now-editing-note {
+  flex-basis: 100%;
+  font-size: 13px; color: var(--ink-2); line-height: 1.4;
+}
+.now-editing-note[hidden] { display: none; }
+
 .side-badge {
   padding: 4px 10px;
   border-radius: 999px;
@@ -1396,6 +1469,21 @@ body[data-side="rhythm"] .poetry-only { display: none; }
 .lib-action-btn.delete-btn-item:hover,
 .lib-action-btn.delete-btn-item:active { background: var(--danger); color: #fff; }
 
+/* the sandbox group: scratch pages, drawn unfiled */
+.library-group-sandbox .library-group-title,
+.library-group-sandbox .library-group-head svg { color: var(--ink-2); }
+.sandbox-item { border-style: dashed; background: var(--paper); }
+.sandbox-item .side-badge { flex: none; min-width: 78px; text-align: center; box-sizing: border-box; }
+.sandbox-title { display: flex; flex-direction: column; gap: 1px; }
+.sandbox-title > * { overflow: hidden; text-overflow: ellipsis; }
+.sandbox-title small { font-size: 12px; font-weight: 600; color: var(--ink-3); }
+.sandbox-rhythm.active-song { border-style: solid; border-color: var(--rhythm); box-shadow: 0 0 0 3px var(--rhythm-soft); }
+.sandbox-poetry.active-song { border-style: solid; border-color: var(--poetry); box-shadow: 0 0 0 3px var(--poetry-soft); }
+.sandbox-rhythm .lib-action-btn.load-btn { background: var(--rhythm); }
+.sandbox-poetry .lib-action-btn.load-btn { background: var(--poetry); }
+.sandbox-rhythm .lib-action-btn.is-active { color: var(--rhythm); }
+.sandbox-poetry .lib-action-btn.is-active { color: var(--poetry); }
+
 .library-empty {
   padding: 26px;
   text-align: center;
@@ -1469,7 +1557,11 @@ body[data-side="rhythm"] .poetry-only { display: none; }
 .export-song-item:hover,
 .export-song-item:active { background: var(--paper-2); }
 .export-song-item input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; flex: none; }
-.export-song-title { flex: 1; font-size: 14px; font-weight: 600; color: var(--ink); }
+/* the side badge and the name, with room between them */
+.export-song-item-info { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; }
+/* one width for both badges, so the names line up in a column */
+.export-song-item-info .side-badge { flex: none; min-width: 78px; text-align: center; box-sizing: border-box; }
+.export-song-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
 
 .filename-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .filename-row .text-field { flex: 1; }
@@ -1650,6 +1742,10 @@ body.present-mode .word:active { background: transparent; }
   .side-tab-icon { width: 15px; height: 15px; }
 
   .song-chip { max-width: 110px; padding: 7px 8px 7px 11px; font-size: 13px; }
+  .chip-cluster { gap: 5px; }
+  .autosave-toggle { height: 38px; padding: 0 8px; }
+  .autosave-label { display: none; }
+  .song-chip.is-sandbox { padding: 5.5px 6.5px 5.5px 9.5px; }
 
   .stage { padding: 16px 10px 6px; align-items: flex-start; }
 
@@ -2108,7 +2204,7 @@ body.present-mode .task-strip { display: none; }
 .beat-number {
   margin-top: 4px;
   font-family: var(--font-round);
-  font-size: calc(var(--word-size) * 0.72);
+  font-size: calc(var(--word-size) * var(--text-scale) * 0.72);
   font-weight: 700;
   line-height: 1;
   color: var(--ink-3);
@@ -2174,11 +2270,11 @@ body.present-mode .task-strip { display: none; }
 
 
 /* ============================================================
-   EMBEDDED IN THE POP  (?embed=pop)
-   The Poetry Ostinato Player shows this app in a frame as a score
+   EMBEDDED IN THE MUSIC STAND  (?embed=music-stand)
+   The Music Stand shows this app in a frame as a score
    and nothing else. The body carries `present-mode` as well, so
    everything present mode already hides stays hidden; this only
-   removes present mode's own transport, which the POP replaces,
+   removes present mode's own transport, which the Music Stand replaces,
    and gives the pane back the room a projector needed.
    ============================================================ */
 body.embedded .present-bar,

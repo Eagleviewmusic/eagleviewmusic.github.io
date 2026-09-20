@@ -943,7 +943,7 @@ function renderOctaveButton() {
 }
 
 function setupAccidentalButtons() {
-  cellRefs['6d'].style.border = "2px solid #ddd";
+  cellRefs['6d'].classList.add('toggle-cell-border');
   renderToggleButton();
   renderOctaveButton();
 
@@ -1050,6 +1050,8 @@ function updateBoxNames() {
       }
     }
   }
+
+  refitNoteLabels();
 }
 
 function loadSettingsFromURL() {
@@ -1096,6 +1098,12 @@ function hideShareOutput() {
       copyBtn.classList.remove('copied');
     }
   }
+}
+
+function updateKeyDisplay() {
+  const keyNameEl = document.getElementById("key-name");
+  if (!keyNameEl) return;
+  keyNameEl.textContent = getEffectiveKeyName(currentKeyIndex, currentScale);
 }
 
 function createControlsBar() {
@@ -1149,7 +1157,7 @@ function createControlsBar() {
   keyButton.className = 'control-area key-control';
   keyButton.tabIndex = 0;
   keyButton.setAttribute('aria-label', 'Key control');
-  keyButton.innerHTML = '<div class="arrow" id="key-left">&#9664;</div><div id="key-name">C</div><div class="arrow" id="key-right">&#9654;</div>';
+  keyButton.innerHTML = `<div class="arrow" id="key-left">&#9664;</div><div id="key-name">${getEffectiveKeyName(currentKeyIndex, currentScale)}</div><div class="arrow" id="key-right">&#9654;</div>`;
 
   const scaleControl = document.createElement('div');
   scaleControl.className = 'control-area scale-control';
@@ -1178,7 +1186,7 @@ function createControlsBar() {
   waveButton.className = 'control-area timbre-control';
   waveButton.tabIndex = 0;
   waveButton.setAttribute('aria-label', 'Timbre waveform control');
-  waveButton.innerHTML = '<div class="arrow" id="left-arrow">&#9664;</div><div id="waveform-name">triangle</div><div class="arrow" id="right-arrow">&#9654;</div>';
+  waveButton.innerHTML = `<div class="arrow" id="left-arrow">&#9664;</div><div id="waveform-name">${currentWaveform}</div><div class="arrow" id="right-arrow">&#9654;</div>`;
 
   timbreSection.appendChild(timbreTitle);
   timbreSection.appendChild(waveButton);
@@ -1269,7 +1277,7 @@ function setupControlEvents() {
   document.getElementById("key-left").onclick = () => {
     hideShareOutput();
     currentKeyIndex = (currentKeyIndex - 1 + keyNames.length) % keyNames.length;
-    document.getElementById("key-name").textContent = getEffectiveKeyName(currentKeyIndex, currentScale);
+    updateKeyDisplay();
     updateScaleMappings();
     updateSolfegeColors();
     updateBoxNames();
@@ -1279,7 +1287,7 @@ function setupControlEvents() {
   document.getElementById("key-right").onclick = () => {
     hideShareOutput();
     currentKeyIndex = (currentKeyIndex + 1) % keyNames.length;
-    document.getElementById("key-name").textContent = getEffectiveKeyName(currentKeyIndex, currentScale);
+    updateKeyDisplay();
     updateScaleMappings();
     updateSolfegeColors();
     updateBoxNames();
@@ -1295,7 +1303,7 @@ function setupControlEvents() {
     currentScale = scaleKey;
     
     // Update the key name display in case it's an enharmonic key
-    document.getElementById("key-name").textContent = getEffectiveKeyName(currentKeyIndex, currentScale);
+    updateKeyDisplay();
 
     updateScaleMappings();
     updateSolfegeColors();
@@ -1746,26 +1754,45 @@ function setupSimulatedKeyboardEvents() {
     });
 }
 
+// --- Label fitting: shrink long names so they stay inside their box ---
+let baseNoteFontSize = 0;
+const labelMeasureCtx = document.createElement('canvas').getContext('2d');
+
+function fitNoteLabel(div, basePx) {
+  if (!div || !basePx) return;
+  const style = window.getComputedStyle(div);
+  labelMeasureCtx.font = `${style.fontStyle} ${style.fontWeight} ${basePx}px ${style.fontFamily}`;
+  const textWidth = labelMeasureCtx.measureText(div.textContent).width;
+  const maxWidth = div.clientWidth * 0.86;
+  const size = (textWidth > maxWidth && textWidth > 0) ? basePx * (maxWidth / textWidth) : basePx;
+  div.style.fontSize = size + 'px';
+}
+
+function refitNoteLabels() {
+  if (!baseNoteFontSize) return;
+  document.querySelectorAll('#grid .note-button').forEach(div => fitNoteLabel(div, baseNoteFontSize));
+}
+
 function resizeGrid() {
   const gridEl = document.getElementById('grid');
   const gridWrapper = document.querySelector('.proportional-grid-wrapper');
   if (!gridEl || !gridWrapper) return;
   const gwRect = gridWrapper.getBoundingClientRect();
   
-  // Reserve padding margin so 1.30x scaling on outer buttons never gets clipped
-  const horizontalMargin = 16;
-  const verticalMargin = 20;
-  const availableWidth = Math.max(gwRect.width - horizontalMargin * 2, 50);
-  const availableHeight = Math.max(gwRect.height - verticalMargin * 2, 50);
+  // Proportional dynamic margins that scale down smoothly in small frames
+  const horizontalMargin = Math.max(Math.min(gwRect.width * 0.03, 16), 4);
+  const verticalMargin = Math.max(Math.min(gwRect.height * 0.03, 20), 4);
+  const availableWidth = Math.max(gwRect.width - horizontalMargin * 2, 20);
+  const availableHeight = Math.max(gwRect.height - verticalMargin * 2, 20);
   const aspectW = 4;
   const aspectH = 11;
   
-  let gridWidth = availableHeight * (aspectW/aspectH);
+  let gridWidth = availableHeight * (aspectW / aspectH);
   let gridHeight = availableHeight;
   
   if (gridWidth > availableWidth) {
     gridWidth = availableWidth;
-    gridHeight = availableWidth * (aspectH/aspectW);
+    gridHeight = availableWidth * (aspectH / aspectW);
   }
   
   gridEl.style.width = gridWidth + 'px';
@@ -1776,8 +1803,9 @@ function resizeGrid() {
   gridEl.style.marginBottom = "auto";
   
   const fontSize = Math.min(gridHeight / 11, gridWidth / 4) * 0.5;
+  baseNoteFontSize = fontSize;
   gridEl.querySelectorAll('.note-button').forEach(div => {
-    div.style.fontSize = fontSize + 'px';
+    fitNoteLabel(div, fontSize);
   });
   gridEl.querySelectorAll('.cell').forEach(div => {
     div.style.fontSize = fontSize + 'px';
@@ -1785,6 +1813,9 @@ function resizeGrid() {
   
   const toggleBtn = cellRefs['6d'] && cellRefs['6d'].querySelector('.chord-toggle-btn');
   if (toggleBtn) toggleBtn.style.fontSize = fontSize + 'px';
+
+  const octaveBtn = cellRefs['5d'] && cellRefs['5d'].querySelector('.octave-btn');
+  if (octaveBtn) octaveBtn.style.fontSize = fontSize + 'px';
 }
 
 function setupMenuToggle() {
@@ -1853,13 +1884,11 @@ function initialize() {
   setupMenuToggle();
   
   if (window.ResizeObserver) {
-    const gridWrapper = document.querySelector('.proportional-grid-wrapper');
-    if (gridWrapper) {
-      const ro = new ResizeObserver(() => {
-        resizeGrid();
-      });
-      ro.observe(gridWrapper);
-    }
+    const appWrapper = document.getElementById('app-wrapper') || document.body;
+    const ro = new ResizeObserver(() => {
+      resizeGrid();
+    });
+    ro.observe(appWrapper);
   }
 
   window.addEventListener('resize', resizeGrid);
@@ -1887,6 +1916,7 @@ function initialize() {
   });
 
   updateScaleMappings();
+  updateKeyDisplay();
   updateSolfegeColors();
   updateBoxNames();
   updateControlsBarColor();

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Poetry Ostinato Player</title>
+  <title>Music Stand</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -22,8 +22,13 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
   </a>
   <div class="brand">
-    <span class="pop-mark" aria-hidden="true"><span class="p1">P</span><span class="o">O</span><span class="p2">P</span></span>
-    <span class="brand-name">Poetry Ostinato Player</span>
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+      <rect class="sheet-poem" x="3.5" y="3.5" width="12" height="14" rx="2"/>
+      <rect class="sheet-ost" x="16.5" y="3.5" width="12" height="14" rx="2"/>
+      <path class="stand-line" d="M2.5 19.5h27M16 19.5V27M16 27l-7 3.5M16 27l7 3.5"/>
+      <path class="staff-line" d="M6.5 8.5h6M6.5 11h6M6.5 13.5h6M19.5 8.5h6M19.5 11h6M19.5 13.5h6"/>
+    </svg>
+    <span class="brand-name">Music Stand</span>
   </div>
 
   <button class="pair-chip" id="pair-chip" title="Pairings, sharing and starting fresh">
@@ -58,7 +63,7 @@
 <!-- ============================================================
      THE TWO PANES
      Each is the real app, in a frame, showing the score and
-     nothing else. The POP decides their size and order; the app
+     nothing else. The Music Stand decides their size and order; the app
      decides how its own score fits the room it is given.
      ============================================================ -->
 <main class="panes" id="panes" data-arrange="stacked" data-first="poem" data-show="both">
@@ -289,6 +294,16 @@
       <button class="seg-btn" data-rp-size="fit" title="Fill the width and scroll down as it plays">Fill the width</button>
     </div>
     <label class="slider-row"><span>Scale</span><input type="range" min="50" max="160" step="5" id="rp-zoom"><span class="slider-val" id="rp-zoom-val">100%</span></label>
+  </div>
+  <div class="pop-section">
+    <div class="pop-label">Words</div>
+    <label class="slider-row"><span>Text size</span><input type="range" min="60" max="250" step="5" id="rp-text"><span class="slider-val" id="rp-text-val">100%</span></label>
+    <div class="chips" id="rp-font" role="group" aria-label="Lyric font">
+      <button class="chip-btn" data-font="rounded">Rounded</button>
+      <button class="chip-btn" data-font="reader">Early reader</button>
+      <button class="chip-btn" data-font="clear">Big &amp; clear</button>
+      <button class="chip-btn" data-font="story">Storybook</button>
+    </div>
   </div>
   <div class="pop-section">
     <div class="pop-label">Bars on a line</div>

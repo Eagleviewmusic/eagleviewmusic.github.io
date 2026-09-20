@@ -19,8 +19,17 @@
     <span class="app-mark">Ostinato Builder</span>
   </div>
   <div class="topbar-right">
+    <!-- Auto-save. Absent in the sandbox (scratch work always keeps
+         itself) and in a lesson (a student's work is always kept). -->
+    <button class="autosave-toggle" id="autosave-toggle" aria-pressed="true" hidden>
+      <svg class="autosave-icon" viewBox="0 0 24 24" width="15" height="15"></svg>
+      <span class="autosave-label" id="autosave-label">Auto-save</span>
+    </button>
     <button class="chip" id="song-chip" title="Songs &amp; library">
-      <span class="chip-label" id="song-chip-label">Untitled ostinato</span>
+      <span class="chip-text">
+        <span class="chip-kicker" id="song-chip-kicker">Library</span>
+        <span class="chip-label" id="song-chip-label">Untitled ostinato</span>
+      </span>
       <svg viewBox="0 0 24 24" width="16" height="16"><path d="m6 9 6 6 6-6"/></svg>
     </button>
   </div>
@@ -238,6 +247,7 @@
       <div class="now-editing">
         <span class="now-editing-label">Now editing</span>
         <span class="now-editing-title" id="now-editing-title">Untitled ostinato</span>
+        <span class="now-editing-note" id="now-editing-note" hidden></span>
       </div>
       <button class="sheet-close" id="library-close" aria-label="Close">
         <svg viewBox="0 0 24 24" width="20" height="20"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
@@ -249,7 +259,7 @@
         <svg viewBox="0 0 24 24" width="17" height="17"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
         <span>New ostinato</span>
       </button>
-      <button class="btn" id="save-copy-btn">Save a copy…</button>
+      <button class="btn" id="save-copy-btn">Save as…</button>
       <button class="btn" id="share-backup-btn">Share &amp; backup</button>
       <button class="btn" id="lesson-setup-btn" title="Send a link that opens with just the task you set">
         Set up for students…

@@ -130,6 +130,16 @@ svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap
   z-index: 40;
 }
 
+/* The right-hand cluster is a row of its own. Without this the toggle and
+   the chip were plain inline buttons in a block, lined up on a text
+   baseline — which sat the taller chip lower than the toggle. */
+.topbar-right {
+  display: flex;
+  align-items: stretch;      /* the toggle takes the chip's height, whatever it is */
+  gap: 8px;
+  min-width: 0;
+}
+
 .app-mark {
   font-family: var(--font-round);
   font-size: 19px;
@@ -154,7 +164,54 @@ svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap
 }
 .chip:hover,
 .chip:active { background: var(--accent-soft); border-color: var(--accent); }
+/* --- auto-save ---
+   On, it is quiet: this is the ordinary state and should not shout.
+   Off, it is the one thing on the bar that is not normal, so it says so
+   in the warning ink and keeps a dashed edge, like the sandbox chip. */
+.autosave-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  min-height: 38px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  background: var(--paper-2);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-3);
+  transition: background .15s, color .15s, border-color .15s;
+}
+.autosave-toggle[hidden] { display: none; }
+.autosave-toggle:hover,
+.autosave-toggle:active { background: var(--accent-soft); color: var(--accent); }
+.autosave-icon { flex: none; }
+.autosave-toggle.is-off {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.autosave-toggle.is-off:hover,
+.autosave-toggle.is-off:active { background: var(--danger-soft); color: var(--danger); }
+
+.chip-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.1; text-align: left; }
 .chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* where the work is going: Library, Lesson or Sandbox */
+.chip-kicker {
+  font-size: 9.5px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.chip-kicker[hidden] { display: none; }
+/* the sandbox reads as unfiled: a dashed edge and no fill */
+.chip.is-sandbox {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--accent);
+  min-height: 42px;
+}
+.chip.is-sandbox .chip-label { color: var(--accent); }
 .chip svg { flex: none; color: var(--ink-3); }
 
 
@@ -928,11 +985,15 @@ body.show-syllables .track-head { padding-bottom: 28px; }
 
 .beat-repeat-btn:hover .simile-svg,
 .beat-repeat-btn:active .simile-svg,
-.beat-repeat-btn:focus-visible .simile-svg {
+.beat-repeat-btn:focus-visible .simile-svg,
+.measure-repeat-btn:hover .simile-svg,
+.measure-repeat-btn:active .simile-svg,
+.measure-repeat-btn:focus-visible .simile-svg {
   opacity: 1;
   transform: scale(1);
 }
-.beat-repeat-btn:active .simile-svg { transform: scale(.94); }
+.beat-repeat-btn:active .simile-svg,
+.measure-repeat-btn:active .simile-svg { transform: scale(.94); }
 
 /* while the mark is showing, the rest steps aside for it */
 .beat-repeat-btn:hover ~ .rhythm-svg .rest,
@@ -942,6 +1003,25 @@ body.show-syllables .track-head { padding-bottom: 28px; }
   transition: opacity .13s ease;
 }
 .rhythm-svg .rest { transition: opacity .13s ease; }
+
+/* ---- the same mark a bar at a time ----
+   On the bar line between a bar that sounds and a bar that is silent,
+   which is where a copyist writes it. Invisible until the line is
+   hovered; while it shows, the empty bar's rests step aside for it. */
+.measure-repeat-btn {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 38px;          /* a fallback: the real size is set in staff spaces */
+  height: 42px;
+  padding: 0;
+  background: none;
+  border: 0;
+  transform: translate(-50%, -50%);
+  z-index: 7;
+  cursor: pointer;
+}
+.measure.repeat-preview .rhythm-svg .rest { opacity: 0; }
 
 .beat-repeat-btn:disabled,
 .beat-repeat-btn.disabled {
@@ -1090,6 +1170,14 @@ body.show-syllables .track-head { padding-bottom: 28px; }
   text-transform: uppercase;
   color: var(--ink-3);
 }
+.now-editing-note {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.4;
+  white-space: normal;
+  max-width: 340px;
+}
+.now-editing-note[hidden] { display: none; }
 .now-editing-title {
   font-family: var(--font-round);
   font-size: 19px;
@@ -1245,6 +1333,10 @@ body.show-syllables .track-head { padding-bottom: 28px; }
 .library-song:hover,
 .library-song:active { background: var(--paper); }
 .library-song.current { background: var(--accent-soft); }
+
+/* the sandbox row: scratch work, drawn unfiled */
+.sandbox-song { border: 1.5px dashed var(--hairline-2); }
+.sandbox-song.current { border-style: solid; border-color: var(--accent); }
 
 .meter-badge {
   flex: none;
@@ -1450,6 +1542,7 @@ body.present-mode .stage { padding: 26px 0 8px; }
 body.present-mode .subdivision-controls,
 body.present-mode .beat-link-btn,
 body.present-mode .beat-repeat-btn,
+body.present-mode .measure-repeat-btn,
 body.present-mode .track-move,
 body.present-mode .mini-btn.remove { visibility: hidden; }
 
@@ -1661,6 +1754,8 @@ body.present-mode .instrument-btn:active {
   .track-head { gap: 8px; }
   .add-track-btn span { display: none; }
   .add-track-btn { padding: 0 13px; }
+  .autosave-toggle { padding: 0 9px; }
+  .autosave-label { display: none; }
 }
 
 
@@ -2061,11 +2156,11 @@ body.present-mode .task-strip { display: none; }
 
 
 /* ============================================================
-   EMBEDDED IN THE POP  (?embed=pop)
-   The Poetry Ostinato Player shows this app in a frame as a score
+   EMBEDDED IN THE MUSIC STAND  (?embed=music-stand)
+   The Music Stand shows this app in a frame as a score
    and nothing else. The body carries `present-mode` as well, so
    everything present mode already hides stays hidden; this only
-   removes present mode's own transport, which the POP replaces,
+   removes present mode's own transport, which the Music Stand replaces,
    and gives the pane back the room a projector needed.
    ============================================================ */
 body.embedded .present-bar,

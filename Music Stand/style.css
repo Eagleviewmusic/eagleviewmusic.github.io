@@ -1,5 +1,5 @@
 /* ============================================================
-   Poetry Ostinato Player (the POP) — Eagle View Music
+   Music Stand — Eagle View Music
 
    The frame around two apps. Its own colours are deliberately
    neutral: the two panes carry the identities, each in its own
@@ -97,16 +97,13 @@ svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap
 .home-link:hover { background: var(--ground); color: var(--ink); }
 
 .brand { display: flex; align-items: baseline; gap: 10px; flex: none; }
-.pop-mark {
-  font-family: var(--font-round);
-  font-weight: 800;
-  font-size: 27px;
-  letter-spacing: -.5px;
-  line-height: 1;
-}
-.pop-mark .p1 { color: var(--poem); }
-.pop-mark .o  { color: var(--ink); }
-.pop-mark .p2 { color: var(--ost); }
+/* The mark is the two panes on one stand: the poem's sheet in Rhythm
+   Poetry's orange, the ostinato's in Ostinato Builder's indigo. */
+.brand-mark { width: 30px; height: 30px; align-self: center; flex: none; }
+.brand-mark .sheet-poem { fill: var(--poem); }
+.brand-mark .sheet-ost  { fill: var(--ost); }
+.brand-mark .stand-line { fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.brand-mark .staff-line { fill: none; stroke: #fff; stroke-width: 1.1; stroke-linecap: round; opacity: .85; }
 .brand-name {
   font-family: var(--font-round);
   font-weight: 600;
@@ -571,6 +568,7 @@ body.dragging .grip { background: var(--ink-2); transform: scale(1.15); }
 .popover input[type="range"] { width: 100%; accent-color: var(--ink); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.slider-row + .chips { margin-top: 10px; }
 .chip-btn {
   min-width: 40px; height: 32px;
   padding: 0 10px;

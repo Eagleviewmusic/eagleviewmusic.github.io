@@ -23,11 +23,11 @@
    ============================================================ */
 
 /* ==================================================================
-   EMBEDDED IN THE POP
+   EMBEDDED IN THE MUSIC STAND
    ------------------------------------------------------------------
-   The Poetry Ostinato Player opens this app in a frame (?embed=pop) to
+   The Music Stand opens this app in a frame (?embed=music-stand) to
    play an ostinato under a poem. There the app is a guest: it may read
-   its library and settings, but nothing it does may write them. Opening a song in the POP must not change which song is open
+   its library and settings, but nothing it does may write them. Opening a song in the Music Stand must not change which song is open
    the next time this app is opened on its own, let alone overwrite one.
 
    Rather than guard every write (there are a dozen, and the next one
@@ -36,12 +36,12 @@
    It runs before the app, so the app never sees the real object.
 
    Rhythm Poetry 2.0 carries the same block; keep the two in step.
-   See `Poetry Ostinato Player/README.md` for the bridge they serve.
+   See `Music Stand/README.md` for the bridge they serve.
    ================================================================== */
 (function () {
   let embedded = false;
   try {
-    embedded = new URLSearchParams(window.location.search).get('embed') === 'pop'
+    embedded = new URLSearchParams(window.location.search).get('embed') === 'music-stand'
       && window.parent !== window;
   } catch (e) {}
   if (!embedded) return;
@@ -65,11 +65,11 @@
   } catch (e) {}
 
   /* If the swap did not take, this is not a safe guest: run as the plain
-     app, and the POP will find no bridge and say so. */
+     app, and the Music Stand will find no bridge and say so. */
   if (window.localStorage !== layer) return;
-  window.POP_EMBED = {
+  window.MUSIC_STAND_EMBED = {
     /* Drop what this frame wrote for a key, so the next read is the real,
-       current value — the POP's song picker wants the live library. */
+       current value — the Music Stand's song picker wants the live library. */
     forget(k) { writes.delete(String(k)); }
   };
 })();
@@ -77,7 +77,7 @@
 (function () {
   'use strict';
 
-  const EMBEDDED = !!window.POP_EMBED;
+  const EMBEDDED = !!window.MUSIC_STAND_EMBED;
   const RN = window.RhythmNotation;
   const VI = window.VirtualInstruments;
   /* The glyph file declares `const GLYPHS_LELAND` at the top level of a
@@ -429,6 +429,15 @@
   const LIBRARY_KEY   = 'ostinato_builder_library_v1';
   const ACTIVE_ID_KEY = 'ostinato_builder_active_song_v1';
 
+  /* The sandbox: one scratch ostinato for work that is not meant to
+     become anything. It is kept from visit to visit like any other song,
+     but it is not in the library — sortedSongIds() leaves it out, so no
+     list, backup, lesson picker or Music Stand listing ever shows it. Save as…
+     is the only way from here into the library. */
+  const SANDBOX_ID = 'sandbox';
+  const SANDBOX_TITLE = 'Sandbox';
+  function isSandbox(id) { return id === SANDBOX_ID; }
+
   function newSongId() {
     return 'song_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
   }
@@ -511,6 +520,7 @@
   function sortedSongIds(lib) {
     const mine = [], starters = [];
     Object.keys(lib).forEach(id => {
+      if (isSandbox(id)) return;              // scratch work, never a library song
       (DEFAULT_SONGS[id] && !lib[id].isCustom ? starters : mine).push(id);
     });
     mine.sort((a, b) => (lib[b].createdAt || 0) - (lib[a].createdAt || 0));
@@ -548,8 +558,63 @@
     song.tracks = record.tracks;
   }
 
-  function saveCurrentSong() {
+  /* ------------------------------------------------------------------
+     AUTO-SAVE
+
+     A library ostinato is sometimes a thing you are building and
+     sometimes a thing you are taking apart in front of a class. The
+     toggle beside the song chip says which: on, every edit is written
+     to the library as it always was; off, nothing on screen reaches
+     storage until you say so, and the library keeps the version you
+     opened.
+
+     Off when a library ostinato is opened, on for one just made or just
+     saved, and absent where the question does not arise: the sandbox
+     keeps itself, a lesson always keeps a student's work, and the Music Stand
+     is not editing a library.
+     ------------------------------------------------------------------ */
+  let autoSave = true;
+  let savedFingerprint = null;
+
+  /* Key order is not promised anywhere, so a plain stringify would call
+     two identical ostinatos different. */
+  function stableStringify(value) {
+    if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']';
+    if (value && typeof value === 'object') {
+      return '{' + Object.keys(value).sort()
+        .map(k => JSON.stringify(k) + ':' + stableStringify(value[k])).join(',') + '}';
+    }
+    return JSON.stringify(value === undefined ? null : value);
+  }
+
+  function stateFingerprint() {
+    if (!song.id) return null;
+    const snap = snapshot();
+    delete snap.id;
+    delete snap.title;
+    return stableStringify(snap);
+  }
+  function markSaved() { savedFingerprint = stateFingerprint(); }
+
+  function autoSaveOffered() {
+    return !EMBEDDED && !lessonMeta && !!song.id && !isSandbox(song.id);
+  }
+  function autoSaveOn() { return !autoSaveOffered() || autoSave; }
+
+  function hasUnsavedChanges() {
+    if (autoSaveOn() || savedFingerprint === null) return false;
+    return stateFingerprint() !== savedFingerprint;
+  }
+
+  function saveCurrentSong(force) {
     if (!song.id) return;
+    /* Auto-save off: the edit stays on screen and nowhere else. Every
+       save comes through here — the debounce after an edit, the flush on
+       the way out of the page — so this one gate covers the lot.
+       `force === true`, not merely truthy: this function is handed
+       straight to timers and listeners, whose argument would otherwise
+       force a save the user has switched off. */
+    if (force !== true && !autoSaveOn()) return;
     const lib = getStoredLibrary();
     const existing = lib[song.id];
     const record = snapshot();
@@ -557,6 +622,7 @@
     record.createdAt = existing ? existing.createdAt : Date.now();
     lib[song.id] = record;
     saveStoredLibrary(lib);
+    markSaved();
   }
 
   /* Saving on a timer rather than at a dozen call sites: every edit ends
@@ -571,6 +637,52 @@
     clearTimeout(autosaveTimer);
     saveCurrentSong();
   }
+
+  const autoSaveToggle = document.getElementById('autosave-toggle');
+  const autoSaveLabel  = document.getElementById('autosave-label');
+  const ICON_SAVING     = '<path d="M20 6 9 17l-5-5"/>';
+  const ICON_NOT_SAVING = '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>';
+
+  function updateAutoSaveToggle() {
+    if (!autoSaveToggle) return;
+    const offered = autoSaveOffered();
+    autoSaveToggle.hidden = !offered;
+    if (!offered) return;
+    const on = autoSaveOn();
+    autoSaveToggle.classList.toggle('is-off', !on);
+    autoSaveToggle.setAttribute('aria-pressed', String(on));
+    autoSaveToggle.title = on
+      ? 'Auto-save is on: every change is saved to this ostinato. Press to stop saving.'
+      : 'Auto-save is off: your changes are not being saved. Press to save them and start saving again.';
+    if (autoSaveLabel) autoSaveLabel.textContent = on ? 'Auto-save' : 'Not saving';
+    const svg = autoSaveToggle.querySelector('.autosave-icon');
+    if (svg) svg.innerHTML = on ? ICON_SAVING : ICON_NOT_SAVING;
+  }
+
+  /* Turning it back on is the moment to ask about the work done while it
+     was off: save it, or leave it on screen only and stay off. */
+  function setAutoSave(on) {
+    if (!autoSaveOffered()) return;
+    if (on && hasUnsavedChanges()) {
+      const title = song.title || 'this ostinato';
+      const ok = confirm('Save the changes you have made to \u201c' + title + '\u201d?\n\n'
+        + 'OK saves them and turns auto-save on.\n'
+        + 'Cancel leaves auto-save off, and \u201c' + title + '\u201d stays as it was saved.');
+      if (!ok) { updateAutoSaveToggle(); return; }
+      autoSave = true;
+      saveCurrentSong(true);
+      toast('Saved — auto-save on');
+    } else {
+      autoSave = !!on;
+      if (autoSave) markSaved();
+    }
+    updateAutoSaveToggle();
+    renderLibraryList();
+  }
+
+  if (autoSaveToggle) {
+    autoSaveToggle.addEventListener('click', () => setAutoSave(!autoSaveOn()));
+  }
   window.addEventListener('beforeunload', flushAutosave);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushAutosave();
@@ -580,12 +692,17 @@
     try { localStorage.setItem(ACTIVE_ID_KEY, song.id || ''); } catch (e) {}
   }
 
-  function openSong(id) {
+  /* `options.autoSave` is for an ostinato this very moment made or
+     saved — New, Save as…, one that arrived in a link. Opening anything
+     else from the library starts with auto-save off, which is the point
+     of the whole thing. */
+  function openSong(id, options) {
     if (isPlaying) stopPlayback();
     const lib = getStoredLibrary();
     const record = lib[id];
     if (!record) return false;
     adoptSong(normalizeSong(record));
+    autoSave = !!(options && options.autoSave);
     rememberActiveSong();
     afterSongChange();
     return true;
@@ -605,12 +722,78 @@
     render();
     syncSettings();
     applyPolicyToShell();
+    /* After conforming and drawing, so the baseline is the song as it
+       actually sits on screen rather than as it came out of storage. */
+    markSaved();
+    updateAutoSaveToggle();
   }
 
+  /* The chip says where the work is going: into the sandbox, or into a
+     library ostinato (a lesson's exercise, inside a lesson). */
   function updateSongChip() {
-    const title = song.title || 'Untitled ostinato';
+    const sandbox = isSandbox(song.id);
+    const title = sandbox ? SANDBOX_TITLE : (song.title || 'Untitled ostinato');
+    const where = sandbox ? SANDBOX_TITLE : (lessonMeta ? 'Lesson' : 'Library');
     songChipLabel.textContent = title;
-    nowEditingTitle.textContent = title;
+    if (songChip) {
+      songChip.classList.toggle('is-sandbox', sandbox);
+      songChip.title = sandbox
+        ? 'Sandbox — scratch work, not saved to your library'
+        : where + ': ' + title;
+    }
+    // the sandbox needs no second line: the word and the dashed edge say it
+    if (songChipKicker) { songChipKicker.textContent = where; songChipKicker.hidden = sandbox; }
+    updateAutoSaveToggle();
+    nowEditingTitle.textContent = sandbox ? SANDBOX_TITLE : title;
+    if (nowEditingNote) {
+      nowEditingNote.textContent = sandbox
+        ? 'Scratch work. It stays here between visits but is not in your library — use Save as… to keep it there.'
+        : '';
+      nowEditingNote.hidden = !sandbox;
+    }
+  }
+
+  /* A blank page, not an empty one: two tracks waiting for a rhythm are
+     far easier to start from than a bare screen. */
+  function blankTracks() {
+    return [
+      { instrument: 'bass',   beats: [], links: {} },
+      { instrument: 'claves', beats: [], links: {} }
+    ];
+  }
+
+  function freshSandbox() {
+    return normalizeSong({
+      id: SANDBOX_ID,
+      title: SANDBOX_TITLE,
+      bpm: 92,
+      timeSignatureNumerator: 4,
+      timeSignatureDenominator: 4,
+      measures: 1,
+      isCustom: true,
+      createdAt: Date.now(),
+      tracks: blankTracks()
+    });
+  }
+
+  function ensureSandbox() {
+    const lib = getStoredLibrary();
+    if (!lib[SANDBOX_ID]) {
+      lib[SANDBOX_ID] = freshSandbox();
+      saveStoredLibrary(lib);
+    }
+    return SANDBOX_ID;
+  }
+
+  function clearSandbox() {
+    const lib = getStoredLibrary();
+    lib[SANDBOX_ID] = freshSandbox();
+    saveStoredLibrary(lib);
+    if (song.id === SANDBOX_ID) {
+      clearTimeout(autosaveTimer);          // the old one must not be written back
+      adoptSong(normalizeSong(lib[SANDBOX_ID]));
+      afterSongChange();
+    }
   }
 
   function createSong(title) {
@@ -624,17 +807,13 @@
       measures: 1,
       isCustom: true,
       createdAt: Date.now(),
-      /* A blank page, not an empty one: two tracks waiting for a rhythm
-         are far easier to start from than a bare screen. */
-      tracks: [
-        { instrument: 'bass',   beats: [], links: {} },
-        { instrument: 'claves', beats: [], links: {} }
-      ]
+      tracks: blankTracks()
     });
     adoptSong(record);
+    autoSave = true;
     rememberActiveSong();
     afterSongChange();
-    saveCurrentSong();
+    saveCurrentSong(true);
   }
 
   function saveCopy(title) {
@@ -648,6 +827,7 @@
     lib[copy.id] = copy;
     saveStoredLibrary(lib);
     adoptSong(normalizeSong(copy));
+    autoSave = true;
     rememberActiveSong();
     afterSongChange();
     toast('Saved as “' + title + '”');
@@ -660,11 +840,9 @@
     let id = null;
     try { id = localStorage.getItem(ACTIVE_ID_KEY); } catch (e) {}
     if (id && lib[id]) return openSong(id);
-    if (lib[LANDING_SONG]) return openSong(LANDING_SONG);
-    const first = sortedSongIds(lib).all[0];
-    if (first) return openSong(first);
-    createSong('Untitled ostinato');
-    return true;
+    /* Nothing open: the sandbox, not a library ostinato that the first
+       edit would quietly change. */
+    return openSong(ensureSandbox());
   }
 
 
@@ -676,8 +854,8 @@
      sound queued up while it is suspended fires at once on resume.
      ================================================================== */
 
-  /* Replaced when the POP embeds this app: it hands over its own context
-     and a gain for this side (see the POP BRIDGE below). */
+  /* Replaced when the Music Stand embeds this app: it hands over its own context
+     and a gain for this side (see the Music Stand BRIDGE below). */
   let kit = VI.createKit();
   let audioUnlocked = false;
 
@@ -1796,6 +1974,9 @@
 
   /* Notes boxes waiting to be engraved once the grid has been measured. */
   let pendingNotation = [];
+  /* Bar-line simile marks, placed in the same pass: they sit on the
+     notation's own line, which is not known until the grid is measured. */
+  let pendingBarMarks = [];
 
   function icon(path, size) {
     return '<svg viewBox="0 0 24 24" width="' + (size || 15) + '" height="' + (size || 15) + '">'
@@ -1826,6 +2007,7 @@
 
     grid.innerHTML = '';
     pendingNotation = [];
+    pendingBarMarks = [];
     litBeat = -1;
     conformAllTracks();
 
@@ -1936,6 +2118,7 @@
     });
 
     const perMeasure = beatsPerMeasure();
+    const measureEls = [], dividerEls = [];
     for (let m = 0; m < song.measures; m++) {
       const measure = document.createElement('div');
       measure.className = 'measure';
@@ -1944,10 +2127,28 @@
         measure.appendChild(buildBeat(track, beatIndex, groupOf[beatIndex]));
       }
       inner.appendChild(measure);
+      measureEls.push(measure);
 
       const bar = document.createElement('div');
       bar.className = m === song.measures - 1 ? 'final-divider' : 'measure-divider';
       inner.appendChild(bar);
+      dividerEls.push(bar);
+    }
+
+    /* The bar-line marks, once both bars either side of a line exist. */
+    if (rhythmEditable()) {
+      for (let m = 1; m < song.measures; m++) {
+        if (!repeatableMeasure(track, m)) continue;
+        const divider = dividerEls[m - 1];
+        const emptyBar = measureEls[m];
+        const btn = buildMeasureRepeatButton(track, m);
+        btn.addEventListener('mouseenter', () => emptyBar.classList.add('repeat-preview'));
+        btn.addEventListener('mouseleave', () => emptyBar.classList.remove('repeat-preview'));
+        btn.addEventListener('focus', () => emptyBar.classList.add('repeat-preview'));
+        btn.addEventListener('blur', () => emptyBar.classList.remove('repeat-preview'));
+        divider.appendChild(btn);
+        pendingBarMarks.push({ btn: btn, divider: divider, measure: emptyBar });
+      }
     }
 
     row.appendChild(body);
@@ -2302,6 +2503,85 @@
     render();
   }
 
+  /* The same idea a bar at a time. A copyist writes the mark on the bar
+     line when a whole bar repeats, so that is where this one lives: on
+     the line between a bar that says something and a bar that is silent.
+
+     It is offered per instrument, exactly as the beat mark is — each line
+     has its own bar line and answers for its own bar. The rules are the
+     beat mark's rules, read over a whole bar: the bar before must sound,
+     this bar must be empty from end to end, and no run in the bar before
+     may be longer than a join is now allowed to reach. Joins never cross
+     a bar line, so a bar is always safe to copy whole. */
+  function repeatableMeasure(track, measureIndex) {
+    if (measureIndex <= 0 || measureIndex >= song.measures) return false;
+    const per = beatsPerMeasure();
+    const from = (measureIndex - 1) * per;
+    const to = measureIndex * per;
+
+    let sounds = false;
+    for (let b = from; b < from + per; b++) {
+      const beat = track.beats[b];
+      if (!beat) return false;
+      if (beat.cells.some(Boolean)) sounds = true;
+    }
+    if (!sounds) return false;               // a silent bar has nothing to repeat
+
+    for (let b = from; b < from + per; b++) {
+      if (linkGroup(track, b).span > joinCap()) return false;
+    }
+
+    for (let b = to; b < to + per; b++) {
+      const beat = track.beats[b];
+      if (!beat || beat.cells.some(Boolean)) return false;
+    }
+    return true;
+  }
+
+  function duplicateMeasure(track, measureIndex) {
+    if (!rhythmEditable()) return;
+    if (!repeatableMeasure(track, measureIndex)) return;
+    if (!track.links) track.links = {};
+
+    const per = beatsPerMeasure();
+    const from = (measureIndex - 1) * per;
+    const to = measureIndex * per;
+
+    /* Beat by beat, so each keeps its own division, then the joins back
+       on — and only the joins inside the bar, which is all a join can
+       ever be. */
+    for (let k = 0; k < per; k++) {
+      const source = track.beats[from + k];
+      track.beats[to + k] = { slots: source.slots, cells: source.cells.slice() };
+      delete track.links[to + k];
+    }
+    for (let k = 0; k < per - 1; k++) {
+      if (track.links[from + k]) track.links[to + k] = true;
+    }
+
+    auditionTrack(track);
+    if (isPlaying) resyncPlayback();
+    render();
+  }
+
+  /* The mark rides on the bar line itself, hidden until the line is
+     hovered, and the empty bar's rests step aside while it shows — the
+     same trick the beat mark plays with the one rest it stands in for. */
+  function buildMeasureRepeatButton(track, measureIndex) {
+    const what = 'Repeat the bar before this one';
+    const btn = document.createElement('button');
+    btn.className = 'measure-repeat-btn';
+    btn.title = what;
+    btn.setAttribute('aria-label', what);
+    btn.innerHTML = '<svg class="simile-svg" viewBox="' + SIMILE_VIEWBOX + '" '
+                  + 'aria-hidden="true" focusable="false">' + ICON_SIMILE + '</svg>';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      duplicateMeasure(track, measureIndex);
+    });
+    return btn;
+  }
+
   const SPAN_WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
 
   function buildBeatRepeatButton(track, beatIndex, span) {
@@ -2424,6 +2704,14 @@
     return x;
   }
 
+  /* #grid is transform-scaled to fit, so vertical positions are walked
+     the same way as horizontal ones rather than read off a rect. */
+  function absOffsetY(el) {
+    let y = 0;
+    while (el) { y += el.offsetTop; el = el.offsetParent; }
+    return y;
+  }
+
   /* The next beat's box. Joins never cross a bar line, so in practice the
      next box is always the sibling; the step out of the `.measure` element
      is there so this keeps working if a run ever is allowed to. */
@@ -2435,6 +2723,28 @@
     let after = measure && measure.nextElementSibling;
     while (after && !after.classList.contains('measure')) after = after.nextElementSibling;
     return after ? after.querySelector('.group') : null;
+  }
+
+  function placeBarMarks(sizeH, boxH) {
+    if (!pendingBarMarks.length) return;
+    const SS = RN.staffSpace(sizeH);
+    for (const mark of pendingBarMarks) {
+      const box = mark.measure.querySelector('.notes-box');
+      if (!box) continue;
+      /* the line the rests sit on, measured from the bar line's own top */
+      const top = (absOffsetY(box) - absOffsetY(mark.divider)) + boxH - SS * 1.70;
+      mark.btn.style.left = Math.round(mark.divider.offsetWidth / 2) + 'px';
+      mark.btn.style.top = Math.round(top) + 'px';
+      /* sized in staff spaces, like the beat mark, so it grows with the
+         notes; the hit area is wider than the line is thin */
+      mark.btn.style.width = Math.round(SS * 3.6) + 'px';
+      mark.btn.style.height = Math.round(SS * 4.0) + 'px';
+      const svg = mark.btn.firstElementChild;
+      if (svg) {
+        svg.style.width = (SS * 2.6) + 'px';
+        svg.style.height = (SS * 2.86) + 'px';
+      }
+    }
   }
 
   function layoutAndEngrave() {
@@ -2555,6 +2865,8 @@
         }
       }
     }
+
+    placeBarMarks(sizeH, boxH);
   }
 
 
@@ -2645,7 +2957,7 @@
        the last instrument falls off the bottom. Below HEIGHT_FLOOR the
        cure is worse than the illness — ten tracks shrunk to fit a laptop
        would be unreadable — so past that point the stage scrolls instead. */
-    /* Embedded in the POP the pane is sized by the user, beside a poem,
+    /* Embedded in the Music Stand the pane is sized by the user, beside a poem,
        and the whole point is that both stay on screen — so there the
        score shrinks as far as it must rather than scrolling. */
     const HEIGHT_FLOOR = EMBEDDED ? FIT_MIN : 0.55;
@@ -2717,7 +3029,7 @@
   const pageNext  = document.getElementById('page-next');
 
   function updatePager(count, paging) {
-    /* Embedded, the POP turns the pages as it plays; a pager nobody can
+    /* Embedded, the Music Stand turns the pages as it plays; a pager nobody can
        click would only take height from the score. */
     pager.hidden = EMBEDDED || !paging || count < 2;
     pageLabel.textContent = 'Page ' + (currentPage + 1) + ' of ' + count;
@@ -3839,7 +4151,9 @@
      ================================================================== */
 
   const songChip        = document.getElementById('song-chip');
+  const songChipKicker  = document.getElementById('song-chip-kicker');
   const songChipLabel   = document.getElementById('song-chip-label');
+  const nowEditingNote  = document.getElementById('now-editing-note');
   const librarySheet    = document.getElementById('library-sheet');
   const libraryList     = document.getElementById('library-list');
   const nowEditingTitle = document.getElementById('now-editing-title');
@@ -3896,11 +4210,25 @@
     const actions = document.createElement('div');
     actions.className = 'library-song-actions';
 
+    /* With auto-save off, the ostinato on screen and the one in the
+       library are two different things — so the button that would say
+       "Open now" offers the saved one back instead. */
+    const canReopen = isCurrent && !autoSaveOn();
     const open = document.createElement('button');
-    open.className = 'lib-btn' + (isCurrent ? ' is-current' : '');
-    open.textContent = isCurrent ? 'Open now' : 'Open';
-    open.disabled = isCurrent;
-    if (!isCurrent) {
+    open.className = 'lib-btn' + (isCurrent && !canReopen ? ' is-current' : '');
+    open.textContent = canReopen ? 'Reopen' : (isCurrent ? 'Open now' : 'Open');
+    open.disabled = isCurrent && !canReopen;
+    if (canReopen) {
+      open.title = 'Open the saved version again, losing the changes on screen';
+      open.addEventListener('click', () => {
+        if (hasUnsavedChanges() &&
+            !confirm('Reopen \u201c' + record.title + '\u201d as it was saved?\n\n'
+                   + 'The changes you have made since opening it are lost.')) return;
+        openSong(id);
+        closeSheet(librarySheet);
+        toast('Reopened as saved');
+      });
+    } else if (!isCurrent) {
       open.addEventListener('click', () => {
         flushAutosave();
         openSong(id);
@@ -3958,15 +4286,11 @@
       saveStoredLibrary(lib);
 
       /* Deleting what is on screen has to leave something on screen. */
+      /* Deleting what is on screen drops you into the sandbox rather
+         than into some other library ostinato. */
       if (id === song.id) {
-        const next = sortedSongIds(lib).all[0];
-        if (next) {
-          song.id = null;          // so the autosave cannot put it back
-          openSong(next);
-        } else {
-          song.id = null;
-          createSong('Untitled ostinato');
-        }
+        song.id = null;            // so the autosave cannot put it back
+        openSong(ensureSandbox());
       }
       renderLibraryList();
     });
@@ -4000,6 +4324,66 @@
     return section;
   }
 
+  /* The sandbox's own row: no rename, no delete — Clear instead, which
+     hands back the blank page it started as. */
+  function buildSandboxRow() {
+    const lib = getStoredLibrary();
+    const record = lib[SANDBOX_ID] ? normalizeSong(lib[SANDBOX_ID]) : freshSandbox();
+    const isCurrent = song.id === SANDBOX_ID;
+
+    const row = document.createElement('div');
+    row.className = 'library-song sandbox-song' + (isCurrent ? ' current' : '');
+
+    const meter = document.createElement('span');
+    meter.className = 'meter-badge';
+    meter.textContent = record.timeSignatureNumerator + '/' + record.timeSignatureDenominator;
+
+    const middle = document.createElement('div');
+    middle.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:1px';
+    const title = document.createElement('span');
+    title.className = 'library-song-title';
+    title.textContent = SANDBOX_TITLE;
+    const sub = document.createElement('span');
+    sub.className = 'library-song-sub';
+    sub.textContent = 'Scratch work — not in your library';
+    middle.appendChild(title);
+    middle.appendChild(sub);
+
+    const actions = document.createElement('div');
+    actions.className = 'library-song-actions';
+
+    const open = document.createElement('button');
+    open.className = 'lib-btn' + (isCurrent ? ' is-current' : '');
+    open.textContent = isCurrent ? 'Open now' : 'Open';
+    open.disabled = isCurrent;
+    if (!isCurrent) {
+      open.addEventListener('click', () => {
+        flushAutosave();
+        openSong(ensureSandbox());
+        closeSheet(librarySheet);
+        toast('Opened the sandbox');
+      });
+    }
+
+    const clear = document.createElement('button');
+    clear.className = 'lib-btn';
+    clear.textContent = 'Clear';
+    clear.title = 'Start the sandbox over with a blank page';
+    clear.addEventListener('click', () => {
+      if (!confirm('Clear the sandbox and start with a blank page? This cannot be undone.')) return;
+      clearSandbox();
+      renderLibraryList();
+      toast('Sandbox cleared');
+    });
+
+    actions.appendChild(open);
+    actions.appendChild(clear);
+    row.appendChild(meter);
+    row.appendChild(middle);
+    row.appendChild(actions);
+    return row;
+  }
+
   function renderLibraryList() {
     const lib = getStoredLibrary();
     libraryList.innerHTML = '';
@@ -4014,6 +4398,18 @@
         'Nothing came with this lesson.'));
       return;
     }
+
+    /* The sandbox comes first, in a group of its own: it is not a
+       library ostinato, so it is not listed with them. A lesson has no
+       sandbox — there the library is the lesson. */
+    const sandboxSection = document.createElement('section');
+    const sandboxHead = document.createElement('div');
+    sandboxHead.className = 'library-group-head';
+    sandboxHead.innerHTML = '<span class="library-group-title">Sandbox</span>'
+                          + '<span class="library-group-rule"></span>';
+    sandboxSection.appendChild(sandboxHead);
+    sandboxSection.appendChild(buildSandboxRow());
+    libraryList.appendChild(sandboxSection);
 
     const { mine, starters } = sortedSongIds(lib);
     libraryList.appendChild(libraryGroup('Yours', mine, lib,
@@ -4042,12 +4438,16 @@
   function askForTitle(intent) {
     titleIntent = intent;
     const making = intent === 'new';
-    titleHeading.textContent = making ? 'Create a new ostinato' : 'Save a copy';
+    const fromSandbox = !making && isSandbox(song.id);
+    titleHeading.textContent = making ? 'Create a new ostinato'
+      : (fromSandbox ? 'Save to your library' : 'Save as…');
     titleSub.textContent = making
       ? 'Give it a name so you can find it later.'
-      : 'The copy is yours to change; the original is left as it is.';
-    titleConfirm.textContent = making ? 'Create' : 'Save a copy';
-    titleInput.value = making ? '' : (song.title || 'Untitled ostinato') + ' copy';
+      : (fromSandbox
+        ? 'Your sandbox stays as it is. This adds a copy to your library, and you carry on in that copy.'
+        : 'The copy is yours to change; the original is left as it is.');
+    titleConfirm.textContent = making ? 'Create' : (fromSandbox ? 'Save to library' : 'Save');
+    titleInput.value = (making || fromSandbox) ? '' : (song.title || 'Untitled ostinato') + ' copy';
     titleStatus.textContent = '';
     openSheet(titleModal);
     setTimeout(() => { titleInput.focus(); titleInput.select(); }, 40);
@@ -4137,7 +4537,12 @@
   document.getElementById('make-link-btn').addEventListener('click', () => {
     flushAutosave();
     const record = snapshot();
+    const fromSandbox = isSandbox(record.id);
     delete record.id;                 // the receiver files it as their own
+    /* A sandbox travels marked as one, and lands in the receiver's
+       sandbox rather than in their library: scratch work stays scratch
+       work on both ends. */
+    if (fromSandbox) { record.sandbox = true; record.title = SANDBOX_TITLE; }
 
     /* The ten-per-cent version of a lesson, for the eighty-per-cent
        case: no task, no scoped library, none of that machinery — just
@@ -4351,7 +4756,7 @@
     loadLayout();
     song.id = null;
     getStoredLibrary();                   // writes the starters back
-    openSong(LANDING_SONG);
+    openSong(ensureSandbox());
     renderExportList();
     renderLibraryList();
     applyPolicyToShell();
@@ -5668,7 +6073,8 @@
     if (decoded.layout) applyLayoutSnapshot(decoded.layout, !!decoded.layoutLocked);
 
     const record = normalizeSong(decoded);
-    record.id = newSongId();
+    record.id = decoded.sandbox ? SANDBOX_ID : newSongId();
+    if (decoded.sandbox) record.title = SANDBOX_TITLE;
     record.isCustom = true;
     record.createdAt = Date.now();
 
@@ -5677,9 +6083,11 @@
     saveStoredLibrary(lib);
 
     adoptSong(normalizeSong(record));
+    autoSave = true;              // just filed as this person's own
     rememberActiveSong();
     afterSongChange();
-    toast('Added “' + record.title + '” to your library');
+    toast(decoded.sandbox ? 'Opened in your sandbox'
+                          : 'Added “' + record.title + '” to your library');
     return true;
   }
 
@@ -5762,27 +6170,27 @@
 
 
   /* ==================================================================
-     THE POP BRIDGE
+     THE MUSIC STAND BRIDGE
      ------------------------------------------------------------------
-     Embedded in the Poetry Ostinato Player, this app draws the ostinato
-     and makes its sounds, and the POP does everything else: it keeps the
+     Embedded in the Music Stand, this app draws the ostinato
+     and makes its sounds, and the Music Stand does everything else: it keeps the
      one clock both sides play to, owns the tempo and the mutes, and tells
      this frame which beat to light. So the bridge is small — read the
      piece, hand over its timeline, sound one track now, light one beat.
 
-     Nothing here runs outside the POP, and nothing the POP asks for can
+     Nothing here runs outside the Music Stand, and nothing the Music Stand asks for can
      reach this app's own storage (see the block at the top of the file).
-     The contract is written up in `Poetry Ostinato Player/README.md`;
+     The contract is written up in `Music Stand/README.md`;
      Rhythm Poetry 2.0 exposes the same one.
      ================================================================== */
 
   if (EMBEDDED) {
     document.body.classList.add('embedded', 'present-mode');
 
-    /* A guest shows the score and takes no input yet: the POP is a player.
+    /* A guest shows the score and takes no input yet: the Music Stand is a player.
        Everything is stopped at the window, ahead of every handler in the
        app, except scrolling, which the browser does on its own. Keys are
-       passed up, so Space still starts the POP while this frame has focus.
+       passed up, so Space still starts the Music Stand while this frame has focus.
        `bridge.editable` is the switch minimal editing will turn on. */
     const swallow = e => {
       if (bridge.editable) return;
@@ -5821,7 +6229,7 @@
 
     /* The live library, read past anything this frame has written. */
     function liveLibrary() {
-      window.POP_EMBED.forget(LIBRARY_KEY);
+      window.MUSIC_STAND_EMBED.forget(LIBRARY_KEY);
       return getStoredLibrary();
     }
 
@@ -5830,14 +6238,25 @@
       version: 1,
       editable: false,
       onHostKey: null,
-      /* where this app keeps its library, so the POP can tell when a song
+      /* where this app keeps its library, so the Music Stand can tell when a song
          it is showing has been edited in the app in another tab */
       libraryKey: LIBRARY_KEY,
 
+      /* The library, then the sandbox flagged `sandbox: true`. It is not a
+         library song — sortedSongIds() leaves it out on purpose — so the
+         Music Stand is given it separately and shows it as scratch work rather
+         than among the ostinatos. Not offered before it has been made
+         (the app was never opened). */
       listSongs() {
         const lib = liveLibrary();
         const ids = sortedSongIds(lib);
-        return ids.all.map(id => songSummary(id, lib[id], ids.starters.indexOf(id) !== -1));
+        const out = ids.all.map(id => songSummary(id, lib[id], ids.starters.indexOf(id) !== -1));
+        if (lib[SANDBOX_ID]) {
+          const entry = songSummary(SANDBOX_ID, normalizeSong(lib[SANDBOX_ID]), false);
+          entry.sandbox = true;
+          out.unshift(entry);
+        }
+        return out;
       },
 
       openLibrarySong(id) {
@@ -5849,7 +6268,7 @@
       },
 
       /* A piece that is not in the library — from a share link, or kept
-         by the POP. normalizeSong() is the same door every file and link
+         by the Music Stand. normalizeSong() is the same door every file and link
          comes through in the app itself. */
       loadSong(raw) {
         if (!raw || typeof raw !== 'object' || !Array.isArray(raw.tracks)) return null;
@@ -5883,7 +6302,7 @@
       },
 
       /* Every hit in one pass, in ticks from the first beat, muted tracks
-         included — the POP owns the mutes. `gapTicks` is how long until
+         included — the Music Stand owns the mutes. `gapTicks` is how long until
          that track's next hit, which the kit needs to shape fast repeats. */
       timeline() {
         const notes = [];
@@ -5934,7 +6353,7 @@
         render();
       },
 
-      /* What the POP needs to share the room out fairly: one page's size
+      /* What the Music Stand needs to share the room out fairly: one page's size
          at scale 1, the padding around it, and how it scales — pages
          shrink to fit both ways, scrolling across is one fixed size. */
       sizing() {
@@ -5958,7 +6377,7 @@
       refit() { syncHeadColumn(); applyLayout(); }
     };
 
-    window.PopBridge = bridge;
+    window.MusicStandBridge = bridge;
   }
 
 
@@ -5977,7 +6396,7 @@
      last — following a link is a deliberate act, and it files the piece
      in the library on the way in. */
   let openedFromLesson = false;
-  /* Embedded in the POP there is no link to read — the POP sends the song. */
+  /* Embedded in the Music Stand there is no link to read — the Music Stand sends the song. */
   const lessonPayload = EMBEDDED ? null : checkUrlForLesson();
   if (lessonPayload) {
     const landing = openLesson(lessonPayload);

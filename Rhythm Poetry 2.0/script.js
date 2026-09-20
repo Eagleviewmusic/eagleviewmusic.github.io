@@ -1,10 +1,10 @@
 /* ==================================================================
-   EMBEDDED IN THE POP
+   EMBEDDED IN THE MUSIC STAND
    ------------------------------------------------------------------
-   The Poetry Ostinato Player opens this app in a frame (?embed=pop) to
+   The Music Stand opens this app in a frame (?embed=music-stand) to
    show and play a poem beside an ostinato. There the app is a guest: it
    may read its library and settings, but nothing it does may write
-   them. Opening a song in the POP must not change which song is open
+   them. Opening a song in the Music Stand must not change which song is open
    the next time this app is opened on its own, let alone overwrite one.
 
    Rather than guard every write (there are a dozen, and the next one
@@ -13,12 +13,12 @@
    It runs before the app, so the app never sees the real object.
 
    Ostinato Builder 2.0 carries the same block; keep the two in step.
-   See `Poetry Ostinato Player/README.md` for the bridge they serve.
+   See `Music Stand/README.md` for the bridge they serve.
    ================================================================== */
 (function () {
   let embedded = false;
   try {
-    embedded = new URLSearchParams(window.location.search).get('embed') === 'pop'
+    embedded = new URLSearchParams(window.location.search).get('embed') === 'music-stand'
       && window.parent !== window;
   } catch (e) {}
   if (!embedded) return;
@@ -42,18 +42,18 @@
   } catch (e) {}
 
   /* If the swap did not take, this is not a safe guest: run as the plain
-     app, and the POP will find no bridge and say so. */
+     app, and the Music Stand will find no bridge and say so. */
   if (window.localStorage !== layer) return;
-  window.POP_EMBED = {
+  window.MUSIC_STAND_EMBED = {
     /* Drop what this frame wrote for a key, so the next read is the real,
-       current value — the POP's song picker wants the live library. */
+       current value — the Music Stand's song picker wants the live library. */
     forget(k) { writes.delete(String(k)); }
   };
 })();
 
 (function() {
   const container = document.getElementById('poem');
-  const EMBEDDED = !!window.POP_EMBED;
+  const EMBEDDED = !!window.MUSIC_STAND_EMBED;
 
   const DEFAULT_SONGS = {
     'instructions': {
@@ -433,6 +433,16 @@
 
   const DEFAULT_LANDING = { rhythm: 'rhythm-ta-and-ti-ti', poetry: 'instructions' };
 
+  /* The sandbox: one scratch song per side, for work that is not meant to
+     become anything. It persists from visit to visit like every other
+     song, but it is not in the library — getSortedSongIds() leaves it
+     out, so no list, backup, lesson or Music Stand picker ever shows it. The only
+     way into the library is Save as…. It is also where a side with no
+     current song lands. */
+  const SANDBOX_IDS = { rhythm: 'sandbox-rhythm', poetry: 'sandbox-poetry' };
+  const SANDBOX_TITLE = 'Sandbox';
+  function isSandboxId(id) { return id === SANDBOX_IDS.rhythm || id === SANDBOX_IDS.poetry; }
+
   const poetryState = {
     words: DEFAULT_SONGS['instructions'].poetryState.words.slice(),
     rawLyrics: DEFAULT_SONGS['instructions'].poetryState.rawLyrics.slice(),
@@ -494,6 +504,8 @@
   const view = {
     sizeMode: 'fit',
     zoomPct: 100,
+    textPct: 100,       // lyrics and counts only, on top of the staff's size
+    lyricFont: 'rounded',   // a key of LYRIC_FONTS
     overflow: 'scroll',
     measuresPerLine: 'auto',
     showDots: true,
@@ -1184,7 +1196,7 @@
   // Audio context for generating sounds
   let audioContext = null;
   /* Where the sounds go. Left null, that is the speakers; embedded in the
-     POP it is the POP's own gain for this side, on the POP's own context,
+     Music Stand it is its own gain for this side, on its own context,
      so both apps sound on one clock and each side has its own volume. */
   let audioOut = null;
   function audioDestination(ctx) { return audioOut || ctx.destination; }
@@ -1477,7 +1489,7 @@
 
   /* Every voice reads the clock once and starts from that reading, never
      with a bare start(). On its own that is the same thing; embedded in
-     the POP, the clock it reads is the moment the note is due, so the
+     the Music Stand, the clock it reads is the moment the note is due, so the
      note is scheduled to the sample rather than to a timer. */
   function playBrushDrum() {
     if (!beatEnabled) return;
@@ -2729,7 +2741,10 @@
       hideTimer = setTimeout(() => { if (!dragging) wrap.classList.remove('show'); }, 150);
     }
 
-    trigger.addEventListener('mouseenter', show);
+    /* A real mouse only. A smart board or a touch laptop can claim to hover
+       precisely, and then a finger's tap would open the gauge on top of
+       the tap's own action (the typed tempo, for one). */
+    trigger.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') show(); });
     trigger.addEventListener('mouseleave', scheduleHide);
     wrap.addEventListener('mouseenter', () => clearTimeout(hideTimer));
     wrap.addEventListener('mouseleave', scheduleHide);
@@ -2787,7 +2802,9 @@
   const saveAsBtn = document.getElementById('saveAsBtn');
   const libraryBtn = document.getElementById('library-btn');
   const songChip = document.getElementById('song-chip');
+  const songChipKicker = document.getElementById('song-chip-kicker');
   const songChipLabel = document.getElementById('song-chip-label');
+  const nowEditingNote = document.getElementById('now-editing-note');
   const nowEditingTitle = document.getElementById('now-editing-title');
   const nowEditingBadge = document.getElementById('now-editing-badge');
   const importExportBtn = document.getElementById('importExportBtn');
@@ -2832,7 +2849,7 @@
   function effectiveScale(naturalW, availableW, naturalH, availableH) {
     if (view.sizeMode === 'fixed') return view.zoomPct / 100;
     fitScale = Math.min(FIT_MAX, availableW / naturalW);
-    /* 'page' is only ever set by the POP: the whole poem fits its pane
+    /* 'page' is only ever set by the Music Stand: the whole poem fits its pane
        both ways, so it stays on screen beside the ostinato. */
     if (view.sizeMode === 'page' && naturalH > 0 && availableH > 0) {
       fitScale = Math.min(fitScale, availableH / naturalH);
@@ -3004,6 +3021,7 @@
     const defaultIds = [];
 
     allIds.forEach(id => {
+      if (isSandboxId(id)) return;     // scratch work, never a library song
       const song = library[id];
       const isDefault = DEFAULT_SONGS[id] !== undefined && !song.isCustom;
       if (isDefault) {
@@ -3076,9 +3094,65 @@
     return snapshot;
   }
 
-  function saveCurrentSongToLibrary() {
+  /* ------------------------------------------------------------------
+     AUTO-SAVE
+
+     A library song is sometimes a thing you are building, and sometimes
+     a thing you are taking apart to show a class what is inside it. The
+     toggle beside the song chip says which: with it on, every edit is
+     written to the library as it always was; with it off, nothing on
+     screen reaches storage until you say so, and the library keeps the
+     version you opened.
+
+     It is off when a library song is opened, on for a song you have just
+     made or just saved, and it does not appear at all where the question
+     does not arise: the sandbox keeps itself, a lesson always keeps a
+     student's work, and the Music Stand is not editing a library.
+     ------------------------------------------------------------------ */
+  let autoSave = true;
+  let savedFingerprint = null;
+
+  /* Key order is not promised anywhere, so a plain stringify would call
+     two identical songs different. */
+  function stableStringify(value) {
+    if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']';
+    if (value && typeof value === 'object') {
+      return '{' + Object.keys(value).sort()
+        .map(k => JSON.stringify(k) + ':' + stableStringify(value[k])).join(',') + '}';
+    }
+    return JSON.stringify(value === undefined ? null : value);
+  }
+
+  function stateFingerprint() {
+    const id = getCurrentSongId();
+    if (!id) return null;
+    const snap = buildSongSnapshot(id, getCurrentSongTitle() || 'Untitled', currentMode);
+    return stableStringify(currentMode === 'rhythm' ? snap.rhythmState : snap.poetryState);
+  }
+
+  function markSaved() { savedFingerprint = stateFingerprint(); }
+
+  /* Whether the toggle is anyone's business on this song. */
+  function autoSaveOffered() {
+    return !EMBEDDED && !lessonMeta && !isSandboxId(getCurrentSongId()) && !!getCurrentSongId();
+  }
+  function autoSaveOn() { return !autoSaveOffered() || autoSave; }
+
+  function hasUnsavedChanges() {
+    if (autoSaveOn() || savedFingerprint === null) return false;
+    return stateFingerprint() !== savedFingerprint;
+  }
+
+  function saveCurrentSongToLibrary(force) {
     const id = getCurrentSongId();
     if (!id) return;
+    /* Auto-save off: the edit stays on screen and nowhere else. Every
+       save in the app comes through here, so this one gate covers the
+       lot — including the ones on the way out of the page. */
+    /* `force === true`, not merely truthy: this function is handed
+       straight to addEventListener in places, and an Event object would
+       otherwise force a save the user has switched off. */
+    if (force !== true && !autoSaveOn()) return;
     const library = getStoredLibrary();
     const existing = library[id] || {};
 
@@ -3091,20 +3165,92 @@
 
     library[id] = snapshot;
     saveStoredLibrary(library);
+    markSaved();
   }
 
+  const autoSaveToggle = document.getElementById('autosave-toggle');
+  const autoSaveLabel = document.getElementById('autosave-label');
+  const ICON_SAVING = '<path d="M20 6 9 17l-5-5"/>';
+  const ICON_NOT_SAVING = '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>';
+
+  function updateAutoSaveToggle() {
+    if (!autoSaveToggle) return;
+    const offered = autoSaveOffered();
+    autoSaveToggle.hidden = !offered;
+    if (!offered) return;
+    const on = autoSaveOn();
+    autoSaveToggle.classList.toggle('is-off', !on);
+    autoSaveToggle.setAttribute('aria-pressed', String(on));
+    autoSaveToggle.title = on
+      ? 'Auto-save is on: every change is saved to this song. Press to stop saving.'
+      : 'Auto-save is off: your changes are not being saved. Press to save them and start saving again.';
+    if (autoSaveLabel) autoSaveLabel.textContent = on ? 'Auto-save' : 'Not saving';
+    const svg = autoSaveToggle.querySelector('.autosave-icon');
+    if (svg) svg.innerHTML = on ? ICON_SAVING : ICON_NOT_SAVING;
+  }
+
+  /* Turning it back on is the moment to ask about the work done while it
+     was off: save it, or leave it on screen only and stay off. */
+  function setAutoSave(on) {
+    if (!autoSaveOffered()) return;
+    if (on && hasUnsavedChanges()) {
+      const title = getCurrentSongTitle() || 'this song';
+      const ok = confirm('Save the changes you have made to “' + title + '”?\n\n'
+        + 'OK saves them and turns auto-save on.\n'
+        + 'Cancel leaves auto-save off, and “' + title + '” stays as it was saved.');
+      if (!ok) { updateAutoSaveToggle(); return; }
+      autoSave = true;
+      saveCurrentSongToLibrary(true);
+      toast('Saved — auto-save on');
+    } else {
+      autoSave = !!on;
+      if (autoSave) markSaved();
+    }
+    updateAutoSaveToggle();
+    renderLibrarySongList();
+  }
+
+  if (autoSaveToggle) {
+    autoSaveToggle.addEventListener('click', () => setAutoSave(!autoSaveOn()));
+  }
+
+  /* The chip says where your work is going: into the sandbox, or into a
+     library song (a lesson's exercise, inside a lesson). */
   function updateSongChip() {
-    const title = getCurrentSongTitle() || 'Untitled';
+    const sandbox = isSandboxId(getCurrentSongId());
+    const title = sandbox ? SANDBOX_TITLE : (getCurrentSongTitle() || 'Untitled');
+    const where = sandbox ? 'Sandbox' : (lessonMeta ? 'Lesson' : 'Library');
+    if (songChip) {
+      songChip.classList.toggle('is-sandbox', sandbox);
+      songChip.title = sandbox
+        ? 'Sandbox — scratch work, not saved to your library'
+        : `${where}: ${title}`;
+    }
+    // the sandbox needs no second line: the word and the dashed edge say it
+    if (songChipKicker) { songChipKicker.textContent = where; songChipKicker.hidden = sandbox; }
     if (songChipLabel) songChipLabel.textContent = title;
-    if (nowEditingTitle) nowEditingTitle.textContent = title;
+    if (nowEditingTitle) nowEditingTitle.textContent = sandbox
+      ? (currentMode === 'rhythm' ? 'Rhythm sandbox' : 'Poetry sandbox')
+      : title;
+    if (nowEditingNote) {
+      nowEditingNote.textContent = sandbox
+        ? 'Scratch work. It stays here between visits but is not in your library — use Save as… to keep it there.'
+        : '';
+      nowEditingNote.hidden = !sandbox;
+    }
     if (nowEditingBadge) {
       nowEditingBadge.textContent = currentMode === 'rhythm' ? 'Rhythm' : 'Poetry';
       nowEditingBadge.className = 'side-badge ' + (currentMode === 'rhythm' ? 'badge-rhythm' : 'badge-poetry');
     }
     if (newSongBtnLabel) newSongBtnLabel.textContent = currentMode === 'rhythm' ? 'New rhythm' : 'New poem';
+    updateAutoSaveToggle();
   }
 
-  function loadSongById(songId) {
+  /* `options.autoSave` is for a song this very moment made or saved —
+     New, Save as…, a song that arrived in a link. Opening anything else
+     from the library starts with auto-save off, which is the point of
+     the whole thing. */
+  function loadSongById(songId, options) {
     if (isPlaying || isPaused) stopPlayback();
     const library = getStoredLibrary();
     let song = library[songId];
@@ -3171,7 +3317,10 @@
       if (rhythmSystemsDropdown) rhythmSystemsDropdown.value = rhythmState.currentRhythmSystem;
     }
 
+    autoSave = (options && options.autoSave) ? true : false;
     setMode(side);
+    markSaved();
+    updateAutoSaveToggle();
   }
 
   if (rhythmSystemsDropdown) {
@@ -3182,17 +3331,21 @@
     });
   }
 
-  // --- TITLE PROMPT (used for both "new" and "save a copy") ---
+  // --- TITLE PROMPT (used for both "new" and "save as") ---
   function updateNewSongModalTexts() {
     const isRhythm = currentMode === 'rhythm';
     const noun = isRhythm ? 'rhythm' : 'poem';
     const heading = document.getElementById('newSongModalHeading');
     const subtext = document.getElementById('newSongModalSubtext');
 
-    if (titlePromptIntent === 'saveAs') {
-      if (heading) heading.textContent = 'Save a copy';
+    if (titlePromptIntent === 'saveAs' && isSandboxId(getCurrentSongId())) {
+      if (heading) heading.textContent = 'Save to your library';
+      if (subtext) subtext.textContent = `Your sandbox stays as it is. This adds a copy to your library as a new ${noun}, and you carry on in that copy.`;
+      if (confirmNewSongBtn) confirmNewSongBtn.textContent = 'Save to library';
+    } else if (titlePromptIntent === 'saveAs') {
+      if (heading) heading.textContent = 'Save as…';
       if (subtext) subtext.textContent = `This keeps the original and starts a new ${noun} from where you are.`;
-      if (confirmNewSongBtn) confirmNewSongBtn.textContent = 'Save the copy';
+      if (confirmNewSongBtn) confirmNewSongBtn.textContent = 'Save';
     } else {
       if (heading) heading.textContent = isRhythm ? 'Create a new rhythm' : 'Create a new poem';
       if (subtext) subtext.textContent = 'Give it a name so you can find it later.';
@@ -3209,7 +3362,7 @@
     if (!newSongModal) return;
     titlePromptIntent = intent || 'new';
     updateNewSongModalTexts();
-    newSongTitleInput.value = titlePromptIntent === 'saveAs'
+    newSongTitleInput.value = titlePromptIntent === 'saveAs' && !isSandboxId(getCurrentSongId())
       ? `${getCurrentSongTitle() || 'Untitled'} copy`
       : '';
     newSongTitleInput.classList.remove('input-error');
@@ -3293,13 +3446,15 @@
 
     hideNewSongModal();
     closeSheet('library-sheet');
-    loadSongById(id);
+    loadSongById(id, { autoSave: true });
     toast(side === 'rhythm' ? 'New rhythm created' : 'New poem created');
   }
 
   function saveCurrentSongAs(title) {
     const trimmed = (title && title.trim()) ? title.trim() : '';
     if (!trimmed) { rejectEmptyTitle(); return; }
+
+    saveCurrentSongToLibrary();   // the original — or the sandbox — keeps what is on screen
 
     const side = currentMode;
     const id = 'song_' + Date.now();
@@ -3313,7 +3468,7 @@
 
     hideNewSongModal();
     closeSheet('library-sheet');
-    loadSongById(id);
+    loadSongById(id, { autoSave: true });
     toast('Saved as “' + trimmed + '”');
   }
 
@@ -3347,6 +3502,66 @@
     }
   };
 
+  const SANDBOX_ICON = '<path d="M4 20h16"/><path d="M6 20l1.5-6h9L18 20"/><path d="M12 14V4"/><path d="M12 4l5 3-5 3"/>';
+
+  function buildSandboxRow(side) {
+    const id = SANDBOX_IDS[side];
+    const isCurrent = currentSongIds[side] === id;
+    const song = getStoredLibrary()[id];
+    const st = song ? (side === 'rhythm' ? song.rhythmState : song.poetryState) || {} : {};
+
+    const row = document.createElement('div');
+    row.className = 'library-song-item sandbox-item sandbox-' + side + (isCurrent ? ' active-song' : '');
+
+    const badge = document.createElement('span');
+    badge.className = 'side-badge ' + (side === 'rhythm' ? 'badge-rhythm' : 'badge-poetry');
+    badge.textContent = side === 'rhythm' ? 'Rhythm' : 'Poetry';
+
+    const text = document.createElement('span');
+    text.className = 'library-song-title sandbox-title';
+    text.innerHTML = '<span></span><small>Scratch work — not in your library</small>';
+    text.firstChild.textContent = song
+      ? `${st.timeSignatureNumerator || 4}/${st.timeSignatureDenominator || 4} · ${side === 'rhythm' ? 'Rhythm' : 'Poetry'} sandbox`
+      : `${side === 'rhythm' ? 'Rhythm' : 'Poetry'} sandbox`;
+
+    const actions = document.createElement('div');
+    actions.className = 'library-song-actions';
+
+    const openBtn = document.createElement('button');
+    if (isCurrent && side === currentMode) {
+      openBtn.className = 'lib-action-btn is-active';
+      openBtn.textContent = 'Open now';
+      openBtn.disabled = true;
+    } else {
+      openBtn.className = 'lib-action-btn load-btn';
+      openBtn.textContent = 'Open';
+      openBtn.addEventListener('click', () => {
+        saveCurrentSongToLibrary();
+        loadSongById(ensureSandbox(side));
+        hideManageLibraryModal();
+      });
+    }
+
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'lib-action-btn';
+    clearBtn.textContent = 'Clear';
+    clearBtn.title = 'Start this sandbox over with a blank page';
+    clearBtn.addEventListener('click', () => {
+      const name = side === 'rhythm' ? 'rhythm' : 'poetry';
+      if (!confirm(`Clear the ${name} sandbox and start with a blank page? This can’t be undone.`)) return;
+      clearSandbox(side);
+      renderLibrarySongList();
+      toast('Sandbox cleared');
+    });
+
+    actions.appendChild(openBtn);
+    actions.appendChild(clearBtn);
+    row.appendChild(badge);
+    row.appendChild(text);
+    row.appendChild(actions);
+    return row;
+  }
+
   function buildSongRow(id, song, library) {
     const side = songSide(song);
     const isCurrent = id === currentSongIds[side];
@@ -3368,7 +3583,23 @@
     actions.className = 'library-song-actions';
 
     const loadBtn = document.createElement('button');
-    if (isCurrent) {
+    /* With auto-save off, the song on screen and the song in the
+       library are two different things — so the button that would say
+       "Open now" offers the saved one back instead. */
+    const canReopen = isCurrent && side === currentMode && !autoSaveOn();
+    if (canReopen) {
+      loadBtn.className = 'lib-action-btn load-btn';
+      loadBtn.textContent = 'Reopen';
+      loadBtn.title = 'Open the saved version again, losing the changes on screen';
+      loadBtn.addEventListener('click', () => {
+        if (hasUnsavedChanges() &&
+            !confirm('Reopen “' + song.title + '” as it was saved?\n\n'
+                   + 'The changes you have made since opening it are lost.')) return;
+        loadSongById(id);
+        hideManageLibraryModal();
+        toast('Reopened as saved');
+      });
+    } else if (isCurrent) {
       loadBtn.className = 'lib-action-btn is-active';
       loadBtn.textContent = 'Open now';
       loadBtn.disabled = true;
@@ -3430,14 +3661,17 @@
       delete lib[id];
       saveStoredLibrary(lib);
 
+      /* Deleting the song you had open drops you into that side's
+         sandbox rather than into some other library song. */
       if (id === currentSongIds[side]) {
         currentSongIds[side] = null;
         currentSongTitles[side] = '';
-        const remaining = getSongIdsBySide(lib, side);
-        if (remaining.length > 0) {
-          loadSongById(remaining[0]);
+        const next = ensureSongForSide(side);
+        if (side === currentMode) {
+          loadSongById(next);
         } else {
-          ensureSongForSide(side);
+          currentSongIds[side] = next;
+          currentSongTitles[side] = (getStoredLibrary()[next] || {}).title || '';
         }
       }
       persistActiveIds();
@@ -3462,6 +3696,25 @@
 
     // The side you are on is listed first.
     const order = currentMode === 'rhythm' ? ['rhythm', 'poetry'] : ['poetry', 'rhythm'];
+
+    /* The sandboxes come first, in a group of their own: not library
+       songs, so they are not listed with them. A lesson has none — there
+       the library is the lesson. */
+    if (!lessonMeta) {
+      const group = document.createElement('section');
+      group.className = 'library-group library-group-sandbox';
+      const head = document.createElement('div');
+      head.className = 'library-group-head';
+      head.innerHTML =
+        `<svg viewBox="0 0 24 24" aria-hidden="true">${SANDBOX_ICON}</svg>` +
+        `<span class="library-group-title">Sandbox</span>` +
+        `<span class="library-group-rule"></span>`;
+      group.appendChild(head);
+      order.forEach(side => {
+        if (sideAllowed(side)) group.appendChild(buildSandboxRow(side));
+      });
+      librarySongList.appendChild(group);
+    }
 
     order.forEach(side => {
       if (!sideAllowed(side)) return;
@@ -3551,11 +3804,38 @@
 
   const lockLayoutOnShare = document.getElementById('lock-layout-on-share');
 
+  /* A song lives on one side, but a link should hand over what the sender
+     sees on both: the rhythm they were building alongside their poem, or
+     the other way round. The other side's current song rides along as a
+     partner, unless it is a built-in song left exactly as it came — the
+     recipient has that already. */
+  /* From a sandbox, the partner is the other sandbox, whatever that side
+     has open: a sandbox link is both sandboxes as they are right now.
+     Either way a sandbox travels marked as one, so it lands in the
+     recipient's sandbox rather than their library. */
+  function partnerForShare() {
+    const other = currentMode === 'rhythm' ? 'poetry' : 'rhythm';
+    const id = isSandboxId(getCurrentSongId()) ? SANDBOX_IDS[other] : currentSongIds[other];
+    const song = id ? getStoredLibrary()[id] : null;
+    if (!song || songSide(song) !== other) return null;
+    const stateKey = other === 'rhythm' ? 'rhythmState' : 'poetryState';
+    const mine = normalizeSong(song);
+    if (isSandboxId(id)) {
+      return { title: SANDBOX_TITLE, side: other, sandbox: true, [stateKey]: mine[stateKey] };
+    }
+    if (DEFAULT_SONGS[id]) {
+      const stock = normalizeSong(JSON.parse(JSON.stringify(DEFAULT_SONGS[id])));
+      if (JSON.stringify(stock[stateKey]) === JSON.stringify(mine[stateKey])) return null;
+    }
+    return { title: mine.title, side: other, [stateKey]: mine[stateKey] };
+  }
+
   function handleShareCurrentSong() {
     saveCurrentSongToLibrary();
     const songData = buildSongSnapshot(
       'shared', getCurrentSongTitle() || 'Shared Song', currentMode
     );
+    if (isSandboxId(getCurrentSongId())) songData.sandbox = true;
 
     /* The short way to hand out a controlled copy: one song, plus the room
        it was written in, without going near Set up for students. There is
@@ -3565,6 +3845,9 @@
       songData.layout = layoutSnapshot();
       songData.layoutLocked = true;
     }
+
+    const partner = partnerForShare();
+    if (partner) songData.partner = partner;
 
     const link = generateShareLink(songData);
     if (shareLinkInput) shareLinkInput.value = link;
@@ -3882,6 +4165,9 @@
         songSide(library[currentSongIds[side]]) === side) {
       return currentSongIds[side];
     }
+    // Outside a lesson, a side with nothing open opens its sandbox — not
+    // a library song that the first edit would quietly change.
+    if (!lessonMeta) return ensureSandbox(side);
     const landing = DEFAULT_LANDING[side];
     if (library[landing] && songSide(library[landing]) === side) return landing;
 
@@ -3893,6 +4179,33 @@
     library[landing] = seed;
     saveStoredLibrary(library);
     return landing;
+  }
+
+  /* The side's sandbox, made on first use: a blank page, the same one
+     Clear gives back. */
+  function ensureSandbox(side) {
+    const id = SANDBOX_IDS[side];
+    const library = getStoredLibrary();
+    if (!library[id] || songSide(library[id]) !== side) {
+      library[id] = freshSandbox(side);
+      saveStoredLibrary(library);
+    }
+    return id;
+  }
+
+  function freshSandbox(side) {
+    const id = SANDBOX_IDS[side];
+    return normalizeSong({
+      id: id, title: SANDBOX_TITLE, side: side, isCustom: true, createdAt: Date.now(),
+      [side === 'rhythm' ? 'rhythmState' : 'poetryState']: blankStateForSide(side)
+    });
+  }
+
+  function clearSandbox(side) {
+    const library = getStoredLibrary();
+    library[SANDBOX_IDS[side]] = freshSandbox(side);
+    saveStoredLibrary(library);
+    if (currentSongIds[currentMode] === SANDBOX_IDS[side]) loadSongById(SANDBOX_IDS[side]);
   }
 
   function switchSide(side) {
@@ -4008,6 +4321,96 @@
     render();
   }
 
+  /* Text size is the words alone. The staff's size is untouched; the layout
+     pass measures every word, so a bigger word widens its beat and the
+     notes are redrawn on the new dot positions — a full render, always. */
+  const textSmallerBtn = document.getElementById('text-smaller-btn');
+  const textBiggerBtn = document.getElementById('text-bigger-btn');
+  const textSizeSlider = document.getElementById('text-size-slider');
+  const textSizeValue = document.getElementById('text-size-value');
+  const textSizeResetBtn = document.getElementById('text-size-reset-btn');
+  const TEXT_MIN = 60, TEXT_MAX = 250, TEXT_STEP = 10;
+
+  function applyTextSize() {
+    // from storage or the Music Stand, so never trusted to be in range
+    view.textPct = Math.max(TEXT_MIN, Math.min(TEXT_MAX, Math.round(Number(view.textPct)) || 100));
+    document.documentElement.style.setProperty('--text-scale', view.textPct / 100);
+    if (textSizeSlider) textSizeSlider.value = view.textPct;
+    if (textSizeValue) textSizeValue.textContent = `${view.textPct}%`;
+    if (textSmallerBtn) textSmallerBtn.disabled = view.textPct <= TEXT_MIN;
+    if (textBiggerBtn) textBiggerBtn.disabled = view.textPct >= TEXT_MAX;
+  }
+
+  function setTextSize(pct) {
+    const next = Math.max(TEXT_MIN, Math.min(TEXT_MAX, Math.round(pct) || 100));
+    if (next === view.textPct) return;
+    view.textPct = next;
+    saveViewPrefs();
+    applyTextSize();
+    render();
+  }
+
+  if (textSmallerBtn) textSmallerBtn.addEventListener('click', () => setTextSize(view.textPct - TEXT_STEP));
+  if (textBiggerBtn) textBiggerBtn.addEventListener('click', () => setTextSize(view.textPct + TEXT_STEP));
+  if (textSizeResetBtn) textSizeResetBtn.addEventListener('click', () => setTextSize(100));
+  if (textSizeSlider) textSizeSlider.addEventListener('input', () => setTextSize(parseInt(textSizeSlider.value, 10)));
+
+  /* Lyric font: the face of the words on the staff, nothing else. Each is
+     strong in a different way. A face that has not downloaded yet is
+     drawn in its fallback first, so the words are measured again once it
+     arrives — otherwise the beats keep the fallback's widths. */
+  const LYRIC_FONTS = {
+    rounded: { family: "'Nunito', sans-serif",
+               note: 'Friendly and round — the app’s own font.' },
+    reader:  { family: "'Andika', 'Nunito', sans-serif",
+               note: 'Made for beginning readers: the a and g children learn to write, and no letter mistaken for another.' },
+    clear:   { family: "'Atkinson Hyperlegible', 'Nunito', sans-serif",
+               note: 'Built so every letter stays distinct from across the room — good on a projector.' },
+    story:   { family: "'Literata', Georgia, serif",
+               note: 'A storybook serif, for words that should read like a poem on the page.' }
+  };
+  const lyricFontRow = document.getElementById('lyric-font-row');
+  const lyricFontNote = document.getElementById('lyric-font-note');
+
+  function applyLyricFont() {
+    if (!LYRIC_FONTS[view.lyricFont]) view.lyricFont = 'rounded';
+    const font = LYRIC_FONTS[view.lyricFont];
+    document.documentElement.style.setProperty('--lyric-font', font.family);
+    if (lyricFontRow) {
+      lyricFontRow.querySelectorAll('.font-chip').forEach(chip => {
+        chip.classList.toggle('active', chip.dataset.font === view.lyricFont);
+      });
+    }
+    if (lyricFontNote) lyricFontNote.textContent = font.note;
+  }
+
+  /* `after` runs once the words have been measured again — the Music Stand's
+     line-fitting needs the new widths, not the fallback font's. */
+  function relayoutWhenLyricFontLoads(after) {
+    if (!document.fonts || !document.fonts.load) return;
+    const family = LYRIC_FONTS[view.lyricFont].family;
+    const wanted = view.lyricFont;
+    Promise.all(['600', '700'].map(w => document.fonts.load(`${w} 21px ${family}`)))
+      .then(() => {
+        if (view.lyricFont !== wanted) return;
+        render();
+        if (typeof after === 'function') after();
+      })
+      .catch(() => {});
+  }
+
+  if (lyricFontRow) {
+    lyricFontRow.addEventListener('click', (e) => {
+      const chip = e.target.closest('.font-chip');
+      if (!chip || chip.dataset.font === view.lyricFont) return;
+      view.lyricFont = chip.dataset.font;
+      saveViewPrefs();
+      applyLyricFont();
+      render();
+      relayoutWhenLyricFontLoads();
+    });
+  }
+
   if (fitModeBtn) fitModeBtn.addEventListener('click', () => setSizeMode('fit'));
   if (fixedModeBtn) fixedModeBtn.addEventListener('click', () => setSizeMode('fixed'));
 
@@ -4092,6 +4495,8 @@
     syncDotsToggle();
     updateCircleVisibility();
 
+    applyTextSize();
+    applyLyricFont();
     updateZoomReadout();
   }
 
@@ -4193,30 +4598,56 @@
   }
 
   // BPM Control
+  /* The typed tempo. Built to survive a touch screen — a smart board
+     especially — where three things went wrong:
+       - a tap inside the box is also a click on the button around it,
+         which used to throw the box away and open a fresh one;
+       - an on-screen keyboard's Done often hides the keyboard without
+         ever leaving the box, so a tempo applied only on blur never landed;
+       - the hover slider could open under the same tap and fight it.
+     So a number is taken as soon as it is a real tempo, the box closes on
+     Enter, on blur, or on a tap anywhere else, and closing only ever
+     happens once. */
+  let bpmSaveTimer = null;
+
+  function typedTempo(raw) {
+    const n = parseInt(raw, 10);
+    if (isNaN(n) || n <= 20 || n > 600) return null;
+    // A lesson can narrow this to a range; without one it is the 21-600
+    // the field has always accepted.
+    return clampTempo(n);
+  }
+
   if (bpmButton) {
-    bpmButton.addEventListener('click', () => {
+    bpmButton.addEventListener('click', (e) => {
       if (tempoLocked()) return;
+      if (bpmButton.querySelector('.bpm-input')) return;   // already typing
+      const gaugeWrap = document.getElementById('bpm-gauge-wrap');
+      if (gaugeWrap) gaugeWrap.classList.remove('show');
+
       const activeState = getActiveState();
       const currentBPM = activeState.BPM;
       const input = document.createElement('input');
       input.type = 'number';
+      input.inputMode = 'numeric';
+      input.min = String(Math.max(21, tempoMin()));
+      input.max = String(Math.min(600, tempoMax()));
       input.value = currentBPM;
       input.className = 'bpm-input';
-      
+      input.setAttribute('aria-label', 'Tempo in beats per minute');
+
       bpmButton.innerHTML = '';
       bpmButton.appendChild(input);
       input.focus();
       input.select();
 
-      const onUpdate = () => {
-        let newValue = parseInt(input.value, 10);
-        if (isNaN(newValue) || newValue <= 20) newValue = 82;
-        if (newValue > 600) newValue = 600;
-        // A lesson can narrow this to a range; without one it is the
-        // 21-600 the field has always accepted.
-        newValue = clampTempo(newValue);
-
-        activeState.BPM = newValue;
+      let closed = false;
+      const close = (keep) => {
+        if (closed) return;
+        closed = true;
+        document.removeEventListener('pointerdown', onOutside, true);
+        const typed = keep ? typedTempo(input.value) : null;
+        activeState.BPM = typed !== null ? typed : (keep ? activeState.BPM : currentBPM);
         bpmValueSpan.textContent = activeState.BPM;
 
         // rebuild with both spans so the styled unit label survives editing
@@ -4225,16 +4656,30 @@
         bpmButton.appendChild(bpmUnitSpan);
         saveCurrentSongToLibrary();
       };
+      const onOutside = (ev) => { if (ev.target !== input) close(true); };
 
-      input.addEventListener('blur', onUpdate);
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          input.blur();
-        } else if (e.key === 'Escape') {
-          input.value = currentBPM;
-          input.blur();
+      // taken as it is typed, so a keyboard that never leaves the box still sets it
+      input.addEventListener('input', () => {
+        const typed = typedTempo(input.value);
+        if (typed !== null) activeState.BPM = typed;
+      });
+      input.addEventListener('change', () => {
+        const typed = typedTempo(input.value);
+        if (typed !== null) activeState.BPM = typed;
+      });
+      input.addEventListener('blur', () => close(true));
+      input.addEventListener('click', (ev) => ev.stopPropagation());
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.keyCode === 13) {
+          ev.preventDefault();
+          close(true);
+        } else if (ev.key === 'Escape') {
+          ev.preventDefault();
+          close(false);
         }
       });
+      // after this tap has finished, so the tap that opened the box can't close it
+      setTimeout(() => document.addEventListener('pointerdown', onOutside, true), 0);
     });
   }
 
@@ -4252,8 +4697,11 @@
       const bpm = clampTempo(v);
       getActiveState().BPM = bpm;
       if (bpmValueSpan) bpmValueSpan.textContent = bpm;
+      // saved as it moves as well: a touch drag doesn't always end in 'change'
+      clearTimeout(bpmSaveTimer);
+      bpmSaveTimer = setTimeout(saveCurrentSongToLibrary, 250);
     },
-    onChange: () => saveCurrentSongToLibrary()
+    onChange: () => { clearTimeout(bpmSaveTimer); saveCurrentSongToLibrary(); }
   });
 
   // Play button
@@ -4712,9 +5160,23 @@
   }, true);
 
   // Keyboard: space toggles playback, Esc backs out of whatever is open
+  function isTypingPlace(el) {
+    if (!el || !el.tagName) return false;
+    const tag = el.tagName.toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
+  }
+
   document.addEventListener('keydown', (e) => {
-    const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-    const inField = activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select';
+    /* Anything that is being edited keeps Space for itself. Checking only
+       the focused element was not enough: Space in a lyric box moves on to
+       the next word, which redraws the staff and removes that box before
+       the key reaches here — so focus had already fallen to the page, and
+       the next word started the music. The event's own target, a lyric box
+       on screen, an open sheet, and a key a field has already claimed all
+       count as editing too. */
+    const inField = isTypingPlace(e.target) || isTypingPlace(document.activeElement)
+      || !!document.querySelector('.word-input') || e.defaultPrevented
+      || !!document.querySelector('.sheet-backdrop.show');
 
     if (e.key === 'Escape') {
       const openSheetEl = document.querySelector('.sheet-backdrop.show');
@@ -7782,26 +8244,26 @@
 
 
   /* ==================================================================
-     THE POP BRIDGE
+     THE MUSIC STAND BRIDGE
      ------------------------------------------------------------------
-     Embedded in the Poetry Ostinato Player, this app draws the poem and
-     makes its sounds, and the POP does everything else: it keeps the one
+     Embedded in the Music Stand, this app draws the poem and
+     makes its sounds, and the Music Stand does everything else: it keeps the one
      clock both sides play to, owns the tempo and the mutes, and tells
      this frame which beat to light. So the bridge is small — read the
      piece, hand over its timeline, sound one voice now, light one beat.
 
-     Nothing here runs outside the POP, and nothing the POP asks for can
+     Nothing here runs outside the Music Stand, and nothing the Music Stand asks for can
      reach this app's own storage (see the block at the top of the file).
-     The contract is written up in `Poetry Ostinato Player/README.md`;
+     The contract is written up in `Music Stand/README.md`;
      Ostinato Builder 2.0 exposes the same one.
      ================================================================== */
   if (EMBEDDED) {
     document.body.classList.add('embedded', 'present-mode');
 
-    /* A guest shows the score and takes no input yet: the POP is a player.
+    /* A guest shows the score and takes no input yet: the Music Stand is a player.
        Everything is stopped at the window, ahead of every handler in the
        app, except scrolling, which the browser does on its own. Keys are
-       passed up, so Space still starts the POP while this frame has focus.
+       passed up, so Space still starts the Music Stand while this frame has focus.
        `bridge.editable` is the switch minimal editing will turn on. */
     const swallow = e => {
       if (bridge.editable) return;
@@ -7820,13 +8282,13 @@
       }
     }, true);
 
-    const VIEW_KEYS = ['sizeMode', 'zoomPct', 'overflow',
+    const VIEW_KEYS = ['sizeMode', 'zoomPct', 'textPct', 'lyricFont', 'overflow',
                        'showDots', 'showMeasureNumbers', 'followPlayback'];
 
     /* Bars on a line, chosen for the pane. This app's own 'auto' reads the
        width of the screen, which in a pane beside an ostinato is the wrong
        question: a short, wide pane wants long lines, a tall narrow one
-       short lines. When the POP leaves it to us and the whole poem is to
+       short lines. When the Music Stand leaves it to us and the whole poem is to
        fit, each choice is tried on paper — how big would the poem be with
        n bars to a line? — and the biggest wins. The sizes come from the
        poem as it is drawn now, so it costs one extra render at most. */
@@ -7910,7 +8372,7 @@
 
     /* The live library, read past anything this frame has written. */
     function liveLibrary() {
-      window.POP_EMBED.forget(STORAGE_KEY);
+      window.MUSIC_STAND_EMBED.forget(STORAGE_KEY);
       return getStoredLibrary();
     }
 
@@ -7919,13 +8381,27 @@
       version: 1,
       editable: false,
       onHostKey: null,
-      /* where this app keeps its library, so the POP can tell when a song
+      /* where this app keeps its library, so the Music Stand can tell when a song
          it is showing has been edited in the app in another tab */
       libraryKey: STORAGE_KEY,
 
+      /* The library, then the two sandboxes flagged `sandbox: true`. They
+         are not library songs — getSortedSongIds() leaves them out on
+         purpose — so the Music Stand is given them separately and shows them as
+         scratch work rather than among the songs. One that has never been
+         made (the app was never opened) is not offered. */
       listSongs() {
         const lib = liveLibrary();
-        return getSortedSongIds(lib).map(id => songSummary(id, lib[id]));
+        const out = getSortedSongIds(lib).map(id => songSummary(id, lib[id]));
+        ['poetry', 'rhythm'].forEach(side => {
+          const id = SANDBOX_IDS[side];
+          if (!lib[id] || songSide(lib[id]) !== side) return;
+          const entry = songSummary(id, lib[id]);
+          entry.sandbox = true;
+          entry.title = side === 'rhythm' ? 'Rhythm sandbox' : 'Poetry sandbox';
+          out.unshift(entry);
+        });
+        return out;
       },
 
       openLibrarySong(id) {
@@ -7937,13 +8413,13 @@
       },
 
       /* A song that is not in the library — from a share link, or kept
-         by the POP. Filed in this frame's in-memory library under a
+         by the Music Stand. Filed in this frame's in-memory library under a
          throwaway id and opened the ordinary way, so it goes through
          exactly the path a song opened in the app itself does. */
       loadSong(raw) {
         if (!raw || typeof raw !== 'object' ||
             !(raw.poetryState || raw.rhythmState || Array.isArray(raw.words))) return null;
-        const id = 'pop_' + Date.now();
+        const id = 'stand_' + Date.now();
         const lib = getStoredLibrary();
         lib[id] = normalizeSong({
           id: id,
@@ -7970,7 +8446,9 @@
         return {
           app: 'rhythm-poetry',
           kind: currentMode,
-          title: getCurrentSongTitle() || 'Untitled',
+          title: isSandboxId(getCurrentSongId())
+            ? (currentMode === 'rhythm' ? 'Rhythm sandbox' : 'Poetry sandbox')
+            : (getCurrentSongTitle() || 'Untitled'),
           meter: [st.timeSignatureNumerator, st.timeSignatureDenominator],
           bpm: st.BPM,
           beatsPerMeasure: getLayoutConfig().beatsPerMeasure,
@@ -7985,7 +8463,7 @@
       },
 
       /* Every sound in one pass, in ticks from the first beat — read off
-         the same slot maps schedulePlayback() plays from, so the POP hears
+         the same slot maps schedulePlayback() plays from, so the Music Stand hears
          exactly what this app would. The steady beat is a voice like any
          other, one event on every beat. */
       timeline() {
@@ -8019,7 +8497,7 @@
         audioOut = out || null;
       },
 
-      /* Sounds one voice now. `style` is the POP's choice of tone or drum
+      /* Sounds one voice now. `style` is the Music Stand's choice of tone or drum
          for the words — this app's own pitch/drum switch, made from there. */
       sound(voice, opts) {
         const o = opts || {};
@@ -8057,11 +8535,14 @@
         syncViewControls();
         render();
         fitLines();
+        /* A face that has not arrived yet is measured in its fallback, so
+           once it has, the words are measured again and the bars re-fitted. */
+        if (partial.lyricFont !== undefined) relayoutWhenLyricFontLoads(fitLines);
       },
 
-      /* What the POP needs to share the room out fairly: the poem's size
+      /* What the Music Stand needs to share the room out fairly: the poem's size
          at scale 1, the padding around it, and how it scales —
-           'page'  shrinks to fit both ways (the POP's default)
+           'page'  shrinks to fit both ways (the Music Stand's default)
            'fit'   always fills the width, and scrolls down if it must
            'fixed' one size, whatever the room */
       sizing() {
@@ -8076,7 +8557,7 @@
           mode: view.sizeMode === 'fixed' || view.sizeMode === 'fit' ? view.sizeMode : 'page',
           fixedScale: view.zoomPct / 100,
           /* when the bars on a line are ours to choose, every way of
-             setting them, so the POP can weigh them against the ostinato */
+             setting them, so the Music Stand can weigh them against the ostinato */
           layouts: linesAuto && view.sizeMode === 'page' ? lineLayouts() : null
         };
       },
@@ -8084,32 +8565,68 @@
       refit() { render(); }
     };
 
-    window.PopBridge = bridge;
+    window.MusicStandBridge = bridge;
   }
 
   // --- INITIALIZATION ---
   /* A lesson link wins over everything else: it is the reason the page was
      opened at all, and it decides which songs the rest of this can see.
-     Embedded in the POP there is no link to read — the POP sends the song. */
+     Embedded in the Music Stand there is no link to read — the Music Stand sends the song. */
   let songIdToLoad = null;
   const lessonPayload = EMBEDDED ? null : checkUrlForLesson();
   if (lessonPayload) songIdToLoad = openLesson(lessonPayload);
 
   const library = getStoredLibrary();
   const sharedSong = (songIdToLoad || EMBEDDED) ? null : checkUrlForSharedSong();
-  if (sharedSong && (sharedSong.poetryState || sharedSong.rhythmState || sharedSong.words || sharedSong.title)) {
-    const title = (sharedSong.title && sharedSong.title.trim()) ? sharedSong.title.trim() : 'Shared Song';
-    const sharedId = 'shared_' + Date.now();
-    library[sharedId] = normalizeSong({
-      id: sharedId,
-      title: title,
-      side: songSide(sharedSong),
-      isCustom: true,
-      createdAt: Date.now(),
-      poetryState: sharedSong.poetryState,
-      rhythmState: sharedSong.rhythmState,
-      words: sharedSong.words
+
+  // What was open on each side last time.
+  function restoreActiveIds() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(ACTIVE_SONG_ID_KEY) || 'null'); } catch (e) {}
+    if (!saved || typeof saved !== 'object') return;
+    ['rhythm', 'poetry'].forEach(side => {
+      const id = saved[side];
+      if (id && library[id] && songSide(library[id]) === side) {
+        currentSongIds[side] = id;
+        currentSongTitles[side] = library[id].title;
+      }
     });
+  }
+  if (sharedSong && (sharedSong.poetryState || sharedSong.rhythmState || sharedSong.words || sharedSong.title)) {
+    /* Each part lands where it came from: a sandbox into this person's
+       sandbox on that side (it is scratch work — that is what the sandbox
+       is for), a library song into the library as a new song. */
+    restoreActiveIds();   // the side a link doesn't cover stays as it was
+    const fileShared = (song, libraryId) => {
+      const side = songSide(song);
+      const id = song.sandbox ? SANDBOX_IDS[side] : libraryId;
+      library[id] = normalizeSong({
+        id: id,
+        title: song.sandbox ? SANDBOX_TITLE
+          : ((song.title && song.title.trim()) ? song.title.trim() : 'Shared Song'),
+        side: side,
+        isCustom: true,
+        createdAt: Date.now(),
+        poetryState: song.poetryState,
+        rhythmState: song.rhythmState,
+        words: song.words
+      });
+      return id;
+    };
+    const sharedId = fileShared(sharedSong, 'shared_' + Date.now());
+    /* The other side's song, if the sender sent one: filed beside it and
+       made that side's current song, so switching sides finds it. */
+    const partner = sharedSong.partner;
+    const partnerSide = partner ? songSide(partner) : null;
+    if (partner && partnerSide !== songSide(sharedSong) &&
+        (partner.rhythmState || partner.poetryState)) {
+      const partnerId = fileShared(
+        { title: partner.title, side: partnerSide, sandbox: !!partner.sandbox,
+          poetryState: partner.poetryState, rhythmState: partner.rhythmState },
+        'shared_' + Date.now() + '_' + partnerSide);
+      currentSongIds[partnerSide] = partnerId;
+      currentSongTitles[partnerSide] = library[partnerId].title;
+    }
     saveStoredLibrary(library);
     songIdToLoad = sharedId;
     // A song sent with its layout locked carries the sender's settings and
@@ -8119,21 +8636,14 @@
       window.history.replaceState(null, document.title, window.location.pathname);
     } catch (e) {}
   } else if (!songIdToLoad) {
-    let saved = null;
-    try { saved = JSON.parse(localStorage.getItem(ACTIVE_SONG_ID_KEY) || 'null'); } catch (e) {}
-    if (saved && typeof saved === 'object') {
-      ['rhythm', 'poetry'].forEach(side => {
-        const id = saved[side];
-        if (id && library[id] && songSide(library[id]) === side) {
-          currentSongIds[side] = id;
-          currentSongTitles[side] = library[id].title;
-        }
-      });
-    }
+    restoreActiveIds();
     songIdToLoad = currentSongIds.rhythm || ensureSongForSide('rhythm');
   }
 
-  if (songIdToLoad) loadSongById(songIdToLoad);
+  /* A song that arrived in a link has just been filed as this person's
+     own, so it keeps itself from here; anything reopened from the
+     library starts with auto-save off. */
+  if (songIdToLoad) loadSongById(songIdToLoad, { autoSave: !!sharedSong });
   applyPolicyToShell();
 
   if (toggleReplaceBtn) toggleReplaceBtn.classList.add('active');
@@ -8142,6 +8652,7 @@
   syncViewControls();
   updateCircleVisibility();
   render();
+  relayoutWhenLyricFontLoads();
 
   // --- keep the staff fitted as things change ---
   let resizeTimer = null;
@@ -8162,5 +8673,5 @@
   window.addEventListener('load', () => requestAnimationFrame(applyZoom));
 
 
-  window.addEventListener('beforeunload', saveCurrentSongToLibrary);
+  window.addEventListener('beforeunload', () => saveCurrentSongToLibrary());
 })();

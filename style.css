@@ -632,44 +632,6 @@ body {
   background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
 }
 
-/* A category that holds four apps: its card runs down both rows, and
-   the fourth app sits beside it in a wide card under the other three. */
-.group-category-tall {
-  grid-row: span 2;
-}
-
-.app-card-wide {
-  grid-column: 2 / -1;
-  flex-direction: row;
-}
-
-.app-card-wide .app-cover-wrapper {
-  width: 260px;
-  flex: none;
-}
-
-.app-card-wide .app-body {
-  padding: 22px 24px;
-  justify-content: center;
-}
-
-.app-card-wide .app-desc {
-  flex-grow: 0;
-  font-size: 0.92rem;
-  max-width: 62ch;
-}
-
-.app-card-wide .app-card-btn {
-  align-self: flex-start;
-  padding: 9px 22px;
-}
-
-.app-title-short {
-  color: var(--text-muted);
-  font-weight: 600;
-  font-size: 0.9em;
-}
-
 /* =========================================================
    Footer
    ========================================================= */
@@ -732,14 +694,6 @@ body {
   .group-category-card {
     grid-column: 1 / -1;
   }
-
-  .group-category-tall {
-    grid-row: auto;
-  }
-
-  .app-card-wide {
-    grid-column: 1 / -1;
-  }
 }
 
 @media (max-width: 900px) {
@@ -780,22 +734,5 @@ body {
 
   .app-group-grid {
     grid-template-columns: 1fr;
-  }
-
-  /* one column: the wide card becomes an ordinary one */
-  .app-card-wide {
-    flex-direction: column;
-  }
-
-  .app-card-wide .app-cover-wrapper {
-    width: 100%;
-  }
-
-  .app-card-wide .app-body {
-    padding: 16px 14px 18px 14px;
-  }
-
-  .app-card-wide .app-card-btn {
-    align-self: stretch;
   }
 }
