@@ -118,13 +118,13 @@
     views: {
       poem: { sizeMode: 'page', zoomPct: 100, measuresPerLine: 'auto',
               textPct: 100, lyricFont: 'rounded',
-              showDots: true, showMeasureNumbers: true, followPlayback: true },
+              showDots: true, easyMode: false, showMeasureNumbers: true, followPlayback: true },
       /* `Lines` with the number left to the stand: in a pane the whole
          ostinato should be on show — a pane that turns its own pages
          under a stand that is already turning them is one page too many
          — and how many bars to a line is a question about the pane,
          which is the stand's to answer. */
-      ost:  { layout: 'systems', measuresPerPage: 'auto', zoomPct: 100, showDots: true,
+      ost:  { layout: 'systems', measuresPerPage: 'auto', zoomPct: 100, showDots: true, easyMode: false,
               lightNotes: true, showSyllables: false, showBarNumbers: true, showBeatNumbers: true }
     },
     /* { src: 'library' | 'data', id, title, data, edited?, origin? } —
@@ -290,6 +290,9 @@
     forgetShapes();
     bridge.onHostKey = handleKey;
     bridge.onEdit = () => paneEdited(side);
+    /* An instrument picture pressed in the ostinato pane: the same
+       picker the mixer's pictures open. */
+    if (side === 'ost') bridge.onInstrumentPick = voice => openInstrumentSheet(voice, false);
     /* A badge pressed in a pane. Not an edit — the piece is untouched;
        what moved is this stand's mixer, so that is all that is written
        down. The pane has already changed its own badge. */
@@ -1206,7 +1209,7 @@
       if (canSwapInstrument(side)) {
         pic.title = 'Change this instrument';
         pic.setAttribute('aria-label', 'Change ' + voice.label);
-        pic.addEventListener('click', () => openInstrumentSheet(voice.id));
+        pic.addEventListener('click', () => openInstrumentSheet(voice.id, true));
       } else {
         pic.title = voice.label;
       }
@@ -1325,14 +1328,19 @@
      becomes its own copy, and the one in the library is not touched. */
   const instrumentSheet = $('instrument-sheet');
   let pickingVoice = null;
+  let pickedFromMixer = false;
 
-  function openInstrumentSheet(voiceId) {
+  /* From a picture in the mixer, or from the instrument's own picture
+     in the pane (bridge.onInstrumentPick). Only the mixer is put back
+     afterwards — a pane's picture was pressed where the answer shows. */
+  function openInstrumentSheet(voiceId, fromMixer) {
     const b = sides.ost.bridge;
     if (!b || typeof b.instruments !== 'function') return;
     const got = safe(() => b.instruments(voiceId), null);
     if (!got || !got.editable || !got.items || !got.items.length) return;
 
     pickingVoice = voiceId;
+    pickedFromMixer = !!fromMixer;
     const grid = $('instrument-grid');
     grid.innerHTML = '';
     got.items.forEach(item => {
@@ -1362,7 +1370,7 @@
     /* The stand asked for the change, so the pane will not report it —
        nothing in there was reached for. It is still an edit. */
     paneEdited('ost');
-    togglePopover($('mixer-pop'), $('mixer-btn'));
+    if (pickedFromMixer) togglePopover($('mixer-pop'), $('mixer-btn'));
   }
 
   document.querySelectorAll('.pane-mute').forEach(btn => {
@@ -1895,6 +1903,7 @@
     document.querySelectorAll('[data-rp-switch]').forEach(b => {
       b.classList.toggle('on', !!rp[b.dataset.rpSwitch]);
     });
+    syncDotsSeg('poem');
 
     const ob = state.views.ost;
     document.querySelectorAll('[data-ob-layout]').forEach(b => {
@@ -1916,7 +1925,31 @@
     document.querySelectorAll('[data-ob-switch]').forEach(b => {
       b.classList.toggle('on', !!ob[b.dataset.obSwitch]);
     });
+    syncDotsSeg('ost');
   }
+
+  /* The dots above each beat, three ways — the same three the dots
+     button in either app cycles through: none, the ordinary dots, or
+     EASY's one coloured circle per rhythm. Two view keys say it between
+     them, because that is how both apps keep it. */
+  function dotsMode(side) {
+    const v = state.views[side];
+    return !v.showDots ? 'off' : v.easyMode ? 'easy' : 'dots';
+  }
+
+  function syncDotsSeg(side) {
+    const mode = dotsMode(side);
+    document.querySelectorAll('[data-dots-side="' + side + '"]').forEach(b => {
+      b.classList.toggle('active', b.dataset.dots === mode);
+    });
+  }
+
+  document.querySelectorAll('[data-dots-side]').forEach(b => {
+    b.addEventListener('click', () => {
+      const mode = b.dataset.dots;
+      setView(b.dataset.dotsSide, { showDots: mode !== 'off', easyMode: mode === 'easy' });
+    });
+  });
 
   document.querySelectorAll('[data-rp-size]').forEach(b => {
     b.addEventListener('click', () => setView('poem', { sizeMode: b.dataset.rpSize }));

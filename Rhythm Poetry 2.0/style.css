@@ -203,6 +203,32 @@ body[data-side="poetry"] #poetry-mode-btn.active { color: var(--poetry); }
 .autosave-toggle:hover,
 .autosave-toggle:active { background: var(--hairline); color: var(--ink-2); }
 .autosave-icon { width: 15px; height: 15px; flex: none; }
+
+/* The Clear pill beside the chip, shown only in the sandbox. Quiet until
+   reached for, then red, because what it does cannot be undone. */
+.sandbox-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  min-height: 38px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-3);
+  transition: background .15s, color .15s;
+}
+.sandbox-clear[hidden] { display: none; }
+.sandbox-clear svg { flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sandbox-clear:hover,
+.sandbox-clear:active { background: var(--danger-soft); color: var(--danger); }
+@media (max-width: 640px) {
+  .sandbox-clear { padding: 0 9px; }
+  .sandbox-clear-label { display: none; }
+}
+
 .autosave-toggle.is-off {
   background: transparent;
   border-style: dashed;
@@ -442,6 +468,46 @@ body.hide-measure-numbers .measure-number { display: none; }
 }
 
 .circles.linked { border-color: var(--hold); }
+
+/* --- EASY ---
+   The circles stay laid out underneath, unseen, because the notation is
+   placed on their centres; the coloured circles sit over the whole pill.
+   The one that is lit is full colour with a ring round it, the others
+   wait at a third strength. A beat held by a note that began earlier is
+   washed in that note's colour. Ostinato Builder draws the same row. */
+.circles.easy .circle { visibility: hidden; pointer-events: none; }
+.easy-row {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;              /* EASY_GAP */
+  padding: 0 8px;        /* EASY_PAD */
+  border-radius: inherit;
+}
+.easy-row.held { background: color-mix(in srgb, var(--held, var(--hold)) 16%, transparent); }
+.easy-choice {
+  flex: none;
+  width: var(--dot);
+  height: var(--dot);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--c);
+  opacity: .3;
+  cursor: pointer;
+  transition: opacity .13s, transform .13s, box-shadow .13s;
+}
+.easy-choice:hover { opacity: .6; transform: scale(1.12); }
+.easy-choice:active { transform: scale(.94); }
+.easy-choice.on {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--c);
+}
+.circles.frozen .easy-choice { cursor: default; }
+/* a picture taken in EASY shows the ordinary dots, which say the rhythm */
+body.capturing .circles.easy .circle { visibility: visible; }
 
 .circle {
   width: var(--dot);
@@ -2203,6 +2269,60 @@ body.present-mode .task-strip { display: none; }
 .dots-toggle:active { background: var(--hairline); }
 .dots-toggle.active { background: var(--accent-soft); color: var(--accent); }
 
+/* In EASY it reads EASY, a letter in each circle's colour. */
+.dots-toggle .easy-label {
+  display: none;
+  font-family: var(--font-round);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+.dots-toggle.easy { width: auto; min-width: 44px; padding: 0 10px; }
+.dots-toggle.easy svg { display: none; }
+.dots-toggle.easy .easy-label { display: inline; }
+.dots-toggle.easy,
+.dots-toggle.easy:hover,
+.dots-toggle.easy:active { background: #1F2433; }
+.dots-toggle .easy-label b { font-weight: inherit; }
+.dots-toggle .easy-label b:nth-child(1) { color: #FF6B6F; }
+.dots-toggle .easy-label b:nth-child(2) { color: #FFB938; }
+.dots-toggle .easy-label b:nth-child(3) { color: #4CD37F; }
+.dots-toggle .easy-label b:nth-child(4) { color: #5DB2F5; }
+
+/* Layout settings: the list of EASY circles, one row each. */
+.easy-set-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+.easy-set-head .lesson-sub { margin: 0; }
+.easy-count { display: inline-flex; align-items: center; gap: 4px; }
+.easy-count-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--paper-2);
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink-2);
+}
+.easy-count-btn:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); }
+.easy-count-btn:disabled { opacity: .35; cursor: default; }
+.easy-count-value { min-width: 72px; text-align: center; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.easy-set { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.easy-set-row {
+  display: grid;
+  grid-template-columns: 22px 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+.easy-swatch { width: 22px; height: 22px; border-radius: 50%; background: var(--c); }
+.easy-pic { display: flex; align-items: flex-end; justify-content: center; height: 48px; }
+.easy-pic svg { position: static; overflow: visible; }
+.easy-select { width: 100%; min-width: 0; max-width: none; }
+
 /* ---- the count line ----
    Which beat of the measure this is, under the staff where a class reads
    its counting. Deliberately quiet: it is a reference, not part of the
@@ -2319,3 +2439,11 @@ body.embedded.editing .circle:hover,
 body.embedded.editing .circle:active { transform: scale(1.12); }
 body.embedded.editing .word:hover,
 body.embedded.editing .word:active { background: var(--accent-soft); }
+
+/* EASY circles are the stand's to switch on (the pane's View menu) and
+   answer the pointer only while it is editing, like the dots do. */
+body.embedded .easy-choice { cursor: default; }
+body.embedded:not(.editing) .easy-choice:hover,
+body.embedded:not(.editing) .easy-choice:active { transform: none; }
+body.embedded:not(.editing) .easy-choice:not(.on):hover { opacity: .3; }
+body.embedded.editing .easy-choice { cursor: pointer; }

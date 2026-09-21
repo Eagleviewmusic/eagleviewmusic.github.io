@@ -160,6 +160,15 @@ svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap
 .seg-btn.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
 .seg-wide { display: flex; width: 100%; }
 .seg-wide .seg-btn { flex: 1; }
+/* EASY is written the way both apps write it on their dots button:
+   four letters in four of its colours, on dark once it is chosen. */
+.seg-btn.easy-seg { gap: 0; letter-spacing: .04em; }
+.seg-btn.easy-seg b { font-weight: 800; }
+.seg-btn.easy-seg b:nth-child(1) { color: #FF6B6F; }
+.seg-btn.easy-seg b:nth-child(2) { color: #FFB938; }
+.seg-btn.easy-seg b:nth-child(3) { color: #4CD37F; }
+.seg-btn.easy-seg b:nth-child(4) { color: #5DB2F5; }
+.seg-btn.easy-seg.active { background: #1F2433; }
 
 .tool-btn {
   display: flex; align-items: center; gap: 6px;

@@ -179,12 +179,22 @@ this stand later bring pitched instruments with them, and they go here, which is
 why the code asks the library what it holds rather than naming anything.
 
 **The mixer can change an ostinato's instruments.** Tap the picture beside a
-line — in the mixer, or on the track head in the pane while editing — and the
-app's own picker opens, narrowed the way the app would narrow it (a lesson can
+line — in the mixer, or on the track head in the pane, with or without Edit on —
+and the stand's picker opens, showing what the app offers, narrowed the way the app would narrow it (a lesson can
 lock the instruments, and then no picker opens at all). Tapping one plays it and
 takes it. It is an edit like any other made in a pane: the ostinato on the stand
 becomes its own copy, marked **Edited here**, and the one in the library is not
-touched.
+touched. A picture pressed in the pane reaches the stand through
+`onInstrumentPick(voice)`; the pane's swallow guard lets `.instrument-btn:not(.fixed)`
+through for it, the same way it lets the mute badge through.
+
+**EASY mode in the panes.** Each pane's View menu has *Above the beats: None /
+Dots / EASY* — the same three states each app's dots button cycles through. It is
+two view keys, `showDots` and `easyMode`, both in each app's `VIEW_KEYS`, kept per
+pane and never written to the app's prefs. The EASY circles show the lit rhythm
+at all times and only take a tap while Edit is on; a tap writes ordinary
+rhythm data and comes back through `onEdit` like any other edit. The circles
+come from the app's own Layout Settings (`layout.easy`), read from its storage.
 
 **Mutes are the stand's, not the piece's.** The button in the mixer and the badge
 on the instrument in the pane are one switch seen twice, and each moves the other
@@ -219,6 +229,7 @@ it too and adding an entry to `APPS`.
 | `attachAudio(ctx, out)` | use this context and send sound to `out` instead of the speakers |
 | `sound(voice, opts)` | sound one voice **now** (by `ctx.currentTime`). Poem: `{ holdMs, style: 'tone'\|'drum', strength: 1\|2\|3 }`; ostinato: `{ gapMs }` |
 | `setVoiceMuted(voice, muted)` | ostinato only: show that voice muted in the pane. The mute is the Music Stand's, not the piece's — the song is not changed |
+| `onInstrumentPick` | ostinato only: set by the Music Stand; the frame calls it with the voice when an instrument picture in the pane is pressed |
 | `onVoiceMute` | ostinato only: set by the Music Stand; the frame calls it when a mute badge in the pane is pressed. Not an edit |
 | `instruments(voice)` | ostinato only: `{ editable, current, items:[{ id, label, alt, image }] }` — what this piece may be played on, lesson policy included |
 | `setInstrument(voice, id)` | ostinato only: change one line's instrument; returns `info()` or `null`. **This is an edit**, and the Music Stand asked for it, so `onEdit` does not fire — the caller reports it |
@@ -265,8 +276,8 @@ block. Outside the Music Stand none of it runs. Inside it:
   hidden on purpose: Ostinato Builder's track order (the Music Stand's mixer
   is already showing an answer for that) and Rhythm Poetry's line handles
   (the Music Stand chooses the bars per line itself, and would overrule a
-  handle at the next re-fit). Its instrument buttons do answer while editing,
-  because which instrument plays a line is part of the piece.
+  handle at the next re-fit). Its instrument buttons answer whether or not
+  the pane is editing, and open the stand's picker, not the app's.
 - Every edit in both apps ends in `render()`, so that is where the frame tells
   the Music Stand. It only speaks when the pane has been touched since it last
   spoke *and* the piece has actually come out different — `render()` is also

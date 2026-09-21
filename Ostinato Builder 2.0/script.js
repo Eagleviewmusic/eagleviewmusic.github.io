@@ -744,6 +744,8 @@
     }
     // the sandbox needs no second line: the word and the dashed edge say it
     if (songChipKicker) { songChipKicker.textContent = where; songChipKicker.hidden = sandbox; }
+    const clearBtn = document.getElementById('sandbox-clear-btn');
+    if (clearBtn) clearBtn.hidden = !sandbox;
     updateAutoSaveToggle();
     nowEditingTitle.textContent = sandbox ? SANDBOX_TITLE : title;
     if (nowEditingNote) {
@@ -795,6 +797,19 @@
       adoptSong(normalizeSong(lib[SANDBOX_ID]));
       afterSongChange();
     }
+  }
+
+  /* The Clear pill beside the chip: the same clear the sandbox row in
+     the library sheet offers, without opening the sheet. */
+  const sandboxClearBtn = document.getElementById('sandbox-clear-btn');
+  if (sandboxClearBtn) {
+    sandboxClearBtn.addEventListener('click', () => {
+      if (!isSandbox(song.id)) return;
+      if (!confirm('Clear the sandbox and start with a blank page? This cannot be undone.')) return;
+      if (isPlaying) stopPlayback();
+      clearSandbox();
+      toast('Sandbox cleared');
+    });
   }
 
   function createSong(title) {
@@ -1046,6 +1061,9 @@
        the editing layer over the notation, so reading the score means
        putting both away and writing it means bringing both back. */
     showDots: true,
+    /* With the dots showing, whether they are the ordinary dots or the
+       EASY circles. The button beside Play walks both. */
+    easyMode: false,
     showBarNumbers: true,
     showBeatNumbers: true,
 
@@ -1285,9 +1303,78 @@
     return out;
   }
 
+  /* ------------------------------------------------------------------
+     EASY mode's circles.
+
+     Instead of one dot per slot, every beat offers a short row of
+     coloured circles, and each circle writes a whole rhythm in one tap.
+     A child can build something that reads and sounds right without
+     knowing what a subdivision is.
+
+     A choice is a list of beats in the same X/O spelling the starters
+     use. More than one beat means the beats are joined — that is how a
+     half or a whole note gets written — so those circles only appear on
+     beats where the note fits: inside the bar, and starting on a beat
+     the note would normally start on (see easyFits).
+
+     Layout settings picks up to five of these per family, in order; the
+     order is the colour. Rhythm Poetry 2.0 carries the same catalogue
+     under the same ids, so a teacher's choices mean the same thing in
+     both apps.
+     ------------------------------------------------------------------ */
+  const EASY_MAX = 5;
+  const EASY_COLOURS = ['#E5484D', '#F59E0B', '#22A55B', '#2E90D9', '#8E4EC6'];
+
+  const EASY_CHOICES = {
+    simple: [
+      { id: 'q',    name: 'Quarter note',                   beats: ['XO'] },
+      { id: 'ee',   name: 'Two eighths',                    beats: ['XX'] },
+      { id: 'ssss', name: 'Four sixteenths',                beats: ['XXXX'] },
+      { id: 'h',    name: 'Half note',                      beats: ['XO', 'OO'] },
+      { id: 'w',    name: 'Whole note',                     beats: ['XO', 'OO', 'OO', 'OO'] },
+      { id: 'dh',   name: 'Dotted half note',               beats: ['XO', 'OO', 'OO'] },
+      { id: 'qr',   name: 'Quarter rest',                   beats: ['OO'] },
+      { id: 're',   name: 'Eighth rest and eighth',         beats: ['OX'] },
+      { id: 'ess',  name: 'Eighth and two sixteenths',      beats: ['XOXX'] },
+      { id: 'sse',  name: 'Two sixteenths and an eighth',   beats: ['XXXO'] },
+      { id: 'ses',  name: 'Sixteenth, eighth, sixteenth',   beats: ['XXOX'] },
+      { id: 'trip', name: 'Triplet',                        beats: ['XXX'] },
+      { id: 'dqe',  name: 'Dotted quarter and eighth',      beats: ['XO', 'OX'] },
+      { id: 'syn',  name: 'Eighth, quarter, eighth',        beats: ['XX', 'OX'] }
+    ],
+    compound: [
+      { id: 'dq',   name: 'Dotted quarter note',            beats: ['XOO'] },
+      { id: 'eee',  name: 'Three eighths',                  beats: ['XXX'] },
+      { id: 'six',  name: 'Six sixteenths',                 beats: ['XXXXXX'] },
+      { id: 'dh',   name: 'Dotted half note',               beats: ['XOO', 'OOO'] },
+      { id: 'dw',   name: 'Dotted whole note',              beats: ['XOO', 'OOO', 'OOO', 'OOO'] },
+      { id: 'dqr',  name: 'Dotted quarter rest',            beats: ['OOO'] },
+      { id: 'qe',   name: 'Quarter and eighth',             beats: ['XOX'] },
+      { id: 'eq',   name: 'Eighth and quarter',             beats: ['XXO'] },
+      { id: 'ree',  name: 'Eighth rest and two eighths',    beats: ['OXX'] },
+      { id: 'qre',  name: 'Quarter rest and eighth',        beats: ['OOX'] },
+      { id: 'duo',  name: 'Duplet',                         beats: ['XX'] }
+    ]
+  };
+
+  const EASY_DEFAULT = {
+    simple:   ['q', 'ee', 'ssss', 'h', 'w'],
+    compound: ['dq', 'eee', 'qe', 'qre', 'dh']
+  };
+
+  /* The compound set as it first shipped. A layout still holding exactly
+     that was never chosen by anyone, so it moves to the default above. */
+  const EASY_FIRST_COMPOUND = ['dq', 'eee', 'six', 'dh', 'dw'];
+
+  function easyChoice(fam, id) {
+    return EASY_CHOICES[fam].find(c => c.id === id) || null;
+  }
+
   function blankLayout() {
     return {
       v: 1,
+      /* The EASY circles, per family, in order. Always one to five. */
+      easy: { simple: EASY_DEFAULT.simple.slice(), compound: EASY_DEFAULT.compound.slice() },
       meters: { simple: METERS.simple.slice(), compound: METERS.compound.slice() },
       divide: { sixteenths: true, tuplets: true, subTuplets: true },
       /* {} for a division means nothing has been narrowed there. A stored
@@ -1355,6 +1442,19 @@
       L.instruments = (keep.length && keep.length < VI.INSTRUMENT_IDS.length) ? keep : null;
     }
 
+    if (raw.easy && typeof raw.easy === 'object') {
+      ['simple', 'compound'].forEach(fam => {
+        const src = raw.easy[fam];
+        if (!Array.isArray(src)) return;
+        const keep = [];
+        src.forEach(id => {
+          if (easyChoice(fam, id) && keep.indexOf(id) === -1 && keep.length < EASY_MAX) keep.push(id);
+        });
+        if (fam === 'compound' && keep.join() === EASY_FIRST_COMPOUND.join()) return;
+        if (keep.length) L.easy[fam] = keep;
+      });
+    }
+
     return L;
   }
 
@@ -1386,6 +1486,7 @@
       layout: JSON.parse(JSON.stringify(layout)),
       show: {
         dots: view.showDots,
+        easy: !!view.easyMode,
         barNumbers: view.showBarNumbers,
         beatNumbers: view.showBeatNumbers,
         syllables: view.showSyllables,
@@ -1406,6 +1507,7 @@
     layout = normalizeLayout(snap.layout || snap);
     if (snap.show) {
       if (snap.show.dots !== undefined) view.showDots = !!snap.show.dots;
+      if (snap.show.easy !== undefined) view.easyMode = !!snap.show.easy;
       if (snap.show.beatNumbers !== undefined) view.showBeatNumbers = !!snap.show.beatNumbers;
       /* A link from before the two were split carries one flag for both. */
       const bars = snap.show.barNumbers !== undefined ? snap.show.barNumbers : snap.show.beatNumbers;
@@ -1592,6 +1694,26 @@
   function rhythmEditable()      { return !policy || !policy.task.rhythmLocked; }
   function instrumentsEditable() { return !policy || !policy.task.instrumentsLocked; }
 
+  /* Which circles a lesson hands over: 'easy', 'regular' or 'both'. Read
+     only is not a fourth value here — it is the rhythm lock above, and
+     both answers below already follow it. */
+  function circlesAllowed() { return (policy && policy.task.circles) || 'both'; }
+
+  /* EASY writes, so it goes wherever writing does. In the Music Stand
+     there is no button here to leave EASY by, so the stand switches it
+     from the pane's View menu (`easyMode` in the bridge's VIEW_KEYS), and
+     the circles only take a tap while the stand is editing. */
+  function easyOffered() {
+    return rhythmEditable() && circlesAllowed() !== 'regular';
+  }
+  function regularOffered() { return !easyOffered() || circlesAllowed() !== 'easy'; }
+
+  /* A lesson that only offers EASY shows EASY whenever the dots are up,
+     whatever this browser last had. */
+  function easyOn() {
+    return view.showDots && easyOffered() && (view.easyMode || !regularOffered());
+  }
+
   function tempoLocked() { return !!policy && policy.tempo.locked; }
   function tempoMin() { return policy ? policy.tempo.min : BPM_MIN; }
   function tempoMax() { return policy ? policy.tempo.max : BPM_MAX; }
@@ -1624,12 +1746,16 @@
     return SYLLABLE_SYSTEMS.filter(s => policy.shell.systems.indexOf(s) !== -1);
   }
 
+  const CIRCLE_MODES = ['easy', 'regular', 'both'];
+
   function blankPolicy() {
     return {
       v: POLICY_VERSION,
       tempo: { min: 40, max: 240, locked: false },
       structure: { maxMeasures: null, maxTracks: null, canAdd: true, canRemove: true },
-      task: { rhythmLocked: false, instrumentsLocked: false, note: '' },
+      /* circles: which dots the button beside Play offers — 'easy',
+         'regular' or 'both'. */
+      task: { rhythmLocked: false, instrumentsLocked: false, circles: 'both', note: '' },
       shell: {
         view: true,        // the Layout half of Settings — pages, scroll, size
         present: true,     // present mode
@@ -1669,6 +1795,7 @@
     if (src.task) {
       p.task.rhythmLocked = !!src.task.rhythmLocked;
       p.task.instrumentsLocked = !!src.task.instrumentsLocked;
+      p.task.circles = CIRCLE_MODES.indexOf(src.task.circles) !== -1 ? src.task.circles : 'both';
       p.task.note = typeof src.task.note === 'string' ? src.task.note.slice(0, 160) : '';
     }
 
@@ -2012,6 +2139,10 @@
   /* Set by the Music Stand bridge: told when a badge in a pane is pressed,
      so the mixer and the pane never show two different answers. */
   let standVoiceMuted = null;
+  /* Set by the Music Stand bridge: an instrument picture pressed in a
+     pane opens the stand's picker, not this app's, so there is one way
+     to change an instrument there and it works with editing off. */
+  let standPickInstrument = null;
 
   function icon(path, size) {
     return '<svg viewBox="0 0 24 24" width="' + (size || 15) + '" height="' + (size || 15) + '">'
@@ -2280,7 +2411,13 @@
     img.alt = meta.alt;
     pick.appendChild(img);
     if (instrumentsEditable()) {
-      pick.addEventListener('click', () => openInstrumentSheet(trackIndex));
+      pick.addEventListener('click', () => {
+        if (EMBEDDED) {
+          if (typeof standPickInstrument === 'function') standPickInstrument(trackIndex);
+          return;
+        }
+        openInstrumentSheet(trackIndex);
+      });
     } else {
       pick.classList.add('fixed');
       pick.title = meta.label;
@@ -2387,27 +2524,34 @@
     el.dataset.beat = String(beatIndex);
     el.style.setProperty('--slots', String(beat.slots));
 
-    /* ---- the dots ---- */
+    /* ---- the dots ----
+       In EASY the dots are still laid out, only unseen: the notation is
+       placed on their centres, so they are what keeps it on its grid. The
+       coloured circles sit over the same pill. */
+    const easy = easyOn();
     const dots = document.createElement('div');
     dots.className = 'dots'
       + (group.span > 1 ? ' linked' : '')
+      + (easy ? ' easy' : '')
       + (view.showDots ? '' : ' dots-hidden');
 
-    if (rhythmEditable()) dots.appendChild(buildSubdivisionControls(track, beatIndex));
+    if (rhythmEditable() && !easy) dots.appendChild(buildSubdivisionControls(track, beatIndex));
 
     for (let i = 0; i < beat.slots; i++) {
       const dot = document.createElement('div');
       dot.className = 'dot ' + mine[i];
-      if (rhythmEditable()) {
+      if (rhythmEditable() && !easy) {
         dot.addEventListener('click', () => tapDot(track, beatIndex, i));
       } else {
         dot.classList.add('fixed');
       }
       dots.appendChild(dot);
     }
+    if (easy) dots.appendChild(buildEasyRow(track, beatIndex, group));
     el.appendChild(dots);
 
-    if (view.showDots && rhythmEditable() && joinButtonOffered(track, beatIndex)) {
+    /* No chains in EASY: the circles make and break joins themselves. */
+    if (view.showDots && !easy && rhythmEditable() && joinButtonOffered(track, beatIndex)) {
       el.appendChild(buildLinkButton(track, beatIndex));
     }
 
@@ -2464,6 +2608,141 @@
     if (changed && beat.cells.some(Boolean)) auditionTrack(track);
     if (isPlaying) resyncPlayback();
     render();
+  }
+
+  /* ---- EASY ----------------------------------------------------------
+     The circles write whole shapes, but what is stored is exactly what
+     the dots would have stored — slots, cells and joins — so the notation,
+     playback, sharing and the Music Stand need to know nothing about it,
+     and a piece written in EASY opens in the ordinary dots as the same
+     rhythm. */
+
+  /* This family's circles, in colour order. */
+  function easySet(fam) {
+    fam = fam || familyOf();
+    return layout.easy[fam].map(id => easyChoice(fam, id)).filter(Boolean);
+  }
+
+  /* Can a choice this many beats long start here? It has to stay inside
+     the bar — a join never crosses a bar line — and start where that note
+     normally starts: a half note on 1 or 3 in 4/4, a whole note on 1. A
+     bar that does not divide by the note's length (a half in 3/4, a
+     dotted half in 4/4) takes it wherever it fits. */
+  function easyFits(beatIndex, span) {
+    if (span <= 1) return true;
+    const per = beatsPerMeasure();
+    const offset = beatIndex % per;
+    if (offset + span > per || beatIndex + span > totalBeats()) return false;
+    return per % span !== 0 || offset % span === 0;
+  }
+
+  /* What a run of beats sounds like, as a key: how many beats, and the
+     tick each note starts on. XOOO on sixteenths and XO on eighths are the
+     same quarter note and get the same key, so the right circle lights
+     whichever grid the rhythm happens to be written on. */
+  function easyKey(beats) {
+    const bt = beatTicks();
+    const onsets = [];
+    beats.forEach((beat, b) => {
+      const per = bt / beat.slots;
+      beat.cells.forEach((on, i) => { if (on) onsets.push(Math.round(b * bt + i * per)); });
+    });
+    return beats.length + ':' + onsets.join(',');
+  }
+
+  function easyChoiceKey(choice) {
+    return easyKey(choice.beats.map(p => ({ slots: p.length, cells: patternToFlags(p) })));
+  }
+
+  /* Which circle this group is, as an index into easySet(), or -1. */
+  function easyLit(track, group) {
+    const beats = [];
+    for (let b = group.start; b <= group.end; b++) beats.push(track.beats[b]);
+    const key = easyKey(beats);
+    return easySet().findIndex(c => easyChoiceKey(c) === key);
+  }
+
+  /* A tap on a circle. The lit one goes silent — the same length of rest,
+     so a half note becomes a half rest. Any other writes its rhythm here,
+     taking apart whatever joins it lands across: a half note losing its
+     second beat becomes a quarter, and a beat freed from under a longer
+     note is left as a rest. */
+  function easyTap(track, beatIndex, choice) {
+    if (!rhythmEditable()) return;
+    if (!track.links) track.links = {};
+    const group = linkGroup(track, beatIndex);
+    const lit = group.start === beatIndex
+      && easyKey(track.beats.slice(group.start, group.end + 1)) === easyChoiceKey(choice);
+
+    if (lit) {
+      for (let b = group.start; b <= group.end; b++) {
+        track.beats[b].cells = track.beats[b].cells.map(() => false);
+      }
+    } else {
+      const span = choice.beats.length;
+      if (!easyFits(beatIndex, span)) return;
+      for (let b = beatIndex; b < beatIndex + span; b++) {
+        const g = linkGroup(track, b);
+        for (let j = g.start; j < g.end; j++) delete track.links[j];
+      }
+      choice.beats.forEach((pattern, k) => {
+        track.beats[beatIndex + k] = makeBeat(pattern.length, patternToFlags(pattern));
+      });
+      for (let k = 0; k < span - 1; k++) track.links[beatIndex + k] = true;
+      if (choice.beats.some(p => p.indexOf('X') !== -1)) auditionTrack(track);
+    }
+
+    if (isPlaying) resyncPlayback();
+    render();
+  }
+
+  /* The circles a beat offers. Every track offers the same ones at the
+     same beat, which is what lets the beat's width be settled per beat. */
+  function easyChoicesAt(beatIndex) {
+    return easySet().filter(c => easyFits(beatIndex, c.beats.length));
+  }
+
+  function buildEasyRow(track, beatIndex, group) {
+    const row = document.createElement('div');
+    row.className = 'easy-row';
+    const set = easySet();
+    const lit = easyLit(track, group);
+
+    /* A beat under a note that started earlier shows it is taken: the
+       row is washed in that note's colour. Its circles still work, and
+       tapping one cuts the long note short. */
+    if (group.start !== beatIndex) {
+      row.classList.add('held');
+      if (lit >= 0) row.style.setProperty('--held', EASY_COLOURS[lit]);
+    }
+
+    set.forEach((choice, i) => {
+      if (!easyFits(beatIndex, choice.beats.length)) return;
+      const on = group.start === beatIndex && lit === i;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'easy-choice' + (on ? ' on' : '');
+      btn.style.setProperty('--c', EASY_COLOURS[i]);
+      btn.title = on ? choice.name + ' — tap again for a rest' : choice.name;
+      btn.setAttribute('aria-label', choice.name);
+      btn.setAttribute('aria-pressed', String(on));
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        easyTap(track, beatIndex, choice);
+      });
+      row.appendChild(btn);
+    });
+    return row;
+  }
+
+  /* How wide a row of n circles is, border to border — read off the
+     same --dot the stylesheet draws them at, so the two cannot disagree. */
+  const EASY_GAP = 6;
+  const EASY_PAD = 8;
+  function easyRowWidth(n) {
+    if (!n) return 0;
+    const dot = parseFloat(getComputedStyle(grid).getPropertyValue('--dot')) || 22;
+    return n * dot + (n - 1) * EASY_GAP + EASY_PAD * 2 + BORDER_PAD;
   }
 
   /* The chain between this beat and the next is offered while joining
@@ -2966,6 +3245,14 @@
         const b = startBeat + k;
         if (width > need[b]) need[b] = width;
         target = nextGroupEl(target);
+      }
+    }
+
+    /* EASY's circles sit in a row, however few slots the beat has, and
+       every track offers the same ones at a given beat. */
+    if (easyOn()) {
+      for (let b = 0; b < need.length; b++) {
+        need[b] = Math.max(need[b], easyRowWidth(easyChoicesAt(b).length));
       }
     }
 
@@ -4306,6 +4593,151 @@
     });
   }
 
+  /* ---- EASY mode's circles ----------------------------------------- */
+
+  const layoutEasyBox = document.getElementById('layout-easy');
+
+  /* One EASY choice drawn the way the score would draw it. A single beat
+     goes through engraveCell, exceptions and all; a joined run is read by
+     the general rule across the run, as groupColours reads it, and cut to
+     the width the drawing actually uses, as engraveJoin is. */
+  function engraveEasyChoice(choice, compound) {
+    if (choice.beats.length === 1) {
+      return engraveCell(choice.beats[0], choice.beats[0].length, compound);
+    }
+    const flags = [];
+    choice.beats.forEach(p => patternToFlags(p).forEach(f => flags.push(f)));
+    const roles = RN.rolesFromFlags(flags);
+    let at = 0;
+    const map = RN.buildMap({
+      compound: compound,
+      beats: choice.beats.map(p => {
+        const r = roles.slice(at, at + p.length);
+        at += p.length;
+        return { slots: p.length, roles: r };
+      })
+    });
+    let last = 0;
+    RN.plan(map).forEach(it => { if (it.slot > last) last = it.slot; });
+    const span = last + 1.5;
+    const slotW = Math.max(4, Math.min(CELL_SLOT_W, JOIN_CELL_W / span));
+    const centres = [];
+    for (let i = 0; i < flags.length; i++) centres.push(slotW / 2 + i * slotW);
+    return RN.engrave({
+      roles: map.roles, slotTicks: map.slotTicks, slotBeat: map.slotBeat,
+      slotSubGroup: map.slotSubGroup, tuplets: map.tuplets,
+      slotCentres: centres,
+      width: span * slotW,
+      height: CELL_SIZE_H,
+      sizeHeight: CELL_SIZE_H
+    });
+  }
+
+  function setEasyCount(fam, n) {
+    const list = layout.easy[fam].slice();
+    n = Math.max(1, Math.min(EASY_MAX, n));
+    while (list.length > n) list.pop();
+    /* a new circle arrives holding the first rhythm not already on one */
+    while (list.length < n) {
+      const spare = EASY_CHOICES[fam].find(c => list.indexOf(c.id) === -1);
+      if (!spare) break;
+      list.push(spare.id);
+    }
+    layout.easy[fam] = list;
+    saveLayout();
+  }
+
+  function renderLayoutEasy() {
+    if (!layoutEasyBox) return;
+    layoutEasyBox.innerHTML = '';
+
+    ['simple', 'compound'].forEach(fam => {
+      const compound = fam === 'compound';
+      const list = layout.easy[fam];
+
+      const head = document.createElement('div');
+      head.className = 'easy-set-head';
+      const sub = document.createElement('div');
+      sub.className = 'lesson-sub';
+      sub.textContent = compound ? 'Compound time' : 'Simple time';
+      head.appendChild(sub);
+
+      const count = document.createElement('div');
+      count.className = 'easy-count';
+      count.setAttribute('role', 'group');
+      count.setAttribute('aria-label', 'How many circles');
+      const less = document.createElement('button');
+      less.type = 'button';
+      less.className = 'easy-count-btn';
+      less.textContent = '−';
+      less.title = 'One circle fewer';
+      less.disabled = list.length <= 1;
+      const value = document.createElement('span');
+      value.className = 'easy-count-value';
+      value.textContent = list.length + (list.length === 1 ? ' circle' : ' circles');
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'easy-count-btn';
+      more.textContent = '+';
+      more.title = 'One circle more';
+      more.disabled = list.length >= EASY_MAX;
+      [[less, -1], [more, 1]].forEach(([btn, d]) => {
+        btn.addEventListener('click', () => {
+          setEasyCount(fam, list.length + d);
+          renderLayoutEasy();
+          render();
+        });
+      });
+      count.appendChild(less);
+      count.appendChild(value);
+      count.appendChild(more);
+      head.appendChild(count);
+      layoutEasyBox.appendChild(head);
+
+      const rows = document.createElement('div');
+      rows.className = 'easy-set';
+      list.forEach((id, i) => {
+        const choice = easyChoice(fam, id);
+        if (!choice) return;
+        const row = document.createElement('div');
+        row.className = 'easy-set-row';
+
+        const swatch = document.createElement('span');
+        swatch.className = 'easy-swatch';
+        swatch.style.setProperty('--c', EASY_COLOURS[i]);
+
+        const pic = document.createElement('span');
+        pic.className = 'easy-pic';
+        pic.innerHTML = engraveEasyChoice(choice, compound);
+
+        const select = document.createElement('select');
+        select.className = 'tool-select easy-select';
+        select.setAttribute('aria-label', 'What circle ' + (i + 1) + ' writes');
+        EASY_CHOICES[fam].forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = c.name + (c.beats.length > 1 ? ' (' + c.beats.length + ' beats)' : '');
+          /* one rhythm, one circle */
+          opt.disabled = c.id !== id && list.indexOf(c.id) !== -1;
+          select.appendChild(opt);
+        });
+        select.value = id;
+        select.addEventListener('change', () => {
+          layout.easy[fam][i] = select.value;
+          saveLayout();
+          renderLayoutEasy();
+          render();
+        });
+
+        row.appendChild(swatch);
+        row.appendChild(pic);
+        row.appendChild(select);
+        rows.appendChild(row);
+      });
+      layoutEasyBox.appendChild(rows);
+    });
+  }
+
   function renderLayoutSheet() {
     renderLayoutShow();
     renderLayoutMeters();
@@ -4313,6 +4745,7 @@
     renderLayoutDivide();
     renderLayoutFamily();
     renderLayoutVocab();
+    renderLayoutEasy();
   }
 
   function openLayoutSheet() {
@@ -4353,16 +4786,49 @@
      every few minutes. */
   const dotsBtn = document.getElementById('dots-btn');
 
+  /* Three states now, walked in the order the user asked for: the dots,
+     then nothing, then EASY, then the dots again — so from the usual
+     screen the first press still hides the dots as it always has, and
+     the second brings up EASY. A lesson that offers only one kind of
+     circle makes it a plain on/off again. */
+  function dotsState() {
+    return !view.showDots ? 'off' : easyOn() ? 'easy' : 'regular';
+  }
+
+  function dotsCycle() {
+    const states = [];
+    if (regularOffered()) states.push('regular');
+    states.push('off');
+    if (easyOffered()) states.push('easy');
+    return states;
+  }
+
+  const DOTS_TITLES = {
+    regular: 'Show the tappable dots',
+    off:     'Hide the dots',
+    easy:    'EASY — one tap, one rhythm'
+  };
+
+  function nextDotsState() {
+    const states = dotsCycle();
+    return states[(states.indexOf(dotsState()) + 1) % states.length];
+  }
+
   function syncDotsButton() {
     if (!dotsBtn) return;
-    dotsBtn.classList.toggle('active', view.showDots);
-    dotsBtn.setAttribute('aria-pressed', String(view.showDots));
-    dotsBtn.title = view.showDots ? 'Hide the tappable dots' : 'Show the tappable dots';
+    const state = dotsState();
+    dotsBtn.classList.toggle('active', state !== 'off');
+    dotsBtn.classList.toggle('easy', state === 'easy');
+    dotsBtn.setAttribute('aria-pressed', String(state !== 'off'));
+    dotsBtn.title = DOTS_TITLES[nextDotsState()];
   }
 
   if (dotsBtn) {
     dotsBtn.addEventListener('click', () => {
-      view.showDots = !view.showDots;
+      const next = nextDotsState();
+      view.showDots = next !== 'off';
+      if (next === 'easy') view.easyMode = true;
+      else if (next === 'regular') view.easyMode = false;
       saveViewPrefs();
       syncSettings();
       if (layoutShowList && layoutShowList.children.length) renderLayoutShow();
@@ -5771,6 +6237,8 @@
   const lessonSetupSheet  = document.getElementById('lesson-setup-sheet');
   const taskGrid          = document.getElementById('lesson-task-grid');
   const taskNoteInput     = document.getElementById('lesson-task-note');
+  const circlesSeg        = document.getElementById('lesson-circles-seg');
+  const circlesNote       = document.getElementById('lesson-circles-note');
   const tempoSeg          = document.getElementById('lesson-tempo-seg');
   const tempoRangeBox     = document.getElementById('lesson-tempo-range');
   const tempoMinInput     = document.getElementById('lesson-tempo-min');
@@ -5815,6 +6283,9 @@
 
     const cap = joinCap();
     bits.push(cap <= 1 ? 'no joining beats' : 'joins up to ' + Math.min(cap, 4) + ' beats');
+
+    const easyN = layout.easy.simple.length;
+    bits.push(easyN + ' EASY circle' + (easyN === 1 ? '' : 's'));
 
     const kit = instrumentsOffered();
     bits.push(kit.length === VI.INSTRUMENT_IDS.length
@@ -5870,6 +6341,28 @@
       taskNoteInput.placeholder = TASK_BLURB[current ? current.id : 'free'];
       taskNoteInput.value = draft.policy.task.note || '';
     }
+  }
+
+  /* Easy, Regular, Both or Read only. Read only is the rhythm lock the
+     task cards above already set — the two are one switch seen twice, so
+     choosing either one moves the other. */
+  function renderCircles() {
+    if (!circlesSeg) return;
+    const task = draft.policy.task;
+    const mode = task.rhythmLocked ? 'read' : task.circles;
+    circlesSeg.querySelectorAll('.seg-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.circles === mode);
+    });
+    if (!circlesNote) return;
+    const names = easySet('simple').map(c => c.name.toLowerCase()).join(', ');
+    circlesNote.textContent = mode === 'easy'
+      ? 'The button beside Play gives them the EASY circles and nothing else — one tap, one rhythm: '
+        + names + '. Change these in Layout settings.'
+      : mode === 'regular'
+        ? 'The ordinary dots, one to a slot, with the + and − buttons and the chains. No EASY.'
+        : mode === 'both'
+          ? 'The button beside Play walks the dots, then nothing, then EASY, so they can use either.'
+          : 'The rhythms stay as you wrote them. The dots button still shows and hides the dots.';
   }
 
   function renderTempo() {
@@ -6106,6 +6599,7 @@
     pruneDraftSongs();
     renderLayoutSummary();
     renderTask();
+    renderCircles();
     renderTempo();
     renderLength();
     renderLessonSongs();
@@ -6197,6 +6691,21 @@
       }
       closeSheet(librarySheet);
       openSheet(lessonSetupSheet);
+      renderSetupSheet();
+    });
+  }
+
+  if (circlesSeg) {
+    circlesSeg.addEventListener('click', e => {
+      const btn = e.target.closest('.seg-btn');
+      if (!btn) return;
+      const task = draft.policy.task;
+      if (btn.dataset.circles === 'read') {
+        task.rhythmLocked = true;
+      } else {
+        task.rhythmLocked = false;
+        task.circles = btn.dataset.circles;
+      }
       renderSetupSheet();
     });
   }
@@ -6487,11 +6996,13 @@
 
     const swallow = e => {
       if (hostEditable) { touched = true; return; }
-      /* One exception, and only one: the mute badge. Muting is the
-         mixer's job and the mixer is live whether or not the score has
-         been handed to the pointer — it changes what is heard, never the
-         piece. Everything else in here stays behind the glass. */
-      if (e.target && e.target.closest && e.target.closest('.mute-badge')) return;
+      /* Two exceptions: the mute badge, and the instrument picture.
+         Both are the mixer's, and the mixer is live whether or not the
+         score has been handed to the pointer. The badge changes what is
+         heard; the picture opens the stand's own instrument picker (see
+         standPickInstrument). Everything else stays behind the glass. */
+      if (e.target && e.target.closest
+          && e.target.closest('.mute-badge, .instrument-btn:not(.fixed)')) return;
       e.stopImmediatePropagation();
       if (e.type === 'click' || e.type === 'dblclick' || e.type === 'contextmenu') e.preventDefault();
     };
@@ -6538,7 +7049,7 @@
       toldHost = fingerprint();
     }
 
-    const VIEW_KEYS = ['layout', 'measuresPerPage', 'zoomPct', 'showDots', 'showSyllables',
+    const VIEW_KEYS = ['layout', 'measuresPerPage', 'zoomPct', 'showDots', 'easyMode', 'showSyllables',
                        'syllableSystem', 'lightNotes', 'showBarNumbers', 'showBeatNumbers'];
 
     function songSummary(id, rec, starter) {
@@ -6689,6 +7200,9 @@
         render();
       },
       onVoiceMute: null,
+      /* An instrument picture pressed in the pane: `(voice)`. The stand
+         opens its picker and answers with setInstrument(). */
+      onInstrumentPick: null,
 
       /* Which instruments this piece may be played on, and the picture
          for each — the stand's picker shows what the app's own picker
@@ -6792,6 +7306,10 @@
        the mixer's, and the mixer is always live. */
     standVoiceMuted = (voice, muted) => {
       if (typeof bridge.onVoiceMute === 'function') bridge.onVoiceMute(voice, muted);
+    };
+
+    standPickInstrument = voice => {
+      if (typeof bridge.onInstrumentPick === 'function') bridge.onInstrumentPick(voice);
     };
 
     window.MusicStandBridge = bridge;

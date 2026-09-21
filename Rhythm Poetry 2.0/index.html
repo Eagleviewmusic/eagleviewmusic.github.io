@@ -43,6 +43,12 @@
   <div class="chip-cluster">
     <!-- Auto-save. Absent in the sandbox (scratch work always keeps
          itself) and in a lesson (a student's work is always kept). -->
+    <!-- Clear the sandbox. Only there while the sandbox is open, never
+         beside a library song. -->
+    <button class="sandbox-clear" id="sandbox-clear-btn" title="Clear the sandbox and start over" hidden>
+      <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      <span class="sandbox-clear-label">Clear</span>
+    </button>
     <button class="autosave-toggle" id="autosave-toggle" aria-pressed="true" hidden>
       <svg class="autosave-icon" viewBox="0 0 24 24" aria-hidden="true"></svg>
       <span class="autosave-label" id="autosave-label">Auto-save</span>
@@ -132,6 +138,7 @@
         <circle cx="8.6" cy="12" r="2.3" fill="currentColor" stroke="none"/>
         <circle cx="15.4" cy="12" r="2.3" fill="currentColor" stroke="none"/>
       </svg>
+      <span class="easy-label" aria-hidden="true"><b>E</b><b>A</b><b>S</b><b>Y</b></span>
     </button>
 
     <div class="tool-group meter-group">
@@ -568,6 +575,20 @@
       </div>
       <div class="switch-list" id="layout-joins"></div>
     </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2.6"/><circle cx="12" cy="12" r="2.6"/><circle cx="19" cy="12" r="2.6"/></svg>
+        Easy mode
+      </div>
+      <p class="card-desc">
+        Press the beat-dot button beside Play until it reads EASY, and every beat offers a row
+        of coloured circles instead of its dots. Each circle writes a whole rhythm in one tap,
+        and tapping the lit one again turns it into a rest. The longer notes only appear on the
+        beats they can start on. Choose how many circles there are, and what each one writes.
+      </p>
+      <div id="layout-easy"></div>
+    </div>
   </div>
 </div>
 
@@ -606,6 +627,15 @@
         The task
       </div>
       <div class="task-grid" id="lesson-task-grid"></div>
+      <div class="lesson-sub">How they write rhythms</div>
+      <div class="seg seg-wide" id="lesson-circles-seg" role="group" aria-label="How they write rhythms">
+        <button class="seg-btn" data-circles="easy">Easy</button>
+        <button class="seg-btn" data-circles="regular">Regular</button>
+        <button class="seg-btn active" data-circles="both">Both</button>
+        <button class="seg-btn" data-circles="read">Read&nbsp;only</button>
+      </div>
+      <p class="card-desc lesson-hint" id="lesson-circles-note"></p>
+      <div class="lesson-sub">What the strip at the top says</div>
       <input type="text" id="lesson-task-note" class="text-field" maxlength="160" autocomplete="off" />
       <p class="card-desc lesson-hint">This sentence sits above their work the whole time. Leave it as it is if it says what you mean.</p>
     </div>

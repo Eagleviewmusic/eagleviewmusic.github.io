@@ -8,6 +8,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Noto+Serif:wght@700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <!-- Framed (the Music Stand, or any page embedding this one) there is no
+       hub to go back to, so the link home is hidden. Rhythm Poetry 2.0
+       makes the same check. -->
+  <script>
+    try {
+      if (window.self !== window.top) document.documentElement.classList.add('in-iframe');
+    } catch (e) {
+      document.documentElement.classList.add('in-iframe');
+    }
+  </script>
 </head>
 <body>
 
@@ -16,11 +26,21 @@
      ============================================================ -->
 <header class="topbar">
   <div class="topbar-left">
+    <a href="../index.html" class="home-link" title="Back to Eagle View Music">
+      <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      <span>Eagle View</span>
+    </a>
     <span class="app-mark">Ostinato Builder</span>
   </div>
   <div class="topbar-right">
     <!-- Auto-save. Absent in the sandbox (scratch work always keeps
          itself) and in a lesson (a student's work is always kept). -->
+    <!-- Clear the sandbox. Only there while the sandbox is open, never
+         beside a library song. -->
+    <button class="sandbox-clear" id="sandbox-clear-btn" title="Clear the sandbox and start over" hidden>
+      <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      <span class="sandbox-clear-label">Clear</span>
+    </button>
     <button class="autosave-toggle" id="autosave-toggle" aria-pressed="true" hidden>
       <svg class="autosave-icon" viewBox="0 0 24 24" width="15" height="15"></svg>
       <span class="autosave-label" id="autosave-label">Auto-save</span>
@@ -114,6 +134,7 @@
            stroke-width="2" aria-hidden="true">
         <circle cx="7.5" cy="12" r="3.2"/><circle cx="16.5" cy="12" r="3.2"/>
       </svg>
+      <span class="easy-label" aria-hidden="true"><b>E</b><b>A</b><b>S</b><b>Y</b></span>
     </button>
 
     <div class="time-sig" id="time-signature" title="Tap the numbers to change the meter">
@@ -474,6 +495,17 @@
         <p class="card-desc" id="layout-fam-note"></p>
         <div class="vocab-list" id="layout-vocab"></div>
       </section>
+
+      <section class="settings-card">
+        <h3 class="card-title">Easy mode</h3>
+        <p class="card-desc">
+          Press the dots button beside Play until it reads EASY, and every beat offers a row of
+          coloured circles instead of its dots. Each circle writes a whole rhythm in one tap, and
+          tapping the lit one again turns it into a rest. The longer notes only appear on the
+          beats they can start on. Choose how many circles there are, and what each one writes.
+        </p>
+        <div id="layout-easy"></div>
+      </section>
     </div>
   </div>
 </div>
@@ -506,6 +538,14 @@
         <h3 class="card-title">The task</h3>
         <p class="card-desc">Which half of the score is already yours, and which half is theirs.</p>
         <div class="task-grid" id="lesson-task-grid"></div>
+        <div class="lesson-sub">How they write rhythms</div>
+        <div class="seg" id="lesson-circles-seg" role="group" aria-label="How they write rhythms">
+          <button class="seg-btn" data-circles="easy">Easy</button>
+          <button class="seg-btn" data-circles="regular">Regular</button>
+          <button class="seg-btn active" data-circles="both">Both</button>
+          <button class="seg-btn" data-circles="read">Read only</button>
+        </div>
+        <p class="card-desc" id="lesson-circles-note"></p>
         <label class="field-label" for="lesson-task-note">What the strip at the top says</label>
         <input type="text" id="lesson-task-note" class="text-field" maxlength="160" autocomplete="off" />
       </section>
