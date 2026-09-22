@@ -485,7 +485,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Restore from a backup
       </div>
-      <p class="card-desc">Songs in the file are added to your library.</p>
+      <p class="card-desc">Songs in the file are added to your library. A song you already have is not added twice, and a newer version replaces an older one.</p>
       <input type="file" id="jsonFileInput" accept=".json,application/json" hidden />
       <button class="btn" id="uploadJsonBtn">Choose a file…</button>
       <span class="status-msg" id="uploadStatusMsg"></span>
@@ -753,6 +753,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="lib/instruments/js/virtual-instruments.js"></script>
+<script src="lib/evm-library.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

@@ -52,6 +52,8 @@
 })();
 
 (function() {
+  // Shared library rules (ids, updatedAt, the import rule): lib/evm-library.js
+  const EVM = window.EVMLibrary;
   const container = document.getElementById('poem');
   const EMBEDDED = !!window.MUSIC_STAND_EMBED;
 
@@ -3105,7 +3107,72 @@
         timeSignatureDenominator: p.timeSignatureDenominator || 4
       };
     }
+    // updatedAt, received, receivedAt, derivedFrom — see lib/evm-library.js
+    EVM.carry(song, out);
     return out;
+  }
+
+  /* ------------------------------------------------------------------
+     WHAT A SONG IS, FOR MATCHING (lib/evm-library.js)
+
+     songKey() is the song's content with its name, id and dates left out:
+     two records with the same key are the same piece. It is how a link
+     made before ids travelled finds the copy already here instead of
+     filing another, and how a save tells whether anything changed.
+     Null means blank — a blank song is never filed from a link or file.
+     ------------------------------------------------------------------ */
+  function songKey(song) {
+    if (!song || typeof song !== 'object') return null;
+    const n = normalizeSong(Object.assign({}, song, { id: song.id || 'x' }));
+    return isBlankSong(n) ? null : rawSongKey(n);
+  }
+
+  // The same, blank or not — what a save compares.
+  function rawSongKey(song) {
+    const n = normalizeSong(Object.assign({}, song, { id: song.id || 'x' }));
+    const st = n.side === 'rhythm' ? Object.assign({}, n.rhythmState) : Object.assign({}, n.poetryState);
+    // The syllable system is how the reader likes to say it, not the rhythm.
+    delete st.currentRhythmSystem;
+    /* Poems are padded out to whole bars when they are drawn, and the
+       padding was written back by older saves: trailing rests are not
+       content. */
+    if (Array.isArray(st.words)) {
+      const w = st.words.slice();
+      while (w.length && (w[w.length - 1] === '-' || w[w.length - 1] === '')) w.pop();
+      st.words = w;
+    }
+    return n.side + ':' + EVM.stableStringify(st);
+  }
+
+  /* Blank: a poem with no words but the ones New starts with, or a rhythm
+     with no note in it. */
+  function isBlankSong(n) {
+    if (n.side === 'rhythm') {
+      const beats = (n.rhythmState && n.rhythmState.beats) || [];
+      return !beats.some(b => Array.isArray(b) ? b.some(Boolean) : !!b);
+    }
+    const p = n.poetryState || {};
+    const words = (p.rawLyrics && p.rawLyrics.length ? p.rawLyrics : (p.words || []))
+      .filter(w => w && w !== '-' && String(w).trim() !== '');
+    if (!words.length) return true;
+    const said = words.join(' ').toLowerCase();
+    return said === 'start here' || said === 'press the words to edit.';
+  }
+
+  /* Links made before ids travelled all say id 'shared' — a placeholder,
+     not an id, so they are matched by content like any other old link. */
+  const fileOpts = received => ({
+    key: songKey,
+    /* nor may anything arriving take a lesson's id, or it could overwrite
+       a student's lesson work */
+    reserved: id => isSandboxId(id) || id === 'shared' || String(id).indexOf('lesson_') === 0,
+    newId: () => EVM.newId('song'),
+    received: received
+  });
+
+  function isReceived(id) {
+    const song = id ? getStoredLibrary()[id] : null;
+    return !!(song && song.received);
   }
 
   function defaultLibrary() {
@@ -3178,8 +3245,9 @@
 
     // Sort user-created songs newest first
     userIds.sort((a, b) => {
-      const timeA = (library[a] && library[a].createdAt) || 0;
-      const timeB = (library[b] && library[b].createdAt) || 0;
+      // a shared song is new here when it arrived, not when it was written
+      const timeA = (library[a] && (library[a].receivedAt || library[a].createdAt)) || 0;
+      const timeB = (library[b] && (library[b].receivedAt || library[b].createdAt)) || 0;
       return timeB - timeA;
     });
 
@@ -3256,6 +3324,10 @@
      ------------------------------------------------------------------ */
   let autoSave = true;
   let savedFingerprint = null;
+  /* The song on screen arrived from someone else (a link, a file from the
+     Librarian): it is never saved into, and the toggle offers Save my
+     copy instead of auto-save. */
+  let openedReceived = false;
 
   /* Key order is not promised anywhere, so a plain stringify would call
      two identical songs different. */
@@ -3281,7 +3353,7 @@
   function autoSaveOffered() {
     return !EMBEDDED && !lessonMeta && !isSandboxId(getCurrentSongId()) && !!getCurrentSongId();
   }
-  function autoSaveOn() { return !autoSaveOffered() || autoSave; }
+  function autoSaveOn() { return !autoSaveOffered() || (autoSave && !openedReceived); }
 
   function hasUnsavedChanges() {
     if (autoSaveOn() || savedFingerprint === null) return false;
@@ -3303,10 +3375,16 @@
 
     // Never let one side overwrite a song that belongs to the other.
     if (existing.id && songSide(existing) !== currentMode) return;
+    /* A shared song stays exactly as it was sent — that is what lets a
+       student always go back to it. Their changes become theirs only
+       through Save my copy (Save as…). */
+    if (existing.received) return;
 
     const snapshot = buildSongSnapshot(id, getCurrentSongTitle() || 'Untitled', currentMode);
     snapshot.isCustom = existing.isCustom !== undefined ? existing.isCustom : !DEFAULT_SONGS[id];
     snapshot.createdAt = existing.createdAt || Date.now();
+    // updatedAt moves only if something actually changed
+    EVM.stamp(snapshot, existing.id ? existing : null, rawSongKey);
 
     library[id] = snapshot;
     saveStoredLibrary(library);
@@ -3317,6 +3395,8 @@
   const autoSaveLabel = document.getElementById('autosave-label');
   const ICON_SAVING = '<path d="M20 6 9 17l-5-5"/>';
   const ICON_NOT_SAVING = '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>';
+  // Save my copy, on a shared song: two sheets, one on the other
+  const ICON_COPY = '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>';
 
   function updateAutoSaveToggle() {
     if (!autoSaveToggle) return;
@@ -3325,19 +3405,23 @@
     if (!offered) return;
     const on = autoSaveOn();
     autoSaveToggle.classList.toggle('is-off', !on);
+    autoSaveToggle.classList.toggle('is-shared', openedReceived);
     autoSaveToggle.setAttribute('aria-pressed', String(on));
-    autoSaveToggle.title = on
+    autoSaveToggle.title = openedReceived
+      ? 'A shared song stays exactly as it was sent, so you can always go back to it. Press to save your own copy and keep your changes.'
+      : on
       ? 'Auto-save is on: every change is saved to this song. Press to stop saving.'
       : 'Auto-save is off: your changes are not being saved. Press to save them and start saving again.';
-    if (autoSaveLabel) autoSaveLabel.textContent = on ? 'Auto-save' : 'Not saving';
+    if (autoSaveLabel) autoSaveLabel.textContent = openedReceived ? 'Save my copy' : (on ? 'Auto-save' : 'Not saving');
     const svg = autoSaveToggle.querySelector('.autosave-icon');
-    if (svg) svg.innerHTML = on ? ICON_SAVING : ICON_NOT_SAVING;
+    if (svg) svg.innerHTML = openedReceived ? ICON_COPY : (on ? ICON_SAVING : ICON_NOT_SAVING);
   }
 
   /* Turning it back on is the moment to ask about the work done while it
      was off: save it, or leave it on screen only and stay off. */
   function setAutoSave(on) {
     if (!autoSaveOffered()) return;
+    if (on && openedReceived) { showNewSongModal('saveAs'); return; }
     if (on && hasUnsavedChanges()) {
       const title = getCurrentSongTitle() || 'this song';
       const ok = confirm('Save the changes you have made to “' + title + '”?\n\n'
@@ -3364,7 +3448,7 @@
   function updateSongChip() {
     const sandbox = isSandboxId(getCurrentSongId());
     const title = sandbox ? SANDBOX_TITLE : (getCurrentSongTitle() || 'Untitled');
-    const where = sandbox ? 'Sandbox' : (lessonMeta ? 'Lesson' : 'Library');
+    const where = sandbox ? 'Sandbox' : (lessonMeta ? 'Lesson' : (openedReceived ? 'Shared' : 'Library'));
     if (songChip) {
       songChip.classList.toggle('is-sandbox', sandbox);
       songChip.title = sandbox
@@ -3386,8 +3470,10 @@
     if (nowEditingNote) {
       nowEditingNote.textContent = sandbox
         ? 'Scratch work. It stays here between visits but is not in your library — use Save as… to keep it there.'
+        : openedReceived
+        ? 'Shared with you. It stays exactly as it was sent, so you can always come back to it — use Save as… to keep your own copy with your changes.'
         : '';
-      nowEditingNote.hidden = !sandbox;
+      nowEditingNote.hidden = !sandbox && !openedReceived;
     }
     if (nowEditingBadge) {
       nowEditingBadge.textContent = currentMode === 'rhythm' ? 'Rhythm' : 'Poetry';
@@ -3468,7 +3554,8 @@
       if (rhythmSystemsDropdown) rhythmSystemsDropdown.value = rhythmState.currentRhythmSystem;
     }
 
-    autoSave = (options && options.autoSave) ? true : false;
+    openedReceived = !!song.received;
+    autoSave = (options && options.autoSave && !openedReceived) ? true : false;
     setMode(side);
     markSaved();
     updateAutoSaveToggle();
@@ -3493,6 +3580,10 @@
       if (heading) heading.textContent = 'Save to your library';
       if (subtext) subtext.textContent = `Your sandbox stays as it is. This adds a copy to your library as a new ${noun}, and you carry on in that copy.`;
       if (confirmNewSongBtn) confirmNewSongBtn.textContent = 'Save to library';
+    } else if (titlePromptIntent === 'saveAs' && openedReceived) {
+      if (heading) heading.textContent = 'Save my copy';
+      if (subtext) subtext.textContent = `The shared ${noun} stays as it was sent, so you can always go back to it. Your copy is yours to change, and you carry on in it.`;
+      if (confirmNewSongBtn) confirmNewSongBtn.textContent = 'Save my copy';
     } else if (titlePromptIntent === 'saveAs') {
       if (heading) heading.textContent = 'Save as…';
       if (subtext) subtext.textContent = `This keeps the original and starts a new ${noun} from where you are.`;
@@ -3514,7 +3605,7 @@
     titlePromptIntent = intent || 'new';
     updateNewSongModalTexts();
     newSongTitleInput.value = titlePromptIntent === 'saveAs' && !isSandboxId(getCurrentSongId())
-      ? `${getCurrentSongTitle() || 'Untitled'} copy`
+      ? `${getCurrentSongTitle() || 'Untitled'} ${openedReceived ? '(my copy)' : 'copy'}`
       : '';
     newSongTitleInput.classList.remove('input-error');
     const sheet = newSongModal.querySelector('.sheet');
@@ -3580,13 +3671,14 @@
     saveCurrentSongToLibrary();
 
     const side = currentMode;
-    const id = 'song_' + Date.now();
+    const id = EVM.newId('song');
     const record = {
       id: id,
       title: trimmed,
       side: side,
       isCustom: true,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      updatedAt: Date.now()
     };
     if (side === 'rhythm') record.rhythmState = blankStateForSide('rhythm');
     else record.poetryState = blankStateForSide('poetry');
@@ -3608,10 +3700,14 @@
     saveCurrentSongToLibrary();   // the original — or the sandbox — keeps what is on screen
 
     const side = currentMode;
-    const id = 'song_' + Date.now();
+    const from = getCurrentSongId();
+    const id = EVM.newId('song');
     const record = buildSongSnapshot(id, trimmed, side);
     record.isCustom = true;
     record.createdAt = Date.now();
+    record.updatedAt = record.createdAt;
+    // The way back to what it was made from — a shared song, most often.
+    if (from && !isSandboxId(from)) record.derivedFrom = from;
 
     const library = getStoredLibrary();
     library[id] = record;
@@ -3729,6 +3825,13 @@
     const titleSpan = document.createElement('span');
     titleSpan.className = 'library-song-title';
     titleSpan.textContent = song.title;
+    if (song.received) {
+      const tag = document.createElement('span');
+      tag.className = 'shared-tag';
+      tag.textContent = 'Shared';
+      tag.title = 'Shared with you: it stays as it was sent. Save as… keeps your own copy.';
+      titleSpan.appendChild(tag);
+    }
 
     const actions = document.createElement('div');
     actions.className = 'library-song-actions';
@@ -3793,6 +3896,7 @@
         const lib = getStoredLibrary();
         if (!lib[id]) return;
         lib[id].title = newTitle.trim();
+        lib[id].updatedAt = Date.now();
         saveStoredLibrary(lib);
         if (id === currentSongIds[side]) {
           currentSongTitles[side] = newTitle.trim();
@@ -3831,7 +3935,8 @@
     });
 
     actions.appendChild(loadBtn);
-    actions.appendChild(renameBtn);
+    // A shared song keeps the name it was sent with; a copy can be renamed.
+    if (!song.received) actions.appendChild(renameBtn);
     actions.appendChild(deleteBtn);
 
     row.appendChild(meter);
@@ -3978,7 +4083,8 @@
       const stock = normalizeSong(JSON.parse(JSON.stringify(DEFAULT_SONGS[id])));
       if (JSON.stringify(stock[stateKey]) === JSON.stringify(mine[stateKey])) return null;
     }
-    return { title: mine.title, side: other, [stateKey]: mine[stateKey] };
+    return Object.assign({ title: mine.title, side: other, [stateKey]: mine[stateKey] },
+                         EVM.shareHeader(song, rawSongKey));
   }
 
   function handleShareCurrentSong() {
@@ -3986,7 +4092,14 @@
     const songData = buildSongSnapshot(
       'shared', getCurrentSongTitle() || 'Shared Song', currentMode
     );
+    delete songData.id;
+    /* The song's own id and dates travel with it, so opening the link
+       again finds the copy already filed instead of adding another, and a
+       newer version replaces an older one. Only when the link holds what
+       is saved under that id (see EVM.shareHeader). */
     if (isSandboxId(getCurrentSongId())) songData.sandbox = true;
+    else Object.assign(songData, EVM.shareHeader(
+      getStoredLibrary()[getCurrentSongId()], rawSongKey, rawSongKey(songData)));
 
     /* The short way to hand out a controlled copy: one song, plus the room
        it was written in, without going near Set up for students. There is
@@ -4146,19 +4259,12 @@
     reader.onload = function(e) {
       try {
         const json = JSON.parse(e.target.result);
-        let importedSongs = [];
-
-        if (Array.isArray(json)) {
-          importedSongs = json;
-        } else if (json && Array.isArray(json.songs)) {
-          importedSongs = json.songs;
-        } else if (json && typeof json === 'object') {
-          Object.keys(json).forEach(k => {
-            if (json[k] && typeof json[k] === 'object' && (json[k].poetryState || json[k].rhythmState || json[k].words || json[k].title)) {
-              importedSongs.push(json[k]);
-            }
-          });
-        }
+        /* A backup, an old export, a raw library, or a Librarian file —
+           see EVM.readItems. */
+        const importedSongs = EVM.readItems(json, {
+          app: 'rhythm-poetry',
+          looksLike: v => !!(v.poetryState || v.rhythmState || v.words || v.title)
+        }).filter(song => song && (song.title || song.poetryState || song.rhythmState || song.words));
 
         if (importedSongs.length === 0) {
           if (uploadStatusMsg) {
@@ -4168,37 +4274,35 @@
           return;
         }
 
+        /* Songs keep their ids and dates, so importing the same file twice
+           adds nothing, and a newer copy of a song replaces the older one.
+           A file keeps each song as it was there — yours stay yours, shared
+           ones stay shared. Blank songs are left out. */
         const library = getStoredLibrary();
-        let addedCount = 0;
-
+        const counts = { added: 0, updated: 0, same: 0, matched: 0, kept: 0, blank: 0 };
         importedSongs.forEach(song => {
-          if (song && (song.title || song.poetryState || song.rhythmState || song.words)) {
-            const title = (song.title && song.title.trim()) ? song.title.trim() : 'Imported Song';
-            let id = song.id || ('song_' + Date.now() + '_' + Math.floor(Math.random() * 1000));
-            if (library[id]) {
-              id = 'song_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-            }
-
-            library[id] = normalizeSong({
-              id: id,
-              title: title,
-              side: songSide(song),
-              isCustom: true,
-              createdAt: Date.now(),
-              poetryState: song.poetryState,
-              rhythmState: song.rhythmState,
-              words: song.words
-            });
-            addedCount++;
-          }
+          const title = (song.title && String(song.title).trim()) ? String(song.title).trim() : 'Imported Song';
+          const incoming = normalizeSong(Object.assign({}, song, {
+            id: song.id || 'incoming', title: title, side: songSide(song), isCustom: true
+          }));
+          if (!song.id || isSandboxId(song.id)) delete incoming.id;
+          const result = EVM.file(library, incoming, fileOpts(false));
+          counts[result.action] = (counts[result.action] || 0) + 1;
         });
+        const parts = [];
+        if (counts.added) parts.push(`added ${counts.added}`);
+        if (counts.updated) parts.push(`updated ${counts.updated}`);
+        if (counts.same + counts.matched) parts.push(`${counts.same + counts.matched} already here`);
+        if (counts.kept) parts.push(`kept your newer copy of ${counts.kept}`);
+        if (counts.blank) parts.push(`skipped ${counts.blank} blank`);
 
         saveStoredLibrary(library);
         renderExportSongList();
         renderLibrarySongList();
 
         if (uploadStatusMsg) {
-          uploadStatusMsg.textContent = `✓ Successfully imported ${addedCount} song${addedCount > 1 ? 's' : ''}!`;
+          const said = parts.join(', ');
+          uploadStatusMsg.textContent = '✓ ' + said.charAt(0).toUpperCase() + said.slice(1) + '.';
           uploadStatusMsg.className = 'status-msg';
         }
 
@@ -7426,6 +7530,8 @@
     (payload.songs || []).forEach((song, i) => {
       const id = stem + i;
       const fresh = normalizeSong({ ...song, id: id, isCustom: true, createdAt: Date.now() + i });
+      // (a lesson made before exercises were stripped of it could carry this)
+      delete fresh.received; delete fresh.receivedAt;
       sources[id] = fresh;
       if (!library[id]) library[id] = JSON.parse(JSON.stringify(fresh));
       ids.push(id);
@@ -8707,6 +8813,9 @@
       .map(id => {
         const snapshot = normalizeSong(JSON.parse(JSON.stringify(library[id])));
         delete snapshot.createdAt;
+        /* A lesson's exercises are the student's to work in, never shared
+           songs that refuse to save — so the library header stays home. */
+        ['updatedAt', 'received', 'receivedAt', 'derivedFrom'].forEach(k => delete snapshot[k]);
         return snapshot;
       });
     return {
@@ -9327,43 +9436,57 @@
       }
     });
   }
+  let sharedFiled = null;
   if (sharedSong && (sharedSong.poetryState || sharedSong.rhythmState || sharedSong.words || sharedSong.title)) {
     /* Each part lands where it came from: a sandbox into this person's
        sandbox on that side (it is scratch work — that is what the sandbox
-       is for), a library song into the library as a new song. */
+       is for), anything else into the library as a shared song — once.
+
+       A page embedded in a Google Site opens with its link every time it
+       is visited, so filing it is not "add a song" but "make sure it is
+       here": the same id, or (for links made before ids travelled) the
+       same content, finds the copy already filed. A newer version of it
+       replaces the old one. A blank song is not filed at all. See
+       EVM.file in lib/evm-library.js. */
     restoreActiveIds();   // the side a link doesn't cover stays as it was
-    const fileShared = (song, libraryId) => {
+    const fileShared = (song) => {
       const side = songSide(song);
-      const id = song.sandbox ? SANDBOX_IDS[side] : libraryId;
-      library[id] = normalizeSong({
-        id: id,
-        title: song.sandbox ? SANDBOX_TITLE
-          : ((song.title && song.title.trim()) ? song.title.trim() : 'Shared Song'),
-        side: side,
-        isCustom: true,
-        createdAt: Date.now(),
-        poetryState: song.poetryState,
-        rhythmState: song.rhythmState,
-        words: song.words
-      });
-      return id;
+      const record = {
+        id: song.id, title: (song.title && song.title.trim()) ? song.title.trim() : 'Shared Song',
+        side: side, createdAt: song.createdAt, updatedAt: song.updatedAt,
+        poetryState: song.poetryState, rhythmState: song.rhythmState, words: song.words
+      };
+      if (song.sandbox) {
+        const id = SANDBOX_IDS[side];
+        library[id] = normalizeSong(Object.assign(record, {
+          id: id, title: SANDBOX_TITLE, isCustom: true, createdAt: Date.now(), updatedAt: undefined }));
+        return { action: 'sandbox', id: id };
+      }
+      const incoming = normalizeSong(Object.assign({}, record, { id: record.id || 'incoming' }));
+      if (!record.id) delete incoming.id;     // a link from before ids travelled
+      return EVM.file(library, incoming, fileOpts(true));
     };
-    const sharedId = fileShared(sharedSong, 'shared_' + Date.now());
+    const result = fileShared(sharedSong);
+    const sharedId = result.id;
+    sharedFiled = result;
     /* The other side's song, if the sender sent one: filed beside it and
        made that side's current song, so switching sides finds it. */
     const partner = sharedSong.partner;
     const partnerSide = partner ? songSide(partner) : null;
     if (partner && partnerSide !== songSide(sharedSong) &&
         (partner.rhythmState || partner.poetryState)) {
-      const partnerId = fileShared(
-        { title: partner.title, side: partnerSide, sandbox: !!partner.sandbox,
-          poetryState: partner.poetryState, rhythmState: partner.rhythmState },
-        'shared_' + Date.now() + '_' + partnerSide);
-      currentSongIds[partnerSide] = partnerId;
-      currentSongTitles[partnerSide] = library[partnerId].title;
+      const partnerResult = fileShared(
+        { id: partner.id, createdAt: partner.createdAt, updatedAt: partner.updatedAt,
+          title: partner.title, side: partnerSide, sandbox: !!partner.sandbox,
+          poetryState: partner.poetryState, rhythmState: partner.rhythmState });
+      if (partnerResult.id) {
+        currentSongIds[partnerSide] = partnerResult.id;
+        currentSongTitles[partnerSide] = library[partnerResult.id].title;
+      }
     }
     saveStoredLibrary(library);
     songIdToLoad = sharedId;
+    if (!songIdToLoad) songIdToLoad = currentSongIds[songSide(sharedSong)] || ensureSongForSide(songSide(sharedSong));
     // A song sent with its layout locked carries the sender's settings and
     // closes the sheet that would let them be changed.
     if (sharedSong.layout) applyLayoutSnapshot(sharedSong.layout, !!sharedSong.layoutLocked);
@@ -9375,10 +9498,21 @@
     songIdToLoad = currentSongIds.rhythm || ensureSongForSide('rhythm');
   }
 
-  /* A song that arrived in a link has just been filed as this person's
-     own, so it keeps itself from here; anything reopened from the
-     library starts with auto-save off. */
+  /* A song that arrived in a link is filed as shared, which never
+     auto-saves; a sandbox link keeps itself as a sandbox always does. */
   if (songIdToLoad) loadSongById(songIdToLoad, { autoSave: !!sharedSong });
+  if (sharedFiled) {
+    const t = (getStoredLibrary()[sharedFiled.id] || {}).title || 'the song';
+    const said = {
+      added: 'Added “' + t + '” to your library',
+      same: 'Opened “' + t + '” from your library',
+      matched: 'Opened “' + t + '” from your library',
+      updated: 'Updated “' + t + '” to the newest version',
+      kept: 'Opened “' + t + '” — you already have a newer version',
+      blank: 'That link holds an empty song, so nothing was added'
+    }[sharedFiled.action];
+    if (said) toast(said);
+  }
   applyPolicyToShell();
 
   if (toggleReplaceBtn) toggleReplaceBtn.classList.add('active');

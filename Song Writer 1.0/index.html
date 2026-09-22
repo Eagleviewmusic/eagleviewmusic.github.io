@@ -41,7 +41,14 @@
     </button>
 </div>
 <!-- ===== App Header End ===== -->
+    <!-- Short messages, e.g. what happened to a song that arrived in a link -->
+    <div class="app-toast" id="appToast" role="status" aria-live="polite"></div>
     <div class="main-container">
+        <!-- Shown while a song shared by link is open: it is never saved into -->
+        <div class="received-notice" id="receivedNotice" hidden>
+            <span class="received-notice-text">Shared with you — it stays exactly as it was sent, so you can always come back to it. Save my copy keeps your changes.</span>
+            <button class="received-notice-btn" id="saveMyCopyBtn">Save my copy</button>
+        </div>
         <div class="notation-container">
             <!-- First Line -->
             <div class="notation-line">
@@ -742,6 +749,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="songs.js"></script>
+    <script src="lib/evm-library.js"></script>
     <script src="script.js"></script>
     <script>
       // Iframe detection cleanup

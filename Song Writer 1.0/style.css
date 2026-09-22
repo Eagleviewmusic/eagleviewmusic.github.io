@@ -2555,3 +2555,85 @@ body:not(.chord-mode-active) .bottom-controls-group.minimized .floating-navigati
 .back-to-music-btn:active {
     transform: translateY(0);
 }
+
+/* ===== SHARED (RECEIVED) SONGS ===== */
+/* Shown while a song that arrived in a link is open: it is never saved
+   into, and Save my copy keeps the student's changes. */
+.received-notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    max-width: 900px;
+    box-sizing: border-box;
+    margin: 4px 0 10px;
+    padding: 8px 10px 8px 14px;
+    background-color: #fbf0fa;
+    border: 1.5px solid #e2b6dd;
+    border-radius: 8px;
+    color: #5c0d54;
+    font-size: 14px;
+    line-height: 1.35;
+}
+
+.received-notice[hidden] {
+    display: none;
+}
+
+.received-notice-btn {
+    flex-shrink: 0;
+    background-color: #9c168e;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.received-notice-btn:hover {
+    background-color: #801174;
+}
+
+.received-notice-btn:active {
+    transform: scale(0.97);
+}
+
+/* A song shared with you, in the Manage Library list */
+.shared-tag {
+    flex-shrink: 0;
+    padding: 1px 7px;
+    border-radius: 999px;
+    border: 1.5px solid #e2b6dd;
+    color: #9c168e;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+/* Short transient message just under the header */
+.app-toast {
+    position: fixed;
+    top: 50px;
+    left: 50%;
+    transform: translate(-50%, -8px);
+    z-index: 1001;
+    max-width: calc(100% - 32px);
+    box-sizing: border-box;
+    padding: 8px 16px;
+    background-color: #333;
+    color: white;
+    font-size: 14px;
+    border-radius: 8px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.app-toast.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}

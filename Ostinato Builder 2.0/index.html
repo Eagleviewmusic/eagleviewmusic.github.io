@@ -421,7 +421,7 @@
 
       <section class="backup-section">
         <h3 class="backup-title">Open a backup</h3>
-        <p class="backup-note">Songs in the file are added to your library; nothing already there is replaced.</p>
+        <p class="backup-note">Ostinatos in the file are added to your library. One you already have is not added twice, and a newer version replaces an older one.</p>
         <input type="file" id="import-file" accept=".json,application/json" hidden />
         <button class="btn" id="import-btn">Choose a file…</button>
         <span class="status-msg" id="import-status"></span>
@@ -627,6 +627,7 @@
 <script src="lib/notation/notation-engine.js"></script>
 <script src="lib/instruments/js/virtual-instruments.js"></script>
 <script src="lib/instruments/js/instrument-icons.js"></script>
+<script src="lib/evm-library.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

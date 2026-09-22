@@ -77,6 +77,10 @@
 (function () {
   'use strict';
 
+  /* Shared library rules (ids, updatedAt, the import rule):
+     lib/evm-library.js. Declared first, because normalizeSong() leans on
+     it and runs early. */
+  const EVM = window.EVMLibrary;
   const EMBEDDED = !!window.MUSIC_STAND_EMBED;
   const RN = window.RhythmNotation;
   const VI = window.VirtualInstruments;
@@ -439,7 +443,7 @@
   function isSandbox(id) { return id === SANDBOX_ID; }
 
   function newSongId() {
-    return 'song_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    return EVM.newId('song');
   }
 
   /* Anything read from storage, a file or a link goes through here first,
@@ -470,7 +474,7 @@
                beats: beats, links: links };
     });
 
-    return {
+    const out = {
       id: src.id || newSongId(),
       title: (typeof src.title === 'string' && src.title.trim()) ? src.title.trim() : 'Untitled ostinato',
       createdAt: Number(src.createdAt) || Date.now(),
@@ -481,7 +485,77 @@
       measures: measures,
       tracks: tracks
     };
+    // updatedAt, received, receivedAt, derivedFrom — see lib/evm-library.js
+    EVM.carry(src, out);
+    return out;
   }
+
+  /* ------------------------------------------------------------------
+     WHAT AN OSTINATO IS, FOR MATCHING (lib/evm-library.js)
+
+     songKey() is the ostinato's content with its name, id and dates left
+     out: two records with the same key are the same piece. It is how a
+     link made before ids travelled finds the copy already here instead
+     of filing another, and how a save tells whether anything changed.
+     Null means blank — a blank ostinato is never filed from a link or
+     file.
+     ------------------------------------------------------------------ */
+  function songKey(rec) {
+    if (!rec || typeof rec !== 'object') return null;
+    const n = normalizeSong(Object.assign({}, rec, { id: rec.id || 'x' }));
+    return isBlankSong(n) ? null : rawSongKey(n);
+  }
+
+  // The same, blank or not — what a save compares.
+  function rawSongKey(rec) {
+    const n = normalizeSong(Object.assign({}, rec, { id: (rec && rec.id) || 'x' }));
+    ['id', 'title', 'createdAt', 'updatedAt', 'isCustom',
+     'received', 'receivedAt', 'derivedFrom'].forEach(k => { delete n[k]; });
+
+    /* Opening a piece conforms it (conformTrack): beats are padded out to
+       the length of the piece with empty beats of the plain division, and
+       a division the app cannot draw falls back to the plain one. The
+       next save writes that back, so neither is content — otherwise a
+       piece merely opened would look changed, and newer. */
+    const compound = n.timeSignatureDenominator === 8;
+    const plain = compound ? 3 : 2;
+    const allowed = compound ? [3, 6, 2, 4] : [2, 4, 3, 6];
+    const want = n.measures * (compound ? n.timeSignatureNumerator / 3 : n.timeSignatureNumerator);
+    n.tracks = n.tracks.map(t => {
+      const beats = t.beats.map((b, i) => (i < want && allowed.indexOf(b.slots) === -1)
+        ? { slots: plain, cells: Array.from({ length: plain }, (_, k) => !!b.cells[k]) }
+        : { slots: b.slots, cells: b.cells.slice() });
+      while (beats.length) {
+        const last = beats[beats.length - 1];
+        if (last.slots !== plain || last.cells.some(Boolean)) break;
+        beats.pop();
+      }
+      // a track's id is a counter for this page load, not part of the piece
+      return { instrument: t.instrument, muted: t.muted, beats: beats, links: t.links };
+    });
+    return EVM.stableStringify(n);
+  }
+
+  // Blank: not a single cell turned on, in any beat of any track.
+  function isBlankSong(n) {
+    return !(n.tracks || []).some(t =>
+      (t.beats || []).some(b => (b.cells || []).some(Boolean)));
+  }
+
+  /* Ids an import must never take. The sandbox is scratch work; a lesson
+     exercise lives under an id made from the lesson, and is the student's
+     own work inside it — a link landing there would either overwrite it
+     or file it as read-only, and a student could no longer save it. */
+  function isReservedId(id) {
+    return isSandbox(id) || String(id).indexOf('lesson_') === 0;
+  }
+
+  const fileOpts = received => ({
+    key: songKey,
+    reserved: isReservedId,
+    newId: () => EVM.newId('song'),
+    received: received
+  });
 
   function defaultLibrary() {
     const lib = {};
@@ -523,7 +597,9 @@
       if (isSandbox(id)) return;              // scratch work, never a library song
       (DEFAULT_SONGS[id] && !lib[id].isCustom ? starters : mine).push(id);
     });
-    mine.sort((a, b) => (lib[b].createdAt || 0) - (lib[a].createdAt || 0));
+    // a shared ostinato is new here when it arrived, not when it was written
+    const when = id => lib[id].receivedAt || lib[id].createdAt || 0;
+    mine.sort((a, b) => when(b) - when(a));
     const order = Object.keys(DEFAULT_SONGS);
     starters.sort((a, b) => order.indexOf(a) - order.indexOf(b));
     return { mine: mine, starters: starters, all: mine.concat(starters) };
@@ -575,6 +651,10 @@
      ------------------------------------------------------------------ */
   let autoSave = true;
   let savedFingerprint = null;
+  /* The ostinato on screen arrived from someone else (a link, a file
+     from the Librarian): it is never saved into, and the toggle offers
+     Save my copy instead of auto-save. */
+  let openedReceived = false;
 
   /* Key order is not promised anywhere, so a plain stringify would call
      two identical ostinatos different. */
@@ -599,7 +679,7 @@
   function autoSaveOffered() {
     return !EMBEDDED && !lessonMeta && !!song.id && !isSandbox(song.id);
   }
-  function autoSaveOn() { return !autoSaveOffered() || autoSave; }
+  function autoSaveOn() { return !autoSaveOffered() || (autoSave && !openedReceived); }
 
   function hasUnsavedChanges() {
     if (autoSaveOn() || savedFingerprint === null) return false;
@@ -617,9 +697,15 @@
     if (force !== true && !autoSaveOn()) return;
     const lib = getStoredLibrary();
     const existing = lib[song.id];
+    /* A shared ostinato stays exactly as it was sent — that is what lets
+       a student always go back to it. Their changes become theirs only
+       through Save my copy (Save as…). */
+    if (existing && existing.received) return;
     const record = snapshot();
     record.isCustom = existing ? existing.isCustom : !DEFAULT_SONGS[song.id];
     record.createdAt = existing ? existing.createdAt : Date.now();
+    // updatedAt moves only if something actually changed
+    EVM.stamp(record, existing || null, rawSongKey);
     lib[song.id] = record;
     saveStoredLibrary(lib);
     markSaved();
@@ -642,6 +728,8 @@
   const autoSaveLabel  = document.getElementById('autosave-label');
   const ICON_SAVING     = '<path d="M20 6 9 17l-5-5"/>';
   const ICON_NOT_SAVING = '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>';
+  // Save my copy, on a shared song: two sheets, one on the other
+  const ICON_COPY = '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>';
 
   function updateAutoSaveToggle() {
     if (!autoSaveToggle) return;
@@ -650,19 +738,23 @@
     if (!offered) return;
     const on = autoSaveOn();
     autoSaveToggle.classList.toggle('is-off', !on);
+    autoSaveToggle.classList.toggle('is-shared', openedReceived);
     autoSaveToggle.setAttribute('aria-pressed', String(on));
-    autoSaveToggle.title = on
+    autoSaveToggle.title = openedReceived
+      ? 'A shared ostinato stays exactly as it was sent, so you can always go back to it. Press to save your own copy and keep your changes.'
+      : on
       ? 'Auto-save is on: every change is saved to this ostinato. Press to stop saving.'
       : 'Auto-save is off: your changes are not being saved. Press to save them and start saving again.';
-    if (autoSaveLabel) autoSaveLabel.textContent = on ? 'Auto-save' : 'Not saving';
+    if (autoSaveLabel) autoSaveLabel.textContent = openedReceived ? 'Save my copy' : (on ? 'Auto-save' : 'Not saving');
     const svg = autoSaveToggle.querySelector('.autosave-icon');
-    if (svg) svg.innerHTML = on ? ICON_SAVING : ICON_NOT_SAVING;
+    if (svg) svg.innerHTML = openedReceived ? ICON_COPY : (on ? ICON_SAVING : ICON_NOT_SAVING);
   }
 
   /* Turning it back on is the moment to ask about the work done while it
      was off: save it, or leave it on screen only and stay off. */
   function setAutoSave(on) {
     if (!autoSaveOffered()) return;
+    if (on && openedReceived) { askForTitle('copy'); return; }
     if (on && hasUnsavedChanges()) {
       const title = song.title || 'this ostinato';
       const ok = confirm('Save the changes you have made to \u201c' + title + '\u201d?\n\n'
@@ -693,16 +785,17 @@
   }
 
   /* `options.autoSave` is for an ostinato this very moment made or
-     saved — New, Save as…, one that arrived in a link. Opening anything
-     else from the library starts with auto-save off, which is the point
-     of the whole thing. */
+     saved — New, Save as…. Opening anything else from the library starts
+     with auto-save off, which is the point of the whole thing. A shared
+     ostinato (one that arrived in a link) never auto-saves at all. */
   function openSong(id, options) {
     if (isPlaying) stopPlayback();
     const lib = getStoredLibrary();
     const record = lib[id];
     if (!record) return false;
     adoptSong(normalizeSong(record));
-    autoSave = !!(options && options.autoSave);
+    openedReceived = !!record.received;
+    autoSave = !!(options && options.autoSave) && !openedReceived;
     rememberActiveSong();
     afterSongChange();
     return true;
@@ -734,7 +827,7 @@
   function updateSongChip() {
     const sandbox = isSandbox(song.id);
     const title = sandbox ? SANDBOX_TITLE : (song.title || 'Untitled ostinato');
-    const where = sandbox ? SANDBOX_TITLE : (lessonMeta ? 'Lesson' : 'Library');
+    const where = sandbox ? SANDBOX_TITLE : (lessonMeta ? 'Lesson' : (openedReceived ? 'Shared' : 'Library'));
     songChipLabel.textContent = title;
     if (songChip) {
       songChip.classList.toggle('is-sandbox', sandbox);
@@ -751,8 +844,10 @@
     if (nowEditingNote) {
       nowEditingNote.textContent = sandbox
         ? 'Scratch work. It stays here between visits but is not in your library — use Save as… to keep it there.'
+        : (openedReceived && !lessonMeta)
+        ? 'Shared with you. It stays exactly as it was sent, so you can always come back to it — use Save as… to keep your own copy with your changes.'
         : '';
-      nowEditingNote.hidden = !sandbox;
+      nowEditingNote.hidden = !sandbox && !(openedReceived && !lessonMeta);
     }
   }
 
@@ -795,6 +890,7 @@
     if (song.id === SANDBOX_ID) {
       clearTimeout(autosaveTimer);          // the old one must not be written back
       adoptSong(normalizeSong(lib[SANDBOX_ID]));
+      openedReceived = false;
       afterSongChange();
     }
   }
@@ -823,9 +919,11 @@
       measures: 1,
       isCustom: true,
       createdAt: Date.now(),
+      updatedAt: Date.now(),
       tracks: blankTracks()
     });
     adoptSong(record);
+    openedReceived = false;
     autoSave = true;
     rememberActiveSong();
     afterSongChange();
@@ -833,16 +931,21 @@
   }
 
   function saveCopy(title) {
-    flushAutosave();
+    flushAutosave();   // the original — or the sandbox — keeps what is on screen
+    const from = song.id;
     const copy = snapshot();
     copy.id = newSongId();
     copy.title = title;
     copy.isCustom = true;
     copy.createdAt = Date.now();
+    copy.updatedAt = copy.createdAt;
+    // The way back to what it was made from — a shared ostinato, most often.
+    if (from && !isSandbox(from)) copy.derivedFrom = from;
     const lib = getStoredLibrary();
     lib[copy.id] = copy;
     saveStoredLibrary(lib);
     adoptSong(normalizeSong(copy));
+    openedReceived = false;
     autoSave = true;
     rememberActiveSong();
     afterSongChange();
@@ -4951,6 +5054,13 @@
     const title = document.createElement('span');
     title.className = 'library-song-title';
     title.textContent = record.title;
+    if (record.received) {
+      const tag = document.createElement('span');
+      tag.className = 'shared-tag';
+      tag.textContent = 'Shared';
+      tag.title = 'Shared with you: it stays as it was sent. Save as… keeps your own copy.';
+      title.appendChild(tag);
+    }
     const sub = document.createElement('span');
     sub.className = 'library-song-sub';
     sub.textContent = describeSong(record);
@@ -5020,6 +5130,7 @@
       const lib = getStoredLibrary();
       if (!lib[id]) return;
       lib[id].title = next.trim();
+      lib[id].updatedAt = Date.now();
       saveStoredLibrary(lib);
       if (id === song.id) { song.title = next.trim(); updateSongChip(); }
       renderLibraryList();
@@ -5046,7 +5157,8 @@
     });
 
     actions.appendChild(open);
-    actions.appendChild(rename);
+    // A shared ostinato keeps the name it was sent with; a copy can be renamed.
+    if (!record.received) actions.appendChild(rename);
     actions.appendChild(remove);
 
     row.appendChild(meter);
@@ -5189,15 +5301,21 @@
     titleIntent = intent;
     const making = intent === 'new';
     const fromSandbox = !making && isSandbox(song.id);
+    // Save as… on a shared ostinato is how a student keeps their changes.
+    const fromShared = !making && !fromSandbox && openedReceived;
     titleHeading.textContent = making ? 'Create a new ostinato'
-      : (fromSandbox ? 'Save to your library' : 'Save as…');
+      : (fromSandbox ? 'Save to your library' : (fromShared ? 'Save my copy' : 'Save as…'));
     titleSub.textContent = making
       ? 'Give it a name so you can find it later.'
       : (fromSandbox
         ? 'Your sandbox stays as it is. This adds a copy to your library, and you carry on in that copy.'
+        : fromShared
+        ? 'The shared ostinato stays as it was sent, so you can always go back to it. Your copy is yours to change, and you carry on in it.'
         : 'The copy is yours to change; the original is left as it is.');
-    titleConfirm.textContent = making ? 'Create' : (fromSandbox ? 'Save to library' : 'Save');
-    titleInput.value = (making || fromSandbox) ? '' : (song.title || 'Untitled ostinato') + ' copy';
+    titleConfirm.textContent = making ? 'Create'
+      : (fromSandbox ? 'Save to library' : (fromShared ? 'Save my copy' : 'Save'));
+    titleInput.value = (making || fromSandbox) ? ''
+      : (song.title || 'Untitled ostinato') + (fromShared ? ' (my copy)' : ' copy');
     titleStatus.textContent = '';
     openSheet(titleModal);
     setTimeout(() => { titleInput.focus(); titleInput.select(); }, 40);
@@ -5287,12 +5405,19 @@
   document.getElementById('make-link-btn').addEventListener('click', () => {
     flushAutosave();
     const record = snapshot();
-    const fromSandbox = isSandbox(record.id);
-    delete record.id;                 // the receiver files it as their own
+    const fromId = record.id;
+    const fromSandbox = isSandbox(fromId);
+    delete record.id;
     /* A sandbox travels marked as one, and lands in the receiver's
        sandbox rather than in their library: scratch work stays scratch
        work on both ends. */
     if (fromSandbox) { record.sandbox = true; record.title = SANDBOX_TITLE; }
+    /* Anything else carries its own id and dates, so opening the link
+       again finds the copy already filed instead of adding another, and a
+       newer version replaces an older one. Only when the link holds what
+       is saved under that id (see EVM.shareHeader). */
+    else Object.assign(record, EVM.shareHeader(
+      getStoredLibrary()[fromId], rawSongKey, rawSongKey(record)));
 
     /* The ten-per-cent version of a lesson, for the eighty-per-cent
        case: no task, no scoped library, none of that machinery — just
@@ -5441,14 +5566,12 @@
       let incoming = [];
       try {
         const parsed = JSON.parse(e.target.result);
-        if (Array.isArray(parsed)) incoming = parsed;
-        else if (parsed && Array.isArray(parsed.songs)) incoming = parsed.songs;
-        else if (parsed && typeof parsed === 'object') {
-          Object.keys(parsed).forEach(k => {
-            const v = parsed[k];
-            if (v && typeof v === 'object' && (v.tracks || v.title)) incoming.push(v);
-          });
-        }
+        /* A backup, an old export, a raw library, or a Librarian file —
+           see EVM.readItems. */
+        incoming = EVM.readItems(parsed, {
+          app: 'ostinato-builder',
+          looksLike: v => !!(v.tracks || v.title)
+        });
       } catch (err) {
         importStatus.textContent = 'That file is not readable as JSON.';
         importStatus.className = 'status-msg error';
@@ -5456,33 +5579,44 @@
         return;
       }
 
+      const otherApp = incoming.otherApp || 0;   // Librarian items meant for another app
       incoming = incoming.filter(x => x && typeof x === 'object' && Array.isArray(x.tracks));
       if (!incoming.length) {
-        importStatus.textContent = 'No ostinatos found in that file.';
+        importStatus.textContent = otherApp
+          ? 'That file holds work for a different app, not ostinatos.'
+          : 'No ostinatos found in that file.';
         importStatus.className = 'status-msg error';
         importFile.value = '';
         return;
       }
 
-      /* Imports are added, never merged over: a song already in the
-         library keeps its place and the arrival gets a fresh id. */
+      /* Ostinatos keep their ids and dates, so importing the same file
+         twice adds nothing, and a newer copy of one replaces the older.
+         A file keeps each as it was there — yours stay yours, shared ones
+         stay shared. Blank ones are left out. See EVM.file. */
       const lib = getStoredLibrary();
-      let added = 0;
+      const counts = { added: 0, updated: 0, same: 0, matched: 0, kept: 0, blank: 0 };
       incoming.forEach(raw => {
-        const record = normalizeSong(raw);
-        if (!record.tracks.length) return;
-        if (lib[record.id]) record.id = newSongId();
-        record.isCustom = true;
-        record.createdAt = Date.now();
-        lib[record.id] = record;
-        added++;
+        const incomingRec = normalizeSong(Object.assign({}, raw, {
+          id: raw.id || 'incoming', isCustom: true
+        }));
+        if (!raw.id || isReservedId(raw.id)) delete incomingRec.id;
+        const result = EVM.file(lib, incomingRec, fileOpts(false));
+        counts[result.action] = (counts[result.action] || 0) + 1;
       });
+      const parts = [];
+      if (counts.added) parts.push('added ' + counts.added);
+      if (counts.updated) parts.push('updated ' + counts.updated);
+      if (counts.same + counts.matched) parts.push((counts.same + counts.matched) + ' already here');
+      if (counts.kept) parts.push('kept your newer copy of ' + counts.kept);
+      if (counts.blank) parts.push('skipped ' + counts.blank + ' blank');
       saveStoredLibrary(lib);
       renderExportList();
       renderLibraryList();
 
-      importStatus.textContent = added === 1 ? 'Added 1 ostinato.' : 'Added ' + added + ' ostinatos.';
-      importStatus.className = 'status-msg good';
+      const said = parts.join(', ');
+      importStatus.textContent = said.charAt(0).toUpperCase() + said.slice(1) + '.';
+      importStatus.className = (counts.added || counts.updated) ? 'status-msg good' : 'status-msg';
       importFile.value = '';
     };
     reader.readAsText(file);
@@ -6157,6 +6291,10 @@
         id: id, isCustom: true, createdAt: Date.now() + i
       }));
       if (!fresh.tracks.length) return;
+      /* An exercise is the student's own work, whatever the teacher's
+         copy was: never filed read-only, or nothing they did would save. */
+      delete fresh.received;
+      delete fresh.receivedAt;
       sources[id] = fresh;                                     // always pristine
       if (!lib[id]) lib[id] = JSON.parse(JSON.stringify(fresh)); // seeded once only
       ids.push(id);
@@ -6630,6 +6768,8 @@
       const record = normalizeSong(JSON.parse(JSON.stringify(lib[id])));
       delete record.id;
       delete record.createdAt;
+      // where the teacher's copy came from is not the student's business
+      ['updatedAt', 'received', 'receivedAt', 'derivedFrom'].forEach(k => { delete record[k]; });
       return record;
     });
     return {
@@ -6865,22 +7005,62 @@
        is not part of it. */
     if (decoded.layout) applyLayoutSnapshot(decoded.layout, !!decoded.layoutLocked);
 
-    const record = normalizeSong(decoded);
-    record.id = decoded.sandbox ? SANDBOX_ID : newSongId();
-    if (decoded.sandbox) record.title = SANDBOX_TITLE;
-    record.isCustom = true;
-    record.createdAt = Date.now();
-
     const lib = getStoredLibrary();
-    lib[record.id] = record;
+
+    /* A sandbox lands in this person's sandbox, over whatever was there:
+       it is scratch work, and that is what the sandbox is for. */
+    if (decoded.sandbox) {
+      const record = normalizeSong(decoded);
+      record.id = SANDBOX_ID;
+      record.title = SANDBOX_TITLE;
+      record.isCustom = true;
+      record.createdAt = Date.now();
+      ['updatedAt', 'received', 'receivedAt', 'derivedFrom'].forEach(k => { delete record[k]; });
+      lib[SANDBOX_ID] = record;
+      saveStoredLibrary(lib);
+
+      adoptSong(normalizeSong(record));
+      openedReceived = false;
+      autoSave = true;            // the sandbox keeps itself, as it always does
+      rememberActiveSong();
+      afterSongChange();
+      toast('Opened in your sandbox');
+      return true;
+    }
+
+    /* Anything else goes into the library as a shared ostinato — once.
+
+       A page embedded in a Google Site opens with its link every time it
+       is visited, so filing it is not "add an ostinato" but "make sure it
+       is here": the same id, or (for links made before ids travelled)
+       the same content, finds the copy already filed. A newer version of
+       it replaces the old one. A blank one is not filed at all, and the
+       app opens as it would have without the link. See EVM.file in
+       lib/evm-library.js. */
+    const incoming = normalizeSong(Object.assign({}, decoded, {
+      id: decoded.id || 'incoming', isCustom: true
+    }));
+    if (!decoded.id || isReservedId(decoded.id)) delete incoming.id;   // a link from before ids travelled
+    const result = EVM.file(lib, incoming, fileOpts(true));
+    if (result.action === 'blank') {
+      toast('That link holds an empty ostinato, so nothing was added');
+      return false;
+    }
     saveStoredLibrary(lib);
 
-    adoptSong(normalizeSong(record));
-    autoSave = true;              // just filed as this person's own
-    rememberActiveSong();
-    afterSongChange();
-    toast(decoded.sandbox ? 'Opened in your sandbox'
-                          : 'Added “' + record.title + '” to your library');
+    /* Opened the way the library opens anything: a shared ostinato never
+       auto-saves (Save my copy keeps changes), and one of this person's
+       own that the link turned out to be starts with auto-save off. */
+    if (!openSong(result.id)) return false;
+    const t = (getStoredLibrary()[result.id] || {}).title || 'the ostinato';
+    const said = {
+      added: 'Added \u201c' + t + '\u201d to your library',
+      same: 'Opened \u201c' + t + '\u201d from your library',
+      matched: 'Opened \u201c' + t + '\u201d from your library',
+      updated: 'Updated \u201c' + t + '\u201d to the newest version',
+      kept: 'Opened \u201c' + t + '\u201d \u2014 you already have a newer version'
+    }[result.action];
+    if (said) toast(said);
     return true;
   }
 
@@ -7120,6 +7300,7 @@
         const lib = liveLibrary();
         if (!lib[id]) return null;
         adoptSong(normalizeSong(lib[id]));
+        openedReceived = !!lib[id].received;
         afterSongChange();
         settled();
         return bridge.info();
@@ -7131,6 +7312,7 @@
       loadSong(raw) {
         if (!raw || typeof raw !== 'object' || !Array.isArray(raw.tracks)) return null;
         adoptSong(normalizeSong(raw));
+        openedReceived = false;   // not a library song at all
         afterSongChange();
         settled();
         return bridge.info();

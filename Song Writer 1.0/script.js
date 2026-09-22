@@ -335,12 +335,25 @@ const harmonyBarsControl = document.getElementById('harmonyBarsControl');
 const harmonyBarsIconWrap = document.getElementById('harmonyBarsIconWrap');
 const addHarmonyNoteBtn = document.getElementById('addHarmonyNoteBtn');
 const removeHarmonyNoteBtn = document.getElementById('removeHarmonyNoteBtn');
+const receivedNotice = document.getElementById('receivedNotice');
+const saveMyCopyBtn = document.getElementById('saveMyCopyBtn');
+const appToast = document.getElementById('appToast');
 
 // ===== STORAGE & STATE VARIABLES =====
 const STORAGE_KEY = 'song_writer_library_v1';
 const ACTIVE_SONG_ID_KEY = 'song_writer_active_song_id';
 let currentSongId = 'twinkle';
 let currentSongTitle = 'Twinkle Twinkle';
+// Shared library rules (ids, updatedAt, the import rule): lib/evm-library.js
+const EVM = window.EVMLibrary;
+// The songs every copy of the app starts with. They never travel by id.
+const BUILT_IN_SONG_IDS = ['twinkle', 'mary', 'starspangledbanner'];
+const NEW_SONG_TEMPLATE = `[Key of C]\n[A]\nStart[D1] Here[D1]`;
+/* The song on screen arrived from someone else (a link): it is never
+   saved into. Edits stay on screen until Save my copy. */
+let openedReceived = false;
+// 'new' (Create a New Song) or 'copy' (Save my copy of a shared song)
+let newSongModalMode = 'new';
 let saveLoadMode = false;
 let abaMode = false;
 
@@ -1919,7 +1932,63 @@ function getStoredLibrary() {
         saveStoredLibrary(library);
     }
 
+    // A built-in is marked as one, so it never travels by id (EVM.shareHeader / EVM.file).
+    BUILT_IN_SONG_IDS.forEach(id => {
+        const song = library[id];
+        if (song && typeof song === 'object' && song.isCustom !== true) song.isCustom = false;
+    });
+
     return library;
+}
+
+/* ------------------------------------------------------------------
+   WHAT A SONG IS, FOR MATCHING (lib/evm-library.js)
+
+   rawSongKey() is the song's text with whitespace tidied (line endings,
+   runs of spaces, blank lines): two records with the same key are the
+   same piece. It is how a link made before ids travelled finds the copy
+   already here, and how a save tells whether anything changed.
+   songKey() is the same, but null for a blank song — a blank song is
+   never filed from a link or a file.
+   ------------------------------------------------------------------ */
+function rawSongKey(song) {
+    const content = song && typeof song.content === 'string' ? song.content : '';
+    return content.replace(/\r\n?/g, '\n').split('\n')
+        .map(line => line.trim().replace(/\s+/g, ' '))
+        .filter(line => line.length > 0)
+        .join('\n');
+}
+
+function songKey(song) {
+    if (!song || typeof song !== 'object' || typeof song.content !== 'string') return null;
+    const key = rawSongKey(song);
+    if (key === rawSongKey({ content: NEW_SONG_TEMPLATE })) return null;
+    return songHasLyrics(key) ? key : null;
+}
+
+// True when at least one syllable has a real word (not '-' or empty).
+function songHasLyrics(text) {
+    return text.split('\n').some(line => {
+        const trimmed = line.trim();
+        if (!trimmed || /^\[(.*)\]$/.test(trimmed)) return false;   // [Key of C], [A] …
+        return trimmed.split(/\s+/).some(token => {
+            const m = token.match(/^(.*)\[(.*)\]$/);
+            const lyric = (m ? m[1] : token).trim();
+            return lyric !== '' && lyric !== '-';
+        });
+    });
+}
+
+function showToast(message) {
+    if (!appToast || !message) return;
+    appToast.textContent = message;
+    appToast.classList.add('show');
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => appToast.classList.remove('show'), 3500);
+}
+
+function updateReceivedNotice() {
+    if (receivedNotice) receivedNotice.hidden = !openedReceived;
 }
 
 function saveStoredLibrary(library) {
@@ -1997,15 +2066,27 @@ function generateScoreText() {
 function saveCurrentSongToLibrary() {
     if (!currentSongId) return;
     const library = getStoredLibrary();
+    const existing = library[currentSongId];
+    /* A shared song stays exactly as it was sent — that is what lets a
+       student always come back to it. Their changes become theirs only
+       through Save my copy. */
+    if (openedReceived || (existing && existing.received)) return;
     const scoreText = generateScoreText();
-    if (!library[currentSongId]) {
+    const now = Date.now();
+    if (!existing) {
         library[currentSongId] = {
             id: currentSongId,
             title: currentSongTitle || 'Untitled Song',
-            content: scoreText
+            content: scoreText,
+            createdAt: now,
+            updatedAt: now
         };
     } else {
-        library[currentSongId].content = scoreText;
+        // This runs on every edit and more: updatedAt moves only if the song changed.
+        const changed = rawSongKey(existing) !== rawSongKey({ content: scoreText });
+        existing.content = scoreText;
+        if (!existing.createdAt) existing.createdAt = now;
+        if (changed) existing.updatedAt = now;
     }
     saveStoredLibrary(library);
 }
@@ -2026,7 +2107,7 @@ function populateLibraryDropdown() {
         const song = library[id];
         const opt = document.createElement('option');
         opt.value = id;
-        opt.textContent = song.title;
+        opt.textContent = song.received ? `${song.title} (shared)` : song.title;
         if (id === currentSongId) {
             opt.selected = true;
         }
@@ -2046,10 +2127,12 @@ function loadSongById(songId) {
 
     currentSongId = songId;
     currentSongTitle = song.title;
+    openedReceived = !!song.received;
     localStorage.setItem(ACTIVE_SONG_ID_KEY, songId);
 
     loadSongFromText(song.content);
     populateLibraryDropdown();
+    updateReceivedNotice();
 }
 
 function loadSongFromText(text) {
@@ -2077,10 +2160,27 @@ function loadSongFromText(text) {
 }
 
 // ===== CREATE NEW SONG MODAL =====
-function showNewSongModal() {
-    newSongTitleInput.value = '';
+// mode 'copy' asks for the title of Save my copy; anything else (including a click event) is New Song.
+function showNewSongModal(mode) {
+    newSongModalMode = (mode === 'copy' && openedReceived) ? 'copy' : 'new';
+    const heading = newSongModal.querySelector('h3');
+    const subtext = newSongModal.querySelector('.popup-subtext');
+    if (newSongModalMode === 'copy') {
+        if (heading) heading.textContent = 'Save my copy';
+        if (subtext) subtext.textContent = 'The shared song stays as it was sent. Your copy keeps your changes and is yours to edit. Enter a title for your copy:';
+        if (confirmNewSongBtn) confirmNewSongBtn.textContent = 'Save my copy';
+        newSongTitleInput.value = `${currentSongTitle || 'Song'} (my copy)`;
+    } else {
+        if (heading) heading.textContent = 'Create a New Song';
+        if (subtext) subtext.textContent = 'Enter a title for your new song:';
+        if (confirmNewSongBtn) confirmNewSongBtn.textContent = 'Create Song';
+        newSongTitleInput.value = '';
+    }
     newSongModal.classList.add('show');
-    setTimeout(() => newSongTitleInput.focus(), 60);
+    setTimeout(() => {
+        newSongTitleInput.focus();
+        if (newSongModalMode === 'copy') newSongTitleInput.select();
+    }, 60);
 }
 
 function hideNewSongModal() {
@@ -2088,16 +2188,54 @@ function hideNewSongModal() {
     newSongTitleInput.value = '';
 }
 
-function createNewSong(title) {
-    const cleanTitle = (title && title.trim()) ? title.trim() : 'New Song';
-    const id = 'song_' + Date.now();
-    const defaultContent = `[Key of C]\n[A]\nStart[D1] Here[D1]`;
-    
+function confirmNewSongModal() {
+    if (newSongModalMode === 'copy') {
+        saveMyCopy(newSongTitleInput.value);
+    } else {
+        createNewSong(newSongTitleInput.value);
+    }
+}
+
+/* A shared song is never saved into. Save my copy files what is on screen
+   as the student's own new song (with the way back to the shared one in
+   derivedFrom) and carries on in it, where normal saving applies. */
+function saveMyCopy(title) {
+    if (!openedReceived) { hideNewSongModal(); return; }
+    const fromId = currentSongId;
+    const cleanTitle = (title && title.trim()) ? title.trim() : `${currentSongTitle || 'Song'} (my copy)`;
+    const now = Date.now();
+    const id = EVM.newId('song');
+
     const library = getStoredLibrary();
     library[id] = {
         id: id,
         title: cleanTitle,
-        content: defaultContent
+        content: generateScoreText(),
+        isCustom: true,
+        createdAt: now,
+        updatedAt: now,
+        derivedFrom: fromId
+    };
+    saveStoredLibrary(library);
+
+    hideNewSongModal();
+    loadSongById(id);   // not received, so openedReceived is false from here
+    showToast(`Saved “${cleanTitle}” — your changes are saved from now on`);
+}
+
+function createNewSong(title) {
+    const cleanTitle = (title && title.trim()) ? title.trim() : 'New Song';
+    const id = EVM.newId('song');
+    const now = Date.now();
+
+    const library = getStoredLibrary();
+    library[id] = {
+        id: id,
+        title: cleanTitle,
+        content: NEW_SONG_TEMPLATE,
+        isCustom: true,
+        createdAt: now,
+        updatedAt: now
     };
     saveStoredLibrary(library);
 
@@ -2155,6 +2293,13 @@ function renderLibrarySongList() {
 
         infoDiv.appendChild(badge);
         infoDiv.appendChild(titleSpan);
+        if (song.received) {
+            const tag = document.createElement('span');
+            tag.className = 'shared-tag';
+            tag.textContent = 'Shared';
+            tag.title = 'Shared with you: it stays as it was sent. Save my copy keeps your changes.';
+            infoDiv.appendChild(tag);
+        }
 
         const actionsDiv = document.createElement('div');
         actionsDiv.className = 'library-song-actions';
@@ -2180,6 +2325,7 @@ function renderLibrarySongList() {
             const newTitle = prompt('Enter new song title:', song.title);
             if (newTitle && newTitle.trim()) {
                 library[id].title = newTitle.trim();
+                library[id].updatedAt = Date.now();
                 saveStoredLibrary(library);
                 if (id === currentSongId) {
                     currentSongTitle = newTitle.trim();
@@ -2212,7 +2358,8 @@ function renderLibrarySongList() {
         });
 
         actionsDiv.appendChild(loadBtn);
-        actionsDiv.appendChild(renameBtn);
+        // A shared song keeps the name it was sent with; a copy can be renamed.
+        if (!song.received) actionsDiv.appendChild(renameBtn);
         actionsDiv.appendChild(deleteBtn);
 
         itemDiv.appendChild(infoDiv);
@@ -2251,10 +2398,15 @@ function decodeSongFromUrl(encodedStr) {
 
 function generateShareLink() {
     saveCurrentSongToLibrary();
-    const songData = {
+    const content = generateScoreText();
+    /* The song's own id and dates travel with it, so opening the link
+       again finds the copy already filed instead of adding another, and a
+       newer version replaces an older one. Only when the link holds what
+       is saved under that id, and never for a built-in (EVM.shareHeader). */
+    const songData = Object.assign({
         title: currentSongTitle || 'Song',
-        content: generateScoreText()
-    };
+        content: content
+    }, EVM.shareHeader(getStoredLibrary()[currentSongId], rawSongKey, rawSongKey({ content: content })));
     const encoded = encodeSongToUrl(songData);
     const baseUrl = window.location.origin + window.location.pathname;
     const fullUrl = `${baseUrl}#song=${encoded}`;
@@ -2375,11 +2527,14 @@ function handleExportDownload() {
     checkboxes.forEach(cb => {
         const songId = cb.value;
         if (library[songId]) {
-            selectedSongs.push({
+            /* Dates and shared/derived marks travel too, so importing this
+               file again adds nothing and a newer copy wins (EVM.file). */
+            selectedSongs.push(EVM.carry(library[songId], {
                 id: songId,
                 title: library[songId].title,
-                content: library[songId].content
-            });
+                content: library[songId].content,
+                createdAt: library[songId].createdAt || undefined
+            }));
         }
     });
 
@@ -2414,19 +2569,14 @@ function handleFileUpload(event) {
     reader.onload = function(e) {
         try {
             const json = JSON.parse(e.target.result);
-            let importedSongs = [];
-
-            if (Array.isArray(json)) {
-                importedSongs = json;
-            } else if (json && Array.isArray(json.songs)) {
-                importedSongs = json.songs;
-            } else if (json && typeof json === 'object') {
-                Object.keys(json).forEach(k => {
-                    if (json[k] && typeof json[k] === 'object' && json[k].content) {
-                        importedSongs.push(json[k]);
-                    }
-                });
-            }
+            /* A backup, an old export, a raw library, or a Librarian file —
+               see EVM.readItems. Song Writer 1.0 songs are text: an item
+               without a `content` string (a 2.0 score only) is skipped. */
+            const readSongs = EVM.readItems(json, {
+                app: 'song-writer',
+                looksLike: v => typeof v.content === 'string'
+            });
+            const importedSongs = readSongs.filter(song => song && typeof song.content === 'string');
 
             if (importedSongs.length === 0) {
                 if (uploadStatusMsg) {
@@ -2436,34 +2586,52 @@ function handleFileUpload(event) {
                 return;
             }
 
+            /* Songs keep their ids and dates, so importing the same file twice
+               adds nothing, and a newer copy of a song replaces the older one.
+               A file keeps each song as it was there — yours stay yours, shared
+               ones stay shared. Blank songs are left out. See EVM.file. */
             const library = getStoredLibrary();
-            let addedCount = 0;
+            const counts = { added: 0, updated: 0, same: 0, matched: 0, kept: 0, blank: 0 };
+            let currentReplaced = false;
 
             importedSongs.forEach(song => {
-                if (song && (song.content || song.title)) {
-                    const title = (song.title && song.title.trim()) ? song.title.trim() : 'Imported Song';
-                    const content = song.content || `[Key of C]\n[A]\nStart[D1] Here[D1]`;
-                    
-                    let id = song.id || ('song_' + Date.now() + '_' + Math.floor(Math.random() * 1000));
-                    if (library[id]) {
-                        id = 'song_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-                    }
+                const incoming = {
+                    title: (song.title && String(song.title).trim()) ? String(song.title).trim() : 'Imported Song',
+                    content: song.content
+                };
+                if (song.id) incoming.id = String(song.id);
+                if (song.createdAt) incoming.createdAt = song.createdAt;
+                if (song.updatedAt) incoming.updatedAt = song.updatedAt;
+                if (song.received) incoming.received = true;
+                if (song.derivedFrom) incoming.derivedFrom = song.derivedFrom;
 
-                    library[id] = {
-                        id: id,
-                        title: title,
-                        content: content
-                    };
-                    addedCount++;
-                }
+                const result = EVM.file(library, incoming, {
+                    key: songKey,
+                    reserved: () => false,
+                    newId: () => EVM.newId('song'),
+                    received: false
+                });
+                counts[result.action] = (counts[result.action] || 0) + 1;
+                if (result.action === 'updated' && result.id === currentSongId) currentReplaced = true;
             });
 
+            const parts = [];
+            if (counts.added) parts.push(`added ${counts.added}`);
+            if (counts.updated) parts.push(`updated ${counts.updated}`);
+            if (counts.same + counts.matched) parts.push(`${counts.same + counts.matched} already here`);
+            if (counts.kept) parts.push(`kept your newer copy of ${counts.kept}`);
+            if (counts.blank) parts.push(`skipped ${counts.blank} blank`);
+            if (readSongs.otherApp) parts.push(`skipped ${readSongs.otherApp} from another app`);
+
             saveStoredLibrary(library);
+            // The song on screen was just replaced by a newer version: show that one.
+            if (currentReplaced) loadSongById(currentSongId);
             populateLibraryDropdown();
             renderExportSongList();
 
             if (uploadStatusMsg) {
-                uploadStatusMsg.textContent = `✓ Successfully imported ${addedCount} song${addedCount > 1 ? 's' : ''}!`;
+                const said = parts.join(', ');
+                uploadStatusMsg.textContent = '✓ ' + said.charAt(0).toUpperCase() + said.slice(1) + '.';
                 uploadStatusMsg.className = 'upload-status-msg';
             }
 
@@ -2985,30 +3153,59 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  let sharedFiled = null;
   if (sharedSong && (sharedSong.content || sharedSong.title)) {
-    const title = (sharedSong.title && sharedSong.title.trim()) ? sharedSong.title.trim() : 'Shared Song';
-    const content = sharedSong.content || '[Key of C]\n[A]\nStart[D1] Here[D1]';
-    const sharedId = 'shared_' + Date.now();
-
-    library[sharedId] = {
-      id: sharedId,
-      title: title,
-      content: content
+    /* A page embedded in a Google Site opens with its link every time it
+       is visited, so filing it is not "add a song" but "make sure it is
+       here": the same id, or (for links made before ids travelled) the
+       same content, finds the copy already filed. A newer version of it
+       replaces the old one. A blank song is not filed at all. It is filed
+       as shared (received): it stays exactly as it was sent. See EVM.file
+       in lib/evm-library.js. */
+    const incoming = {
+      title: (sharedSong.title && String(sharedSong.title).trim()) ? String(sharedSong.title).trim() : 'Shared Song',
+      content: typeof sharedSong.content === 'string' ? sharedSong.content : ''
     };
-    saveStoredLibrary(library);
-    songIdToLoad = sharedId;
-    localStorage.setItem(ACTIVE_SONG_ID_KEY, sharedId);
+    if (sharedSong.id) incoming.id = String(sharedSong.id);
+    if (sharedSong.createdAt) incoming.createdAt = sharedSong.createdAt;
+    if (sharedSong.updatedAt) incoming.updatedAt = sharedSong.updatedAt;
+
+    sharedFiled = EVM.file(library, incoming, {
+      key: songKey,
+      reserved: () => false,
+      newId: () => EVM.newId('song'),
+      received: true
+    });
+    if (sharedFiled.id) {
+      saveStoredLibrary(library);
+      songIdToLoad = sharedFiled.id;
+      localStorage.setItem(ACTIVE_SONG_ID_KEY, sharedFiled.id);
+    }
 
     try {
       window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
     } catch (e) {}
-  } else {
+  }
+  if (!songIdToLoad) {
+    // No link, or a link holding an empty song: the normal startup song.
     const savedActiveId = localStorage.getItem(ACTIVE_SONG_ID_KEY);
     songIdToLoad = (savedActiveId && library[savedActiveId]) ? savedActiveId : (library['twinkle'] ? 'twinkle' : Object.keys(library)[0]);
   }
-  
+
   if (songIdToLoad) {
     loadSongById(songIdToLoad);
+  }
+  if (sharedFiled) {
+    const t = (getStoredLibrary()[sharedFiled.id] || {}).title || 'the song';
+    const said = {
+      added: `Added “${t}” to your library`,
+      same: `Opened “${t}” from your library`,
+      matched: `Opened “${t}” from your library`,
+      updated: `Updated “${t}” to the newest version`,
+      kept: `Opened “${t}” — you already have a newer version`,
+      blank: 'That link holds an empty song, so nothing was added'
+    }[sharedFiled.action];
+    if (said) showToast(said);
   }
   
   document.querySelectorAll('.syllable').forEach(syllable => addSyllableEventListeners(syllable));
@@ -3110,15 +3307,20 @@ if (cancelNewSongBtn) {
 }
 
 if (confirmNewSongBtn) {
-  confirmNewSongBtn.addEventListener('click', () => {
-    createNewSong(newSongTitleInput.value);
+  confirmNewSongBtn.addEventListener('click', confirmNewSongModal);
+}
+
+if (saveMyCopyBtn) {
+  saveMyCopyBtn.addEventListener('click', () => {
+    saveMyCopyBtn.blur();
+    showNewSongModal('copy');
   });
 }
 
 if (newSongTitleInput) {
   newSongTitleInput.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
-      createNewSong(newSongTitleInput.value);
+      confirmNewSongModal();
     } else if (event.key === 'Escape') {
       hideNewSongModal();
     }
