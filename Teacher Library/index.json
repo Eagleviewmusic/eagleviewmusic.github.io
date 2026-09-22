@@ -1,6 +1,15 @@
 {
   "format": "evm-index",
   "formatVersion": 1,
-  "generatedAt": "2026-09-22T00:00:00.000Z",
-  "items": []
+  "generatedAt": "2026-09-22T23:20:34.574Z",
+  "items": [
+    {
+      "app": "rhythm-poetry",
+      "kind": "poem",
+      "id": "song_1790120000000_test",
+      "title": "Library test (to be removed)",
+      "updatedAt": 1790120000000,
+      "path": "rhythm-poetry--song_1790120000000_test.json"
+    }
+  ]
 }
