@@ -35,7 +35,7 @@
      content. id, title, createdAt and isCustom are older than this file and
      each app already keeps them; these are the ones its normalize and save
      functions must now carry through as well, or a save drops them. */
-  const HEADER = ['updatedAt', 'received', 'receivedAt', 'derivedFrom'];
+  const HEADER = ['updatedAt', 'received', 'receivedAt', 'derivedFrom', 'book'];
 
   function stableStringify(value) {
     if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']';
@@ -237,7 +237,7 @@
      knowing any app. Built-ins (isCustom false) are never published.
      ------------------------------------------------------------------ */
   const ENVELOPE_SKIP = ['id', 'title', 'createdAt', 'updatedAt', 'isCustom',
-                         'received', 'receivedAt', 'derivedFrom', 'sandbox'];
+                         'received', 'receivedAt', 'derivedFrom', 'sandbox', 'book'];
 
   function toEnvelope(record, opts) {
     const o = opts || {};
@@ -256,12 +256,16 @@
       title: record.title || record.name || 'Untitled',
       createdAt: record.createdAt || Date.now(),
       updatedAt: record.updatedAt || record.createdAt || Date.now(),
+      // the Teacher Library book it sits in on the shelf (evm-shelf.js)
+      book: o.book ? String(o.book) : undefined,
       data: data
     };
   }
 
   /* An envelope is something published to people — so it arrives
-     read-only, unless it says otherwise. */
+     read-only, unless it says otherwise. Its `book` is not copied: a
+     record's `book` means "taken out from the shelf in that book", and
+     only evm-shelf.js sets it (a file uploaded by hand is not on loan). */
   function fromEnvelope(env) {
     const rec = Object.assign({}, env.data || {});
     rec.id = env.id;

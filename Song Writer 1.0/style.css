@@ -2637,3 +2637,67 @@ body:not(.chord-mode-active) .bottom-controls-group.minimized .floating-navigati
     opacity: 1;
     transform: translate(-50%, 0);
 }
+
+/* ===== TEACHER LIBRARY (the shelf of books: lib/evm-shelf.js + .css) ===== */
+/* The shelf reads these tokens; nothing else in Song Writer uses them. */
+:root {
+    --accent: #9c168e;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* The shelf opens over the Manage Library modal (.popup-overlay is 100000). */
+body .evm-shelf {
+    z-index: 100010;
+}
+
+#shelfBtn .shelf-icon {
+    color: #9c168e;
+}
+
+.teacher-library-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    margin-right: 8px;
+    background-color: #9c168e;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.teacher-library-btn:hover {
+    background-color: #801174;
+}
+
+.teacher-library-btn:active {
+    transform: scale(0.97);
+}
+
+/* A book's heading in the Manage Library list; its songs follow it */
+.library-book-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 0 4px;
+    color: #9c168e;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.library-book-head svg {
+    flex-shrink: 0;
+}
+
+.library-book-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

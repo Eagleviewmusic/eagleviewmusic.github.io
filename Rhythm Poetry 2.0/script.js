@@ -2947,6 +2947,7 @@
   const newSongBtn = document.getElementById('newSongBtn');
   const newSongBtnLabel = document.getElementById('newSongBtnLabel');
   const saveAsBtn = document.getElementById('saveAsBtn');
+  const shelfBtn = document.getElementById('shelfBtn');
   const libraryBtn = document.getElementById('library-btn');
   const songChip = document.getElementById('song-chip');
   const songChipKicker = document.getElementById('song-chip-kicker');
@@ -3328,6 +3329,8 @@
      Librarian): it is never saved into, and the toggle offers Save my
      copy instead of auto-save. */
   let openedReceived = false;
+  // …and, if it came from a book taken off the Teacher Library shelf, which one
+  let openedBook = '';
 
   /* Key order is not promised anywhere, so a plain stringify would call
      two identical songs different. */
@@ -3448,7 +3451,7 @@
   function updateSongChip() {
     const sandbox = isSandboxId(getCurrentSongId());
     const title = sandbox ? SANDBOX_TITLE : (getCurrentSongTitle() || 'Untitled');
-    const where = sandbox ? 'Sandbox' : (lessonMeta ? 'Lesson' : (openedReceived ? 'Shared' : 'Library'));
+    const where = sandbox ? 'Sandbox' : (lessonMeta ? 'Lesson' : (openedReceived ? (openedBook || 'Shared') : 'Library'));
     if (songChip) {
       songChip.classList.toggle('is-sandbox', sandbox);
       songChip.title = sandbox
@@ -3555,6 +3558,7 @@
     }
 
     openedReceived = !!song.received;
+    openedBook = openedReceived && song.book ? String(song.book) : '';
     autoSave = (options && options.autoSave && !openedReceived) ? true : false;
     setMode(side);
     markSaved();
@@ -3937,12 +3941,84 @@
     actions.appendChild(loadBtn);
     // A shared song keeps the name it was sent with; a copy can be renamed.
     if (!song.received) actions.appendChild(renameBtn);
-    actions.appendChild(deleteBtn);
+    /* A song from a book leaves with its book (Put back): deleted on its
+       own it would only come back at the next visit while the book is out. */
+    if (!isShelfSong(song)) actions.appendChild(deleteBtn);
 
     row.appendChild(meter);
     row.appendChild(titleSpan);
     row.appendChild(actions);
     return row;
+  }
+
+  /* ------------------------------------------------------------------
+     BOOKS FROM THE TEACHER LIBRARY (lib/evm-shelf.js)
+
+     A book taken off the shelf puts its songs in the library as shared
+     songs marked with `book`. They are listed under their book, above the
+     student's own, with the way to put the book back. Putting it back
+     removes them; a Save my copy of one is the student's own and stays.
+     ------------------------------------------------------------------ */
+  const BOOK_ICON = '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>';
+  const isShelfSong = rec => !!(window.EVMShelf && EVMShelf.isShelfSong(rec));
+
+  function renderBookGroups(library, order) {
+    const byBook = {};
+    Object.keys(library).forEach(id => {
+      const rec = library[id];
+      if (!isShelfSong(rec) || !sideAllowed(songSide(rec))) return;
+      (byBook[rec.book] = byBook[rec.book] || []).push(id);
+    });
+    Object.keys(byBook).sort((a, b) => a.localeCompare(b)).forEach(book => {
+      const group = document.createElement('section');
+      group.className = 'library-group library-group-book';
+      const head = document.createElement('div');
+      head.className = 'library-group-head';
+      head.innerHTML =
+        `<svg viewBox="0 0 24 24" aria-hidden="true">${BOOK_ICON}</svg>` +
+        `<span class="library-group-title"></span>` +
+        `<span class="library-group-rule"></span>`;
+      head.querySelector('.library-group-title').textContent = book;
+      const back = document.createElement('button');
+      back.className = 'evm-book-head-btn';
+      back.textContent = 'Put back';
+      back.title = 'Put this book back on the Teacher Library shelf';
+      back.addEventListener('click', () => EVMShelf.putBack(book));
+      head.appendChild(back);
+      group.appendChild(head);
+      byBook[book]
+        .sort((a, b) => (order.indexOf(songSide(library[a])) - order.indexOf(songSide(library[b]))) ||
+                        String(library[a].title).localeCompare(String(library[b].title)))
+        .forEach(id => group.appendChild(buildSongRow(id, library[id], library)));
+      librarySongList.appendChild(group);
+    });
+  }
+
+  /* After the shelf filed or removed songs: move off anything that left,
+     show a newer version of the song on screen, and redraw. */
+  function shelfChanged(summary) {
+    const library = getStoredLibrary();
+    ['rhythm', 'poetry'].forEach(side => {
+      const id = currentSongIds[side];
+      if (!id || library[id]) return;
+      currentSongIds[side] = null;
+      currentSongTitles[side] = '';
+      const next = ensureSongForSide(side);
+      if (side === currentMode) loadSongById(next);
+      else {
+        currentSongIds[side] = next;
+        currentSongTitles[side] = (getStoredLibrary()[next] || {}).title || '';
+      }
+    });
+    const cur = getCurrentSongId();
+    if (cur && openedReceived && summary.updated.indexOf(cur) !== -1) loadSongById(cur);
+    persistActiveIds();
+    renderLibrarySongList();
+    updateSongChip();
+    const n = summary.added.length, up = summary.updated.length, gone = summary.removed.length;
+    if (n) toast(n === 1 ? 'A song from your books is in your library' : n + ' songs from your books are in your library');
+    else if (up) toast(up === 1 ? 'Your teacher updated a song in your books' : 'Your teacher updated ' + up + ' songs in your books');
+    else if (gone) toast(gone === 1 ? 'A song from your books left your library' : gone + ' songs from your books left your library');
   }
 
   function renderLibrarySongList() {
@@ -3972,10 +4048,13 @@
       librarySongList.appendChild(group);
     }
 
+    if (!lessonMeta) renderBookGroups(library, order);
+
     order.forEach(side => {
       if (!sideAllowed(side)) return;
       const meta = SIDE_META[side];
-      const ids = getSongIdsBySide(library, side);
+      // songs from a book are listed under their book, above
+      const ids = getSongIdsBySide(library, side).filter(id => !isShelfSong(library[id]));
       if (lessonMeta && !ids.length) return;
 
       const group = document.createElement('section');
@@ -5217,6 +5296,7 @@
   // --- MODAL EVENT LISTENERS ---
   if (newSongBtn) newSongBtn.addEventListener('click', () => showNewSongModal('new'));
   if (saveAsBtn) saveAsBtn.addEventListener('click', () => showNewSongModal('saveAs'));
+  if (shelfBtn) shelfBtn.addEventListener('click', () => window.EVMShelf && EVMShelf.openSheet());
 
   function submitTitlePrompt() {
     const value = newSongTitleInput ? newSongTitleInput.value : '';
@@ -7414,6 +7494,7 @@
     // A student's library is the lesson; none of the authoring lives there.
     showHide(newSongBtn, !inLesson);
     showHide(saveAsBtn, !inLesson);
+    showHide(shelfBtn, !inLesson);
     showHide(importExportBtn, !inLesson);
     showHide(lessonSetupBtn, !inLesson);
 
@@ -7531,7 +7612,7 @@
       const id = stem + i;
       const fresh = normalizeSong({ ...song, id: id, isCustom: true, createdAt: Date.now() + i });
       // (a lesson made before exercises were stripped of it could carry this)
-      delete fresh.received; delete fresh.receivedAt;
+      delete fresh.received; delete fresh.receivedAt; delete fresh.book;
       sources[id] = fresh;
       if (!library[id]) library[id] = JSON.parse(JSON.stringify(fresh));
       ids.push(id);
@@ -8815,7 +8896,7 @@
         delete snapshot.createdAt;
         /* A lesson's exercises are the student's to work in, never shared
            songs that refuse to save — so the library header stays home. */
-        ['updatedAt', 'received', 'receivedAt', 'derivedFrom'].forEach(k => delete snapshot[k]);
+        ['updatedAt', 'received', 'receivedAt', 'derivedFrom', 'book'].forEach(k => delete snapshot[k]);
         return snapshot;
       });
     return {
@@ -9522,6 +9603,27 @@
   updateCircleVisibility();
   render();
   relayoutWhenLyricFontLoads();
+
+  /* The Teacher Library shelf: books out are kept in step every visit
+     (new songs arrive, put-back and deleted ones leave). Not in the Music
+     Stand, which must not write this app's library, and not in a lesson. */
+  if (window.EVMShelf) {
+    EVMShelf.init({
+      app: 'rhythm-poetry',
+      disabled: EMBEDDED || !!lessonMeta,
+      load: getStoredLibrary,
+      save: saveStoredLibrary,
+      incoming: rec => normalizeSong(Object.assign({}, rec, { id: rec.id || 'incoming' })),
+      key: songKey,
+      changed: shelfChanged,
+      openSong: id => {
+        saveCurrentSongToLibrary();
+        loadSongById(id);
+        hideManageLibraryModal();
+      }
+    });
+    EVMShelf.sync();
+  }
 
   // --- keep the staff fitted as things change ---
   let resizeTimer = null;

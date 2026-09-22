@@ -510,7 +510,7 @@
   function rawSongKey(rec) {
     const n = normalizeSong(Object.assign({}, rec, { id: (rec && rec.id) || 'x' }));
     ['id', 'title', 'createdAt', 'updatedAt', 'isCustom',
-     'received', 'receivedAt', 'derivedFrom'].forEach(k => { delete n[k]; });
+     'received', 'receivedAt', 'derivedFrom', 'book'].forEach(k => { delete n[k]; });
 
     /* Opening a piece conforms it (conformTrack): beats are padded out to
        the length of the piece with empty beats of the plain division, and
@@ -655,6 +655,8 @@
      from the Librarian): it is never saved into, and the toggle offers
      Save my copy instead of auto-save. */
   let openedReceived = false;
+  // …and, if it came from a book taken off the Teacher Library shelf, which one
+  let openedBook = '';
 
   /* Key order is not promised anywhere, so a plain stringify would call
      two identical ostinatos different. */
@@ -795,6 +797,7 @@
     if (!record) return false;
     adoptSong(normalizeSong(record));
     openedReceived = !!record.received;
+    openedBook = openedReceived && record.book ? String(record.book) : '';
     autoSave = !!(options && options.autoSave) && !openedReceived;
     rememberActiveSong();
     afterSongChange();
@@ -827,7 +830,7 @@
   function updateSongChip() {
     const sandbox = isSandbox(song.id);
     const title = sandbox ? SANDBOX_TITLE : (song.title || 'Untitled ostinato');
-    const where = sandbox ? SANDBOX_TITLE : (lessonMeta ? 'Lesson' : (openedReceived ? 'Shared' : 'Library'));
+    const where = sandbox ? SANDBOX_TITLE : (lessonMeta ? 'Lesson' : (openedReceived ? (openedBook || 'Shared') : 'Library'));
     songChipLabel.textContent = title;
     if (songChip) {
       songChip.classList.toggle('is-sandbox', sandbox);
@@ -891,6 +894,7 @@
       clearTimeout(autosaveTimer);          // the old one must not be written back
       adoptSong(normalizeSong(lib[SANDBOX_ID]));
       openedReceived = false;
+      openedBook = '';
       afterSongChange();
     }
   }
@@ -924,6 +928,7 @@
     });
     adoptSong(record);
     openedReceived = false;
+    openedBook = '';
     autoSave = true;
     rememberActiveSong();
     afterSongChange();
@@ -946,6 +951,7 @@
     saveStoredLibrary(lib);
     adoptSong(normalizeSong(copy));
     openedReceived = false;
+    openedBook = '';
     autoSave = true;
     rememberActiveSong();
     afterSongChange();
@@ -5159,7 +5165,9 @@
     actions.appendChild(open);
     // A shared ostinato keeps the name it was sent with; a copy can be renamed.
     if (!record.received) actions.appendChild(rename);
-    actions.appendChild(remove);
+    /* An ostinato from a book leaves with its book (Put back): deleted on
+       its own it would only come back at the next visit while the book is out. */
+    if (!(window.EVMShelf && EVMShelf.isShelfSong(record))) actions.appendChild(remove);
 
     row.appendChild(meter);
     row.appendChild(middle);
@@ -5184,6 +5192,67 @@
       ids.forEach(id => section.appendChild(buildSongRow(id, normalizeSong(lib[id]))));
     }
     return section;
+  }
+
+  /* ------------------------------------------------------------------
+     BOOKS FROM THE TEACHER LIBRARY (lib/evm-shelf.js)
+
+     A book taken off the shelf puts its ostinatos in the library as
+     shared ones marked with `book`. They are listed under their book,
+     above the student's own, with the way to put the book back. Putting
+     it back removes them; a Save as… copy of one is the student's own
+     and stays.
+     ------------------------------------------------------------------ */
+  const BOOK_ICON = '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>';
+  const isShelfSong = rec => !!(window.EVMShelf && EVMShelf.isShelfSong(rec));
+
+  function renderBookGroups(lib) {
+    const byBook = {};
+    Object.keys(lib).forEach(id => {
+      const rec = lib[id];
+      if (isSandbox(id) || !isShelfSong(rec)) return;
+      (byBook[rec.book] = byBook[rec.book] || []).push(id);
+    });
+    Object.keys(byBook).sort((a, b) => a.localeCompare(b)).forEach(book => {
+      const section = document.createElement('section');
+      section.className = 'library-group-book';
+      const head = document.createElement('div');
+      head.className = 'library-group-head';
+      head.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + BOOK_ICON + '</svg>'
+                     + '<span class="library-group-title"></span>'
+                     + '<span class="library-group-rule"></span>';
+      head.querySelector('.library-group-title').textContent = book;
+      const back = document.createElement('button');
+      back.className = 'evm-book-head-btn';
+      back.textContent = 'Put back';
+      back.title = 'Put this book back on the Teacher Library shelf';
+      back.addEventListener('click', () => EVMShelf.putBack(book));
+      head.appendChild(back);
+      section.appendChild(head);
+      byBook[book]
+        .sort((a, b) => String(lib[a].title).localeCompare(String(lib[b].title)))
+        .forEach(id => section.appendChild(buildSongRow(id, normalizeSong(lib[id]))));
+      libraryList.appendChild(section);
+    });
+  }
+
+  /* After the shelf filed or removed ostinatos: move off one that left
+     (into the sandbox, as deleting it would), show a newer version of
+     the shared one on screen, and redraw. */
+  function shelfChanged(summary) {
+    const lib = getStoredLibrary();
+    if (song.id && !isSandbox(song.id) && !lib[song.id]) {
+      song.id = null;            // so the autosave cannot put it back
+      openSong(ensureSandbox());
+    } else if (song.id && openedReceived && summary.updated.indexOf(song.id) !== -1) {
+      openSong(song.id);
+    }
+    renderLibraryList();
+    updateSongChip();
+    const n = summary.added.length, up = summary.updated.length, gone = summary.removed.length;
+    if (n) toast(n === 1 ? 'A song from your books is in your library' : n + ' songs from your books are in your library');
+    else if (up) toast(up === 1 ? 'Your teacher updated a song in your books' : 'Your teacher updated ' + up + ' songs in your books');
+    else if (gone) toast(gone === 1 ? 'A song from your books left your library' : gone + ' songs from your books left your library');
   }
 
   /* The sandbox's own row: no rename, no delete — Clear instead, which
@@ -5273,7 +5342,12 @@
     sandboxSection.appendChild(buildSandboxRow());
     libraryList.appendChild(sandboxSection);
 
-    const { mine, starters } = sortedSongIds(lib);
+    renderBookGroups(lib);
+
+    // ostinatos from a book are listed under their book, above
+    const ids = sortedSongIds(lib);
+    const mine = ids.mine.filter(id => !isShelfSong(lib[id]));
+    const starters = ids.starters.filter(id => !isShelfSong(lib[id]));
     libraryList.appendChild(libraryGroup('Yours', mine, lib,
       'Nothing yet — press New ostinato, or save a copy of a starter.'));
     libraryList.appendChild(libraryGroup('Starters', starters, lib,
@@ -5343,6 +5417,7 @@
 
   document.getElementById('new-song-btn').addEventListener('click', () => askForTitle('new'));
   document.getElementById('save-copy-btn').addEventListener('click', () => askForTitle('copy'));
+  document.getElementById('shelf-btn').addEventListener('click', () => window.EVMShelf && EVMShelf.openSheet());
 
 
   /* ==================================================================
@@ -6152,6 +6227,7 @@
   const addTrackBtn       = document.getElementById('add-track-btn');
   const newSongBtn        = document.getElementById('new-song-btn');
   const saveCopyBtn       = document.getElementById('save-copy-btn');
+  const shelfBtn          = document.getElementById('shelf-btn');
   const shareBackupBtn    = document.getElementById('share-backup-btn');
   const layoutSettingsSection = document.getElementById('layout-settings-section');
   const lessonSetupBtn    = document.getElementById('lesson-setup-btn');
@@ -6205,6 +6281,7 @@
        outside a lesson. */
     showHide(newSongBtn, !inLesson);
     showHide(saveCopyBtn, !inLesson);
+    showHide(shelfBtn, !inLesson);
     showHide(shareBackupBtn, !inLesson);
     showHide(lessonSetupBtn, !inLesson);
     showHide(songChip, libraryMode() !== 'none');
@@ -6769,7 +6846,7 @@
       delete record.id;
       delete record.createdAt;
       // where the teacher's copy came from is not the student's business
-      ['updatedAt', 'received', 'receivedAt', 'derivedFrom'].forEach(k => { delete record[k]; });
+      ['updatedAt', 'received', 'receivedAt', 'derivedFrom', 'book'].forEach(k => { delete record[k]; });
       return record;
     });
     return {
@@ -7015,12 +7092,13 @@
       record.title = SANDBOX_TITLE;
       record.isCustom = true;
       record.createdAt = Date.now();
-      ['updatedAt', 'received', 'receivedAt', 'derivedFrom'].forEach(k => { delete record[k]; });
+      ['updatedAt', 'received', 'receivedAt', 'derivedFrom', 'book'].forEach(k => { delete record[k]; });
       lib[SANDBOX_ID] = record;
       saveStoredLibrary(lib);
 
       adoptSong(normalizeSong(record));
       openedReceived = false;
+      openedBook = '';
       autoSave = true;            // the sandbox keeps itself, as it always does
       rememberActiveSong();
       afterSongChange();
@@ -7301,6 +7379,7 @@
         if (!lib[id]) return null;
         adoptSong(normalizeSong(lib[id]));
         openedReceived = !!lib[id].received;
+        openedBook = openedReceived && lib[id].book ? String(lib[id].book) : '';
         afterSongChange();
         settled();
         return bridge.info();
@@ -7313,6 +7392,7 @@
         if (!raw || typeof raw !== 'object' || !Array.isArray(raw.tracks)) return null;
         adoptSong(normalizeSong(raw));
         openedReceived = false;   // not a library song at all
+        openedBook = '';
         afterSongChange();
         settled();
         return bridge.info();
@@ -7523,6 +7603,28 @@
   if (!openedFromLesson && (EMBEDDED || !offerSharedSong())) restoreLastSong();
 
   applyPolicyToShell();
+
+  /* The Teacher Library shelf: books out are kept in step every visit
+     (new ostinatos arrive, put-back and deleted ones leave). Not in the
+     Music Stand, which must not write this app's library, and not in a
+     lesson. */
+  if (window.EVMShelf) {
+    EVMShelf.init({
+      app: 'ostinato-builder',
+      disabled: EMBEDDED || !!lessonMeta,
+      load: getStoredLibrary,
+      save: saveStoredLibrary,
+      incoming: rec => normalizeSong(Object.assign({}, rec, { id: rec.id || 'incoming' })),
+      key: songKey,
+      changed: shelfChanged,
+      openSong: id => {
+        flushAutosave();
+        openSong(id);
+        closeSheet(librarySheet);
+      }
+    });
+    EVMShelf.sync();
+  }
 
   /* The artwork loads after the first layout; a beat's width does not
      depend on it, but the fit does, so settle again once it is in. */

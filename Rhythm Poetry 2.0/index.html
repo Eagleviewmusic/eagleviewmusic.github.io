@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Noto+Serif:wght@700;900&family=Andika:wght@400;700&family=Atkinson+Hyperlegible:wght@400;700&family=Literata:opsz,wght@7..72,600;7..72,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lib/evm-shelf.css">
   <script>
     try {
       if (window.self !== window.top) document.documentElement.classList.add('in-iframe');
@@ -379,6 +380,10 @@
       <button class="btn btn-primary" id="newSongBtn">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
         <span id="newSongBtnLabel">New rhythm</span>
+      </button>
+      <button class="btn" id="shelfBtn" title="Books your teacher has put on the shelf">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v14"/><path d="M9 19V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v11"/><path d="m14.5 8.6 2.9-.8a1 1 0 0 1 1.2.7l2.7 10.1"/><path d="M3 19h18"/></svg>
+        <span>Teacher Library</span>
       </button>
       <button class="btn" id="saveAsBtn">Save as…</button>
       <button class="btn" id="importExportBtn">Share &amp; backup</button>
@@ -754,6 +759,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="lib/instruments/js/virtual-instruments.js"></script>
 <script src="lib/evm-library.js"></script>
+<script src="lib/evm-shelf.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

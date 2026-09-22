@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Noto+Serif:wght@700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lib/evm-shelf.css">
   <!-- Framed (the Music Stand, or any page embedding this one) there is no
        hub to go back to, so the link home is hidden. Rhythm Poetry 2.0
        makes the same check. -->
@@ -280,6 +281,10 @@
       <button class="btn btn-primary" id="new-song-btn">
         <svg viewBox="0 0 24 24" width="17" height="17"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
         <span>New ostinato</span>
+      </button>
+      <button class="btn" id="shelf-btn" title="Books your teacher has put on the shelf">
+        <svg viewBox="0 0 24 24" width="17" height="17"><path d="M4 19V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v14"/><path d="M9 19V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v11"/><path d="m14.5 8.6 2.9-.8a1 1 0 0 1 1.2.7l2.7 10.1"/><path d="M3 19h18"/></svg>
+        <span>Teacher Library</span>
       </button>
       <button class="btn" id="save-copy-btn">Save as…</button>
       <button class="btn" id="share-backup-btn">Share &amp; backup</button>
@@ -628,6 +633,7 @@
 <script src="lib/instruments/js/virtual-instruments.js"></script>
 <script src="lib/instruments/js/instrument-icons.js"></script>
 <script src="lib/evm-library.js"></script>
+<script src="lib/evm-shelf.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

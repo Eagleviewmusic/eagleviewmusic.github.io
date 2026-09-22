@@ -1541,6 +1541,8 @@ body.show-syllables .track-head { padding-bottom: 28px; }
   white-space: nowrap;
 }
 .library-group-rule { flex: 1; height: 1px; background: var(--hairline); }
+/* a book from the Teacher Library (lib/evm-shelf.js): its icon, beside the name */
+.library-group-head svg { flex: none; width: 14px; height: 14px; color: var(--ink-3); }
 
 .library-song {
   display: flex;

@@ -35,11 +35,11 @@
   <section class="intro card">
     <h2>Publish songs to every student</h2>
     <ol class="steps">
-      <li><strong>Tick</strong> the songs you want students to have.</li>
+      <li><strong>Tick</strong> the songs you want students to have, and choose the <strong>book</strong> each one goes in. Books are what students see on the shelf.</li>
       <li><strong>Download</strong> them — one small file each.</li>
       <li><strong>Upload</strong> the files to the Teacher Library on GitHub. About a minute later, every student’s app has them.</li>
     </ol>
-    <p class="fine">Students get them as <em>Shared</em> songs: they stay exactly as you made them, and students keep their own changes with <em>Save my copy</em>. Publish a song again after changing it and students get the new version.</p>
+    <p class="fine">Students take a book off the shelf in any app and its songs join their library as <em>Shared</em> songs: exactly as you made them, with <em>Save my copy</em> to keep their own changes. Putting the book back removes them; their own copies stay. Publish a song again after changing it and students get the new version.</p>
   </section>
 
   <div class="status" id="status" role="status"></div>
@@ -50,9 +50,16 @@
       <button class="seg-btn" data-filter="todo" role="tab" aria-selected="false">To publish</button>
       <button class="seg-btn" data-filter="published" role="tab" aria-selected="false">Published</button>
     </div>
-    <button class="text-btn" id="select-todo">Tick new &amp; changed</button>
+    <button class="text-btn" id="select-todo">Tick what needs publishing</button>
     <button class="text-btn" id="select-none">Clear ticks</button>
   </div>
+
+  <div class="bulk-row">
+    <label for="bulk-book">Put the ticked songs in the book</label>
+    <input type="text" id="bulk-book" class="book-field" list="book-names" placeholder="e.g. Winter Songs">
+    <button class="btn small" id="bulk-book-apply">Put in book</button>
+  </div>
+  <datalist id="book-names"></datalist>
 
   <div id="groups"></div>
 

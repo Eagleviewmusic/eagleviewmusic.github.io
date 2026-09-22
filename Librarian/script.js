@@ -104,6 +104,37 @@
   let filter = 'all';
   const ticked = new Set();
 
+  /* ------------------------------------------------------------------
+     BOOKS. Every published song stands in a book on the students' shelf.
+     Which book is the Librarian's own note (librarian_books_v1, keyed
+     app|id) — it never writes to an app's library — and, for a song
+     already published, the book it was published in is the default, so
+     another computer starts from what is on the shelf.
+     ------------------------------------------------------------------ */
+  const BOOKS_KEY = 'librarian_books_v1';
+  const DEFAULT_BOOK = 'More songs';
+  let bookNotes = {};
+  try { bookNotes = JSON.parse(localStorage.getItem(BOOKS_KEY) || '{}') || {}; } catch (e) { bookNotes = {}; }
+  function saveBookNotes() { try { localStorage.setItem(BOOKS_KEY, JSON.stringify(bookNotes)); } catch (e) {} }
+  const tidyBook = b => String(b || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+
+  function bookOf(item) {
+    const k = item.app + '|' + item.id;
+    if (bookNotes[k] !== undefined) return tidyBook(bookNotes[k]);
+    const e = published && published[k];
+    return e && e.book ? tidyBook(e.book) : '';
+  }
+  function setBook(item, name) {
+    bookNotes[item.app + '|' + item.id] = tidyBook(name);
+    saveBookNotes();
+  }
+  function knownBooks() {
+    const names = new Set();
+    Object.keys(bookNotes).forEach(k => { if (tidyBook(bookNotes[k])) names.add(tidyBook(bookNotes[k])); });
+    if (published) Object.keys(published).forEach(k => { if (published[k].book) names.add(tidyBook(published[k].book)); });
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }
+
   /* ---------------- reading the apps' libraries ---------------- */
   function readLibrary(key) {
     try {
@@ -124,6 +155,8 @@
         const builtIn = rec.isCustom === false ||
           (src.builtIns && src.builtIns.indexOf(id) !== -1 && rec.isCustom !== true);
         if (builtIn) return;
+        // a book taken off the shelf in this browser: already published
+        if (rec.received && rec.book) return;
         /* Older songs (Song Writer 1.0's especially) carry no dates. Take
            one from the id ('song_1789512614629…') rather than "now", or
            every download would look like a newer version to the students. */
@@ -170,6 +203,7 @@
     if (!published) return 'unknown';
     const e = published[item.app + '|' + item.id];
     if (!e) return 'new';
+    if ((bookOf(item) || DEFAULT_BOOK) !== (tidyBook(e.book) || DEFAULT_BOOK)) return 'moved';
     return item.updatedAt > (Number(e.updatedAt) || 0) ? 'changed' : 'published';
   }
 
@@ -178,8 +212,10 @@
     unknown: '',
     new: 'Not published',
     changed: 'Changed since you published',
+    moved: 'Moved to another book',
     published: 'Published'
   };
+  const TO_PUBLISH = s => s === 'new' || s === 'changed' || s === 'moved';
 
   /* ---------------- drawing ---------------- */
   function when(ms) {
@@ -190,12 +226,13 @@
 
   function shown(item) {
     const s = stateOf(item);
-    if (filter === 'todo') return s === 'new' || s === 'changed' || s === 'unknown';
-    if (filter === 'published') return s === 'published' || s === 'changed';
+    if (filter === 'todo') return TO_PUBLISH(s) || s === 'unknown';
+    if (filter === 'published') return s === 'published' || s === 'changed' || s === 'moved';
     return true;
   }
 
   function render() {
+    renderBookNames();
     const groups = $('groups');
     groups.innerHTML = '';
     $('empty').hidden = items.length > 0;
@@ -228,17 +265,21 @@
   function row(item) {
     const k = item.app + '|' + item.id;
     const s = stateOf(item);
-    const label = document.createElement('label');
-    label.className = 'item state-' + s;
+    const wrap = document.createElement('div');
+    wrap.className = 'item state-' + s;
 
+    const pick = document.createElement('label');
+    pick.className = 'item-pick';
     const box = document.createElement('input');
     box.type = 'checkbox';
     box.checked = ticked.has(k);
     box.disabled = s === 'blank';
     box.addEventListener('change', () => {
       if (box.checked) ticked.add(k); else ticked.delete(k);
+      wrap.classList.toggle('is-ticked', box.checked);
       updateDock();
     });
+    wrap.classList.toggle('is-ticked', box.checked);
 
     const main = document.createElement('span');
     main.className = 'item-main';
@@ -249,11 +290,27 @@
     meta.className = 'item-meta';
     const bits = [KIND_NAMES[item.kind] || item.kind];
     if (item.from) bits.push('Song Writer ' + item.from);
-    if (item.updatedAt) bits.push('edited ' + when(item.updatedAt));
+    if (item.updatedAt > 1) bits.push('edited ' + when(item.updatedAt));
     meta.textContent = bits.join(' · ');
     main.appendChild(title);
     main.appendChild(meta);
+    pick.appendChild(box);
+    pick.appendChild(main);
 
+    const side = document.createElement('span');
+    side.className = 'item-side';
+    if (s !== 'blank') {
+      const book = document.createElement('input');
+      book.className = 'book-field';
+      book.type = 'text';
+      book.setAttribute('list', 'book-names');
+      book.placeholder = DEFAULT_BOOK;
+      book.value = bookOf(item);
+      book.title = 'The book this song stands in on the students’ shelf';
+      book.setAttribute('aria-label', 'Book for ' + item.title);
+      book.addEventListener('change', () => { setBook(item, book.value); render(); });
+      side.appendChild(book);
+    }
     const tags = document.createElement('span');
     tags.className = 'item-tags';
     if (item.received) {
@@ -269,11 +326,21 @@
       t.textContent = STATE_LABEL[s];
       tags.appendChild(t);
     }
+    side.appendChild(tags);
 
-    label.appendChild(box);
-    label.appendChild(main);
-    label.appendChild(tags);
-    return label;
+    wrap.appendChild(pick);
+    wrap.appendChild(side);
+    return wrap;
+  }
+
+  function renderBookNames() {
+    const list = $('book-names');
+    list.innerHTML = '';
+    knownBooks().forEach(n => {
+      const o = document.createElement('option');
+      o.value = n;
+      list.appendChild(o);
+    });
   }
 
   function updateDock() {
@@ -307,6 +374,7 @@
     return EVM.toEnvelope(item.record, {
       app: item.app,
       kind: item.kind,
+      book: bookOf(item) || DEFAULT_BOOK,
       dataOf: item.dataOf || undefined
     });
   }
@@ -358,13 +426,19 @@
     });
   });
   $('select-todo').addEventListener('click', () => {
-    items.forEach(i => {
-      const s = stateOf(i);
-      if (s === 'new' || s === 'changed') ticked.add(i.app + '|' + i.id);
-    });
+    items.forEach(i => { if (TO_PUBLISH(stateOf(i))) ticked.add(i.app + '|' + i.id); });
     render();
   });
   $('select-none').addEventListener('click', () => { ticked.clear(); render(); });
+  $('bulk-book-apply').addEventListener('click', () => {
+    const name = tidyBook($('bulk-book').value);
+    const chosen = items.filter(i => ticked.has(i.app + '|' + i.id) && !i.blank);
+    if (!name) { toast('Type a book name first'); return; }
+    if (!chosen.length) { toast('Tick some songs first'); return; }
+    chosen.forEach(i => setBook(i, name));
+    render();
+    toast(`${chosen.length} song${chosen.length === 1 ? '' : 's'} put in “${name}”`);
+  });
   $('download-btn').addEventListener('click', downloadTicked);
   $('upload-link').href = UPLOAD_URL;
   $('folder-link').href = FOLDER_URL;

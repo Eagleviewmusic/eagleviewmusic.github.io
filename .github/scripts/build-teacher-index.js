@@ -56,6 +56,8 @@ fs.readdirSync(folder)
       updatedAt: Number(env.updatedAt || env.createdAt) || 0,
       path: name
     };
+    // The book it stands in on the students' shelf (none: the apps' "More songs").
+    if (env.book && String(env.book).trim()) entry.book = String(env.book).trim();
     const key = entry.app + '|' + entry.id;
     if (seen.has(key)) {
       // The same song twice under two file names: the newer one is published.
@@ -68,7 +70,8 @@ fs.readdirSync(folder)
     items.push(entry);
   });
 
-items.sort((a, b) => a.app.localeCompare(b.app) || a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
+items.sort((a, b) => (a.book || '').localeCompare(b.book || '') || a.app.localeCompare(b.app) ||
+  a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
 
 let previous = null;
 try { previous = JSON.parse(fs.readFileSync(indexPath, 'utf8')); } catch (e) {}

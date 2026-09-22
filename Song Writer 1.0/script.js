@@ -289,6 +289,8 @@ const submitTextEditor = document.getElementById('submitTextEditor');
 const newSongBtn = document.getElementById('newSongBtn');
 const librarySelector = document.getElementById('librarySelector');
 const manageLibraryBtn = document.getElementById('manageLibraryBtn');
+const shelfBtn = document.getElementById('shelfBtn');
+const libraryShelfBtn = document.getElementById('libraryShelfBtn');
 const newSongModal = document.getElementById('newSongModal');
 const newSongTitleInput = document.getElementById('newSongTitleInput');
 const cancelNewSongBtn = document.getElementById('cancelNewSongBtn');
@@ -337,6 +339,9 @@ const addHarmonyNoteBtn = document.getElementById('addHarmonyNoteBtn');
 const removeHarmonyNoteBtn = document.getElementById('removeHarmonyNoteBtn');
 const receivedNotice = document.getElementById('receivedNotice');
 const saveMyCopyBtn = document.getElementById('saveMyCopyBtn');
+const receivedNoticeText = receivedNotice ? receivedNotice.querySelector('.received-notice-text') : null;
+// The notice as written in index.html; a song from a book says which book instead.
+const RECEIVED_NOTICE_DEFAULT = receivedNoticeText ? receivedNoticeText.textContent : '';
 const appToast = document.getElementById('appToast');
 
 // ===== STORAGE & STATE VARIABLES =====
@@ -352,6 +357,13 @@ const NEW_SONG_TEMPLATE = `[Key of C]\n[A]\nStart[D1] Here[D1]`;
 /* The song on screen arrived from someone else (a link): it is never
    saved into. Edits stay on screen until Save my copy. */
 let openedReceived = false;
+// …and, if it came from a book taken off the Teacher Library shelf, which one
+let openedBook = '';
+/* A song from a book taken off the Teacher Library shelf (lib/evm-shelf.js):
+   shared (received) and marked with `book`. Save my copy makes a song of the
+   student's own, with no book. */
+const isShelfSong = rec => !!(window.EVMShelf && EVMShelf.isShelfSong(rec));
+const BOOK_ICON_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>';
 // 'new' (Create a New Song) or 'copy' (Save my copy of a shared song)
 let newSongModalMode = 'new';
 let saveLoadMode = false;
@@ -448,7 +460,8 @@ function isPopupOpen() {
          (importExportModal && importExportModal.classList.contains('show')) || 
          (deleteSectionModal && deleteSectionModal.classList.contains('show')) || 
          (aboutModal && aboutModal.classList.contains('show')) || 
-         (keySignaturePopup && keySignaturePopup.classList.contains('show'));
+         (keySignaturePopup && keySignaturePopup.classList.contains('show')) ||
+         !!document.querySelector('.evm-shelf.show');
 }
 
 // ===== VISUAL CAPTURE FUNCTIONS =====
@@ -1989,6 +2002,11 @@ function showToast(message) {
 
 function updateReceivedNotice() {
     if (receivedNotice) receivedNotice.hidden = !openedReceived;
+    if (receivedNoticeText) {
+        receivedNoticeText.textContent = openedBook
+            ? `From the book “${openedBook}” in the Teacher Library — it stays exactly as your teacher shared it. Save my copy keeps your changes.`
+            : RECEIVED_NOTICE_DEFAULT;
+    }
 }
 
 function saveStoredLibrary(library) {
@@ -2103,15 +2121,30 @@ function populateLibraryDropdown() {
     librarySelector.appendChild(defaultOption);
 
     const songIds = Object.keys(library);
-    songIds.forEach(id => {
-        const song = library[id];
+    const makeOption = (id, text) => {
         const opt = document.createElement('option');
         opt.value = id;
-        opt.textContent = song.received ? `${song.title} (shared)` : song.title;
+        opt.textContent = text;
         if (id === currentSongId) {
             opt.selected = true;
         }
-        librarySelector.appendChild(opt);
+        return opt;
+    };
+    // Songs from a book are listed under their book, after the student's own.
+    const byBook = {};
+    songIds.forEach(id => {
+        const song = library[id];
+        if (isShelfSong(song)) {
+            (byBook[song.book] = byBook[song.book] || []).push(id);
+            return;
+        }
+        librarySelector.appendChild(makeOption(id, song.received ? `${song.title} (shared)` : song.title));
+    });
+    Object.keys(byBook).sort((a, b) => a.localeCompare(b)).forEach(book => {
+        const group = document.createElement('optgroup');
+        group.label = book;
+        byBook[book].forEach(id => group.appendChild(makeOption(id, library[id].title)));
+        librarySelector.appendChild(group);
     });
 
     if (!currentSongId && songIds.length > 0) {
@@ -2128,6 +2161,7 @@ function loadSongById(songId) {
     currentSongId = songId;
     currentSongTitle = song.title;
     openedReceived = !!song.received;
+    openedBook = openedReceived && song.book ? String(song.book) : '';
     localStorage.setItem(ACTIVE_SONG_ID_KEY, songId);
 
     loadSongFromText(song.content);
@@ -2270,102 +2304,155 @@ function renderLibrarySongList() {
         return;
     }
 
+    // The student's own (and other shared) songs first; songs from a book after, under their book.
+    const byBook = {};
     songIds.forEach(id => {
         const song = library[id];
-        const isCurrent = id === currentSongId;
-        
-        const keyMatch = (song.content || '').match(/^\[Key of (.*?)\]/);
-        const songKey = keyMatch ? keyMatch[1] : 'C';
-
-        const itemDiv = document.createElement('div');
-        itemDiv.className = `library-song-item ${isCurrent ? 'active-song' : ''}`;
-
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'library-song-info';
-
-        const badge = document.createElement('span');
-        badge.className = 'library-song-badge';
-        badge.textContent = songKey;
-
-        const titleSpan = document.createElement('span');
-        titleSpan.className = 'library-song-title';
-        titleSpan.textContent = song.title;
-
-        infoDiv.appendChild(badge);
-        infoDiv.appendChild(titleSpan);
-        if (song.received) {
-            const tag = document.createElement('span');
-            tag.className = 'shared-tag';
-            tag.textContent = 'Shared';
-            tag.title = 'Shared with you: it stays as it was sent. Save my copy keeps your changes.';
-            infoDiv.appendChild(tag);
+        if (isShelfSong(song)) {
+            (byBook[song.book] = byBook[song.book] || []).push(id);
+            return;
         }
+        librarySongList.appendChild(buildLibrarySongRow(id, library));
+    });
+    Object.keys(byBook).sort((a, b) => a.localeCompare(b)).forEach(book => {
+        const head = document.createElement('div');
+        head.className = 'library-book-head';
+        head.innerHTML = BOOK_ICON_SVG + '<span class="library-book-title"></span>';
+        head.querySelector('.library-book-title').textContent = book;
+        const back = document.createElement('button');
+        back.className = 'evm-book-head-btn';
+        back.textContent = 'Put back';
+        back.title = 'Put this book back on the Teacher Library shelf';
+        back.addEventListener('click', () => EVMShelf.putBack(book));
+        head.appendChild(back);
+        librarySongList.appendChild(head);
+        byBook[book]
+            .sort((a, b) => String(library[a].title).localeCompare(String(library[b].title)))
+            .forEach(id => librarySongList.appendChild(buildLibrarySongRow(id, library)));
+    });
+}
 
-        const actionsDiv = document.createElement('div');
-        actionsDiv.className = 'library-song-actions';
+// One song's row in the Manage Library list.
+function buildLibrarySongRow(id, library) {
+    const song = library[id];
+    const isCurrent = id === currentSongId;
+    
+    const keyMatch = (song.content || '').match(/^\[Key of (.*?)\]/);
+    const songKey = keyMatch ? keyMatch[1] : 'C';
 
-        const loadBtn = document.createElement('button');
-        loadBtn.className = 'lib-action-btn load-btn';
-        loadBtn.textContent = isCurrent ? 'Active' : 'Load';
-        if (!isCurrent) {
-            loadBtn.addEventListener('click', () => {
-                loadSongById(id);
-                hideManageLibraryModal();
-            });
-        } else {
-            loadBtn.style.opacity = '0.7';
-            loadBtn.style.cursor = 'default';
+    const itemDiv = document.createElement('div');
+    itemDiv.className = `library-song-item ${isCurrent ? 'active-song' : ''}`;
+
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'library-song-info';
+
+    const badge = document.createElement('span');
+    badge.className = 'library-song-badge';
+    badge.textContent = songKey;
+
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'library-song-title';
+    titleSpan.textContent = song.title;
+
+    infoDiv.appendChild(badge);
+    infoDiv.appendChild(titleSpan);
+    if (song.received) {
+        const tag = document.createElement('span');
+        tag.className = 'shared-tag';
+        tag.textContent = 'Shared';
+        tag.title = 'Shared with you: it stays as it was sent. Save my copy keeps your changes.';
+        infoDiv.appendChild(tag);
+    }
+
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'library-song-actions';
+
+    const loadBtn = document.createElement('button');
+    loadBtn.className = 'lib-action-btn load-btn';
+    loadBtn.textContent = isCurrent ? 'Active' : 'Load';
+    if (!isCurrent) {
+        loadBtn.addEventListener('click', () => {
+            loadSongById(id);
+            hideManageLibraryModal();
+        });
+    } else {
+        loadBtn.style.opacity = '0.7';
+        loadBtn.style.cursor = 'default';
+    }
+
+    const renameBtn = document.createElement('button');
+    renameBtn.className = 'lib-action-btn';
+    renameBtn.textContent = 'Rename';
+    renameBtn.title = 'Rename song';
+    renameBtn.addEventListener('click', () => {
+        const newTitle = prompt('Enter new song title:', song.title);
+        if (newTitle && newTitle.trim()) {
+            library[id].title = newTitle.trim();
+            library[id].updatedAt = Date.now();
+            saveStoredLibrary(library);
+            if (id === currentSongId) {
+                currentSongTitle = newTitle.trim();
+            }
+            populateLibraryDropdown();
+            renderLibrarySongList();
         }
+    });
 
-        const renameBtn = document.createElement('button');
-        renameBtn.className = 'lib-action-btn';
-        renameBtn.textContent = 'Rename';
-        renameBtn.title = 'Rename song';
-        renameBtn.addEventListener('click', () => {
-            const newTitle = prompt('Enter new song title:', song.title);
-            if (newTitle && newTitle.trim()) {
-                library[id].title = newTitle.trim();
-                library[id].updatedAt = Date.now();
-                saveStoredLibrary(library);
-                if (id === currentSongId) {
-                    currentSongTitle = newTitle.trim();
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'lib-action-btn delete-btn-item';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.title = 'Delete song';
+    deleteBtn.addEventListener('click', () => {
+        if (confirm(`Delete "${song.title}" from your library?`)) {
+            delete library[id];
+            saveStoredLibrary(library);
+            const remainingIds = Object.keys(library);
+            if (id === currentSongId) {
+                if (remainingIds.length > 0) {
+                    loadSongById(remainingIds[0]);
+                } else {
+                    createNewSong('New Song');
                 }
+            } else {
                 populateLibraryDropdown();
                 renderLibrarySongList();
             }
-        });
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'lib-action-btn delete-btn-item';
-        deleteBtn.textContent = 'Delete';
-        deleteBtn.title = 'Delete song';
-        deleteBtn.addEventListener('click', () => {
-            if (confirm(`Delete "${song.title}" from your library?`)) {
-                delete library[id];
-                saveStoredLibrary(library);
-                const remainingIds = Object.keys(library);
-                if (id === currentSongId) {
-                    if (remainingIds.length > 0) {
-                        loadSongById(remainingIds[0]);
-                    } else {
-                        createNewSong('New Song');
-                    }
-                } else {
-                    populateLibraryDropdown();
-                    renderLibrarySongList();
-                }
-            }
-        });
-
-        actionsDiv.appendChild(loadBtn);
-        // A shared song keeps the name it was sent with; a copy can be renamed.
-        if (!song.received) actionsDiv.appendChild(renameBtn);
-        actionsDiv.appendChild(deleteBtn);
-
-        itemDiv.appendChild(infoDiv);
-        itemDiv.appendChild(actionsDiv);
-        librarySongList.appendChild(itemDiv);
+        }
     });
+
+    actionsDiv.appendChild(loadBtn);
+    // A shared song keeps the name it was sent with; a copy can be renamed.
+    if (!song.received) actionsDiv.appendChild(renameBtn);
+    /* A song from a book leaves with its book (Put back): deleted on its
+       own it would only come back at the next visit while the book is out. */
+    if (!isShelfSong(song)) actionsDiv.appendChild(deleteBtn);
+
+    itemDiv.appendChild(infoDiv);
+    itemDiv.appendChild(actionsDiv);
+    return itemDiv;
+}
+
+/* After the Teacher Library shelf filed or removed songs (lib/evm-shelf.js):
+   move off a song that left, show a newer version of the song on screen,
+   and redraw. */
+function shelfChanged(summary) {
+    const library = getStoredLibrary();
+    if (!library[currentSongId]) {
+        // As at start-up: Twinkle, or the first song there is.
+        loadSongById(library['twinkle'] ? 'twinkle' : Object.keys(library)[0]);
+    } else if (openedReceived && summary.updated.indexOf(currentSongId) !== -1) {
+        loadSongById(currentSongId);
+    } else {
+        const song = library[currentSongId];
+        openedBook = openedReceived && song.book ? String(song.book) : '';
+        updateReceivedNotice();
+        populateLibraryDropdown();
+    }
+    renderLibrarySongList();
+    const n = summary.added.length, up = summary.updated.length, gone = summary.removed.length;
+    if (n) showToast(n === 1 ? 'A song from your books is in your library' : n + ' songs from your books are in your library');
+    else if (up) showToast(up === 1 ? 'Your teacher updated a song in your books' : 'Your teacher updated ' + up + ' songs in your books');
+    else if (gone) showToast(gone === 1 ? 'A song from your books left your library' : gone + ' songs from your books left your library');
 }
 
 // ===== DOWNLOAD & UPLOAD (JSON IMPORT/EXPORT) & SHARE LINK =====
@@ -2604,6 +2691,8 @@ function handleFileUpload(event) {
                 if (song.updatedAt) incoming.updatedAt = song.updatedAt;
                 if (song.received) incoming.received = true;
                 if (song.derivedFrom) incoming.derivedFrom = song.derivedFrom;
+                // a book song stays one, so the shelf still manages it (removes it if its book is back)
+                if (song.received && song.book) incoming.book = song.book;
 
                 const result = EVM.file(library, incoming, {
                     key: songKey,
@@ -3246,6 +3335,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.querySelectorAll('.harmony-stack').forEach(updateHarmonyStackVisuals);
   updateAllLineHeights();
+
+  /* The Teacher Library shelf: books out are kept in step every visit
+     (new songs arrive, put-back and deleted ones leave). Song Writer 1.0
+     reads only songs in its own text form: an item with only a 2.0 score
+     is skipped. */
+  if (window.EVMShelf) {
+    EVMShelf.init({
+      app: 'song-writer',
+      disabled: false,
+      load: getStoredLibrary,
+      save: saveStoredLibrary,
+      incoming: rec => (typeof rec.content === 'string'
+        ? { id: rec.id, title: rec.title || 'Shared Song', content: rec.content }
+        : null),
+      key: songKey,
+      changed: shelfChanged,
+      openSong: id => {
+        saveCurrentSongToLibrary();
+        loadSongById(id);
+        hideManageLibraryModal();
+      }
+    });
+    EVMShelf.sync();
+  }
 });
 
 // ===== EVENT LISTENERS =====
@@ -3285,6 +3398,11 @@ if (librarySelector) {
 if (manageLibraryBtn) {
   manageLibraryBtn.addEventListener('click', showManageLibraryModal);
 }
+
+// The Teacher Library shelf (lib/evm-shelf.js), from the library row and the Manage Library modal
+[shelfBtn, libraryShelfBtn].forEach(btn => {
+  if (btn) btn.addEventListener('click', () => window.EVMShelf && EVMShelf.openSheet());
+});
 
 if (closeLibraryModalBtn) {
   closeLibraryModalBtn.addEventListener('click', hideManageLibraryModal);

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Musical Notation Tool</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="lib/evm-shelf.css">
     <script>
       function applyAppScaling() {
         try {
@@ -340,6 +341,18 @@
                     </button>
                 </div>
 
+                <!-- Teacher Library (the shelf of books: lib/evm-shelf.js) -->
+                <div class="control-group">
+                    <button class="icon-btn" id="shelfBtn" title="Teacher Library — books your teacher has put on the shelf">
+                        <svg class="shelf-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 19V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v14"></path>
+                            <path d="M9 19V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v11"></path>
+                            <path d="m14.5 8.6 2.9-.8a1 1 0 0 1 1.2.7l2.7 10.1"></path>
+                            <path d="M3 19h18"></path>
+                        </svg>
+                    </button>
+                </div>
+
                 <!-- Download/Upload Library Button -->
                 <div class="control-group">
                     <button class="icon-btn" id="importExportBtn" title="Download / Upload Library (JSON)">
@@ -489,6 +502,15 @@
         <div class="popup-content manage-library-content">
             <div class="modal-header">
                 <h3>Song Library</h3>
+                <button class="teacher-library-btn" id="libraryShelfBtn" title="Books your teacher has put on the shelf">
+                    <svg class="shelf-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v14"></path>
+                        <path d="M9 19V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v11"></path>
+                        <path d="m14.5 8.6 2.9-.8a1 1 0 0 1 1.2.7l2.7 10.1"></path>
+                        <path d="M3 19h18"></path>
+                    </svg>
+                    <span>Teacher Library</span>
+                </button>
                 <button class="modal-close-btn" id="closeLibraryModalBtn" title="Close">&times;</button>
             </div>
             <p class="popup-subtext">Manage, rename, load, and delete your saved songs.</p>
@@ -750,6 +772,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="songs.js"></script>
     <script src="lib/evm-library.js"></script>
+    <script src="lib/evm-shelf.js"></script>
     <script src="script.js"></script>
     <script>
       // Iframe detection cleanup
