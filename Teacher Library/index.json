@@ -1,6 +1,16 @@
 {
   "format": "evm-index",
   "formatVersion": 1,
-  "generatedAt": "2026-09-22T23:21:53.697Z",
-  "items": []
+  "generatedAt": "2026-09-22T23:54:57.891Z",
+  "items": [
+    {
+      "app": "rhythm-poetry",
+      "kind": "poem",
+      "id": "song_1790121220158_0eva",
+      "title": "Chicken Wing, Chicken Wing",
+      "updatedAt": 1790121220158,
+      "path": "rhythm-poetry--song_1790121220158_0eva.json",
+      "book": "More songs"
+    }
+  ]
 }
