@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>切土豆 The Chant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Lexend:wght@400;500;600&family=Noto+Sans+SC:wght@500;700;900&display=swap">
+<style>
+/* Light only on purpose: this page lives inside a (white) Google Site. */
+:root{
+  color-scheme:light;
+  --ground:#FFFFFF; --surface:#F4FAFB; --rule:#D6E7EB;
+  --ink:#1B2A34; --ink-2:#465864; --ink-3:#71838D;
+  --qie:#C93C2A;  --qie-soft:#FBE4DF;
+  --kuai:#B86A0C; --kuai-soft:#FBEBD2;
+  --pian:#237A48; --pian-soft:#DBF0E2;
+  --si:#1F6CA8;   --si-soft:#DCEBF7;
+  --ding:#7C43AE; --ding-soft:#EDE2F7;
+  --tudou:#8E5A28; --tudou-soft:#F4E6D3;
+  --go:#237A48;
+  --cn:"Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --display:"Baloo 2","Arial Rounded MT Bold","Trebuchet MS",sans-serif;
+  --body:Lexend,"Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+html,body{margin:0}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;padding:0 16px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:920px;margin:0 auto;padding-block:0 32px}
+h1,h2{font-family:var(--display);line-height:1.1;margin:0;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--si);outline-offset:3px;border-radius:10px}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:5;background:var(--ground);border-bottom:1px solid var(--rule);padding-block:14px 12px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between}
+.top h1{font-size:28px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.top h1 .cn{font-family:var(--cn);font-weight:900;font-size:30px}
+.top h1 .cn b{color:var(--qie);font-weight:900}
+.top p{font-size:14px;color:var(--ink-2);margin-top:2px}
+.btn{display:inline-flex;align-items:center;gap:8px;border:0;cursor:pointer;border-radius:999px;padding:11px 22px;font-weight:600;font-size:17px;background:var(--go);color:#fff;min-width:150px;justify-content:center;font-variant-numeric:tabular-nums}
+.btn svg{width:18px;height:18px}
+.btn.on{background:var(--ink)}
+
+.legend{display:flex;justify-content:center;flex-wrap:wrap;gap:8px 22px;padding-block:14px 4px;font-size:14px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend svg{width:26px;height:20px;color:var(--ink)}
+
+/* verses */
+.verse{padding-block:18px 6px;border-bottom:1px solid var(--rule)}
+.verse:last-child{border-bottom:0}
+.verse-head{text-align:center;margin-bottom:6px}
+.verse-head h2{font-size:24px}
+.verse-head span{font-size:14px;color:var(--ink-3)}
+.line{display:grid;justify-items:center;gap:10px;padding:14px 10px;border-radius:22px;transition:background .15s}
+.line.live{background:var(--surface)}
+.bars{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.beat{--c:var(--tudou);--c-soft:var(--tudou-soft);min-width:70px;border-radius:14px;background:var(--c-soft);padding:6px 8px 8px;display:grid;justify-items:center;gap:2px;transition:transform .08s, box-shadow .08s}
+.stick{height:22px;width:30px;color:var(--c)}
+.beat .h{font-family:var(--cn);font-weight:700;font-size:32px;line-height:1.1;letter-spacing:.04em}
+.beat .p{font-size:13px;color:var(--ink-2);font-weight:500}
+.beat .r{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--c);font-weight:600}
+.beat.cut .h{color:var(--c)}
+.beat.now{transform:translateY(-4px);box-shadow:inset 0 0 0 3px var(--c), 0 6px 14px -8px var(--c)}
+.en{color:var(--ink-2);font-size:15px;text-align:center}
+.acts{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.say{--c:var(--ink);--c-soft:var(--surface);display:inline-flex;align-items:center;gap:6px;border:0;cursor:pointer;border-radius:999px;padding:7px 14px 7px 11px;font-size:14px;font-weight:600;background:var(--c-soft);color:var(--c);min-width:128px;justify-content:center;font-variant-numeric:tabular-nums}
+.say svg{width:16px;height:16px}
+.say.playing,.say.on{box-shadow:inset 0 0 0 2px var(--c)}
+.say.on{background:var(--c);color:#fff}
+
+.c-qie{--c:var(--qie);--c-soft:var(--qie-soft)}
+.c-kuai{--c:var(--kuai);--c-soft:var(--kuai-soft)}
+.c-pian{--c:var(--pian);--c-soft:var(--pian-soft)}
+.c-si{--c:var(--si);--c-soft:var(--si-soft)}
+.c-ding{--c:var(--ding);--c-soft:var(--ding-soft)}
+
+/* tempo gauge */
+.ctrls{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.tempo{display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:999px;padding:5px 8px}
+.tempo label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--ink-3);padding-left:6px}
+.tempo output{font-family:var(--display);font-weight:800;font-size:22px;min-width:3ch;text-align:right;font-variant-numeric:tabular-nums;line-height:1}
+.tempo .unit{font-size:12px;color:var(--ink-3);margin-left:-4px}
+.tempo input[type=range]{width:140px;accent-color:var(--go)}
+.step{width:32px;height:32px;border-radius:50%;border:0;cursor:pointer;background:var(--ground);box-shadow:inset 0 0 0 2px var(--rule);font-size:20px;font-weight:600;line-height:1;display:grid;place-items:center}
+.speed-name{font-size:13px;color:var(--ink-2);min-width:4.5em}
+@media (max-width:520px){
+  .ctrls{width:100%}
+  .tempo{width:100%;justify-content:space-between}
+  .tempo input[type=range]{flex:1;width:auto;min-width:0}
+  .top h1{font-size:22px}.top h1 .cn{font-size:24px}
+  .btn{width:100%}
+  .beat{min-width:58px}.beat .h{font-size:25px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1><span class="cn" lang="zh-CN"><b>切</b>土豆</span>The Chant</h1>
+      <p>Each box is one beat. Four beats per cut, then two, then one.</p>
+    </div>
+    <div class="ctrls">
+      <div class="tempo" role="group" aria-label="Tempo">
+        <label for="bpm">Tempo</label>
+        <button class="step" type="button" id="bpmDown" aria-label="Slower">−</button>
+        <input type="range" id="bpm" min="40" max="160" step="1" value="72">
+        <button class="step" type="button" id="bpmUp" aria-label="Faster">+</button>
+        <output id="bpmOut" for="bpm">72</output><span class="unit">bpm</span>
+        <span class="speed-name" id="speedName">Walking</span>
+      </div>
+      <button class="btn" id="playAll" type="button"><svg viewBox="0 0 20 20"><path d="M5 3l12 7-12 7z" fill="currentColor"/></svg><span>Play all</span></button>
+    </div>
+  </header>
+
+  <div class="legend" aria-label="Rhythm key">
+    <span><svg viewBox="0 0 30 22"><path d="M15 2v20" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><b>ta</b> one sound on the beat</span>
+    <span><svg viewBox="0 0 30 22"><path d="M7 3v19M23 3v19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M7 3h16" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/></svg><b>ti‑ti</b> two sounds share the beat</span>
+  </div>
+
+  <main id="verses"></main>
+</div>
+
+<script>
+(() => {
+const STICK = {
+  ta: '<svg viewBox="0 0 30 22" class="stick" aria-hidden="true"><path d="M15 2v20" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
+  titi: '<svg viewBox="0 0 30 22" class="stick" aria-hidden="true"><path d="M7 3v19M23 3v19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M7 3h16" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/></svg>'
+};
+const SPK = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-3v10l-4-3H3z" fill="currentColor"/><path d="M13 7q2 3 0 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>';
+const LOOP = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 9a6 6 0 0 1 10.5-4M16 11a6 6 0 0 1-10.5 4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M15 1.5v4h-4M5 18.5v-4h4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const STOP = '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="2" fill="currentColor"/></svg>';
+const PLAY = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3l12 7-12 7z" fill="currentColor"/></svg>';
+
+/* ---------- the chant: each beat is {h, p, r:'ta'|'titi', cut} ---------- */
+const E = {kuai:'chunks', pian:'slices', si:'shreds', ding:'dice'};
+const HZ = {kuai:'块', pian:'片', si:'丝', ding:'丁'};
+const PY = {kuai:'kuài', pian:'piàn', si:'sī', ding:'dīng'};
+const CUTS = ['kuai','pian','si','ding'];
+const tb = cut => ({h:'土豆', p:'tǔ dòu', r:'titi', cut, lead:true});
+const cb = c => ({h:HZ[c], p:PY[c], r:'ta', cut:c});
+
+const VERSES = [
+  {name:'Opening', note:'4 beats · chop, chop!', lines:[
+    {say:'l-hook', text:'切！切！切土豆！', en:'Chop! Chop! Chop the potato!', cut:'qie',
+     beats:[{h:'切',p:'qiē',r:'ta',cut:'qie'},{h:'切',p:'qiē',r:'ta',cut:'qie'},{h:'切土',p:'qiē tǔ',r:'titi',cut:'qie'},{h:'豆',p:'dòu',r:'ta',cut:'qie'}]}]},
+  {name:'Verse 1', note:'4 beats for each cut', lines:CUTS.map(c => (
+    {say:'l1-'+c, text:'土豆土豆土豆'+HZ[c], en:`Potato, potato, potato ${E[c]}!`, cut:c, beats:[tb(), tb(), tb(), cb(c)]}))},
+  {name:'Verse 2', note:'2 beats for each cut', lines:[
+    {say:'l2', text:'土豆块，土豆片，土豆丝，土豆丁', en:'Potato chunks, potato slices, potato shreds, potato dice.',
+     beats:CUTS.flatMap(c => [tb(c), cb(c)])}]},
+  {name:'Verse 3', note:'1 beat for each cut', lines:[
+    {say:'l3', text:'块，片，丝，丁', en:'Chunks, slices, shreds, dice!', beats:CUTS.map(cb)}]}
+];
+const LINES = VERSES.flatMap(v => v.lines);
+
+const beatHtml = b => `<div class="beat${b.cut && !b.lead ? ' cut' : ''}${b.cut ? ' c-' + b.cut : ''}">
+  ${STICK[b.r]}<div class="h" lang="zh-CN">${b.h}</div><div class="p">${b.p}</div><div class="r">${b.r === 'titi' ? 'ti‑ti' : 'ta'}</div></div>`;
+
+let n = 0;
+document.getElementById('verses').innerHTML = VERSES.map(v => `
+  <section class="verse">
+    <div class="verse-head"><h2>${v.name}</h2><span>${v.note}</span></div>
+    ${v.lines.map(l => { const i = n++; return `<div class="line" data-line="${i}">
+      <div class="bars">${l.beats.map(beatHtml).join('')}</div>
+      <p class="en">${l.en}</p>
+      <div class="acts">
+        <button class="say ${l.cut ? 'c-' + l.cut : ''}" type="button" data-say="${l.say}" data-text="${l.text}">${SPK}<span>Hear it</span></button>
+        <button class="say loop ${l.cut ? 'c-' + l.cut : ''}" type="button" data-loop="${i}" aria-pressed="false">${LOOP}<span>Loop the beat</span></button>
+      </div>
+    </div>`; }).join('')}
+  </section>`).join('');
+
+const lineEls = [...document.querySelectorAll('.line')];
+const beatEls = lineEls.map(el => [...el.querySelectorAll('.beat')]);
+
+/* ---------- Hear it (recording, with the browser's voice as a backup) ---------- */
+let current = null;
+function speak(text) {
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'zh-CN'; u.rate = .8;
+    const v = speechSynthesis.getVoices().find(v => /zh[-_]CN/i.test(v.lang));
+    if (v) u.voice = v;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  } catch (e) {}
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-say]');
+  if (!b) return;
+  if (current) { current.a.pause(); current.b.classList.remove('playing'); }
+  const a = new Audio('audio/' + b.dataset.say + '.mp4');
+  current = {a, b};
+  b.classList.add('playing');
+  const done = () => b.classList.remove('playing');
+  a.onended = done;
+  a.onerror = () => { done(); speak(b.dataset.text); };
+  a.play().catch(() => { done(); speak(b.dataset.text); });
+});
+
+/* ---------- beat engine: Web Audio clock, look-ahead scheduling ---------- */
+let ctx = null;
+function click(time, accent) {
+  const o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter();
+  o.type = 'triangle';
+  o.frequency.setValueAtTime(accent ? 1250 : 880, time);
+  o.frequency.exponentialRampToValueAtTime(accent ? 900 : 640, time + .05);
+  f.type = 'bandpass'; f.frequency.value = accent ? 1200 : 850; f.Q.value = 2;
+  g.gain.setValueAtTime(0.0001, time);
+  g.gain.exponentialRampToValueAtTime(accent ? .9 : .6, time + .003);
+  g.gain.exponentialRampToValueAtTime(0.0001, time + .09);
+  o.connect(f).connect(g).connect(ctx.destination);
+  o.start(time); o.stop(time + .1);
+}
+
+/* play = {mode:'all'|'line', line, steps, pos, loopFrom, next, queue, timer, raf, btn} */
+let play = null;
+/* Tempo: read on every scheduled beat, so a change takes effect on the next beat, even mid-loop. */
+let spb = 60 / 72;
+const bpmIn = document.getElementById('bpm'), bpmOut = document.getElementById('bpmOut'), speedName = document.getElementById('speedName');
+const NAMES = [[56,'Very slow'],[72,'Slow'],[92,'Walking'],[116,'Quick'],[140,'Fast'],[999,'Chef!']];
+function setBpm(v) {
+  v = Math.max(40, Math.min(160, Math.round(+v || 72)));
+  bpmIn.value = v; bpmOut.textContent = v; spb = 60 / v;
+  speedName.textContent = NAMES.find(([max]) => v < max)[1];
+  try { localStorage.setItem('potatoChant.bpm', v); } catch (e) {}
+}
+bpmIn.addEventListener('input', () => setBpm(bpmIn.value));
+document.getElementById('bpmDown').addEventListener('click', () => setBpm(+bpmIn.value - 4));
+document.getElementById('bpmUp').addEventListener('click', () => setBpm(+bpmIn.value + 4));
+let saved = null; try { saved = localStorage.getItem('potatoChant.bpm'); } catch (e) {}
+setBpm(saved || 72);
+const playAllBtn = document.getElementById('playAll');
+
+function stepsFor(lineIdxs) {
+  const steps = [0, 1, 2, 3].map(k => ({count: k + 1, accent: k === 0}));
+  lineIdxs.forEach(li => beatEls[li].forEach((el, bi) => steps.push({li, el, accent: bi === 0})));
+  return steps;
+}
+
+function start(mode, line) {
+  stop();
+  try {
+    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+  } catch (e) { return; }
+  const steps = stepsFor(mode === 'all' ? LINES.map((_, i) => i) : [line]);
+  const btn = mode === 'all' ? playAllBtn : document.querySelector(`[data-loop="${line}"]`);
+  play = {mode, line, steps, pos: 0, loopFrom: 4, next: ctx.currentTime + .12, queue: [], btn, lastEl: null, lastLine: -1};
+  btn.classList.add('on'); btn.setAttribute('aria-pressed', 'true');
+  schedule();
+  play.timer = setInterval(schedule, 25);
+  play.raf = requestAnimationFrame(draw);
+}
+
+function schedule() {
+  const p = play;
+  if (!p || p.done) return;
+  while (p.next < ctx.currentTime + .12) {
+    if (p.pos >= p.steps.length) {
+      if (p.mode === 'line') p.pos = p.loopFrom;          // loop straight back to beat 1, no count-in
+      else { p.queue.push({time: p.next, end: true}); p.done = true; return; }
+    }
+    const s = p.steps[p.pos++];
+    click(p.next, s.accent);
+    p.queue.push({time: p.next, s});
+    p.next += spb;
+  }
+}
+
+function draw() {
+  const p = play;
+  if (!p) return;
+  while (p.queue.length && p.queue[0].time <= ctx.currentTime) {
+    const q = p.queue.shift();
+    if (q.end) { stop(); return; }
+    show(q.s);
+  }
+  p.raf = requestAnimationFrame(draw);
+}
+
+function label(btn, icon, text) { btn.innerHTML = icon + `<span>${text}</span>`; }
+
+function show(s) {
+  const p = play;
+  if (p.lastEl) p.lastEl.classList.remove('now');
+  if (s.count) { label(p.btn, STOP, `Ready… ${s.count}`); return; }
+  if (p.lastEl === null || p.btn.textContent.startsWith('Ready')) label(p.btn, STOP, 'Stop');
+  s.el.classList.add('now'); p.lastEl = s.el;
+  if (s.li !== p.lastLine) {
+    if (p.lastLine >= 0) lineEls[p.lastLine].classList.remove('live');
+    lineEls[s.li].classList.add('live'); p.lastLine = s.li;
+    if (p.mode === 'all') keepInView(lineEls[s.li]);
+  }
+}
+
+/* Scrolls only this page (inside the Google Sites frame), never the lesson around it. */
+function keepInView(el) {
+  const barH = document.querySelector('.top').offsetHeight;
+  const r = el.getBoundingClientRect();
+  if (r.top < barH + 8 || r.bottom > window.innerHeight - 8) {
+    window.scrollTo({top: window.scrollY + r.top - barH - 12, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+  }
+}
+
+function stop() {
+  const p = play;
+  if (!p) return;
+  clearInterval(p.timer); cancelAnimationFrame(p.raf);
+  if (p.lastEl) p.lastEl.classList.remove('now');
+  if (p.lastLine >= 0) lineEls[p.lastLine].classList.remove('live');
+  p.btn.classList.remove('on'); p.btn.setAttribute('aria-pressed', 'false');
+  if (p.mode === 'all') label(p.btn, PLAY, 'Play all'); else label(p.btn, LOOP, 'Loop the beat');
+  play = null;
+  // silence anything already scheduled
+  if (ctx) { const old = ctx; ctx = null; try { old.close(); } catch (e) {} }
+}
+
+playAllBtn.addEventListener('click', () => { if (play && play.mode === 'all') stop(); else start('all'); });
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-loop]');
+  if (!b) return;
+  const li = +b.dataset.loop;
+  if (play && play.mode === 'line' && play.line === li) stop(); else start('line', li);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') stop(); });
+})();
+</script>
+</body>
+</html>
