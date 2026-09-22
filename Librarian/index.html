@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Librarian — Eagle View Music</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    try {
+      if (window.self !== window.top) document.documentElement.classList.add('in-iframe');
+    } catch (e) {
+      document.documentElement.classList.add('in-iframe');
+    }
+  </script>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="../index.html" class="home-link" title="Back to Eagle View Music">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    <span>Eagle View</span>
+  </a>
+  <h1 class="wordmark">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v14"/><path d="M9 19V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v11"/><path d="m14.5 8.6 2.9-.8a1 1 0 0 1 1.2.7l2.7 10.1"/><path d="M3 19h18"/></svg>
+    Librarian
+  </h1>
+  <span class="topbar-spacer"></span>
+</header>
+
+<main class="page">
+
+  <section class="intro card">
+    <h2>Publish songs to every student</h2>
+    <ol class="steps">
+      <li><strong>Tick</strong> the songs you want students to have.</li>
+      <li><strong>Download</strong> them — one small file each.</li>
+      <li><strong>Upload</strong> the files to the Teacher Library on GitHub. About a minute later, every student’s app has them.</li>
+    </ol>
+    <p class="fine">Students get them as <em>Shared</em> songs: they stay exactly as you made them, and students keep their own changes with <em>Save my copy</em>. Publish a song again after changing it and students get the new version.</p>
+  </section>
+
+  <div class="status" id="status" role="status"></div>
+
+  <div class="toolbar-row">
+    <div class="seg" role="tablist" aria-label="Show">
+      <button class="seg-btn active" data-filter="all" role="tab" aria-selected="true">All</button>
+      <button class="seg-btn" data-filter="todo" role="tab" aria-selected="false">To publish</button>
+      <button class="seg-btn" data-filter="published" role="tab" aria-selected="false">Published</button>
+    </div>
+    <button class="text-btn" id="select-todo">Tick new &amp; changed</button>
+    <button class="text-btn" id="select-none">Clear ticks</button>
+  </div>
+
+  <div id="groups"></div>
+
+  <section class="card empty" id="empty" hidden>
+    <h2>No songs of yours here yet</h2>
+    <p>The Librarian can only see songs made in <strong>this browser</strong>, on <strong>eagleviewmusic.com</strong> itself.</p>
+    <p class="fine">Songs made inside the Google Site are kept separately by the browser (a page inside another site gets storage of its own), so they don’t show up here. Make the songs you want to publish by opening the app from eagleviewmusic.com, then come back.</p>
+  </section>
+
+  <section class="card done" id="done" hidden>
+    <h2 id="done-title">Downloaded</h2>
+    <ol class="steps">
+      <li>Open the Teacher Library’s upload page on GitHub (signed in as <strong>Eagleviewmusic</strong>).</li>
+      <li>Drag in the files from your Downloads folder.</li>
+      <li>Press <strong>Commit changes</strong>. The library updates itself — nothing else to edit.</li>
+    </ol>
+    <div class="done-actions">
+      <a class="btn primary" id="upload-link" target="_blank" rel="noopener">Open the upload page</a>
+      <a class="btn" id="folder-link" target="_blank" rel="noopener">See the Teacher Library</a>
+    </div>
+    <p class="fine">A file with the same name replaces the one already there — that is how a newer version goes out. To take a song back, open its file on GitHub and delete it.</p>
+  </section>
+
+</main>
+
+<footer class="dock" id="dock">
+  <span class="dock-count" id="dock-count">Nothing ticked</span>
+  <button class="btn primary" id="download-btn" disabled>Download</button>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="lib/evm-library.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

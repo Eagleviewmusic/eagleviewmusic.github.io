@@ -1,0 +1,62 @@
+# Rebuilds "Teacher Library/index.json" whenever the Teacher Library changes.
+#
+# The teacher uploads Librarian files to the "Teacher Library" folder on
+# GitHub (Add file -> Upload files). This runs, lists every file in
+# index.json, and commits it; the apps read index.json to find the songs.
+# Master copy: Claude Apps/EVM Library/teacher-library/ on the teacher's Mac.
+
+name: Teacher Library index
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Teacher Library/**'
+      - '!Teacher Library/index.json'
+  workflow_dispatch:        # "Run workflow" button on the Actions tab
+
+permissions:
+  contents: write           # to commit index.json
+  pages: write              # to ask GitHub Pages to publish it
+
+concurrency:
+  group: teacher-library-index
+  cancel-in-progress: false
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build index.json
+        run: node .github/scripts/build-teacher-index.js "Teacher Library"
+
+      - name: Commit index.json if it changed
+        id: commit
+        run: |
+          if [ -z "$(git status --porcelain -- 'Teacher Library/index.json')" ]; then
+            echo "index.json unchanged"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 'Teacher Library/index.json'
+          git commit -m "Rebuild Teacher Library index"
+          git pull --rebase --quiet
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # A commit made by this workflow does not always start a Pages build
+      # by itself, so ask for one. Harmless if one is already running.
+      - name: Publish the site
+        if: steps.commit.outputs.changed == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds"
