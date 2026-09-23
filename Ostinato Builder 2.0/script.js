@@ -487,6 +487,8 @@
     };
     // updatedAt, received, receivedAt, derivedFrom — see lib/evm-library.js
     EVM.carry(src, out);
+    // the Layout Settings it was saved with (A PIECE'S OWN LAYOUT)
+    if (src.layout && typeof src.layout === 'object') out.layout = JSON.parse(JSON.stringify(src.layout));
     return out;
   }
 
@@ -506,11 +508,13 @@
     return isBlankSong(n) ? null : rawSongKey(n);
   }
 
-  // The same, blank or not — what a save compares.
+  /* The same, blank or not — what a save compares. The music only: a
+     piece's Layout Settings ride along (A PIECE'S OWN LAYOUT) but are not
+     what makes two records the same piece, so a link still finds its copy. */
   function rawSongKey(rec) {
     const n = normalizeSong(Object.assign({}, rec, { id: (rec && rec.id) || 'x' }));
     ['id', 'title', 'createdAt', 'updatedAt', 'isCustom',
-     'received', 'receivedAt', 'derivedFrom', 'book'].forEach(k => { delete n[k]; });
+     'received', 'receivedAt', 'derivedFrom', 'book', 'layout'].forEach(k => { delete n[k]; });
 
     /* Opening a piece conforms it (conformTrack): beats are padded out to
        the length of the piece with empty beats of the plain division, and
@@ -674,7 +678,8 @@
     const snap = snapshot();
     delete snap.id;
     delete snap.title;
-    return stableStringify(snap);
+    // the build rules are part of the piece (A PIECE'S OWN LAYOUT)
+    return stableStringify(snap) + '|' + stableStringify(layout);
   }
   function markSaved() { savedFingerprint = stateFingerprint(); }
 
@@ -706,8 +711,13 @@
     const record = snapshot();
     record.isCustom = existing ? existing.isCustom : !DEFAULT_SONGS[song.id];
     record.createdAt = existing ? existing.createdAt : Date.now();
-    // updatedAt moves only if something actually changed
-    EVM.stamp(record, existing || null, rawSongKey);
+    /* The Layout Settings it is saved with (A PIECE'S OWN LAYOUT). A
+       lesson's rules are the lesson's, and the Music Stand has none of its
+       own to give — so there the piece keeps the settings it already had. */
+    if (!lessonMeta && !EMBEDDED) record.layout = layoutSnapshot();
+    else if (existing && existing.layout) record.layout = JSON.parse(JSON.stringify(existing.layout));
+    // updatedAt moves only if something actually changed — the build rules count
+    EVM.stamp(record, existing || null, r => rawSongKey(r) + '|' + pieceLayoutKey(r));
     lib[song.id] = record;
     saveStoredLibrary(lib);
     markSaved();
@@ -800,6 +810,8 @@
     openedBook = openedReceived && record.book ? String(record.book) : '';
     autoSave = !!(options && options.autoSave) && !openedReceived;
     rememberActiveSong();
+    // before drawing, so the render and the saved baseline both use them
+    usePieceLayout(record);
     afterSongChange();
     return true;
   }
@@ -895,6 +907,7 @@
       adoptSong(normalizeSong(lib[SANDBOX_ID]));
       openedReceived = false;
       openedBook = '';
+      usePieceLayout(lib[SANDBOX_ID]);
       afterSongChange();
     }
   }
@@ -931,6 +944,10 @@
     openedBook = '';
     autoSave = true;
     rememberActiveSong();
+    /* A new piece starts from your own settings, not from a shared
+       piece's that happened to be on screen; the save just below writes
+       them into it (A PIECE'S OWN LAYOUT). */
+    usePieceLayout(record);
     afterSongChange();
     saveCurrentSong(true);
   }
@@ -946,6 +963,8 @@
     copy.updatedAt = copy.createdAt;
     // The way back to what it was made from — a shared ostinato, most often.
     if (from && !isSandbox(from)) copy.derivedFrom = from;
+    // the settings on screen travel with the copy — a shared piece's too, unlocked now it is theirs
+    if (!lessonMeta && !EMBEDDED) copy.layout = layoutSnapshot();
     const lib = getStoredLibrary();
     lib[copy.id] = copy;
     saveStoredLibrary(lib);
@@ -954,6 +973,7 @@
     openedBook = '';
     autoSave = true;
     rememberActiveSong();
+    usePieceLayout(copy);
     afterSongChange();
     toast('Saved as “' + title + '”');
   }
@@ -1215,7 +1235,11 @@
   }
 
   function saveViewPrefs() {
-    try { localStorage.setItem(VIEW_PREFS_KEY, JSON.stringify(view)); } catch (e) {}
+    /* While a shared piece's own settings are on screen, its show switches
+       are that piece's, not the student's: what is stored keeps their own
+       (see A PIECE'S OWN LAYOUT). Zoom and paging are still theirs to change. */
+    const out = pieceLayoutInMemory && pieceOwnShow ? Object.assign({}, view, pieceOwnShow) : view;
+    try { localStorage.setItem(VIEW_PREFS_KEY, JSON.stringify(out)); } catch (e) {}
   }
 
   loadViewPrefs();
@@ -1280,6 +1304,8 @@
 
   let layout = null;        // filled in below; never null after that
   let layoutLocked = false; // a lesson, or a link sent with the layout locked
+  let pieceLayoutInMemory = false; // a shared piece's own settings are on screen (A PIECE'S OWN LAYOUT)
+  let pieceOwnShow = null;  // …and the student's own show switches, kept aside meanwhile
   let policy = null;        // the student task, or null outside a lesson
   let lessonMeta = null;    // { title, songIds } while a lesson is open
 
@@ -1577,6 +1603,9 @@
 
   function saveLayout() {
     forgetDivisionOffers();
+    /* A shared piece's settings are on screen for that piece only; the
+       student's own are what is stored (see A PIECE'S OWN LAYOUT). */
+    if (pieceLayoutInMemory) return;
     try {
       pruneLayoutCells(layout);
       const out = JSON.parse(JSON.stringify(layout));
@@ -1605,6 +1634,9 @@
   }
 
   function applyLayoutSnapshot(snap, lock) {
+    /* What arrives here is to be stored, so a shared piece's settings
+       must not be the ones on screen when it lands. */
+    leavePieceLayout();
     if (!snap) {
       /* A link with no layout in it still locks, if it said to. The
          alternative is a lesson whose vocabulary is right and whose
@@ -1615,20 +1647,92 @@
     forgetDivisionOffers();
     layout = normalizeLayout(snap.layout || snap);
     if (snap.show) {
-      if (snap.show.dots !== undefined) view.showDots = !!snap.show.dots;
-      if (snap.show.easy !== undefined) view.easyMode = !!snap.show.easy;
-      if (snap.show.beatNumbers !== undefined) view.showBeatNumbers = !!snap.show.beatNumbers;
-      /* A link from before the two were split carries one flag for both. */
-      const bars = snap.show.barNumbers !== undefined ? snap.show.barNumbers : snap.show.beatNumbers;
-      if (bars !== undefined) view.showBarNumbers = !!bars;
-      if (snap.show.syllables !== undefined) view.showSyllables = !!snap.show.syllables;
-      if (SYLLABLE_SYSTEMS.indexOf(snap.show.syllableSystem) !== -1) {
-        view.syllableSystem = snap.show.syllableSystem;
-      }
+      adoptLayoutShow(snap.show);
       saveViewPrefs();
     }
     if (lock) layoutLocked = true;
     saveLayout();
+  }
+
+  // The four on-screen switches a snapshot carries, onto the view.
+  function adoptLayoutShow(show) {
+    if (show.dots !== undefined) view.showDots = !!show.dots;
+    if (show.easy !== undefined) view.easyMode = !!show.easy;
+    if (show.beatNumbers !== undefined) view.showBeatNumbers = !!show.beatNumbers;
+    /* A link from before the two were split carries one flag for both. */
+    const bars = show.barNumbers !== undefined ? show.barNumbers : show.beatNumbers;
+    if (bars !== undefined) view.showBarNumbers = !!bars;
+    if (show.syllables !== undefined) view.showSyllables = !!show.syllables;
+    if (SYLLABLE_SYSTEMS.indexOf(show.syllableSystem) !== -1) {
+      view.syllableSystem = show.syllableSystem;
+    }
+  }
+
+  /* ------------------------------------------------------------------
+     A PIECE'S OWN LAYOUT
+
+     Every piece remembers the Layout Settings it was saved with —
+     `record.layout`, a layoutSnapshot(): the build rules (EASY's rhythms
+     among them) and whether it shows dots or EASY. Opening it brings
+     them back:
+       • a shared piece (a teacher's, from a book or a link): on screen for
+         that piece only and LOCKED — the student's own settings are left
+         stored and come back as soon as anything else is opened;
+       • one of your own (the sandbox too): becomes the settings in use,
+         and is stored as the app's, so a new piece starts from where you
+         are. Unlocked.
+     A Save my copy keeps the piece's settings, unlocked (it is theirs).
+     Not in a lesson (its layout rules), not in the Music Stand, and never
+     over settings a lesson or a locked link has locked.
+
+     Every caller goes on to afterSongChange(), whose syncSettings()
+     brings the dots button and the show switches into line.
+     ------------------------------------------------------------------ */
+
+  // The view switches a piece carries — what the student gets back after.
+  const PIECE_SHOW_KEYS = ['showDots', 'easyMode', 'showBarNumbers', 'showBeatNumbers',
+                           'showSyllables', 'syllableSystem'];
+
+  function storedLayoutLocked() {
+    try { return !!(JSON.parse(localStorage.getItem(LAYOUT_KEY) || 'null') || {}).locked; }
+    catch (e) { return false; }
+  }
+
+  // Back from a shared piece: the student's own, as stored.
+  function leavePieceLayout() {
+    if (!pieceLayoutInMemory) return;
+    pieceLayoutInMemory = false;
+    if (pieceOwnShow) Object.assign(view, pieceOwnShow);
+    pieceOwnShow = null;
+    loadLayout();
+  }
+
+  function usePieceLayout(rec) {
+    if (EMBEDDED || lessonMeta) return;
+    const snap = rec && rec.layout && typeof rec.layout === 'object' ? rec.layout : null;
+    if (snap && rec.received) {
+      if (!pieceLayoutInMemory) {
+        pieceOwnShow = {};
+        PIECE_SHOW_KEYS.forEach(k => { pieceOwnShow[k] = view[k]; });
+      }
+      forgetDivisionOffers();
+      layout = normalizeLayout(snap.layout || snap);
+      if (snap.show) adoptLayoutShow(snap.show);
+      layoutLocked = true;
+      pieceLayoutInMemory = true;
+    } else {
+      leavePieceLayout();
+      if (snap && !rec.received && !storedLayoutLocked()) applyLayoutSnapshot(snap, false);
+    }
+  }
+
+  /* What a save compares: the build rules count as part of the piece (so a
+     changed setting is a changed piece, and is published as one); the
+     dots/EASY view is carried along but is not a change on its own — the
+     dots button is pressed constantly. */
+  function pieceLayoutKey(rec) {
+    const l = rec && rec.layout;
+    return stableStringify(l ? (l.layout || l) : null);
   }
 
   /* ---- the questions the rest of the app asks ---------------------- */
@@ -4858,7 +4962,12 @@
   }
 
   function openLayoutSheet() {
-    if (!layoutEditable()) { toast('Your layout settings were set by whoever sent this'); return; }
+    if (!layoutEditable()) {
+      toast(pieceLayoutInMemory
+        ? 'This piece comes with its own settings — Save my copy to change them'
+        : 'Your layout settings were set by whoever sent this');
+      return;
+    }
     closeSettings();
     /* The vocabulary is per family, and the family you are working in is
        almost always the one you want to see first. */
@@ -6372,6 +6481,8 @@
          copy was: never filed read-only, or nothing they did would save. */
       delete fresh.received;
       delete fresh.receivedAt;
+      // the lesson's layout rules, not the piece's (A PIECE'S OWN LAYOUT)
+      delete fresh.layout;
       sources[id] = fresh;                                     // always pristine
       if (!lib[id]) lib[id] = JSON.parse(JSON.stringify(fresh)); // seeded once only
       ids.push(id);
@@ -6846,7 +6957,9 @@
       delete record.id;
       delete record.createdAt;
       // where the teacher's copy came from is not the student's business
-      ['updatedAt', 'received', 'receivedAt', 'derivedFrom', 'book'].forEach(k => { delete record[k]; });
+      /* …nor are the settings it was saved with: the lesson carries its
+         own, below (A PIECE'S OWN LAYOUT). */
+      ['updatedAt', 'received', 'receivedAt', 'derivedFrom', 'book', 'layout'].forEach(k => { delete record[k]; });
       return record;
     });
     return {
@@ -6867,6 +6980,9 @@
     policy = normalizePolicy(draft.policy);
     lessonMeta = { title: draft.title || 'Lesson preview', songIds: draft.songIds.slice() };
     previewing = true;
+    /* The preview is the teacher's own room — not a shared piece's
+       settings that were on screen (A PIECE'S OWN LAYOUT). */
+    leavePieceLayout();
     previewLayoutLock = layoutLocked;
     layoutLocked = true;
     if (previewBar) previewBar.hidden = false;
@@ -7101,6 +7217,7 @@
       openedBook = '';
       autoSave = true;            // the sandbox keeps itself, as it always does
       rememberActiveSong();
+      usePieceLayout(record);
       afterSongChange();
       toast('Opened in your sandbox');
       return true;

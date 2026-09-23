@@ -213,6 +213,7 @@ html.in-iframe .home-link { visibility: hidden; }
 .tag-changed { border-color: transparent; background: var(--changed-soft); color: var(--changed); }
 .tag-published { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
 .tag-moved { border-color: transparent; background: var(--changed-soft); color: var(--changed); }
+.tag-warn { border-color: transparent; background: var(--warn-soft); color: var(--warn); cursor: help; }
 
 .none { color: var(--ink-3); font-weight: 700; text-align: center; padding: 20px 0; }
 

@@ -36,6 +36,7 @@
   const SOURCES = [
     {
       app: 'rhythm-poetry', name: 'Rhythm Poetry', key: 'rhythm_poetry_song_library_v3',
+      settings: true,
       reserved: id => /^sandbox-(rhythm|poetry)$/.test(id),
       kind: rec => (rec.side === 'rhythm' ? 'rhythm' : 'poem'),
       blank: rec => {
@@ -52,6 +53,7 @@
     },
     {
       app: 'ostinato-builder', name: 'Ostinato Builder', key: 'ostinato_builder_library_v1',
+      settings: true,
       reserved: id => id === 'sandbox',
       kind: () => 'ostinato',
       blank: rec => !(rec.tracks || []).some(t => (t.beats || []).some(b => (b.cells || []).some(Boolean)))
@@ -70,7 +72,8 @@
         }));
         return !words.length || words.join(' ') === 'start here';
       },
-      data: rec => ({ score: rec.score })
+      data: rec => (rec.layout ? { score: rec.score, layout: rec.layout } : { score: rec.score }),
+      settings: true
     },
     {
       app: 'song-writer', name: 'Song Writer', from: '1.0', key: 'song_writer_library_v1',
@@ -173,6 +176,11 @@
           updatedAt: updatedAt,
           received: !!rec.received,
           blank: src.blank(rec),
+          /* Pieces keep the Layout Settings they were saved with, and those
+             travel with them (record.layout, inside the envelope's data).
+             One saved before that has none: say so, since the students
+             would get their own settings instead. */
+          noSettings: !!src.settings && !rec.layout,
           record: Object.assign({}, rec, { id: id, createdAt: createdAt, updatedAt: updatedAt }),
           dataOf: src.data || null
         };
@@ -313,6 +321,13 @@
     }
     const tags = document.createElement('span');
     tags.className = 'item-tags';
+    if (item.noSettings && s !== 'blank') {
+      const t = document.createElement('span');
+      t.className = 'tag tag-warn';
+      t.textContent = 'No Layout Settings yet';
+      t.title = 'This piece was saved before pieces kept their Layout Settings. Open it in the app, set it up, and save it (turn Auto-save on, or Save as…) — then its settings travel with it.';
+      tags.appendChild(t);
+    }
     if (item.received) {
       const t = document.createElement('span');
       t.className = 'tag tag-shared';

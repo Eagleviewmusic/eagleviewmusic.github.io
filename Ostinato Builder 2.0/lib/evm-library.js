@@ -111,8 +111,10 @@
 
      1. Blank: not filed.
      2. Same id already here (and not a built-in):
-          same content .............. 'same'     (a newer title is taken)
-          incoming stamped newer .... 'updated'  (replaced in place)
+          same content, not newer ... 'same'
+          incoming stamped newer .... 'updated'  (replaced in place — even with the
+                                                  same music: a new title or new
+                                                  Layout Settings is a new version)
           ours is newer ............. 'kept'
           no way to tell ............ filed beside it under a new id
      3. No usable id: the same content already here ... 'matched'
@@ -134,12 +136,10 @@
 
     if (existing && !isBuiltIn(existing)) {
       const tin = Number(incoming.updatedAt) || 0;
-      if (o.key(existing) === k) {
-        if (tin > timeOf(existing) && incoming.title && incoming.title !== existing.title) {
-          existing.title = incoming.title;
-          existing.updatedAt = tin;
-          return { action: 'updated', id: id, record: existing };
-        }
+      /* Same music and not newer: nothing to do. Same music but stamped
+         newer still replaces it — a new title, or new Layout Settings
+         (record.layout), is a newer version too. */
+      if (o.key(existing) === k && !(tin > timeOf(existing))) {
         return { action: 'same', id: id, record: existing };
       }
       if (tin && tin > timeOf(existing)) {
