@@ -1,0 +1,14 @@
+{
+  "format": "evm-item",
+  "formatVersion": 1,
+  "app": "song-writer",
+  "kind": "song",
+  "id": "song_1788835125921",
+  "title": "Hola, Hola",
+  "createdAt": 1788835125921,
+  "updatedAt": 1788835125921,
+  "book": "More songs",
+  "data": {
+    "content": "[Key of E]\n[New Line]\nHo[M1] -la,[S1] Ho[R1] -la,[S1] co[F1] -mo[S1] es[F1] -tas,[M1] Es[S1] -toy[F1] muy[M1] bien[R1] gra[F1] -ci[M1] -as,[R1]\n[New Line]\nHo[M1] -la,[S1] Ho[R1] -la,[S1] co[F1] -mo[S1] es[F1] -tas,[M1] Es[S1] -toy[F1] muy[M1] bien[R1] gra[R1] -ci[T-1] -as,[D1]\n[New Line]\nBue[R1] -nos[M1] di[F1] -as,[R1] Bue[M1] -nos[F1] di[S1] -as,[M1] Bue[R1] -nos[M1] no[F1] -ches,[R1] Bue[M1] -nos[F1] no[S1] -ches,[M1]\n[New Line]\nCa[L1] -da[L1] di[S1] -a[D1] va[F1] muy[F1] bien[M1] Del[M1] sol[R1] ha[M1] -sta[F1] la[R1] lu[S1] -na[S-1]\n[New Line]\nHo[M1] -la,[S1] Ho[R1] -la,[S1] co[F1] -mo[S1] es[F1] -tas,[M1] Es[S1] -toy[F1] muy[M1] bien[R1] gra[F1] -ci[M1] -as,[R1]\n[New Line]\nHo[M1] -la,[S1] Ho[R1] -la,[S1] co[F1] -mo[S1] es[F1] -tas,[M1] Es[S1] -toy[F1] muy[M1] bien[R1] gra[R1] -ci[T-1] -as,[D1]"
+  }
+}

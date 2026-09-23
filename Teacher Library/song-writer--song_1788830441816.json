@@ -1,0 +1,14 @@
+{
+  "format": "evm-item",
+  "formatVersion": 1,
+  "app": "song-writer",
+  "kind": "song",
+  "id": "song_1788830441816",
+  "title": "Days of the Week",
+  "createdAt": 1788830441816,
+  "updatedAt": 1788830441816,
+  "book": "More songs",
+  "data": {
+    "content": "[Key of Bb]\n[New Line]\nMonday,[D1] Tuesday,[R1] Wednesday,[M1] Thursday,[F1] Friday,[S1] Saturday,[L1] Sunday.[T1] The[D2] days[D2] of[D2] the[D2] week![D2]"
+  }
+}

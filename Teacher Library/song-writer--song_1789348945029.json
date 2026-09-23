@@ -1,0 +1,14 @@
+{
+  "format": "evm-item",
+  "formatVersion": 1,
+  "app": "song-writer",
+  "kind": "song",
+  "id": "song_1789348945029",
+  "title": "If I could travel to 1985",
+  "createdAt": 1789348945029,
+  "updatedAt": 1789348945029,
+  "book": "More songs",
+  "data": {
+    "content": "[Key of E]\n[New Line]\nIf[D1] I[D1] could[R1] travel[M1,M1] before[M1,R1] I[M1] was[R1] alive[T-1,S-1] I'd[R1] like[R1] to[M1] travel[F1,F1] to[F1] 1985[M1,R1,M1,R1,D1] 1985,[S1,F1,S1,F1,M1] 1985,[L1,S1,L1,S1,F1] I'd[M1] like[M1] to[M1] travel[M1,M1] to[M1] 1985[R1,M1,R1,T-1,D1]\n[New Line]\nYou[D1] couldn't[D1,D1] watch[R1] YouTube[M1,M1] no[M1] matter[R1,M1] how[R1] you[T-1] tried[S-1] There[R1] was[R1] no[M1] internet[F1,F1,F1] in[F1] 1985[M1,R1,M1,R1,D1] 1985,[S1,F1,S1,F1,M1] 1985,[L1,S1,L1,S1,F1] There[M1] was[M1] no[M1] internet[M1,M1,M1] in[M1] 1985[R1,M1,R1,T-1,D1]\n[New Line]\nIf[D1] you[D1] were[R1] bored[M1] you[M1] had[R1] to[M1] go[R1] outside[T-1,S-1] There[R1] was[R1] no[M1] XBox[F1,F1] in[F1] 1985[M1,R1,M1,R1,D1] 1985,[S1,F1,S1,F1,M1] 1985,[L1,S1,L1,S1,F1] There[M1] was[M1] no[M1] XBox[M1,M1] in[M1] 1985[R1,M1,R1,T-1,D1]\n[New Line]\nCall[D1] up[D1] your[R1] best[M1] friend[M1] just[R1,M1] to[R1] say[T-1] hi[S-1] There[R1] were[R1] no[M1] cellphones[F1,F1] in[F1] 1985[M1,R1,M1,R1,D1] 1985,[S1,F1,S1,F1,M1] 1985,[L1,S1,L1,S1,F1] There[M1] were[M1] no[M1] cellphones[M1,M1] in[M1] 1985[R1,M1,R1,T-1,D1]\n[New Line]\nJust[D1] to[D1] watch[D1] a[R1] movie[M1,M1] you[M1] had[R1] to[M1] take[R1] a[T-1] drive[S-1] There[R1] was[R1] no[M1] Netflix[F1,F1] in[F1] 1985[M1,R1,M1,R1,D1] 1985,[S1,F1,S1,F1,M1] 1985,[L1,S1,L1,S1,F1] There[M1] was[M1] no[M1] Netflix[M1,M1] in[M1] 1985[R1,M1,R1,T-1,D1]"
+  }
+}
