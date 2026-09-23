@@ -1,7 +1,7 @@
 {
   "format": "evm-index",
   "formatVersion": 1,
-  "generatedAt": "2026-09-23T02:37:16.146Z",
+  "generatedAt": "2026-09-23T17:53:12.589Z",
   "items": [
     {
       "app": "rhythm-poetry",
@@ -46,6 +46,15 @@
       "title": "Days of the Week",
       "updatedAt": 1788830441816,
       "path": "song-writer--song_1788830441816.json",
+      "book": "More songs"
+    },
+    {
+      "app": "song-writer",
+      "kind": "song",
+      "id": "song_1790085659105",
+      "title": "Ging Gang Goolie",
+      "updatedAt": 1790085659105,
+      "path": "song-writer--song_1790085659105.json",
       "book": "More songs"
     },
     {
