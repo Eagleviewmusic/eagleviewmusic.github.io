@@ -1,7 +1,7 @@
 {
   "format": "evm-index",
   "formatVersion": 1,
-  "generatedAt": "2026-09-22T23:54:57.891Z",
+  "generatedAt": "2026-09-23T00:29:24.747Z",
   "items": [
     {
       "app": "rhythm-poetry",
@@ -10,6 +10,15 @@
       "title": "Chicken Wing, Chicken Wing",
       "updatedAt": 1790121220158,
       "path": "rhythm-poetry--song_1790121220158_0eva.json",
+      "book": "More songs"
+    },
+    {
+      "app": "rhythm-poetry",
+      "kind": "poem",
+      "id": "song_1789352699141",
+      "title": "Pitty Patty Polt",
+      "updatedAt": 1789352699141,
+      "path": "rhythm-poetry--song_1789352699141.json",
       "book": "More songs"
     }
   ]
