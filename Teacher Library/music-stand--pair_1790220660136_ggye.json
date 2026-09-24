@@ -6,7 +6,7 @@
   "id": "pair_1790220660136_ggye",
   "title": "Chicken Wing with Shakers and Sticks",
   "createdAt": 1790220660136,
-  "updatedAt": 1790221893981,
+  "updatedAt": 1790222136048,
   "book": "More songs",
   "data": {
     "songs": {
@@ -99,7 +99,8 @@
               "easy": {
                 "simple": [
                   "q",
-                  "ee"
+                  "ee",
+                  "sse"
                 ],
                 "compound": [
                   "dq",
@@ -145,6 +146,12 @@
                 "simple": {},
                 "compound": {}
               }
+            },
+            "show": {
+              "dots": true,
+              "easy": true,
+              "measureNumbers": true,
+              "beatNumbers": false
             }
           }
         }
