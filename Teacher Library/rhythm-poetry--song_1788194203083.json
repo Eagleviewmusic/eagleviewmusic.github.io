@@ -1,0 +1,164 @@
+{
+  "format": "evm-item",
+  "formatVersion": 1,
+  "app": "rhythm-poetry",
+  "kind": "poem",
+  "id": "song_1788194203083",
+  "title": "Ickle, Ockle, Blue Bottle",
+  "createdAt": 1788194203083,
+  "updatedAt": 1790254129397,
+  "book": "More songs",
+  "data": {
+    "side": "poetry",
+    "poetryState": {
+      "words": [
+        "Ick",
+        "-le",
+        "ock",
+        "-le,",
+        "blue",
+        "-",
+        "bot",
+        "-tle,",
+        "Fish",
+        "-es",
+        "in",
+        "the",
+        "sea,",
+        "-",
+        "-",
+        "-",
+        "Come",
+        "and",
+        "tell",
+        "your",
+        "first",
+        "-",
+        "name",
+        "To",
+        "lit",
+        "-tle",
+        "old",
+        "-",
+        "me!",
+        "-",
+        "-",
+        "-"
+      ],
+      "rawLyrics": [
+        "Ick",
+        "-le",
+        "ock",
+        "-le,",
+        "blue",
+        "bot",
+        "-tle,",
+        "Fish",
+        "-es",
+        "in",
+        "the",
+        "sea,",
+        "Come",
+        "and",
+        "tell",
+        "your",
+        "first",
+        "name",
+        "To",
+        "lit",
+        "-tle",
+        "old",
+        "me!"
+      ],
+      "beatSubdivisions": {},
+      "linkedBeats": {},
+      "syncopation": [],
+      "syncopationStates": {},
+      "lineOverrides": {},
+      "hasPickupMeasure": false,
+      "BPM": 82,
+      "timeSignatureNumerator": 4,
+      "timeSignatureDenominator": 4
+    },
+    "layout": {
+      "layout": {
+        "v": 1,
+        "easy": {
+          "simple": [
+            "q",
+            "ee"
+          ],
+          "compound": [
+            "dq",
+            "eee",
+            "qe",
+            "qre",
+            "dh"
+          ]
+        },
+        "meters": {
+          "simple": [
+            "4/4",
+            "3/4",
+            "2/4",
+            "6/4",
+            "5/4"
+          ],
+          "compound": [
+            "6/8",
+            "9/8",
+            "12/8"
+          ]
+        },
+        "divide": {
+          "sixteenths": true,
+          "tuplets": true,
+          "subTuplets": true
+        },
+        "cells": {
+          "simple": {
+            "2": [
+              "XX",
+              "XO",
+              "OO"
+            ],
+            "3": [
+              "XOO",
+              "OOO"
+            ],
+            "4": [
+              "XXXX",
+              "XXXO",
+              "XXOX",
+              "XOXX",
+              "XOXO",
+              "XOOO",
+              "OOXO",
+              "OOOO"
+            ],
+            "6": [
+              "XOOOOO",
+              "OOOOOO"
+            ]
+          },
+          "compound": {}
+        },
+        "spans": {
+          "simple": {
+            "2": [
+              "XOOO"
+            ],
+            "3": []
+          },
+          "compound": {}
+        }
+      },
+      "show": {
+        "dots": true,
+        "easy": true,
+        "measureNumbers": true,
+        "beatNumbers": false
+      }
+    }
+  }
+}
