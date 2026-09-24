@@ -1,0 +1,148 @@
+{
+  "format": "evm-item",
+  "formatVersion": 1,
+  "app": "ostinato-builder",
+  "kind": "ostinato",
+  "id": "song_1790256191335_w1a9",
+  "title": "Chickenwing beat",
+  "createdAt": 1790256191335,
+  "updatedAt": 1790256191335,
+  "book": "More songs",
+  "data": {
+    "bpm": 92,
+    "timeSignatureNumerator": 4,
+    "timeSignatureDenominator": 4,
+    "measures": 1,
+    "tracks": [
+      {
+        "instrument": "shaker",
+        "muted": false,
+        "beats": [
+          {
+            "slots": 2,
+            "cells": [
+              true,
+              true
+            ]
+          },
+          {
+            "slots": 4,
+            "cells": [
+              true,
+              true,
+              true,
+              true
+            ]
+          },
+          {
+            "slots": 2,
+            "cells": [
+              true,
+              true
+            ]
+          },
+          {
+            "slots": 4,
+            "cells": [
+              true,
+              true,
+              true,
+              true
+            ]
+          }
+        ],
+        "links": {}
+      },
+      {
+        "instrument": "claves",
+        "muted": false,
+        "beats": [
+          {
+            "slots": 2,
+            "cells": [
+              true,
+              false
+            ]
+          },
+          {
+            "slots": 2,
+            "cells": [
+              true,
+              true
+            ]
+          },
+          {
+            "slots": 2,
+            "cells": [
+              true,
+              false
+            ]
+          },
+          {
+            "slots": 2,
+            "cells": [
+              true,
+              false
+            ]
+          }
+        ],
+        "links": {}
+      }
+    ],
+    "layout": {
+      "layout": {
+        "v": 1,
+        "easy": {
+          "simple": [
+            "q",
+            "ee",
+            "ssss"
+          ],
+          "compound": [
+            "dq",
+            "eee",
+            "qe",
+            "qre",
+            "dh"
+          ]
+        },
+        "meters": {
+          "simple": [
+            "2/4",
+            "3/4",
+            "4/4",
+            "5/4",
+            "6/4"
+          ],
+          "compound": [
+            "6/8",
+            "9/8",
+            "12/8"
+          ]
+        },
+        "divide": {
+          "sixteenths": true,
+          "tuplets": true,
+          "subTuplets": true
+        },
+        "cells": {
+          "simple": {},
+          "compound": {}
+        },
+        "joins": {
+          "simple": 8,
+          "compound": 8
+        },
+        "instruments": null
+      },
+      "show": {
+        "dots": true,
+        "easy": true,
+        "barNumbers": true,
+        "beatNumbers": true,
+        "syllables": false,
+        "syllableSystem": "Simplified Kodály"
+      }
+    }
+  }
+}
