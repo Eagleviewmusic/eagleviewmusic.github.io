@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Noto+Serif:wght@700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="lib/evm-shelf.css">
+  <link rel="stylesheet" href="lib/evm-count-in.css">
   <!-- Framed (the Music Stand, or any page embedding this one) there is no
        hub to go back to, so the link home is hidden. Rhythm Poetry 2.0
        makes the same check. -->
@@ -75,7 +76,7 @@
        the right place. -->
   <div id="grid-fit"><div id="grid"></div></div>
   <p class="empty-note" id="empty-note" hidden>
-    No instruments yet — press <b>Add instrument</b> below to start building.
+    No instruments yet — press <b>Add</b> below to start building.
   </p>
 
   <div class="pager" id="pager" hidden>
@@ -148,6 +149,15 @@
       <span class="bpm-unit">BPM</span>
     </button>
 
+    <!-- What you hear, beside how fast you hear it — as in Rhythm Poetry.
+         The metronome lives in here now. -->
+    <button class="tool-btn" id="sound-btn" title="Sound — the metronome, the instruments, the count-in">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/>
+      </svg>
+      <span class="tool-label">Sound</span>
+    </button>
+
     <div class="stepper" id="measure-stepper" title="How many measures long the ostinato is">
       <button class="step-btn" id="measures-minus" aria-label="One measure fewer">−</button>
       <span class="step-body">
@@ -157,28 +167,58 @@
       <button class="step-btn" id="measures-plus" aria-label="One measure more">+</button>
     </div>
 
-    <button class="tool-btn" id="metronome-btn" title="Count the beat aloud while playing">
-      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M10 3h4l4 18H6L10 3Z"/><path d="M7.5 14h9"/><path d="M12 21V8"/></svg>
-    </button>
-
-    <button class="tool-btn present-btn" id="present-btn" title="Present mode — big and clean for the class">
-      <svg viewBox="0 0 24 24" width="20" height="20">
-        <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/>
-        <path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
-      </svg>
-    </button>
-
-
     <button class="tool-btn" id="settings-btn" title="What to show on the page">
       <svg viewBox="0 0 24 24" width="20" height="20"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
     </button>
 
-    <button class="tool-btn add-track-btn" id="add-track-btn" title="Add another instrument">
-      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-      <span>Add instrument</span>
+    <!-- Last on the row, named and in the accent, the way Rhythm Poetry
+         and the Music Stand end theirs. Adding an instrument is on the
+         score now, under the last picture. -->
+    <button class="tool-btn present-btn" id="present-btn" title="Present mode — big and clean for the class">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/>
+        <path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+      </svg>
+      <span class="tool-label">Present</span>
     </button>
   </div>
 </footer>
+
+<!-- ============================================================
+     SOUND
+     Rhythm Poetry's three questions, asked of an ostinato: a click
+     on the beat, whether the instruments sound, and a count-in.
+     Turning an instrument's sound off is not muting it — a muted line
+     is greyed out of the score; a silent one is still on the page in
+     full, for someone to play live while the computer plays the rest.
+     ============================================================ -->
+<div class="popover" id="sound-popover" role="dialog" aria-label="Sound options">
+  <div class="popover-section">
+    <h3 class="popover-title">What you hear</h3>
+    <button class="switch-row" id="metronome-toggle">
+      <span class="switch-text">
+        <span class="switch-name">Metronome</span>
+        <span class="switch-desc">A click on every beat</span>
+      </span>
+      <span class="switch" aria-hidden="true"></span>
+    </button>
+    <button class="switch-row active" id="voices-toggle">
+      <span class="switch-text">
+        <span class="switch-name">Instrument sounds</span>
+        <span class="switch-desc">Turn one off and someone can play that part live</span>
+      </span>
+      <span class="switch" aria-hidden="true"></span>
+    </button>
+    <div class="sound-voices" id="sound-voices"></div>
+    <button class="switch-row" id="count-in-toggle">
+      <span class="switch-text">
+        <span class="switch-name">Count-in</span>
+        <span class="switch-desc" id="count-in-desc">Clicks before the music starts</span>
+      </span>
+      <span class="switch" aria-hidden="true"></span>
+    </button>
+  </div>
+</div>
 
 <!-- ============================================================
      SETTINGS
@@ -634,6 +674,7 @@
 <script src="lib/instruments/js/instrument-icons.js"></script>
 <script src="lib/evm-library.js"></script>
 <script src="lib/evm-shelf.js"></script>
+<script src="lib/evm-count-in.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

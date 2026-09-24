@@ -294,7 +294,10 @@ present mode simply gives the solver the whole screen to work with.
 **Edit the scores**, the switch in the View popover, hands both scores back to the pointer. What you
 can reach is the score's own controls: the beat divisions, the joins, the
 repeat marks, a word you tap and retype, and a **+** and **×** on the
-closing bar line for adding and removing bars. The apps' own chrome stays
+closing bar line for adding and removing bars. In the ostinato the
+instruments themselves open up too: **Add** under the last picture, and,
+while the pointer is on a picture, an **×** on its corner and up/down
+arrows on its left edge. The apps' own chrome stays
 away — the tempo, the sounds and the mutes belong to the Music Stand now,
 and Auto-save, the library and sharing mean nothing in a pane.
 
@@ -321,6 +324,13 @@ bar present mode hides.
 
 The stand owns the one AudioContext, and both panes play into it — that is in
 **Timing**. Three things sit on top of it.
+
+**Starting.** Play does not start the instant it is pressed: the context is
+resumed and waited for, and a speaker that has gone to sleep is woken, before
+beat one is placed on the clock (`EVMCountIn.prime`, in `lib/evm-count-in.js` —
+the same start as both apps). With **Count-in** on, the count is one bar of the
+lead piece (two of a bar of two), the card that counts it on screen is the one
+both apps show, and it is gone as the first note sounds.
 
 **The stand has its own copy of the instrument library.** `lib/instruments/`
 holds the shared percussion engine, the same one Ostinato Builder plays and
@@ -353,7 +363,11 @@ on the instrument in the pane are one switch seen twice, and each moves the othe
 (`setVoiceMuted` / `onVoiceMute`). Neither changes the song: an ostinato arrives
 with its own mutes, the stand starts its mixer from them, and from then on the
 mixer is the answer. So muting in a pane never marks a piece edited, and the
-badges work whether or not editing is on.
+badges work whether or not editing is on. Both sides keep a mute by voice
+number, so when an edit adds, removes or reorders the ostinato's instruments
+the pane moves each mute along with its instrument (`reorderHostMutes`) and
+`paneEdited` takes the pane's answer back from `info()` — otherwise a mute
+would stay on the number and silence whichever instrument slid into it.
 
 **Strength** (Mixer, under Rhythm Poetry) is how full the poem's voice is — ×1, ×2 or
 ×3. A tone gains the octave above it and then the one above that; a drum gains
@@ -424,12 +438,14 @@ block. Outside the Music Stand none of it runs. Inside it:
   that list or it will show up, and answer a hover, in the Music Stand.
 - `bridge.editable = true` puts `editing` on the body as well. Each stylesheet
   then lets present mode's hiding back off again, control by control — which is
-  where the answer to "what may be edited in a pane" is actually written. Left
-  hidden on purpose: Ostinato Builder's track order (the Music Stand's mixer
-  is already showing an answer for that) and Rhythm Poetry's line handles
+  where the answer to "what may be edited in a pane" is actually written.
+  Ostinato Builder's Add row, × and order arrows come back with it (the Add
+  row is `display`-toggled, since it takes height; the other two are
+  `visibility`). Left hidden on purpose: Rhythm Poetry's line handles
   (the Music Stand chooses the bars per line itself, and would overrule a
-  handle at the next re-fit). Its instrument buttons answer whether or not
-  the pane is editing, and open the stand's picker, not the app's.
+  handle at the next re-fit). Ostinato Builder's instrument pictures answer
+  whether or not the pane is editing, and open the stand's picker, not the
+  app's.
 - Every edit in both apps ends in `render()`, so that is where the frame tells
   the Music Stand. It only speaks when the pane has been touched since it last
   spoke *and* the piece has actually come out different — `render()` is also

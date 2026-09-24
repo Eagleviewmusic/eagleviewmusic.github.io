@@ -71,7 +71,8 @@
   --head-w: 142px;           /* the instrument column on the left */
   --instrument-size: 104px;  /* the picture that labels a track */
   --track-name-size: 17px;
-  --mini-btn: 34px;          /* mute on the picture, bin beside the name */
+  --mini-btn: 34px;          /* mute, on the picture's bottom corner */
+  --corner-btn: 26px;        /* remove, on its top corner */
 
   /* Set from script.js, which needs the same numbers to work out how
      wide a beat has to be before the browser lays it out. */
@@ -370,20 +371,26 @@ html.in-iframe .home-link { display: none; }
 
 /* --- the instrument, on the left ---
    The picture is the row's label, so it is drawn large enough to be read
-   at a glance, and the two things you can do to a track hang off it
-   rather than queueing underneath: mute rides the picture's corner like a
-   badge on an app icon, and the bin sits on the name's line. That keeps
-   the stack to two rows — picture, then name — and lets both rows grow.
+   at a glance, and the things you can do to a track hang off it rather
+   than queueing underneath: mute rides the picture's bottom corner like a
+   badge on an app icon, and remove (top corner) and the order arrows
+   (left edge) come up over it while the pointer is on it. That leaves
+   the name alone on the line below, centred under the picture and close
+   to it.
 
    Sat on the floor of the row (justify-content: flex-end) so the block
-   lines up with the notation rather than with the dots above it. */
+   lines up with the notation rather than with the dots above it.
+
+   The gap only has to clear the mute badge, which hangs 6px below the
+   picture's corner: a name wider than the space beside the badge would
+   otherwise run into it. */
 .track-head {
   flex: 0 0 var(--head-w);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 6px;
   padding-right: 10px;
 }
 
@@ -439,20 +446,12 @@ html.in-iframe .home-link { display: none; }
 .mute-badge:active { background: var(--paper-2); border-color: var(--ink-3); color: var(--ink); }
 .mute-badge.muted { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
 
-/* --- the name, and the one thing you can do to it --- */
-.track-head-side {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  width: 100%;
-  min-width: 0;
-}
-
+/* --- the name, under the picture --- */
 .track-name {
-  min-width: 0;
+  max-width: 100%;
   font-size: var(--track-name-size);
   font-weight: 800;
+  line-height: 1.2;
   letter-spacing: .01em;
   color: var(--ink-2);
   text-align: center;
@@ -475,59 +474,127 @@ html.in-iframe .home-link { display: none; }
 .mini-btn svg { width: calc(var(--mini-btn) * 0.56); height: calc(var(--mini-btn) * 0.56); }
 .mini-btn:hover,
 .mini-btn:active { background: var(--paper-2); color: var(--ink); }
-.mini-btn.remove:hover,
-.mini-btn.remove:active { background: var(--danger-soft); color: var(--danger); }
 .mini-btn.muted { color: var(--danger); }
 
-/* --- moving an instrument up or down the score ---
-   One control rather than two buttons: an arrow up over an arrow down, in
-   a column no wider than half a mini-btn, so putting it on every row costs
-   the instrument column about twenty pixels rather than seventy.
-
-   It is always in the layout and only sometimes visible. Reserving the
-   space means revealing it cannot nudge the name, re-measure the head
-   column or re-fit the score — the row simply gains a pair of arrows.
+/* --- remove and reorder, over the picture ---
+   Both are laid over the picture rather than set beside it, so bringing
+   them up cannot nudge the name, re-measure the head column or re-fit
+   the score — the picture simply gains an × and a pair of arrows.
 
    Faded out rather than visibility: hidden, because a hidden element
-   cannot take focus: keyboard users would never reach the arrows, and
-   the :focus-within that is supposed to bring them up could never fire.
-   pointer-events does the job visibility was doing, and a Tab into the
-   row reveals them the same way the pointer does. */
+   cannot take focus: keyboard users would never reach them, and the
+   :focus-within that is supposed to bring them up could never fire.
+   pointer-events does the job visibility was doing, and a Tab onto the
+   picture reveals them the same way the pointer does. */
+.remove-badge,
 .track-move {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  margin-left: 1px;
+  position: absolute;
+  z-index: 1;
   opacity: 0;
   pointer-events: none;
   transition: opacity .14s;
 }
-.track:hover .track-move,
+.instrument-slot:hover .remove-badge,
+.instrument-slot:hover .track-move,
+.remove-badge:focus-visible,
 .track-move:focus-within { opacity: 1; pointer-events: auto; }
+/* on its own: a browser that does not know :has() would drop the whole
+   list above along with it */
+.instrument-slot:has(:focus-visible) .remove-badge,
+.instrument-slot:has(:focus-visible) .track-move { opacity: 1; pointer-events: auto; }
 
-.move-btn {
-  width: 24px;
-  height: 18px;
+/* the × on the top corner — the mute badge's counterpart, a size down,
+   because it is the one to be sure about */
+.remove-badge {
+  top: -8px;
+  right: -8px;
+  width: var(--corner-btn);
+  height: var(--corner-btn);
   display: grid;
   place-items: center;
-  border-radius: 6px;
+  border-radius: 50%;
   color: var(--ink-2);
-  background: var(--paper-2);
+  background: var(--surface);
+  border: 1.5px solid var(--ink-3);
+  box-shadow: var(--shadow-1);
+  transition: opacity .14s, background .13s, color .13s, border-color .13s;
+}
+.remove-badge svg { width: 60%; height: 60%; stroke-width: 2.6; }
+.remove-badge:hover,
+.remove-badge:active { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* the arrows, an up over a down in one pill, floating on the middle of
+   the picture's left edge */
+.track-move {
+  left: -13px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  padding: 2px;
+  gap: 1px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1.5px solid var(--hairline-2);
+  box-shadow: var(--shadow-1);
+}
+
+.move-btn {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink-2);
+  background: transparent;
   transition: background .13s, color .13s;
 }
 .move-btn:hover,
 .move-btn:active { background: var(--accent-soft); color: var(--accent); }
 .move-btn:disabled { opacity: .25; pointer-events: none; }
-.move-btn svg { width: 15px; height: 15px; }
+.move-btn svg { width: 15px; height: 15px; stroke-width: 2.4; }
 
-/* A board has no pointer to hover with, so there the arrows simply live
-   on the page — the same bargain the rest of this app's hover affordances
+/* A board has no pointer to hover with, so there both simply live on the
+   picture — the same bargain the rest of this app's hover affordances
    make under (hover: none). */
 @media (hover: none) {
-  .track-move { opacity: .75; pointer-events: auto; }
+  .remove-badge,
+  .track-move { opacity: .85; pointer-events: auto; }
+}
+
+/* --- adding an instrument, under the last one ---
+   A row of its own with only an instrument column: a dashed outline as
+   wide as the pictures above it, like the space the next one will fill.
+   Kept short, because every pixel of it is height the fit has to find.
+   After Lines' last line it needs the gap a track would have left. */
+.add-track-row { display: flex; }
+.system + .add-track-row { margin-top: 16px; }
+.add-track-cell {
+  flex: 0 0 var(--head-w);
+  display: flex;
+  justify-content: center;
+  padding-right: 10px;
+}
+.add-track-btn {
+  width: var(--instrument-size);
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: var(--r-md);
+  border: 2px dashed var(--hairline-2);
+  color: var(--ink-3);
+  font-size: 15px;
+  font-weight: 800;
+  transition: background .14s, border-color .14s, color .14s;
+}
+.add-track-btn svg { stroke-width: 2.6; }
+.add-track-btn:hover,
+.add-track-btn:active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* --- the beats, on the right ---
@@ -785,7 +852,24 @@ html.in-iframe .home-link { display: none; }
 .bpm-unit { font-size: 12px; font-weight: 700; color: var(--ink-3); letter-spacing: .04em; }
 .tool-btn.active .bpm-unit { color: rgba(255,255,255,.8); }
 
-.add-track-btn span { font-size: 14px; }
+/* Present ends the row, as it does in Rhythm Poetry and the Music Stand:
+   named, in the accent, and set off from the tools before it by a rule. */
+.present-btn.tool-btn {
+  position: relative;
+  margin-left: 11px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.present-btn.tool-btn:hover,
+.present-btn.tool-btn:active { background: var(--accent); color: #fff; }
+.present-btn::before {
+  content: '';
+  position: absolute;
+  left: -11px;
+  top: 8px;
+  bottom: 8px;
+  border-left: 1px solid var(--hairline);
+}
 
 /* --- time signature ---
    Two numerals stacked the way they sit on a staff: no fraction bar and
@@ -1350,6 +1434,51 @@ body.show-syllables .track-head { padding-bottom: 28px; }
 }
 .switch-row.active .switch { background: var(--accent); }
 .switch-row.active .switch::after { transform: translateX(16px); }
+/* some of a group on — see .vocab-head.partial */
+.switch-row.partial .switch { background: var(--hairline-2); }
+.switch-row.partial .switch::after { transform: translateX(8px); }
+
+/* --- Sound: one switch per instrument ---
+   Hung under the switch for all of them, indented behind a rule so the
+   list reads as that switch's own. A picture to know each one by, since
+   that is how the score names them. */
+.sound-voices {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0 0 4px 14px;
+  padding-left: 8px;
+  border-left: 2px solid var(--hairline);
+}
+.sound-voices:empty { display: none; }
+.voice-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 4px 10px 4px 6px;
+  border-radius: var(--r-sm);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-2);
+  text-align: left;
+  transition: background .13s;
+}
+.voice-switch:hover,
+.voice-switch:active { background: var(--paper-2); }
+.voice-switch img {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  transition: opacity .16s, filter .16s;
+}
+.voice-switch:not(.active) img { opacity: .4; }
+.voice-switch.muted img { filter: grayscale(1); }
+.voice-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.voice-switch .switch { flex: none; }
+.voice-switch.active .switch { background: var(--accent); }
+.voice-switch.active .switch::after { transform: translateX(16px); }
 
 .popover-field {
   display: flex;
@@ -1689,6 +1818,7 @@ body.capturing .subdivision-controls,
 body.capturing .beat-link-btn,
 body.capturing .beat-repeat-btn,
 body.capturing .track-move,
+body.capturing .remove-badge,
 body.capturing .mini-btn,
 body.capturing .easy-row { visibility: hidden; }
 /* a picture taken in EASY shows the ordinary dots, which say the rhythm */
@@ -1782,7 +1912,11 @@ body.present-mode .measure-repeat-btn,
 body.present-mode .measure-add-btn,
 body.present-mode .measure-cut-btn,
 body.present-mode .track-move,
-body.present-mode .mini-btn.remove { visibility: hidden; }
+body.present-mode .remove-badge { visibility: hidden; }
+/* gone rather than hidden: it is a row of its own, and a blank one
+   would cost the score its height */
+body.present-mode .add-track-row,
+body.capturing .add-track-row { display: none; }
 
 /* nothing on the page should look pressable that is not */
 body.present-mode .instrument-btn:hover,
@@ -1987,13 +2121,12 @@ body.present-mode .instrument-btn:active {
   :root {
     --head-w: 122px; --dot: 20px; --note-h: 56px;
     --instrument-size: 84px; --track-name-size: 14.5px; --mini-btn: 29px;
+    --corner-btn: 23px;
   }
   .app-mark { font-size: 17px; }
   .home-link span { display: none; }
   .home-link { padding: 7px; }
-  .track-head { gap: 8px; }
-  .add-track-btn span { display: none; }
-  .add-track-btn { padding: 0 13px; }
+  .tool-label { display: none; }
   .autosave-toggle { padding: 0 9px; }
   .autosave-label { display: none; }
 }
@@ -2061,7 +2194,8 @@ body.present-mode .instrument-btn:active {
 
   .beat-link-btn::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; }
 
-  .mute-badge::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; }
+  .mute-badge::after,
+  .remove-badge::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; }
 
   /* --- the time signature ---
      Two separate targets stacked inside one 44x48 button; each digit
@@ -2416,7 +2550,8 @@ body.embedded #grid-fit { margin: 0 auto; }
 /* ---- editing in a pane ----
    The Music Stand can hand the score back to the pointer. What comes
    back is the score's own controls and nothing else: the divisions, the
-   joins, the two repeat marks and the pair that changes the length. The
+   joins, the two repeat marks, the pair that changes the length, and
+   the ones that add, remove and reorder instruments. The
    topbar and toolbar stay away — what is in them either belongs to the
    Music Stand now (the tempo, the mutes, the count) or has no meaning in
    a pane (Auto-save, the library, sharing).
@@ -2428,7 +2563,10 @@ body.embedded.editing .beat-link-btn,
 body.embedded.editing .beat-repeat-btn,
 body.embedded.editing .measure-repeat-btn,
 body.embedded.editing .measure-add-btn,
-body.embedded.editing .measure-cut-btn { visibility: visible; }
+body.embedded.editing .measure-cut-btn,
+body.embedded.editing .track-move,
+body.embedded.editing .remove-badge { visibility: visible; }
+body.embedded.editing .add-track-row { display: flex; }
 body.embedded.editing .dots .dot { cursor: pointer; }
 body.embedded.editing .instrument-btn:hover,
 body.embedded.editing .instrument-btn:active { transform: none; }
@@ -2441,10 +2579,11 @@ body.embedded:not(.editing) .easy-choice:active { transform: none; }
 body.embedded:not(.editing) .easy-choice:not(.on):hover { opacity: .3; }
 body.embedded.editing .easy-choice { cursor: pointer; }
 
-/* How the lines are ordered is the Music Stand's to say, so the arrows
-   stay away (present mode already hides them). The other two on a track
-   head do answer, and each answers to the mixer rather than instead of
-   it:
+/* Which instruments there are, and in what order, is an edit of the
+   piece like any other, so the ×, the arrows and the Add row come back
+   with Edit (above) and not before. The other two on a track head
+   answer whether or not the pane is editing, and each answers to the
+   mixer rather than instead of it:
 
      the mute badge   always — a mute is a mixer's job, and the mixer is
                       live whether or not the score is being edited. It

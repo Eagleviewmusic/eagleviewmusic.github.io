@@ -261,7 +261,16 @@
     tracks: []
   };
 
+  /* The Sound popover. None of it is saved — as in Rhythm Poetry, it is
+     how this lesson is being played, not part of the piece. */
   let metronomeOn = false;
+  let countInOn = false;
+  /* Lines whose instrument is not sounded: someone is playing that part
+     live. Held by track, not by position, so a line keeps it when the
+     order changes, and a piece opened afresh starts with every sound on.
+     Not the same as a mute, which greys the line out of the score. */
+  const silenced = new WeakSet();
+  function trackSounds(track) { return !silenced.has(track); }
 
 
   /* ==================================================================
@@ -1003,9 +1012,19 @@
      and a gain for this side (see the Music Stand BRIDGE below). */
   let kit = VI.createKit();
   let audioUnlocked = false;
+  /* On its own the app keeps its context behind a timed view (see
+     lib/evm-count-in.js), so playback can place each sound on the audio
+     clock rather than leave it to when a timer fires. Embedded, the Music
+     Stand's context arrives already timed, and the stand does the placing. */
+  let timed = null;
 
   function unlockAudio() {
     if (audioUnlocked) return;
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!EMBEDDED && Ctor) {
+      timed = EVMCountIn.timed(new Ctor({ latencyHint: 'interactive' }));
+      kit = VI.createKit({ audioContext: timed.ctx });
+    }
     kit.unlock();
     audioUnlocked = true;
   }
@@ -2078,25 +2097,54 @@
      is drawn from, so a triplet lands where it is printed without any
      special case.
 
-     The instrument library always starts a voice at the context's
-     current time — there is no `when` to schedule against — so timing
-     comes from self-correcting timeouts anchored to one absolute start.
-     Each loop is scheduled a moment before it is due, and every event
-     inside it is measured from that loop's own anchor, so nothing
-     accumulates drift however long it runs.
+     Time is the audio clock. Every event has a moment on it, worked out
+     from one anchor; a timer hands each sound over a little ahead of its
+     moment (LOOKAHEAD) and the timed view places it there to the sample,
+     so a busy page — a page turning, a re-render — cannot push a note
+     late, and nothing drifts however long it runs. The lights are timers
+     too, set for when each beat is heard rather than when it is handed
+     over.
+
+     Play does not start the instant it is pressed. The sound is made
+     ready first (EVMCountIn.prime), and only then is anything counted:
+     the first click has to be as steady as the fourth, or nobody can come
+     in on bar 1.
      ================================================================== */
+
+  const LOOKAHEAD = 0.08;   // seconds: how early a sound is handed to the clock
+  const START_GAP = 0.1;    // seconds between the sound being ready and beat one
 
   let isPlaying = false;
   let playTimers = [];
-  let loopAnchor = 0;
+  let countTimers = [];     // the count-in's own; an edit mid-count leaves them be
+  let playToken = 0;        // a start still getting ready is dropped if this moves
+  let started = false;      // the loop is laid down (false while getting ready)
+  let playAnchor = 0;       // audio time of tick 0 of the first pass
+  let handedUntil = 0;      // the latest moment a sound has been handed over for
 
-  /* The milliseconds-per-tick the schedule now in flight was built with.
+  /* The seconds-per-tick the schedule now in flight was built with.
      Kept apart from tickMs() because an edit changes that the instant it is
      made, and reading where the music has got to needs the number the
-     running timers were measured against, not the new one. */
-  let liveTickMs = 0;
+     running schedule was measured against, not the new one. */
+  let liveTickSec = 0;
 
   function tickMs() { return (60000 / song.bpm) / beatTicks(); }
+
+  /* The audio clock, and the two ways onto it. Without a context of our
+     own (no Web Audio at all) the page clock stands in, and everything
+     simply plays when its timer fires. */
+  function audioNow() { return timed ? timed.raw.currentTime : performance.now() / 1000; }
+  function soundAt(time, fn) { if (timed) timed.soundAt(time, fn); else fn(); }
+  function heard(time) { return timed ? EVMCountIn.heardAt(timed.raw, time) : time * 1000; }
+
+  /* A timer for audio `time`, fired LOOKAHEAD before it so what it sounds
+     can be placed exactly; and one for when `time` is heard. */
+  function handOver(list, time, fn) {
+    list.push(setTimeout(fn, Math.max(0, (time - LOOKAHEAD - audioNow()) * 1000)));
+  }
+  function whenHeard(list, time, fn) {
+    list.push(setTimeout(fn, Math.max(0, heard(time) - performance.now())));
+  }
 
   /* Every sound in one pass of the loop, with how long it is until that
      track's next hit — the kit needs the figure to shape fast repeats. */
@@ -2146,49 +2194,94 @@
     return events;
   }
 
-  function fireEvent(ev) {
+  /* Mute, the Sound switches and the metronome are all read here, at the
+     moment a sound is handed over, so flipping one mid-playback is heard
+     straight away without the loop being rebuilt. */
+  function fireEvent(ev, due) {
+    handedUntil = Math.max(handedUntil, due);
     if (ev.kind === 'note') {
       const track = song.tracks[ev.track];
-      if (track && !track.muted) playInstrument(track.instrument, ev.gapTicks * tickMs());
-    } else {
-      if (metronomeOn) playClick(ev.beat % beatsPerMeasure() === 0);
-      highlightBeat(ev.beat);
+      if (track && !track.muted && trackSounds(track)) {
+        soundAt(due, () => playInstrument(track.instrument, ev.gapTicks * tickMs()));
+      }
+    } else if (metronomeOn) {
+      soundAt(due, () => playClick(ev.beat % beatsPerMeasure() === 0));
     }
   }
 
-  /* `notBefore` is only passed when picking a pass up in the middle of it:
-     everything already sounded is skipped and the rest of the pass keeps
-     its place. A fresh pass leaves it out and schedules the lot. */
-  function scheduleLoop(iteration, events, loopMs, notBefore) {
-    const base = loopAnchor + iteration * loopMs;
+  /* `notBefore` is only passed when picking the music up where it is:
+     everything already handed over is skipped and the rest keeps its
+     place. It is an absolute time, so it rides along to the next pass
+     too — an edit made in the last moment of a pass may already have
+     handed over the start of the next. */
+  function scheduleLoop(iteration, events, loopSec, notBefore) {
+    const base = playAnchor + iteration * loopSec;
+    const now = audioNow();
 
     events.forEach(ev => {
-      const due = base + ev.tick * liveTickMs;
+      const due = base + ev.tick * liveTickSec;
+      if (ev.kind === 'beat' && due >= now) whenHeard(playTimers, due, () => highlightBeat(ev.beat));
       if (notBefore != null && due <= notBefore) return;
-      playTimers.push(setTimeout(() => fireEvent(ev), Math.max(0, due - performance.now())));
+      handOver(playTimers, due, () => fireEvent(ev, due));
     });
 
-    // queue the next pass shortly before it is due
-    const handoff = base + loopMs - 90;
-    playTimers.push(setTimeout(
-      () => { if (isPlaying) scheduleLoop(iteration + 1, events, loopMs); },
-      Math.max(0, handoff - performance.now())
-    ));
+    // lay the next pass down well before it is due
+    handOver(playTimers, base + loopSec - 0.2,
+      () => { if (isPlaying) scheduleLoop(iteration + 1, events, loopSec, notBefore); });
   }
 
-  function startPlayback() {
+  async function startPlayback() {
     unlockAudio();
     stopPlayback();
-    const events = buildTimeline();
-    const ms = tickMs();
-    const loopMs = totalTicks() * ms;
-    if (!loopMs) return;
-
+    if (!totalTicks() || !tickMs()) return;
+    const token = playToken;
     isPlaying = true;
-    liveTickMs = ms;
-    loopAnchor = performance.now() + 120;   // a beat to settle before bar 1
-    scheduleLoop(0, events, loopMs);
     setPlayGlyph('■', true);
+
+    /* The card is up at once, so the room knows a count is coming while
+       the sound is still being made ready. */
+    const count = countInOn ? countInBeats() : 0;
+    if (count) EVMCountIn.open(count, beatsPerMeasure());
+
+    /* With a count-in, a moment longer to get ready: the count has to be
+       right from its first click, and a second's wait is worth that. */
+    const ready = timed ? await EVMCountIn.prime(timed.raw, { warm: count ? 0.35 : 0.12 }) : true;
+    if (token !== playToken) return;              // stopped while it was getting ready
+    if (!ready) {
+      stopPlayback();
+      toast('The sound would not start — press Play again');
+      return;
+    }
+
+    /* Built now rather than before the wait, so an edit made while it
+       was getting ready is in it. */
+    const events = buildTimeline();
+    liveTickSec = tickMs() / 1000;
+    let t = audioNow() + START_GAP;
+    if (count) t = scheduleCountIn(t, beatTicks() * liveTickSec, count);
+    playAnchor = t;
+    handedUntil = 0;
+    started = true;
+    scheduleLoop(0, events, totalTicks() * liveTickSec);
+  }
+
+  function countInBeats() { return EVMCountIn.beats(beatsPerMeasure()); }
+
+  /* The count-in, from audio time `from`: one click a beat, each bar's
+     first one strong the way the metronome marks it, with the card
+     lighting each number as its click is heard. Returns when bar 1 now
+     begins. */
+  function scheduleCountIn(from, beatSec, n) {
+    const per = beatsPerMeasure();
+    const times = [];
+    for (let i = 0; i < n; i++) {
+      const time = from + i * beatSec;
+      handOver(countTimers, time, () => soundAt(time, () => playClick(i % per === 0)));
+      times.push(heard(time));
+    }
+    const end = from + n * beatSec;
+    EVMCountIn.run(times, heard(end));
+    return end;
   }
 
   /* ---- an edit made while it is playing ----
@@ -2197,39 +2290,54 @@
      and began again at bar 1 — so tapping one dot in bar three sent the
      class back to the beginning. This keeps the place instead: it works out
      how far into the pass the music has got, cancels only what has not
-     sounded yet, and lays the rebuilt loop back down on the same clock.
+     been handed over yet, and lays the rebuilt loop back down on the same
+     clock.
 
-     The position is read in ticks rather than milliseconds, which is what
+     The position is read in ticks rather than seconds, which is what
      lets a tempo change take effect from where the music is rather than
      dragging the beat sideways, and lets a piece that just got shorter wrap
      into itself rather than run off the end. */
   function resyncPlayback() {
-    if (!isPlaying) return;
+    if (!isPlaying || !started) return;   // still getting ready: the start reads the song afresh
 
-    const now = performance.now();
+    const now = audioNow();
     const newLoopTicks = totalTicks();
-    const newTickMs = tickMs();
-    if (!newLoopTicks || !newTickMs) { stopPlayback(); return; }
+    const newTickSec = tickMs() / 1000;
+    if (!newLoopTicks || !newTickSec) { stopPlayback(); return; }
 
-    /* where we are, measured against the clock the running timers used */
-    let tick = liveTickMs > 0 ? (now - loopAnchor) / liveTickMs : 0;
+    playTimers.forEach(clearTimeout);
+    playTimers = [];
+
+    /* Still counting in: bar 1 has not begun, so there is no place to
+       keep — the loop is laid again from where it was always going to
+       start, and the count carries on. */
+    if (now < playAnchor) {
+      liveTickSec = newTickSec;
+      scheduleLoop(0, buildTimeline(), newLoopTicks * newTickSec, handedUntil);
+      return;
+    }
+
+    /* where we are, measured against the tempo the running schedule used */
+    let tick = liveTickSec > 0 ? (now - playAnchor) / liveTickSec : 0;
     if (!isFinite(tick) || tick < 0) tick = 0;
     tick = tick % newLoopTicks;          // the piece may have changed length
 
-    playTimers.forEach(clearTimeout);
-    playTimers = [];
+    liveTickSec = newTickSec;
+    playAnchor = now - tick * newTickSec; // tick 0 of the pass we are inside
 
-    liveTickMs = newTickMs;
-    loopAnchor = now - tick * newTickMs; // tick 0 of the pass we are inside
-
-    scheduleLoop(0, buildTimeline(), newLoopTicks * newTickMs, now);
+    scheduleLoop(0, buildTimeline(), newLoopTicks * newTickSec, handedUntil);
   }
 
   function stopPlayback() {
+    playToken++;
     playTimers.forEach(clearTimeout);
     playTimers = [];
+    countTimers.forEach(clearTimeout);
+    countTimers = [];
+    started = false;
+    EVMCountIn.close();
     isPlaying = false;
-    liveTickMs = 0;
+    liveTickSec = 0;
     clearHighlights();
     setPlayGlyph('▶', false);
   }
@@ -2339,7 +2447,7 @@
      building a rhythm is audible without pressing play. */
   function auditionTrack(track) {
     unlockAudio();
-    if (!track.muted) playInstrument(track.instrument, 0);
+    if (!track.muted && trackSounds(track)) playInstrument(track.instrument, 0);
   }
 
 
@@ -2384,7 +2492,8 @@
 
   const ICON_SOUND_ON  = '<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>';
   const ICON_SOUND_OFF = '<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="m17 9 4 6"/><path d="m21 9-4 6"/>';
-  const ICON_REMOVE    = '<path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>';
+  const ICON_CLOSE     = '<path d="m7 7 10 10"/><path d="M17 7 7 17"/>';
+  const ICON_ADD       = '<path d="M12 5v14"/><path d="M5 12h14"/>';
   const ICON_UP        = '<path d="m6 15 6-6 6 6"/>';
   const ICON_DOWN      = '<path d="m6 9 6 6 6-6"/>';
 
@@ -2451,22 +2560,23 @@
       song.tracks.forEach((track, index) => host.appendChild(buildTrack(track, index, from, to)));
       if (host !== grid) grid.appendChild(host);
     });
+    /* Room for another instrument is a question about the score, so it is
+       asked again every time the score is rebuilt rather than only when
+       the policy changes. */
+    if (instrumentsEditable() && song.tracks.length < maxTracksAllowed()) {
+      grid.appendChild(buildAddTrackRow());
+    }
 
     syncHeadColumn();
     layoutAndEngrave();
     applyFit();
     if (wasLit >= 0 && wasLit < totalBeats()) highlightBeat(wasLit);
-    /* Room for another instrument is a question about the score, so it is
-       asked again every time the score is rebuilt rather than only when
-       the policy changes. */
-    showHide(addTrackBtn, instrumentsEditable() && song.tracks.length < maxTracksAllowed());
     scheduleAutosave();
     if (standAfterRender) standAfterRender();
   }
 
   /* The instrument column is as wide as the widest head needs to be — a
-     long instrument name, or the two small buttons under it, can push it
-     past the width CSS asked for. The ruler has nothing in its own head
+     long instrument name can push it past the width CSS asked for. The ruler has nothing in its own head
      to push it, so it has to be told. Measuring from the stylesheet's
      value each time keeps this from ratcheting upward. */
   function syncHeadColumn() {
@@ -2677,48 +2787,44 @@
     slot.appendChild(pick);
     slot.appendChild(mute);
 
-    /* Name and bin read as one line: the label, and the one thing you can
-       do to it. Centred as a pair, so a short name still sits under the
-       middle of the picture. */
-    const side = document.createElement('div');
-    side.className = 'track-head-side';
+    /* Removing and reordering ride on the picture too, and only come up
+       while the pointer is on it: the × on the top corner, the arrows
+       floating on the left edge. Both change which instruments are on
+       the page, so both go when that is the thing the lesson has fixed.
+       Mute does not, and stays: hearing one line on its own is how a
+       class reads a score. */
+    if (instrumentsEditable()) {
+      const remove = document.createElement('button');
+      remove.className = 'remove-badge';
+      remove.title = 'Remove this instrument';
+      remove.setAttribute('aria-label', 'Remove ' + meta.label);
+      remove.innerHTML = icon(ICON_CLOSE);
+      remove.addEventListener('click', () => removeTrack(trackIndex));
+      slot.appendChild(remove);
+      if (song.tracks.length > 1) slot.appendChild(buildTrackOrderControls(trackIndex));
+    }
 
+    /* With nothing else on its line, the name sits straight under the
+       middle of the picture. */
     const name = document.createElement('div');
     name.className = 'track-name';
     name.textContent = meta.label;
     name.title = meta.label;
 
-    const remove = document.createElement('button');
-    remove.className = 'mini-btn remove';
-    remove.title = 'Remove this instrument';
-    remove.setAttribute('aria-label', 'Remove ' + meta.label);
-    remove.innerHTML = icon(ICON_REMOVE);
-    remove.addEventListener('click', () => removeTrack(trackIndex));
-
-    side.appendChild(name);
-    /* Both of these change which instruments are on the page, so both go
-       when that is the thing the lesson has fixed. Mute does not, and
-       stays: hearing one line on its own is how a class reads a score. */
-    if (instrumentsEditable()) {
-      side.appendChild(remove);
-      side.appendChild(buildTrackOrderControls(trackIndex));
-    }
-
     head.appendChild(slot);
-    head.appendChild(side);
+    head.appendChild(name);
     return head;
   }
 
   /* Moving an instrument up or down the score.
 
-     One control at the end of the name's line, an arrow up over an arrow
-     down, stacked into a single narrow column so the instrument column
-     does not grow by two more buttons' worth. It is kept out of the way
-     until it is wanted: the space is always reserved, so revealing it
-     cannot shift the row, but it only comes up when the pointer is on
-     that instrument (or an arrow has the keyboard focus). Ten rows of
-     permanent arrows would be a wall of chevrons on a page whose whole
-     point is the rhythm.
+     An arrow up over an arrow down, in one small pill floating on the
+     left edge of the picture. It is kept out of the way until it is
+     wanted — it only comes up when the pointer is on that picture (or an
+     arrow has the keyboard focus). Ten rows of permanent arrows would be
+     a wall of chevrons on a page whose whole point is the rhythm. Being
+     laid over the picture rather than beside it, revealing it cannot
+     shift the row or widen the instrument column.
 
      A board has no pointer to hover with, so on a coarse pointer they are
      simply always there — see the media query in the stylesheet. */
@@ -2745,6 +2851,30 @@
     wrap.appendChild(up);
     wrap.appendChild(down);
     return wrap;
+  }
+
+  /* Adding an instrument, from under the last one — where the new one is
+     going to appear. It sits in the instrument column like one more head,
+     but only a short one, so it does not cost the score much of its
+     height. After the last line in Lines, not under every one: one
+     button, at the end of the score. */
+  function buildAddTrackRow() {
+    const row = document.createElement('div');
+    row.className = 'add-track-row';
+
+    const cell = document.createElement('div');
+    cell.className = 'add-track-cell';
+
+    const btn = document.createElement('button');
+    btn.className = 'add-track-btn';
+    btn.title = 'Add another instrument';
+    btn.setAttribute('aria-label', 'Add an instrument');
+    btn.innerHTML = icon(ICON_ADD, 18) + '<span>Add</span>';
+    btn.addEventListener('click', addTrack);
+
+    cell.appendChild(btn);
+    row.appendChild(cell);
+    return row;
   }
 
   function buildBeat(track, beatIndex, membership) {
@@ -3774,9 +3904,15 @@
     const headW = parseFloat(getComputedStyle(grid).getPropertyValue('--head-w')) || 0;
     const adv = measureAdvances();
     if (!adv.length) return [];
+    /* The Add row comes once, at the end of the score, however many
+       blocks there are — so it is taken out of the block and put back on
+       the total. */
+    const addRow = grid.querySelector(':scope > .add-track-row');
+    const addH = addRow ? addRow.offsetHeight + parseFloat(getComputedStyle(addRow).marginTop) : 0;
     /* one block's height: a system when there are systems, the whole grid
        when the piece is in one piece — either way, a ruler and every track */
-    const blockH = (grid.querySelector('.system') || grid).scrollHeight;
+    const system = grid.querySelector('.system');
+    const blockH = system ? system.scrollHeight : grid.scrollHeight - addH;
     if (!blockH) return [];
 
     const choices = PER_PAGE_CHOICES.filter(n => n < song.measures);
@@ -3793,7 +3929,7 @@
       return {
         n: per,
         w: headW + widest,
-        h: blockH * blocks + SYSTEM_GAP * (blocks - 1)
+        h: blockH * blocks + SYSTEM_GAP * (blocks - 1) + addH
       };
     });
   }
@@ -3853,6 +3989,7 @@
     const track = makeTrack(nextOfferedInstrument(), '');
     conformTrack(track);
     song.tracks.push(track);
+    reorderHostMutes(song.tracks.map((t, i) => i < song.tracks.length - 1 ? i : null));
     if (isPlaying) resyncPlayback();
     render();
   }
@@ -3860,8 +3997,21 @@
   function removeTrack(index) {
     if (!instrumentsEditable()) return;
     song.tracks.splice(index, 1);
+    reorderHostMutes(song.tracks.map((t, i) => i < index ? i : i + 1));
     if (isPlaying) resyncPlayback();
     render();
+  }
+
+  /* In a pane the mutes are kept by position (see hostMutes), so a line
+     that moves has to take its mute with it, or the stand would go on
+     silencing whichever instrument slid into its place. `from[i]` is
+     where the track now at i used to be; null for one that is new. The
+     stand reads the result back out of info() after the edit. */
+  function reorderHostMutes(from) {
+    if (!EMBEDDED) return;
+    const was = Object.assign({}, hostMutes);
+    Object.keys(hostMutes).forEach(k => { delete hostMutes[k]; });
+    from.forEach((old, i) => { if (old != null && was[old]) hostMutes[i] = true; });
   }
 
   /* Swap a track with its neighbour. Only the order on the page changes —
@@ -3881,6 +4031,7 @@
     const moved = song.tracks[index];
     song.tracks[index] = song.tracks[to];
     song.tracks[to] = moved;
+    reorderHostMutes(song.tracks.map((t, i) => i === index ? to : i === to ? index : i));
 
     if (isPlaying) resyncPlayback();
     render();
@@ -4128,14 +4279,102 @@
     syncSettings();
   }
 
-  /* ---- the count ---- */
-  const metronomeBtn = document.getElementById('metronome-btn');
-  metronomeBtn.addEventListener('click', () => {
+  /* ==================================================================
+     SOUND — the popover
+     ================================================================== */
+
+  const soundBtn        = document.getElementById('sound-btn');
+  const soundPopover    = document.getElementById('sound-popover');
+  const metronomeToggle = document.getElementById('metronome-toggle');
+  const voicesToggle    = document.getElementById('voices-toggle');
+  const soundVoices     = document.getElementById('sound-voices');
+  const countInToggle   = document.getElementById('count-in-toggle');
+  const countInDesc     = document.getElementById('count-in-desc');
+
+  const NUMBER_WORDS = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven',
+                        'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];
+
+  /* The switch over the instruments reads them the way a group's switch
+     does in Layout settings: on when every one sounds, off when none
+     does, and halfway when some do. */
+  function voicesState() {
+    const on = song.tracks.filter(trackSounds).length;
+    return on === song.tracks.length ? 'all' : on === 0 ? 'none' : 'some';
+  }
+
+  function syncSound() {
+    metronomeToggle.classList.toggle('active', metronomeOn);
+    countInToggle.classList.toggle('active', countInOn);
+    const state = voicesState();
+    voicesToggle.classList.toggle('active', state === 'all');
+    voicesToggle.classList.toggle('partial', state === 'some');
+    const n = countInBeats();
+    countInDesc.textContent = (NUMBER_WORDS[n] || n) + ' clicks before the music starts';
+
+    /* One row per line of the score, in its order, with its picture —
+       two lines playing the same instrument are two rows. A muted line
+       is silent anyway; its picture is greyed here as it is there. */
+    soundVoices.innerHTML = '';
+    song.tracks.forEach((track, i) => {
+      const meta = instrumentMeta(track.instrument);
+      const row = document.createElement('button');
+      row.className = 'voice-switch' + (trackSounds(track) ? ' active' : '')
+        + (trackMuted(track, i) ? ' muted' : '');
+      row.setAttribute('aria-pressed', trackSounds(track) ? 'true' : 'false');
+      row.title = trackSounds(track) ? 'Stop sounding the ' + meta.label : 'Sound the ' + meta.label;
+      const img = document.createElement('img');
+      img.src = instrumentImage(track.instrument);
+      img.alt = '';
+      const name = document.createElement('span');
+      name.className = 'voice-name';
+      name.textContent = meta.label;
+      const pill = document.createElement('span');
+      pill.className = 'switch';
+      pill.setAttribute('aria-hidden', 'true');
+      row.append(img, name, pill);
+      row.addEventListener('click', () => {
+        if (trackSounds(track)) silenced.add(track); else silenced.delete(track);
+        syncSound();
+      });
+      soundVoices.appendChild(row);
+    });
+  }
+
+  /* Nothing here needs the loop rebuilding: each is read at the moment
+     it would sound, so a switch flipped mid-playback is heard at once. */
+  metronomeToggle.addEventListener('click', () => {
     metronomeOn = !metronomeOn;
-    metronomeBtn.classList.toggle('active', metronomeOn);
+    syncSound();
+  });
+  countInToggle.addEventListener('click', () => {
+    countInOn = !countInOn;
+    syncSound();
+  });
+  voicesToggle.addEventListener('click', () => {
+    const on = voicesState() !== 'all';
+    song.tracks.forEach(t => { if (on) silenced.delete(t); else silenced.add(t); });
+    syncSound();
   });
 
-  document.getElementById('add-track-btn').addEventListener('click', addTrack);
+  function toggleSound() {
+    if (soundPopover.classList.contains('open')) return closeSound();
+    closeSettings();
+    syncSound();
+    positionPopover(soundBtn, soundPopover);
+    soundBtn.classList.add('active');
+  }
+
+  function closeSound() {
+    soundPopover.classList.remove('open');
+    soundBtn.classList.remove('active');
+  }
+
+  soundBtn.addEventListener('click', e => { e.stopPropagation(); toggleSound(); });
+  soundPopover.addEventListener('click', e => e.stopPropagation());
+  document.addEventListener('click', closeSound);
+  window.addEventListener('resize', () => {
+    if (soundPopover.classList.contains('open')) positionPopover(soundBtn, soundPopover);
+  });
 
 
   /* ==================================================================
@@ -4293,6 +4532,7 @@
 
   function toggleSettings() {
     if (settingsPopover.classList.contains('open')) return closeSettings();
+    closeSound();
     syncSettings();
     positionPopover(settingsBtn, settingsPopover);
     settingsBtn.classList.add('active');
@@ -5100,6 +5340,7 @@
     presentMode = !!on;
     document.body.classList.toggle('present-mode', presentMode);
     closeSettings();
+    closeSound();
     closeInstrumentSheet();
 
     /* The stage has only just changed size; measuring in the same frame
@@ -5123,9 +5364,11 @@
                       layoutSheet, lessonSetupSheet, librarySheet]
         .filter(el => el && el.classList.contains('open'));
       const hadPopover = settingsPopover.classList.contains('open')
+                      || soundPopover.classList.contains('open')
                       || instrumentSheet.classList.contains('open');
       closeInstrumentSheet();
       closeSettings();
+      closeSound();
       if (sheets.length) closeSheet(sheets[0]);
       else if (hadPopover) { /* the popover was the thing that was open */ }
       else if (presentMode) setPresentMode(false);
@@ -6353,7 +6596,6 @@
      which the link never touches.
      ================================================================== */
 
-  const addTrackBtn       = document.getElementById('add-track-btn');
   const newSongBtn        = document.getElementById('new-song-btn');
   const saveCopyBtn       = document.getElementById('save-copy-btn');
   const shelfBtn          = document.getElementById('shelf-btn');
@@ -6397,11 +6639,14 @@
   function applyPolicyToShell() {
     const inLesson = !!policy;
 
-    /* Add instrument is two questions at once: may this lesson change
-       which instruments are playing, and is there room for another. */
-    showHide(addTrackBtn, instrumentsEditable() && song.tracks.length < maxTracksAllowed());
+    /* Add instrument lives on the score now, and render() asks its two
+       questions there: may this lesson change which instruments are
+       playing, and is there room for another. */
     showHide(presentBtn, shellAllows('present'));
-    showHide(metronomeBtn, shellAllows('count'));
+    /* The metronome is a switch in Sound now; a lesson that leaves the
+       counting to the class takes that switch away, and the click with it. */
+    showHide(metronomeToggle, shellAllows('count'));
+    if (!shellAllows('count')) metronomeOn = false;
     showHide(savePictureBtn, shellAllows('picture'));
 
     /* A student's library is the lesson; none of the authoring lives
@@ -6562,7 +6807,7 @@
 
   const SHELL_SWITCHES = [
     { key: 'view',    name: 'View options',   desc: 'Pages or scrolling, bars to a page, size, syllables' },
-    { key: 'count',   name: 'Count the beat', desc: 'The metronome button' },
+    { key: 'count',   name: 'Count the beat', desc: 'The metronome, under Sound' },
     { key: 'present', name: 'Present mode',   desc: 'Fills the screen for performing' },
     { key: 'picture', name: 'Save a picture', desc: 'Downloads the score as an image' }
   ];

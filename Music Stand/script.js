@@ -508,6 +508,12 @@
     s.stale = false;
     const info = safe(() => s.bridge.info());
     if (info) { s.info = info; song.title = info.title; }
+    /* Mutes are kept by voice number, and an edit in the ostinato pane
+       can add, remove or reorder its instruments. The pane moves each
+       mute along with its instrument, so its answer is the one to keep —
+       otherwise a mute would stay on the number and silence whichever
+       instrument slid into it. */
+    if (side === 'ost' && info) resetVoiceMutes(side, info);
     song.data = safe(() => s.bridge.snapshot(), song.data);
 
     refreshHeads();
@@ -837,7 +843,9 @@
     index: 0,         // the next of them to hand over
     ending: false,
     timers: new Set(),
-    pump: null
+    pump: null,
+    priming: false,   // Play pressed, the sound still being made ready
+    token: 0          // a start still getting ready is dropped if this moves
   };
 
   function isPlaying() { return play.on; }
@@ -879,7 +887,8 @@
     if (!poem && !ost) return null;
 
     const lead = poem || ost;
-    const C = state.countIn ? lead.bpb : 0;
+    /* one bar of the lead piece — two of a bar of two (EVMCountIn.beats) */
+    const C = state.countIn ? EVMCountIn.beats(lead.bpb) : 0;
     const pk = poem ? poem.pickup : 0;
     const L = (poem && ost) ? state.leadIn * ost.n : 0;
     let T0 = C + L;
@@ -978,7 +987,7 @@
   }
 
   function pump() {
-    if (!play.on || play.ending) return;
+    if (!play.on || play.ending || play.priming) return;
     const horizon = audio.ctx.currentTime + LOOKAHEAD;
     for (let guard = 0; guard < 2000; guard++) {
       if (!play.items) { play.items = beatItems(play.beat); play.index = 0; }
@@ -1032,7 +1041,12 @@
     updateReadout(g, r);
   }
 
-  function startPlayback() {
+  /* Play does not start the instant it is pressed. The sound is made
+     ready first — the context resumed and waited for, a sleeping speaker
+     woken (EVMCountIn.prime) — and only then is beat one placed on the
+     clock. With a count-in it waits a moment longer: the count has to be
+     right from its first click, or nobody can come in on bar 1. */
+  async function startPlayback() {
     const plan = buildPlan();
     if (!plan) {
       toast('Choose a poem or an ostinato first');
@@ -1045,24 +1059,61 @@
     }
     closePopovers();
     if (play.on) stopPlayback();
+    const token = ++play.token;
     openGates();
 
     play.plan = plan;
     play.on = true;
+    play.priming = true;
     play.ending = false;
+    setPlayGlyph(true);
+
+    /* The card is up at once, so the room knows a count is coming while
+       the sound is still being made ready. */
+    const clicks = countClicks(plan);
+    if (clicks > 0) EVMCountIn.open(clicks, plan.lead.bpb);
+
+    const ready = await EVMCountIn.prime(ctx, { warm: clicks > 0 ? 0.35 : 0.12 });
+    if (token !== play.token || !play.on) return;   // stopped while it was getting ready
+    if (!ready) {
+      stopPlayback();
+      toast('The sound would not start — press Play again');
+      return;
+    }
+
+    play.priming = false;
     play.spb = 60 / state.bpm;
     play.audioAnchor = ctx.currentTime + LEAD_IN;
     play.beat = 0;
     play.items = null;
     play.index = 0;
+    if (clicks > 0) showCount();
     pump();
     clearInterval(play.pump);
     play.pump = setInterval(pump, PUMP_MS);
-    setPlayGlyph(true);
+  }
+
+  /* The clicks actually sounded: the count-in, less any beat a pickup
+     has already taken — the pickup comes in on the count's last beat. */
+  function countClicks(plan) {
+    return Math.max(0, Math.min(plan.C, plan.poemStart, plan.ostStart));
+  }
+
+  /* The card, lit from the plan: each number as its click is heard, and
+     gone as the first note sounds. Worked out again after a change of
+     tempo, since the clicks still to come have moved. */
+  function showCount() {
+    const n = countClicks(play.plan);
+    const times = [];
+    for (let g = 0; g < n; g++) times.push(heardAt(play.audioAnchor + g * play.spb));
+    EVMCountIn.run(times, heardAt(play.audioAnchor + n * play.spb));
   }
 
   function stopPlayback() {
     const was = play.on;
+    play.token++;
+    play.priming = false;
+    EVMCountIn.close();
     play.on = false;
     play.ending = false;
     clearInterval(play.pump);
@@ -1087,7 +1138,7 @@
      re-anchored so the next event not yet handed over lands exactly where
      it would have, and everything after it follows the new tempo. */
   function retime() {
-    if (!play.on) return;
+    if (!play.on || play.priming) return;   // still getting ready: the start reads the tempo afresh
     const newSpb = 60 / state.bpm;
     const items = play.items || beatItems(play.beat);
     const item = items[Math.min(play.index, items.length - 1)];
@@ -1095,6 +1146,7 @@
     const keep = play.audioAnchor + pos * play.spb;
     play.spb = newSpb;
     play.audioAnchor = keep - pos * newSpb;
+    if (play.beat < countClicks(play.plan)) showCount();
   }
 
   function setPlayGlyph(playing) {

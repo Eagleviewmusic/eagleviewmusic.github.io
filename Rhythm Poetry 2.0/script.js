@@ -1438,9 +1438,18 @@
     return currentMode === 'rhythm' ? rhythmState : poetryState;
   }
 
+  /* On its own the app keeps its context behind a timed view (see
+     lib/evm-count-in.js): every voice reads currentTime once, so playback
+     can hand a note over a moment early and have it placed on the audio
+     clock exactly when it is due. Embedded, the Music Stand hands over
+     its own context, already timed, and does the placing itself. */
+  let timedAudio = null;
+
   function initAudioContext() {
     if (!audioContext) {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const Ctor = window.AudioContext || window.webkitAudioContext;
+      timedAudio = EVMCountIn.timed(new Ctor({ latencyHint: 'interactive' }));
+      audioContext = timedAudio.ctx;
     }
     return audioContext;
   }
@@ -1725,8 +1734,11 @@
      with a bare start(). On its own that is the same thing; embedded in
      the Music Stand, the clock it reads is the moment the note is due, so the
      note is scheduled to the sample rather than to a timer. */
-  function playBrushDrum() {
-    if (!beatEnabled) return;
+  /* `always` is the count-in's: it is heard whether or not the steady
+     beat is on — a count that goes silent when the beat is switched off
+     is no count at all. */
+  function playBrushDrum(always) {
+    if (!beatEnabled && !always) return;
     const ctx = initAudioContext();
     const time = ctx.currentTime;
     const source = ctx.createBufferSource();
@@ -5441,11 +5453,45 @@
 
   // --- PLAYBACK LOGIC ---
 
-  function schedulePlayback(delay = 0, startBeat = 0) {
+  /* Time is the audio clock. Each sound has a moment on it, worked out
+     from one anchor; a timer hands it over a little ahead (LOOKAHEAD) and
+     the timed view places it on that moment to the sample. A long poem is
+     a lot of timers, and the page is busy while it plays — following the
+     words, turning lines — so a note left to fire when its timer did would
+     come in late whenever the page was. The lights are timers too, set for
+     when each beat is heard.
+
+     Play does not start the instant it is pressed. The sound is made ready
+     first (EVMCountIn.prime), and only then is anything counted: on a cold
+     start the first click or two used to go out while the sound was still
+     waking, and the count stumbled in. */
+  const LOOKAHEAD = 0.08;   // seconds: how early a sound is handed to the clock
+  const START_GAP = 0.1;    // seconds between the sound being ready and beat one
+  let playToken = 0;        // a start still getting ready is dropped if this moves
+
+  function audioNow() { return timedAudio ? timedAudio.raw.currentTime : performance.now() / 1000; }
+  function soundAt(time, fn) {
+    if (timedAudio && audioContext === timedAudio.ctx) timedAudio.soundAt(time, fn);
+    else fn();
+  }
+  function heard(time) { return timedAudio ? EVMCountIn.heardAt(timedAudio.raw, time) : time * 1000; }
+
+  /* A timer for audio `time`, fired LOOKAHEAD before it so what it sounds
+     can be placed exactly; and one for when `time` is heard. */
+  function handOver(time, fn) {
+    playTimeouts.push(setTimeout(fn, Math.max(0, (time - LOOKAHEAD - audioNow()) * 1000)));
+  }
+  function whenHeard(time, fn) {
+    playTimeouts.push(setTimeout(fn, Math.max(0, heard(time) - performance.now())));
+  }
+
+  /* One pass, from `startBeat`, with that beat at audio time `anchor`. The
+     next pass is laid down a moment before this one ends and starts
+     exactly where it does, so a loop never gains or loses a hair. */
+  function schedulePlayback(anchor, startBeat = 0) {
     const activeState = getActiveState();
     const isRhythm = currentMode === 'rhythm';
-    const BPM = activeState.BPM;
-    const beatInterval = 60000 / BPM;
+    const beatSec = 60 / activeState.BPM;
     const totalBeats = notesBoxElements.length;
     if (totalBeats === 0) return;
 
@@ -5453,19 +5499,20 @@
       startBeat = 0;
     }
 
-    const totalDuration = (totalBeats - startBeat) * beatInterval;
+    const passSec = (totalBeats - startBeat) * beatSec;
 
     // Schedule BEAT track
     for (let beat = startBeat; beat < totalBeats; beat++) {
-      const timeDelay = delay + ((beat - startBeat) * beatInterval);
-      const beatTimeout = setTimeout(() => {
+      const time = anchor + (beat - startBeat) * beatSec;
+      whenHeard(time, () => {
         if (isPlaying) {
           currentPlayPosition = beat;
           highlightNotesBox(beat);
-          if (beatEnabled) playBrushDrum();
         }
-      }, timeDelay);
-      playTimeouts.push(beatTimeout);
+      });
+      handOver(time, () => {
+        if (isPlaying && beatEnabled) soundAt(time, () => playBrushDrum());
+      });
     }
 
     /* Schedule the RHYTHM track.
@@ -5475,7 +5522,7 @@
        in ticks is what lets a triplet land on thirds of a beat, and it is
        also how a note learns how long it should ring: a half note holds
        for two beats rather than clicking once and stopping. */
-    const tickMs = beatInterval / beatTicks(activeState);
+    const tickSec = beatSec / beatTicks(activeState);
     const words = isRhythm ? [] : poetryState.words;
 
     for (const grp of enumerateRhythmGroups(totalBeats)) {
@@ -5497,40 +5544,45 @@
           heldTicks += map.slotTicks[j];
         }
 
-        const timeDelay = delay + at * tickMs;
-        const holdMs = heldTicks * tickMs;
-        const rhythmTimeout = setTimeout(() => {
-          if (isPlaying && rhythmEnabled) {
-            if (pitchMode === 'pitch') {
-              playTriangleTone(Math.min(holdMs * 0.92, 3000) / 1000);
-            } else {
-              playPercussion();
-            }
-          }
-        }, timeDelay);
-        playTimeouts.push(rhythmTimeout);
+        const time = anchor + at * tickSec;
+        const holdSec = heldTicks * tickSec;
+        handOver(time, () => {
+          if (!isPlaying || !rhythmEnabled) return;
+          soundAt(time, () => {
+            if (pitchMode === 'pitch') playTriangleTone(Math.min(holdSec * 0.92, 3));
+            else playPercussion();
+          });
+        });
       }
     }
 
-    const loopTimeout = setTimeout(() => {
+    handOver(anchor + passSec - 0.2, () => {
       if (isPlaying) {
         isFirstPlay = false;
-        currentPlayPosition = 0;
-        schedulePlayback(0, 0);
+        schedulePlayback(anchor + passSec, 0);
       }
-    }, delay + totalDuration);
-    playTimeouts.push(loopTimeout);
+    });
   }
 
-  function startPlayback() {
-    initAudioContext();
-    if (audioContext && audioContext.state === 'suspended') {
-      audioContext.resume();
+  /* The count-in, from audio time `from`: the brush on every beat, with
+     the card lighting each number as it is heard. Returns when the music
+     now begins. */
+  function scheduleCountIn(from, beatSec, n) {
+    const times = [];
+    for (let i = 0; i < n; i++) {
+      const time = from + i * beatSec;
+      handOver(time, () => { if (isPlaying) soundAt(time, () => playBrushDrum(true)); });
+      times.push(heard(time));
     }
-    
+    const end = from + n * beatSec;
+    EVMCountIn.run(times, heard(end));
+    return end;
+  }
+
+  async function startPlayback() {
+    initAudioContext();
     const activeState = getActiveState();
-    const BPM = activeState.BPM;
-    const beatInterval = 60000 / BPM;
+    const token = ++playToken;
 
     isPlaying = true;
     isPaused = false;
@@ -5539,56 +5591,72 @@
     document.body.classList.add('playback-active');
     document.body.classList.remove('playback-paused');
 
-    const shouldPlayCountIn = introEnabled && (isFirstPlay || activeState.selectedPlayStartPosition !== null);
-
-    if (shouldPlayCountIn) {
-      let countInBeats = 4;
-      if (isFirstPlay && activeState.hasPickupMeasure && activeState.selectedPlayStartPosition === null) {
-        countInBeats = 3;
-      }
-      
-      for (let i = 0; i < countInBeats; i++) {
-        const timeDelay = i * beatInterval;
-        const countInTimeout = setTimeout(() => { 
-          if (isPlaying) playBrushDrum(); 
-        }, timeDelay);
-        playTimeouts.push(countInTimeout);
-      }
-      
-      schedulePlayback(countInBeats * beatInterval, currentPlayPosition);
-    } else {
-      schedulePlayback(0, currentPlayPosition);
+    /* One bar of the meter (two of a bar of two), less the pickup when it
+       starts from the top: the pickup comes in on the count's last beat. */
+    const fromTop = activeState.selectedPlayStartPosition === null;
+    const perBar = getLayoutConfig().beatsPerMeasure;
+    let count = 0;
+    if (introEnabled && (isFirstPlay || !fromTop)) {
+      count = EVMCountIn.beats(perBar);
+      if (isFirstPlay && activeState.hasPickupMeasure && fromTop) count -= 1;
     }
+    /* The card is up at once, so the room knows a count is coming while
+       the sound is still being made ready. */
+    if (count > 0) EVMCountIn.open(count, perBar);
+
+    /* With a count-in, a moment longer to get ready: the count has to be
+       right from its first click, and a second's wait is worth that. */
+    const ready = timedAudio ? await EVMCountIn.prime(timedAudio.raw, { warm: count > 0 ? 0.35 : 0.12 }) : true;
+    if (token !== playToken || !isPlaying) return;   // stopped or paused while getting ready
+    if (!ready) {
+      stopPlayback();
+      toast('The sound would not start — press Play again');
+      return;
+    }
+    if (pitchMode !== 'pitch') getKit();   // built now, not on the first note
+
+    let t = audioNow() + START_GAP;
+    if (count > 0) t = scheduleCountIn(t, 60 / activeState.BPM, count);
+    schedulePlayback(t, currentPlayPosition);
   }
 
   function pausePlayback() {
     if (!isPlaying) return;
+    playToken++;
     isPlaying = false;
     isPaused = true;
     stopFollowing();
     playTimeouts.forEach(timeout => clearTimeout(timeout));
     playTimeouts = [];
+    EVMCountIn.close();
     setPlayGlyph('▶', 'paused');
     document.body.classList.add('playback-paused');
   }
 
-  function resumePlayback() {
+  async function resumePlayback() {
     if (!isPaused) return;
     initAudioContext();
-    if (audioContext && audioContext.state === 'suspended') {
-      audioContext.resume();
-    }
-    
+    const token = ++playToken;
+
     isPlaying = true;
     isPaused = false;
     setPlayGlyph('■', 'playing');
     document.body.classList.add('playback-active');
     document.body.classList.remove('playback-paused');
 
-    schedulePlayback(0, currentPlayPosition);
+    const ready = timedAudio ? await EVMCountIn.prime(timedAudio.raw, { warm: 0.12 }) : true;
+    if (token !== playToken || !isPlaying) return;
+    if (!ready) {
+      stopPlayback();
+      toast('The sound would not start — press Play again');
+      return;
+    }
+    schedulePlayback(audioNow() + START_GAP, currentPlayPosition);
   }
 
   function stopPlayback() {
+    playToken++;
+    EVMCountIn.close();
     isPlaying = false;
     isPaused = false;
     stopFollowing();
