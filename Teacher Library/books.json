@@ -1,0 +1,9 @@
+{
+  "format": "evm-books",
+  "formatVersion": 1,
+  "books": [
+    {
+      "name": "More songs"
+    }
+  ]
+}

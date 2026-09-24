@@ -1,0 +1,210 @@
+{
+  "format": "evm-item",
+  "formatVersion": 1,
+  "app": "music-stand",
+  "kind": "pairing",
+  "id": "pair_1790220660136_ggye",
+  "title": "Chicken Wing with Shakers and Sticks",
+  "createdAt": 1790220660136,
+  "updatedAt": 1790220660136,
+  "book": "More songs",
+  "data": {
+    "songs": {
+      "poem": {
+        "src": "data",
+        "id": null,
+        "title": "Chicken Wing, Chicken Wing",
+        "data": {
+          "title": "Chicken Wing, Chicken Wing",
+          "side": "poetry",
+          "poetryState": {
+            "words": [
+              "Chic",
+              "-ken",
+              "wing,",
+              "-",
+              "Chic",
+              "-ken",
+              "wing,",
+              "-",
+              "Hot",
+              "Dog",
+              "and",
+              "Ba",
+              "-lo",
+              "-",
+              "-ni",
+              "-",
+              "Chic",
+              "-ken",
+              "and",
+              "-",
+              "Ma",
+              "-ca",
+              "-ro",
+              "-",
+              "-ni,",
+              "-",
+              "Chil",
+              "-lin'",
+              "with",
+              "my",
+              "ho",
+              "-",
+              "-mies",
+              "-"
+            ],
+            "rawLyrics": [
+              "Chic",
+              "-ken",
+              "wing,",
+              "Chic",
+              "-ken",
+              "wing,",
+              "Hot",
+              "Dog",
+              "and",
+              "Ba",
+              "-lo",
+              "-ni",
+              "Chic",
+              "-ken",
+              "and",
+              "Ma",
+              "-ca",
+              "-ro",
+              "-ni,",
+              "Chil",
+              "-lin'",
+              "with",
+              "my",
+              "ho",
+              "-mies"
+            ],
+            "beatSubdivisions": {
+              "8": 4
+            },
+            "linkedBeats": {},
+            "syncopation": [],
+            "syncopationStates": {},
+            "lineOverrides": {},
+            "hasPickupMeasure": false,
+            "BPM": 82,
+            "timeSignatureNumerator": 4,
+            "timeSignatureDenominator": 4
+          }
+        }
+      },
+      "ost": {
+        "src": "data",
+        "id": null,
+        "title": "Chickenwing beat",
+        "data": {
+          "title": "Chickenwing beat",
+          "bpm": 92,
+          "timeSignatureNumerator": 4,
+          "timeSignatureDenominator": 4,
+          "measures": 1,
+          "tracks": [
+            {
+              "instrument": "shaker",
+              "muted": false,
+              "beats": [
+                {
+                  "slots": 2,
+                  "cells": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "slots": 4,
+                  "cells": [
+                    true,
+                    true,
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "slots": 2,
+                  "cells": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "slots": 4,
+                  "cells": [
+                    true,
+                    true,
+                    true,
+                    true
+                  ]
+                }
+              ],
+              "links": {}
+            },
+            {
+              "instrument": "claves",
+              "muted": false,
+              "beats": [
+                {
+                  "slots": 2,
+                  "cells": [
+                    true,
+                    false
+                  ]
+                },
+                {
+                  "slots": 2,
+                  "cells": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "slots": 2,
+                  "cells": [
+                    true,
+                    false
+                  ]
+                },
+                {
+                  "slots": 2,
+                  "cells": [
+                    true,
+                    false
+                  ]
+                }
+              ],
+              "links": {}
+            }
+          ]
+        }
+      }
+    },
+    "settings": {
+      "bpm": 82,
+      "countIn": true,
+      "leadIn": 1,
+      "loop": true,
+      "wordsSound": "tone",
+      "wordsStrength": 2,
+      "mute": {
+        "poem": false,
+        "ost": false
+      },
+      "voiceMute": {
+        "poem": {
+          "beat": true
+        },
+        "ost": {}
+      },
+      "vol": {
+        "poem": 100,
+        "ost": 100
+      }
+    }
+  }
+}
