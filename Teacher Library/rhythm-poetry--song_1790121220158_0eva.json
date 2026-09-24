@@ -6,7 +6,7 @@
   "id": "song_1790121220158_0eva",
   "title": "Chicken Wing, Chicken Wing",
   "createdAt": 1790121220158,
-  "updatedAt": 1790121220158,
+  "updatedAt": 1790222136048,
   "book": "More songs",
   "data": {
     "side": "poetry",
@@ -85,6 +85,67 @@
       "BPM": 82,
       "timeSignatureNumerator": 4,
       "timeSignatureDenominator": 4
+    },
+    "layout": {
+      "layout": {
+        "v": 1,
+        "easy": {
+          "simple": [
+            "q",
+            "ee",
+            "sse"
+          ],
+          "compound": [
+            "dq",
+            "eee",
+            "qe",
+            "qre",
+            "dh"
+          ]
+        },
+        "meters": {
+          "simple": [
+            "4/4",
+            "3/4",
+            "2/4",
+            "6/4",
+            "5/4"
+          ],
+          "compound": [
+            "6/8",
+            "9/8",
+            "12/8"
+          ]
+        },
+        "divide": {
+          "sixteenths": true,
+          "tuplets": true,
+          "subTuplets": true
+        },
+        "cells": {
+          "simple": {
+            "3": [
+              "XOO",
+              "OOO"
+            ],
+            "6": [
+              "XOOOOO",
+              "OOOOOO"
+            ]
+          },
+          "compound": {}
+        },
+        "spans": {
+          "simple": {},
+          "compound": {}
+        }
+      },
+      "show": {
+        "dots": true,
+        "easy": true,
+        "measureNumbers": true,
+        "beatNumbers": false
+      }
     }
   }
 }
