@@ -1,7 +1,7 @@
 {
   "format": "evm-index",
   "formatVersion": 1,
-  "generatedAt": "2026-09-24T03:56:10.305Z",
+  "generatedAt": "2026-09-24T12:49:52.884Z",
   "items": [
     {
       "app": "music-stand",
@@ -28,6 +28,15 @@
       "title": "Double Double This This",
       "updatedAt": 1789352326485,
       "path": "rhythm-poetry--song_1789352326485.json",
+      "book": "More songs"
+    },
+    {
+      "app": "rhythm-poetry",
+      "kind": "poem",
+      "id": "song_1788194203083",
+      "title": "Ickle, Ockle, Blue Bottle",
+      "updatedAt": 1790254129397,
+      "path": "rhythm-poetry--song_1788194203083.json",
       "book": "More songs"
     },
     {
