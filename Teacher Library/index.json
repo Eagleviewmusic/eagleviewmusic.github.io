@@ -1,14 +1,14 @@
 {
   "format": "evm-index",
   "formatVersion": 1,
-  "generatedAt": "2026-09-24T03:32:27.587Z",
+  "generatedAt": "2026-09-24T03:52:54.935Z",
   "items": [
     {
       "app": "music-stand",
       "kind": "pairing",
       "id": "pair_1790220660136_ggye",
       "title": "Chicken Wing with Shakers and Sticks",
-      "updatedAt": 1790220660136,
+      "updatedAt": 1790221893981,
       "path": "music-stand--pair_1790220660136_ggye.json",
       "book": "More songs"
     },

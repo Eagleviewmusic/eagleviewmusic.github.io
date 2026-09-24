@@ -6,7 +6,7 @@
   "id": "pair_1790220660136_ggye",
   "title": "Chicken Wing with Shakers and Sticks",
   "createdAt": 1790220660136,
-  "updatedAt": 1790220660136,
+  "updatedAt": 1790221893981,
   "book": "More songs",
   "data": {
     "songs": {
@@ -92,6 +92,60 @@
             "BPM": 82,
             "timeSignatureNumerator": 4,
             "timeSignatureDenominator": 4
+          },
+          "layout": {
+            "layout": {
+              "v": 1,
+              "easy": {
+                "simple": [
+                  "q",
+                  "ee"
+                ],
+                "compound": [
+                  "dq",
+                  "eee",
+                  "qe",
+                  "qre",
+                  "dh"
+                ]
+              },
+              "meters": {
+                "simple": [
+                  "4/4",
+                  "3/4",
+                  "2/4",
+                  "6/4",
+                  "5/4"
+                ],
+                "compound": [
+                  "6/8",
+                  "9/8",
+                  "12/8"
+                ]
+              },
+              "divide": {
+                "sixteenths": true,
+                "tuplets": true,
+                "subTuplets": true
+              },
+              "cells": {
+                "simple": {
+                  "3": [
+                    "XOO",
+                    "OOO"
+                  ],
+                  "6": [
+                    "XOOOOO",
+                    "OOOOOO"
+                  ]
+                },
+                "compound": {}
+              },
+              "spans": {
+                "simple": {},
+                "compound": {}
+              }
+            }
           }
         }
       },
@@ -180,7 +234,56 @@
               ],
               "links": {}
             }
-          ]
+          ],
+          "layout": {
+            "layout": {
+              "v": 1,
+              "easy": {
+                "simple": [
+                  "q",
+                  "ee",
+                  "ssss",
+                  "h",
+                  "w"
+                ],
+                "compound": [
+                  "dq",
+                  "eee",
+                  "qe",
+                  "qre",
+                  "dh"
+                ]
+              },
+              "meters": {
+                "simple": [
+                  "2/4",
+                  "3/4",
+                  "4/4",
+                  "5/4",
+                  "6/4"
+                ],
+                "compound": [
+                  "6/8",
+                  "9/8",
+                  "12/8"
+                ]
+              },
+              "divide": {
+                "sixteenths": true,
+                "tuplets": true,
+                "subTuplets": true
+              },
+              "cells": {
+                "simple": {},
+                "compound": {}
+              },
+              "joins": {
+                "simple": 8,
+                "compound": 8
+              },
+              "instruments": null
+            }
+          }
         }
       }
     },
@@ -204,6 +307,30 @@
       "vol": {
         "poem": 100,
         "ost": 100
+      }
+    },
+    "views": {
+      "poem": {
+        "sizeMode": "fit",
+        "zoomPct": 90,
+        "measuresPerLine": "auto",
+        "textPct": 140,
+        "lyricFont": "rounded",
+        "showDots": true,
+        "easyMode": true,
+        "showMeasureNumbers": true,
+        "followPlayback": true
+      },
+      "ost": {
+        "layout": "systems",
+        "measuresPerPage": "auto",
+        "zoomPct": 100,
+        "showDots": true,
+        "easyMode": false,
+        "lightNotes": true,
+        "showSyllables": false,
+        "showBarNumbers": true,
+        "showBeatNumbers": true
       }
     }
   }
