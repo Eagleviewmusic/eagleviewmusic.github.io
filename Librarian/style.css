@@ -35,6 +35,8 @@
 }
 
 * { box-sizing: border-box; }
+/* hidden means hidden, whatever display a class gives the element */
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
   background: var(--paper);
@@ -267,4 +269,120 @@ html.in-iframe .home-link { visibility: hidden; }
   .item { flex-wrap: wrap; }
   .item-side { width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; padding-left: 30px; }
   .book-field { width: 100%; max-width: 240px; }
+}
+
+/* ============================================================
+   TABS — Publish | Teacher Library
+   ============================================================ */
+.tabs {
+  display: flex; justify-content: center; gap: 4px;
+  padding: 10px 16px 0;
+}
+.tab {
+  border: 0; background: none;
+  padding: 8px 18px 10px;
+  border-bottom: 3px solid transparent;
+  font-size: 14px; font-weight: 800;
+  color: var(--ink-3);
+}
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab:hover { color: var(--ink); }
+body[data-tab="library"] #dock { display: none; }
+body[data-tab="publish"] #lib-savebar { display: none; }
+.dock-acts { display: inline-flex; gap: 8px; align-items: center; }
+.text-btn.danger { color: var(--changed); }
+
+/* ============================================================
+   THE TEACHER LIBRARY TAB
+   ============================================================ */
+.lib-connected {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 14px;
+  font-size: 13px; font-weight: 700; color: var(--ink-2);
+}
+.lib-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.lib-connect-card a { color: var(--accent); font-weight: 800; }
+.lib-connect-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }
+.lib-key { flex: 1; min-width: 220px; width: auto; font-family: ui-monospace, Menlo, monospace; }
+
+.lib-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.lib-title { margin: 0; font-family: var(--font-round); font-size: 20px; }
+.lib-top .fine { margin: 2px 0 0; }
+.lib-top-acts { display: flex; gap: 8px; }
+body:not(.lib-can-edit) .lib-edit-only { display: none; }
+.lib-find { width: 200px; }
+
+.lib-bulk {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  padding: 8px 14px; margin-bottom: 12px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  font-size: 13px; font-weight: 800; color: var(--accent);
+}
+.lib-bulk[hidden] { display: none; }
+
+.lib-book {
+  margin-bottom: 14px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+.lib-book-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 16px;
+  background: hsl(var(--book-hue, 150), 40%, 96%);
+  border-bottom: 1px solid var(--hairline);
+}
+.lib-book-spine {
+  width: 12px; height: 26px; flex: none;
+  border-radius: 2px 4px 4px 2px;
+  background: hsl(var(--book-hue, 150), 45%, 42%);
+  box-shadow: inset 3px 0 0 rgba(0,0,0,.18);
+}
+.lib-book-name { margin: 0; font-family: var(--font-round); font-size: 17px; font-weight: 700; }
+.lib-book-count { font-size: 12px; font-weight: 700; color: var(--ink-3); }
+.lib-book-acts { margin-left: auto; display: inline-flex; gap: 6px; }
+.lib-empty { margin: 0; padding: 12px 16px; font-size: 13px; font-weight: 700; color: var(--ink-3); }
+
+.lib-song {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+.lib-song:last-child { border-bottom: 0; }
+.lib-song.is-ticked { background: var(--accent-soft); }
+.lib-song.is-removed .lib-song-main { opacity: .45; text-decoration: line-through; }
+.lib-song input[type="checkbox"] { width: 17px; height: 17px; margin: 0; flex: none; accent-color: var(--accent); }
+.lib-song::before {
+  content: ''; width: 8px; height: 8px; border-radius: 2px; flex: none; background: var(--ink-3);
+}
+.lib-song.app-rhythm-poetry::before { background: var(--rp); }
+.lib-song.app-ostinato-builder::before { background: var(--ob); }
+.lib-song.app-song-writer::before { background: var(--sw); }
+.lib-song-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lib-song-title { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-song-meta { font-size: 12px; font-weight: 700; color: var(--ink-3); }
+.lib-song-tags { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.lib-move {
+  height: 30px; max-width: 160px;
+  padding: 0 6px;
+  border: 1.5px solid var(--hairline-2);
+  border-radius: 8px;
+  background: var(--surface);
+  font: inherit; font-size: 12px; font-weight: 700; color: var(--ink);
+}
+.lib-x {
+  width: 30px; height: 30px; flex: none;
+  border: 0; border-radius: 999px;
+  background: var(--paper-2); color: var(--ink-3);
+  font-size: 17px; font-weight: 800; line-height: 1;
+}
+.lib-x:hover { background: var(--changed-soft); color: var(--changed); }
+
+@media (max-width: 600px) {
+  .lib-song { flex-wrap: wrap; }
+  .lib-song-tags { width: 100%; justify-content: flex-start; padding-left: 36px; }
+  .lib-find { width: 100%; }
 }

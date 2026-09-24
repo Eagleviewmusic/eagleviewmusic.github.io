@@ -26,6 +26,8 @@
   const UPLOAD_URL = `https://github.com/${REPO}/upload/main/${encodeURIComponent(FOLDER)}`;
   const FOLDER_URL = `https://github.com/${REPO}/tree/main/${encodeURIComponent(FOLDER)}`;
   const INDEX_URL = '../' + encodeURIComponent(FOLDER) + '/index.json';
+  const BOOKS_URL = '../' + encodeURIComponent(FOLDER) + '/books.json';
+  const GH = window.LibGitHub;
 
   /* ------------------------------------------------------------------
      THE APPS — where each keeps its library, and what counts as blank.
@@ -195,9 +197,14 @@
   /* ---------------- what is already in the Teacher Library ---------------- */
   async function readPublished() {
     try {
-      const res = await fetch(INDEX_URL, { cache: 'no-store' });
-      if (!res.ok) throw new Error(res.status);
-      const index = await res.json();
+      let index;
+      if (GH && GH.connected()) {
+        index = (await GH.readJSON('index.json')) || { items: [] };
+      } else {
+        const res = await fetch(INDEX_URL, { cache: 'no-store' });
+        if (!res.ok) throw new Error(res.status);
+        index = await res.json();
+      }
       const map = {};
       (index.items || []).forEach(e => { map[e.app + '|' + e.id] = e; });
       published = map;
@@ -360,9 +367,14 @@
 
   function updateDock() {
     const n = ticked.size;
+    const direct = GH && GH.connected();
     $('dock-count').textContent = n ? `${n} song${n === 1 ? '' : 's'} ticked` : 'Nothing ticked';
     $('download-btn').disabled = !n;
-    $('download-btn').textContent = n ? `Download ${n} file${n === 1 ? '' : 's'}` : 'Download';
+    $('download-btn').textContent = direct
+      ? (n ? `Publish ${n} song${n === 1 ? '' : 's'}` : 'Publish')
+      : (n ? `Download ${n} file${n === 1 ? '' : 's'}` : 'Download');
+    $('download-files-btn').hidden = !direct;
+    $('download-files-btn').disabled = !n;
   }
 
   function setStatus() {
@@ -403,6 +415,79 @@
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  /* ------------------------------------------------------------------
+     THE INDEX, as the Action writes it (.github/scripts/build-teacher-
+     index.js) — the same entries in the same order, so when the Librarian
+     writes it itself the Action finds nothing to change.
+     ------------------------------------------------------------------ */
+  function indexEntry(env, path) {
+    const e = {
+      app: String(env.app), kind: String(env.kind || 'song'), id: String(env.id),
+      title: String(env.title || 'Untitled'),
+      updatedAt: Number(env.updatedAt || env.createdAt) || 0,
+      path: path
+    };
+    if (env.book && String(env.book).trim()) e.book = String(env.book).trim();
+    return e;
+  }
+  function indexText(entries) {
+    const items = entries.slice().sort((a, b) => (a.book || '').localeCompare(b.book || '') ||
+      a.app.localeCompare(b.app) || a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
+    return JSON.stringify({ format: 'evm-index', formatVersion: 1, generatedAt: new Date().toISOString(), items }, null, 2) + '\n';
+  }
+
+  /* Connected: the ticked songs go straight into the Teacher Library, one
+     commit with the index (and books.json, if a new book appeared). */
+  async function publishTicked() {
+    const chosen = items.filter(i => ticked.has(i.app + '|' + i.id) && !i.blank);
+    if (!chosen.length) return;
+    const btn = $('download-btn');
+    btn.disabled = true;
+    btn.textContent = 'Publishing…';
+    try {
+      const index = (await GH.readJSON('index.json')) || { items: [] };
+      const booksJson = await GH.readJSON('books.json');
+      const files = {};
+      const byKey = {};
+      (index.items || []).forEach(e => { byKey[e.app + '|' + e.id] = e; });
+      chosen.forEach(item => {
+        const env = envelopeOf(item);
+        const path = fileName(item);
+        const old = byKey[item.app + '|' + item.id];
+        if (old && old.path !== path) files[old.path] = null;   // uploaded by hand under another name
+        files[path] = JSON.stringify(env, null, 2) + '\n';
+        byKey[item.app + '|' + item.id] = indexEntry(env, path);
+      });
+      const entries = Object.keys(byKey).map(k => byKey[k]);
+      files['index.json'] = indexText(entries);
+      const names = new Set(((booksJson && booksJson.books) || []).map(b => b && b.name).filter(Boolean));
+      const before = names.size;
+      entries.forEach(e => names.add(e.book || DEFAULT_BOOK));
+      if (names.size !== before || !booksJson) {
+        files['books.json'] = JSON.stringify({ format: 'evm-books', formatVersion: 1,
+          books: [...names].sort((a, b) => a.localeCompare(b)).map(name => ({ name })) }, null, 2) + '\n';
+      }
+      await GH.commit(files, 'Librarian: published ' + chosen.length + ' song' + (chosen.length === 1 ? '' : 's') +
+        ' (' + chosen.map(i => i.title).slice(0, 3).join(', ') + (chosen.length > 3 ? ', …' : '') + ')');
+      setPublished(entries);
+      ticked.clear();
+      render();
+      toast(`Published — students see ${chosen.length === 1 ? 'it' : 'them'} in about a minute`);
+      if (window.LibrarianPanel) window.LibrarianPanel.reload();
+    } catch (e) {
+      alert('Nothing was published.\n\n' + (e.message || e));
+    }
+    updateDock();
+  }
+
+  function setPublished(entries) {
+    const map = {};
+    entries.forEach(e => { map[e.app + '|' + e.id] = e; });
+    published = map;
+    setStatus();
+    render();
   }
 
   async function downloadTicked() {
@@ -454,7 +539,8 @@
     render();
     toast(`${chosen.length} song${chosen.length === 1 ? '' : 's'} put in “${name}”`);
   });
-  $('download-btn').addEventListener('click', downloadTicked);
+  $('download-btn').addEventListener('click', () => (GH && GH.connected() ? publishTicked() : downloadTicked()));
+  $('download-files-btn').addEventListener('click', downloadTicked);
   $('upload-link').href = UPLOAD_URL;
   $('folder-link').href = FOLDER_URL;
 
@@ -462,6 +548,14 @@
   window.addEventListener('storage', e => {
     if (SOURCES.some(s => s.key === e.key)) { collect(); render(); }
   });
+
+  window.Librarian = {
+    APP_NAMES, KIND_NAMES, DEFAULT_BOOK, INDEX_URL, BOOKS_URL,
+    indexText, toast, setPublished,
+    setBookNote: (app, id, name) => { bookNotes[app + '|' + id] = tidyBook(name); saveBookNotes(); render(); },
+    hasLocal: (app, id) => items.some(i => i.app === app && i.id === id),
+    connectionChanged: () => { updateDock(); readPublished().then(() => { setStatus(); render(); }); }
+  };
 
   collect();
   setStatus();

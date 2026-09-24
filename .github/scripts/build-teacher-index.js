@@ -34,7 +34,8 @@ const seen = new Map();          // app|id -> position in items
 const problems = [];
 
 fs.readdirSync(folder)
-  .filter(name => name.toLowerCase().endsWith('.json') && name !== 'index.json')
+  // index.json is what this writes; books.json is the Librarian's list of books
+  .filter(name => name.toLowerCase().endsWith('.json') && name !== 'index.json' && name !== 'books.json')
   .sort()
   .forEach(name => {
     let env;

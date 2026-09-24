@@ -30,7 +30,12 @@
   <span class="topbar-spacer"></span>
 </header>
 
-<main class="page">
+<nav class="tabs" role="tablist" aria-label="Librarian">
+  <button class="tab active" role="tab" aria-selected="true" data-tab="publish">Publish</button>
+  <button class="tab" role="tab" aria-selected="false" data-tab="library">Teacher Library</button>
+</nav>
+
+<main class="page" id="tab-publish">
 
   <section class="intro card">
     <h2>Publish songs to every student</h2>
@@ -86,14 +91,82 @@
 
 </main>
 
+<!-- ============ THE TEACHER LIBRARY: what is published, book by book ============ -->
+<main class="page" id="tab-library" hidden>
+  <div id="lib-connect"></div>
+
+  <div class="lib-top">
+    <div>
+      <h2 class="lib-title">What students can find on the shelf</h2>
+      <p class="fine" id="lib-summary"></p>
+    </div>
+    <div class="lib-top-acts">
+      <button class="btn small lib-edit-only" id="lib-new-book">＋ New book</button>
+      <button class="btn small" id="lib-refresh" title="Read the Teacher Library again">Refresh</button>
+    </div>
+  </div>
+
+  <div class="toolbar-row">
+    <div class="seg" id="lib-apps" role="tablist" aria-label="App">
+      <button class="seg-btn active" data-app="all" role="tab" aria-selected="true">All apps</button>
+      <button class="seg-btn" data-app="rhythm-poetry" role="tab" aria-selected="false">Rhythm Poetry</button>
+      <button class="seg-btn" data-app="ostinato-builder" role="tab" aria-selected="false">Ostinato Builder</button>
+      <button class="seg-btn" data-app="song-writer" role="tab" aria-selected="false">Song Writer</button>
+    </div>
+    <input type="search" id="lib-find" class="book-field lib-find" placeholder="Find a song" aria-label="Find a song">
+  </div>
+
+  <div class="lib-bulk" id="lib-bulk" hidden>
+    <span id="lib-bulk-count"></span>
+    <span id="lib-bulk-move"></span>
+    <button class="text-btn danger" id="lib-bulk-remove">Take down</button>
+    <button class="text-btn" id="lib-bulk-clear">Clear ticks</button>
+  </div>
+
+  <div id="lib-books"></div>
+</main>
+
 <footer class="dock" id="dock">
   <span class="dock-count" id="dock-count">Nothing ticked</span>
-  <button class="btn primary" id="download-btn" disabled>Download</button>
+  <span class="dock-acts">
+    <button class="btn small" id="download-files-btn" hidden title="Download the files instead, to upload on GitHub yourself">Download files</button>
+    <button class="btn primary" id="download-btn" disabled>Download</button>
+  </span>
+</footer>
+
+<footer class="dock lib-savebar" id="lib-savebar" hidden>
+  <span class="dock-count" id="lib-pending"></span>
+  <span class="dock-acts">
+    <button class="btn small" id="lib-discard">Discard</button>
+    <button class="btn primary" id="lib-save">Save to Teacher Library</button>
+  </span>
 </footer>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="lib/evm-library.js"></script>
+<script src="github.js"></script>
 <script src="script.js"></script>
+<script src="panel.js"></script>
+<script>
+  /* The two tabs; #library opens the Teacher Library one (bookmarkable). */
+  (function () {
+    const tabs = document.querySelectorAll('.tab');
+    function show(name) {
+      tabs.forEach(t => {
+        const on = t.dataset.tab === name;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', String(on));
+      });
+      document.getElementById('tab-publish').hidden = name !== 'publish';
+      document.getElementById('tab-library').hidden = name !== 'library';
+      document.body.dataset.tab = name;
+      if (name === 'library') window.LibrarianPanel.open();
+      history.replaceState(null, '', name === 'library' ? '#library' : location.pathname);
+    }
+    tabs.forEach(t => t.addEventListener('click', () => show(t.dataset.tab)));
+    show(location.hash === '#library' ? 'library' : 'publish');
+  })();
+</script>
 </body>
 </html>
