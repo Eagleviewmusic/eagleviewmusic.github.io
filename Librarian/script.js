@@ -128,7 +128,7 @@
 
   const APP_ORDER = ['rhythm-poetry', 'ostinato-builder', 'song-writer', 'music-stand'];
   const APP_NAMES = { 'rhythm-poetry': 'Rhythm Poetry', 'ostinato-builder': 'Ostinato Builder', 'song-writer': 'Song Writer', 'music-stand': 'Music Stand' };
-  const KIND_NAMES = { poem: 'Poem', rhythm: 'Rhythm', ostinato: 'Ostinato', song: 'Song', pairing: 'Pairing' };
+  const KIND_NAMES = { poem: 'Poem', rhythm: 'Rhythm', ostinato: 'Ostinato', song: 'Song', pairing: 'Arrangement' };
 
   /* ------------------------------------------------------------------
      PAIRINGS' SONGS. Each side of a pairing is either a link to a song in
@@ -163,6 +163,11 @@
     if (!from || typeof from !== 'object') return null;
     const data = {};
     Object.keys(from).forEach(k => { if (SONG_HEADER.indexOf(k) === -1) data[k] = from[k]; });
+    /* Its Layout Settings (EASY's rhythm choices among them): the song's
+       own, or else the ones the stand kept with its copy — which are what
+       the pane showed. Without them a student's stand would fall back to
+       that student's own settings. */
+    if (!data.layout && song.data && song.data.layout) data.layout = song.data.layout;
     const title = (live && live.title) || song.title || data.title || '';
     if (title) data.title = title;
     return { src: 'data', id: null, title: title, data: data };
@@ -171,7 +176,10 @@
   function pairingData(rec) {
     const songs = {};
     PAIR_SIDES.forEach(side => { songs[side] = frozenSong(side, rec.songs && rec.songs[side]); });
-    return { songs: songs, settings: rec.settings || {} };
+    const out = { songs: songs, settings: rec.settings || {} };
+    // how each pane is shown — dots or EASY, text size, lyric font…
+    if (rec.views && typeof rec.views === 'object') out.views = rec.views;
+    return out;
   }
 
   function pairingUpdated(rec) {
@@ -443,7 +451,7 @@
       b.type = 'button';
       b.textContent = all ? 'Its songs are ticked' : 'Tick its songs too';
       b.title = 'Also publish ' + partItems.map(i => '“' + i.title + '”').join(' and ') +
-        ' in their own apps, so students can open them there as well. Not needed for the pairing itself.';
+        ' in their own apps, so students can open them there as well. Not needed for the arrangement itself.';
       b.disabled = all;
       b.addEventListener('click', () => {
         const book = bookOf(item);

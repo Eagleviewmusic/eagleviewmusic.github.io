@@ -1021,8 +1021,9 @@
        • one of your own: becomes the settings in use, and is stored as the
          app's, so a new piece starts from where you are. Unlocked.
      A Save my copy keeps the piece's settings, unlocked (it is theirs).
-     Not in a lesson (its layout rules), not in the Music Stand, and never
-     over settings a lesson or a locked link has locked.
+     Not in a lesson (its layout rules), and never over settings a lesson
+     or a locked link has locked. In the Music Stand, see
+     embeddedPieceLayout().
      ------------------------------------------------------------------ */
   function storedLayoutLocked() {
     try { return !!(JSON.parse(localStorage.getItem(LAYOUT_KEY) || 'null') || {}).locked; }
@@ -1040,9 +1041,28 @@
     loadLayout();
   }
 
+  /* In the Music Stand a piece is shown with its OWN build rules — EASY's
+     rhythm choices among them — whatever this browser's stored settings
+     are: the stand is showing that piece, and a student's stand must show
+     what the teacher's did (the stand keeps them with the piece; see the
+     bridge's snapshot()). In memory only — the frame cannot write storage
+     — and without `show`: dots or EASY is the stand's to choose, per pane.
+     A piece with no settings of its own shows the stored ones. */
+  function embeddedPieceLayout(snap) {
+    forgetDivisionOffers();
+    if (snap) {
+      layout = normalizeLayout(snap.layout || snap);
+      pieceLayoutInMemory = true;
+    } else {
+      pieceLayoutInMemory = false;
+      loadLayout();
+    }
+  }
+
   function usePieceLayout(song) {
-    if (EMBEDDED || lessonMeta) return;
+    if (lessonMeta) return;
     const snap = song && song.layout && typeof song.layout === 'object' ? song.layout : null;
+    if (EMBEDDED) { embeddedPieceLayout(snap); return; }
     if (snap && song.received) {
       if (!pieceOwnShow) {
         pieceOwnShow = {};
@@ -9439,7 +9459,9 @@
           createdAt: Date.now(),
           poetryState: raw.poetryState,
           rhythmState: raw.rhythmState,
-          words: raw.words
+          words: raw.words,
+          // its own Layout Settings (EASY's rhythms among them), if it came with them
+          layout: raw.layout && typeof raw.layout === 'object' ? raw.layout : undefined
         });
         saveStoredLibrary(lib);
         loadSongById(id);
@@ -9448,8 +9470,15 @@
         return bridge.info();
       },
 
+      /* The piece as the stand keeps it — with the build rules it is shown
+         with (EASY's rhythm choices among them), so the copy the stand
+         keeps, and so what the Librarian publishes, looks the same on a
+         student's stand. The rules only, not the dots/EASY switch: that is
+         the stand's own view, and not part of the piece. */
       snapshot() {
-        return buildSongSnapshot(getCurrentSongId(), getCurrentSongTitle() || 'Untitled', currentMode);
+        const snap = buildSongSnapshot(getCurrentSongId(), getCurrentSongTitle() || 'Untitled', currentMode);
+        snap.layout = { layout: JSON.parse(JSON.stringify(layout)) };
+        return snap;
       },
 
       info() {

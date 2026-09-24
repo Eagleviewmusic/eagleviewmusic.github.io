@@ -1682,8 +1682,9 @@
          and is stored as the app's, so a new piece starts from where you
          are. Unlocked.
      A Save my copy keeps the piece's settings, unlocked (it is theirs).
-     Not in a lesson (its layout rules), not in the Music Stand, and never
-     over settings a lesson or a locked link has locked.
+     Not in a lesson (its layout rules), and never over settings a lesson
+     or a locked link has locked. In the Music Stand, see
+     embeddedPieceLayout().
 
      Every caller goes on to afterSongChange(), whose syncSettings()
      brings the dots button and the show switches into line.
@@ -1707,9 +1708,28 @@
     loadLayout();
   }
 
+  /* In the Music Stand a piece is shown with its OWN build rules — EASY's
+     rhythm choices among them — whatever this browser's stored settings
+     are: the stand is showing that piece, and a student's stand must show
+     what the teacher's did (the stand keeps them with the piece; see the
+     bridge's snapshot()). In memory only — the frame cannot write storage
+     — and without `show`: dots or EASY is the stand's to choose, per pane.
+     A piece with no settings of its own shows the stored ones. */
+  function embeddedPieceLayout(snap) {
+    forgetDivisionOffers();
+    if (snap) {
+      layout = normalizeLayout(snap.layout || snap);
+      pieceLayoutInMemory = true;
+    } else {
+      pieceLayoutInMemory = false;
+      loadLayout();
+    }
+  }
+
   function usePieceLayout(rec) {
-    if (EMBEDDED || lessonMeta) return;
+    if (lessonMeta) return;
     const snap = rec && rec.layout && typeof rec.layout === 'object' ? rec.layout : null;
+    if (EMBEDDED) { embeddedPieceLayout(snap); return; }
     if (snap && rec.received) {
       if (!pieceLayoutInMemory) {
         pieceOwnShow = {};
@@ -7501,6 +7521,7 @@
         adoptSong(normalizeSong(lib[id]));
         openedReceived = !!lib[id].received;
         openedBook = openedReceived && lib[id].book ? String(lib[id].book) : '';
+        usePieceLayout(lib[id]);        // its own Layout Settings, EASY's rhythms among them
         afterSongChange();
         settled();
         return bridge.info();
@@ -7511,15 +7532,26 @@
          comes through in the app itself. */
       loadSong(raw) {
         if (!raw || typeof raw !== 'object' || !Array.isArray(raw.tracks)) return null;
-        adoptSong(normalizeSong(raw));
+        const rec = normalizeSong(raw);
+        adoptSong(rec);
         openedReceived = false;   // not a library song at all
         openedBook = '';
+        usePieceLayout(rec);      // the Layout Settings it came with, if any
         afterSongChange();
         settled();
         return bridge.info();
       },
 
-      snapshot() { return snapshot(); },
+      /* The piece as the stand keeps it — with the build rules it is shown
+         with (EASY's rhythm choices among them), so the copy the stand
+         keeps, and so what the Librarian publishes, looks the same on a
+         student's stand. The rules only, not the dots/EASY switch: that is
+         the stand's own view, and not part of the piece. */
+      snapshot() {
+        const snap = snapshot();
+        snap.layout = { layout: JSON.parse(JSON.stringify(layout)) };
+        return snap;
+      },
 
       info() {
         return {

@@ -85,7 +85,7 @@
 
   const state = {
     /* What is open: the sandbox (pairingId null) or a pairing from the
-       stand's library. `name` is that pairing's title; `shared` and `book`
+       stand's library. `name` is that arrangement's title; `shared` and `book`
        say it came from someone else, and so is never saved into; and
        `autoSave` is the switch on the top bar — off when a pairing is
        opened, as in both apps. See PAIRINGS below. */
@@ -585,7 +585,7 @@
       chip.title = revertable
         ? 'Changed on the stand. The ' + APPS[side].noun + ' in '
           + APPS[side].name + ' is untouched — press to go back to it.'
-        : 'Changed on the stand. Save the pairing to keep these changes.';
+        : 'Changed on the stand. Save the arrangement to keep these changes.';
 
       sides[side].pane.classList.toggle('muted', state.mute[side]);
       const muteBtn = sides[side].pane.querySelector('.pane-mute');
@@ -634,7 +634,7 @@
       if (e && e.received) return { word: 'Shared', title: 'Shared with you, in your ' + name + ' library.' };
       return { word: 'Library', title: 'From your ' + name + ' library. Change it there and it changes here.' };
     }
-    return { word: 'Copy', title: 'A copy kept on the stand' + (state.pairingId ? ', in this pairing' : '')
+    return { word: 'Copy', title: 'A copy kept on the stand' + (state.pairingId ? ', in this arrangement' : '')
       + '. Changing it in ' + name + ' does not change it here.' };
   }
 
@@ -2518,7 +2518,7 @@
   const EVM = window.EVMLibrary;
   const APP_SLUG = 'music-stand';
   const SANDBOX_ID = 'sandbox';
-  const SANDBOX_TITLE = 'Pairing sandbox';
+  const SANDBOX_TITLE = 'Arrangement sandbox';
   const isReserved = id => id === SANDBOX_ID;
   const clone = v => JSON.parse(JSON.stringify(v));
   /* Read before any session is adopted: what New and a cleared sandbox
@@ -2556,13 +2556,16 @@
     const title = typeof rec.title === 'string' && rec.title.trim() ? rec.title.trim().slice(0, 60) : '';
     const out = {
       id: id,
-      title: sandbox ? SANDBOX_TITLE : (title || 'Untitled pairing'),
+      title: sandbox ? SANDBOX_TITLE : (title || 'Untitled arrangement'),
       isCustom: true,
       createdAt: created,
       updatedAt: Number(rec.updatedAt) || Number(rec.savedAt) || created,
       songs: { poem: cleanSong(rec.songs && rec.songs.poem), ost: cleanSong(rec.songs && rec.songs.ost) },
       settings: rec.settings && typeof rec.settings === 'object' ? clone(rec.settings) : {}
     };
+    /* how each pane is shown (dots or EASY, text size, lyric font…) —
+       carried with it, but not part of what counts as a change */
+    if (rec.views && typeof rec.views === 'object') out.views = clone(rec.views);
     if (!sandbox) EVM.carry(rec, out);
     if (typeof rec.filedAs === 'string') out.filedAs = rec.filedAs;
     return out;
@@ -2657,9 +2660,12 @@
     return songs;
   }
 
-  /* What is on the stand, as a pairing would keep it. */
+  /* What is on the stand, as a pairing would keep it. The views go with
+     it — a student's stand should open showing what the teacher's did —
+     but, like the dots button in both apps, they are carried rather than
+     counted: pairingKey leaves them out. */
   function workingRecord() {
-    return { title: state.name, songs: pairingSongs(), settings: settingsRecord() };
+    return { title: state.name, songs: pairingSongs(), settings: settingsRecord(), views: clone(state.views) };
   }
 
   function standTitles() {
@@ -2675,7 +2681,7 @@
       const prev = lib[SANDBOX_ID];
       const next = { id: SANDBOX_ID, title: SANDBOX_TITLE, isCustom: true,
                      createdAt: prev ? prev.createdAt : Date.now(),
-                     songs: clone(state.songs), settings: settingsRecord() };
+                     songs: clone(state.songs), settings: settingsRecord(), views: clone(state.views) };
       next.updatedAt = prev && pairingKey(prev) === pairingKey(next) ? prev.updatedAt : Date.now();
       lib[SANDBOX_ID] = next;
       return writeLibrary(lib);
@@ -2719,9 +2725,18 @@
 
   /* Everything a pairing does not say goes back to the stand's defaults,
      so one pairing's count-in cannot leak into the next. */
-  function applyPairing(songs, settings, id) {
+  function applyPairing(songs, settings, id, views) {
     if (isPlaying()) stopPlayback();
     adoptSettings(Object.assign(clone(DEFAULT_SETTINGS), settings || {}));
+    /* A pairing saved before it kept its views leaves the panes as they are. */
+    if (views && typeof views === 'object') {
+      adoptViews(views);
+      forgetShapes();
+      SIDES.forEach(side => {
+        const b = sides[side].bridge;
+        if (b) safe(() => b.setView(viewFor(side)));
+      });
+    }
     SIDES.forEach(side => {
       const song = songs && songs[side];
       if (song && (song.data || song.id)) {
@@ -2747,7 +2762,7 @@
     state.shared = !!rec.received;
     state.book = rec.received && rec.book ? String(rec.book) : '';
     state.autoSave = !!o.autoSave && !state.shared;
-    applyPairing(rec.songs, rec.settings, id);
+    applyPairing(rec.songs, rec.settings, id, rec.views);
     saveSession();
     if (!o.quiet) toast('Opened “' + rec.title + '”');
     return true;
@@ -2762,7 +2777,7 @@
     state.shared = false;
     state.book = '';
     state.autoSave = false;
-    applyPairing(rec ? rec.songs : null, rec ? rec.settings : null, null);
+    applyPairing(rec ? rec.songs : null, rec ? rec.settings : null, null, rec ? rec.views : null);
     saveSession();
     return true;
   }
@@ -2776,21 +2791,21 @@
   function chipKicker() {
     if (!state.pairingId) return 'Sandbox';
     if (state.shared) return state.book || 'Shared';
-    return 'Pairing';
+    return 'Arrangement';
   }
 
   function refreshLibraryChrome() {
     const sandbox = !state.pairingId;
     const titles = standTitles();
-    const label = sandbox ? (titles.length ? titles.join(' + ') : 'Empty stand') : (state.name || 'Untitled pairing');
+    const label = sandbox ? (titles.length ? titles.join(' + ') : 'Empty stand') : (state.name || 'Untitled arrangement');
 
     const chip = $('pair-chip');
     chip.classList.toggle('is-sandbox', sandbox);
     $('pair-chip-kicker').textContent = chipKicker();
     $('pair-chip-label').textContent = label;
     chip.title = sandbox
-      ? 'Sandbox — scratch work, kept between visits but not in your pairings'
-      : (state.shared ? 'Shared with you: ' : 'Pairing: ') + label;
+      ? 'Sandbox — scratch work, kept between visits but not in your arrangements'
+      : (state.shared ? 'Shared with you: ' : 'Arrangement: ') + label;
 
     $('sandbox-clear-btn').hidden = !sandbox;
 
@@ -2802,9 +2817,9 @@
       t.classList.toggle('is-shared', state.shared);
       t.setAttribute('aria-pressed', String(on));
       t.title = state.shared
-        ? 'A shared pairing stays exactly as it was sent, so you can always go back to it. Press to save your own copy and keep your changes.'
+        ? 'A shared arrangement stays exactly as it was sent, so you can always go back to it. Press to save your own copy and keep your changes.'
         : on
-        ? 'Auto-save is on: every change is saved to this pairing. Press to stop saving.'
+        ? 'Auto-save is on: every change is saved to this arrangement. Press to stop saving.'
         : 'Auto-save is off: your changes are not being saved. Press to save them and start saving again.';
       $('autosave-label').textContent = state.shared ? 'Save my copy' : (on ? 'Auto-save' : 'Not saving');
       t.querySelector('.autosave-icon').innerHTML = state.shared ? ICON_COPY : (on ? ICON_SAVING : ICON_NOT_SAVING);
@@ -2821,7 +2836,7 @@
     if (!state.pairingId) return;
     if (state.shared) { openNameSheet('copy'); return; }
     if (on && hasUnsavedChanges()) {
-      const title = state.name || 'this pairing';
+      const title = state.name || 'this arrangement';
       const ok = confirm('Save the changes you have made to “' + title + '”?\n\n'
         + 'OK saves them and turns auto-save on.\n'
         + 'Cancel leaves auto-save off, and “' + title + '” stays as it was saved.');
@@ -2883,12 +2898,12 @@
     const sandbox = !state.pairingId;
 
     /* what is open */
-    $('now-open-title').textContent = sandbox ? 'Sandbox' : (state.name || 'Untitled pairing');
+    $('now-open-title').textContent = sandbox ? 'Sandbox' : (state.name || 'Untitled arrangement');
     const badge = $('now-open-badge');
-    badge.textContent = sandbox ? 'Sandbox' : state.shared ? (state.book ? 'From a book' : 'Shared') : 'Pairing';
+    badge.textContent = sandbox ? 'Sandbox' : state.shared ? (state.book ? 'From a book' : 'Shared') : 'Arrangement';
     badge.className = 'kind-badge' + (sandbox ? ' is-sandbox' : state.shared ? ' is-shared' : '');
     $('now-open-note').textContent = sandbox
-      ? 'Scratch work. It stays here between visits but is not in your pairings — use Save as… to keep it.'
+      ? 'Scratch work. It stays here between visits but is not in your arrangements — use Save as… to keep it.'
       : state.shared
       ? 'Shared with you. It stays exactly as it was sent, so you can always come back to it — use Save my copy to keep your own with your changes.'
       : (state.autoSave ? '' : 'Auto-save is off: changes on the stand are not kept until you turn it on.');
@@ -2904,8 +2919,8 @@
       current: sandbox,
       extraClass: 'sandbox-row',
       badge: pairBadge(sb),
-      title: 'Pairing sandbox',
-      sub: 'Scratch work — not in your pairings · ' + pairSub(sb),
+      title: 'Arrangement sandbox',
+      sub: 'Scratch work — not in your arrangements · ' + pairSub(sb),
       actions: [
         sandbox ? libButton('Open now', 'is-active')
                 : libButton('Open', 'open-btn', () => { openSandbox(); closeSheet(pairSheet); }),
@@ -2941,7 +2956,7 @@
     }
 
     const mine = ids.filter(id => !lib[id].received);
-    const g = libGroup(list, 'pair', 'Your pairings', { color: 'var(--ink)' });
+    const g = libGroup(list, 'pair', 'Your arrangements', { color: 'var(--ink)' });
     if (mine.length) mine.forEach(id => g.appendChild(pairRow(lib[id])));
     else libEmpty(g, 'Nothing saved yet. Put a poem and an ostinato on the stand, then Save as… to keep them together.');
   }
@@ -2982,7 +2997,7 @@
           return;
         }
         deletePairing(id);
-      }, 'Delete this pairing'));
+      }, 'Delete this arrangement'));
     }
 
     return libRow({
@@ -3010,13 +3025,13 @@
   let naming = null;   // { mode, id }
 
   const NAMING = {
-    new:    { heading: 'New pairing', ok: 'Create',
+    new:    { heading: 'New arrangement', ok: 'Create',
               sub: 'Give it a name. It starts as an empty stand, and saves itself as you work.' },
-    saveAs: { heading: 'Save as a new pairing', ok: 'Save',
+    saveAs: { heading: 'Save as a new arrangement', ok: 'Save',
               sub: 'Everything on the stand now — both scores, the tempo, the intro and the sound — kept together under a name.' },
     copy:   { heading: 'Save my copy', ok: 'Save my copy',
-              sub: 'A shared pairing stays exactly as it was sent. Your copy is yours to change, and saves itself.' },
-    rename: { heading: 'Rename', ok: 'Rename', sub: 'A new name for this pairing.' }
+              sub: 'A shared arrangement stays exactly as it was sent. Your copy is yours to change, and saves itself.' },
+    rename: { heading: 'Rename', ok: 'Rename', sub: 'A new name for this arrangement.' }
   };
 
   function openNameSheet(mode, id) {
@@ -3133,7 +3148,8 @@
       title: state.name || standTitles().join(' + '),
       poem: songPayload('poem'),
       ost: songPayload('ost'),
-      settings: settingsRecord()
+      settings: settingsRecord(),
+      views: clone(state.views)
     };
     if (!state.pairingId) payload.sandbox = true;
     else if (!hasUnsavedChanges()) Object.assign(payload, EVM.shareHeader(readLibrary()[state.pairingId], pairingKey));
@@ -3150,12 +3166,13 @@
       const d = data && data[side];
       if (d && typeof d === 'object') songs[side] = { src: 'data', title: typeof d.title === 'string' ? d.title : '', data: d };
     });
-    if (!songs.poem && !songs.ost) { toast('That pairing link has nothing in it'); return false; }
+    if (!songs.poem && !songs.ost) { toast('That arrangement link has nothing in it'); return false; }
     const titles = SIDES.map(side => songs[side] && songs[side].title).filter(Boolean);
     const base = {
-      title: typeof data.title === 'string' && data.title.trim() ? data.title : (titles.join(' + ') || 'Shared pairing'),
+      title: typeof data.title === 'string' && data.title.trim() ? data.title : (titles.join(' + ') || 'Shared arrangement'),
       songs: songs,
-      settings: data.settings && typeof data.settings === 'object' ? data.settings : {}
+      settings: data.settings && typeof data.settings === 'object' ? data.settings : {},
+      views: data.views && typeof data.views === 'object' ? data.views : undefined
     };
 
     if (!o.boot) flushSession();
@@ -3165,7 +3182,7 @@
       lib[SANDBOX_ID] = normalizePairing(Object.assign(base, { createdAt: Date.now() }), SANDBOX_ID);
       writeLibrary(lib);
       openSandbox({ noFlush: true });
-      toast('That pairing is in your sandbox');
+      toast('That arrangement is in your sandbox');
       return true;
     }
 
@@ -3174,14 +3191,14 @@
     if (!id) delete incoming.id;
     incoming.filedAs = fingerprint(pairingKey(incoming) || '');
     const result = EVM.file(lib, incoming, fileOpts(true));
-    if (result.action === 'blank') { toast('That pairing link has nothing in it'); return false; }
+    if (result.action === 'blank') { toast('That arrangement link has nothing in it'); return false; }
     writeLibrary(lib);
     openPairingRecord(result.id, { noFlush: true, quiet: true });
     const t = result.record.title;
     toast({
-      added: 'Added “' + t + '” to your pairings',
-      same: 'Opened “' + t + '” from your pairings',
-      matched: 'Opened “' + t + '” from your pairings',
+      added: 'Added “' + t + '” to your arrangements',
+      same: 'Opened “' + t + '” from your arrangements',
+      matched: 'Opened “' + t + '” from your arrangements',
       updated: 'Updated “' + t + '” to the newest version',
       kept: 'Opened “' + t + '” — you already have a newer version'
     }[result.action] || 'Opened “' + t + '”');
@@ -3197,7 +3214,7 @@
     $('reset-status').textContent = '';
     $('share-desc').textContent = !state.pairingId
       ? 'Both scores travel inside the link, with the tempo, intro and sound settings, so it works for anyone. A link from the sandbox lands in their sandbox.'
-      : 'Both scores travel inside the link, with the tempo, intro and sound settings, so it works for anyone. It arrives as a shared pairing, and opening it again never makes a second copy.';
+      : 'Both scores travel inside the link, with the tempo, intro and sound settings, so it works for anyone. It arrives as a shared arrangement, and opening it again never makes a second copy.';
     renderExportList();
     closeSheet(pairSheet);
     openSheet(shareSheet);
@@ -3262,7 +3279,7 @@
   $('export-go').addEventListener('click', () => {
     const lib = readLibrary();
     const ids = [...$('export-list').querySelectorAll('input:checked')].map(i => i.value).filter(id => lib[id]);
-    if (!ids.length) { toast('Tick at least one pairing'); return; }
+    if (!ids.length) { toast('Tick at least one arrangement'); return; }
     const items = ids.map(id => {
       const env = EVM.toEnvelope(lib[id], { app: APP_SLUG, kind: 'pairing' });
       env.received = !!lib[id].received;
@@ -3270,7 +3287,7 @@
     });
     const bundle = { format: 'evm-bundle', formatVersion: EVM.FORMAT_VERSION, app: APP_SLUG,
                      exportedAt: new Date().toISOString(), items: items };
-    const name = ($('export-name').value.trim() || 'my-pairings').replace(/[\\/:*?"<>|]+/g, '-');
+    const name = ($('export-name').value.trim() || 'my-arrangements').replace(/[\\/:*?"<>|]+/g, '-');
     const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -3279,7 +3296,7 @@
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    toast(ids.length === 1 ? 'Downloaded 1 pairing' : 'Downloaded ' + ids.length + ' pairings');
+    toast(ids.length === 1 ? 'Downloaded 1 arrangement' : 'Downloaded ' + ids.length + ' arrangements');
   });
 
   $('import-btn').addEventListener('click', () => $('import-file').click());
@@ -3297,8 +3314,8 @@
       }) : [];
       if (!items.length) {
         status.textContent = items.otherApp
-          ? 'That file is for another app — there are no pairings in it.'
-          : 'No pairings were found in that file.';
+          ? 'That file is for another app — there are no arrangements in it.'
+          : 'No arrangements were found in that file.';
         status.className = 'status-msg error';
         return;
       }
@@ -3328,7 +3345,7 @@
   });
 
   $('reset-btn').addEventListener('click', () => {
-    if (!confirm('Delete every pairing you have saved, and clear the sandbox?\n\n'
+    if (!confirm('Delete every arrangement you have saved, and clear the sandbox?\n\n'
       + 'The poems and ostinatos in Rhythm Poetry and Ostinato Builder are not touched. This can’t be undone.')) return;
     writeLibrary({});
     if (isPlaying()) stopPlayback();
@@ -3342,7 +3359,7 @@
     syncAll();
     flushSession();
     renderExportList();
-    $('reset-status').textContent = 'Every pairing has been deleted.';
+    $('reset-status').textContent = 'Every arrangement has been deleted.';
     $('reset-status').className = 'status-msg ok';
   });
 
@@ -3372,7 +3389,7 @@
       key: pairingKey,
       changed: shelfChanged,
       openSong: id => { openPairingRecord(id); closeSheet(pairSheet); },
-      words: 'pairings'
+      words: 'arrangements'
     });
     shelfConnected = true;
     EVMShelf.sync();
@@ -3390,9 +3407,9 @@
     if (pairSheet.classList.contains('open')) renderPairList();
     refreshLibraryChrome();
     const n = summary.added.length, up = summary.updated.length, gone = summary.removed.length;
-    if (n) toast(n === 1 ? 'A pairing from your books is in your pairings' : n + ' pairings from your books are in your pairings');
-    else if (up) toast(up === 1 ? 'Your teacher updated a pairing in your books' : 'Your teacher updated ' + up + ' pairings in your books');
-    else if (gone) toast(gone === 1 ? 'A pairing from your books left your pairings' : gone + ' pairings from your books left your pairings');
+    if (n) toast(n === 1 ? 'An arrangement from your books is in your arrangements' : n + ' arrangements from your books are in your arrangements');
+    else if (up) toast(up === 1 ? 'Your teacher updated an arrangement in your books' : 'Your teacher updated ' + up + ' arrangements in your books');
+    else if (gone) toast(gone === 1 ? 'An arrangement from your books left your arrangements' : gone + ' arrangements from your books left your arrangements');
   }
 
   $('shelf-btn').addEventListener('click', () => {
@@ -3595,7 +3612,7 @@
     if (params.has('pair')) {
       linkPair = decodeBase64Json(params.get('pair'));
       window.history.replaceState(null, document.title, window.location.pathname);
-      if (!linkPair) toast('That pairing link could not be read');
+      if (!linkPair) toast('That arrangement link could not be read');
     }
   } catch (e) {}
 

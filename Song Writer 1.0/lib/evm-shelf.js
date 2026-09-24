@@ -59,7 +59,7 @@
     poem: ['poem', 'poems'], rhythm: ['rhythm', 'rhythms'],
     ostinato: ['ostinato', 'ostinatos'], song: ['song', 'songs'],
     scale: ['scale', 'scales'], layout: ['layout', 'layouts'],
-    pairing: ['pairing', 'pairings']
+    pairing: ['arrangement', 'arrangements']   // the Music Stand's; the kind keeps its first name
   };
   const APP_NAME = {
     'rhythm-poetry': 'Rhythm Poetry', 'ostinato-builder': 'Ostinato Builder',

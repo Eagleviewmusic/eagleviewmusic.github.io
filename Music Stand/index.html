@@ -65,11 +65,11 @@
       <svg class="autosave-icon" viewBox="0 0 24 24" aria-hidden="true"></svg>
       <span class="autosave-label" id="autosave-label">Auto-save</span>
     </button>
-    <button class="pair-chip" id="pair-chip" title="Pairings &amp; library">
+    <button class="pair-chip" id="pair-chip" title="Arrangements &amp; library">
       <span class="pair-chip-dots" aria-hidden="true"><span class="dot poem"></span><span class="dot ost"></span></span>
       <span class="pair-chip-text">
         <span class="pair-chip-kicker" id="pair-chip-kicker">Sandbox</span>
-        <span class="pair-chip-label" id="pair-chip-label">New pairing</span>
+        <span class="pair-chip-label" id="pair-chip-label">New arrangement</span>
       </span>
       <svg class="caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
@@ -248,8 +248,8 @@
      worked on. Where the stand's own settings go as it grows. -->
 <div class="popover" id="view-pop" role="dialog" aria-label="View">
   <div class="pop-section">
-    <div class="pop-label">Arrangement</div>
-    <div class="seg seg-wide seg-arrange" role="group" aria-label="Arrangement">
+    <div class="pop-label">Layout</div>
+    <div class="seg seg-wide seg-arrange" role="group" aria-label="Layout">
       <button class="seg-btn" id="arrange-auto" title="Let the stand choose whichever draws both scores larger">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>
         <span>Automatic</span>
@@ -454,7 +454,7 @@
         <span class="status-msg" id="link-status"></span>
         <button class="btn btn-primary" id="link-open">Open it</button>
       </div>
-      <p class="pop-note">A link from either app works here — it goes to the side it belongs to. So does a pairing link.</p>
+      <p class="pop-note">A link from either app works here — it goes to the side it belongs to. So does an arrangement link.</p>
     </div>
   </div>
 </div>
@@ -480,7 +480,7 @@
 <div class="sheet-backdrop" id="pair-sheet">
   <div class="sheet sheet-lg" role="dialog" aria-labelledby="pair-heading">
     <div class="sheet-head">
-      <h2 id="pair-heading">Pairings</h2>
+      <h2 id="pair-heading">Arrangements</h2>
       <button class="sheet-close" data-close title="Close">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
       </button>
@@ -496,7 +496,7 @@
     <div class="sheet-actions">
       <button class="btn btn-primary" id="pair-new">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-        <span>New pairing</span>
+        <span>New arrangement</span>
       </button>
       <button class="btn" id="shelf-btn" title="Books your teacher has put on the shelf">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v14"/><path d="M9 19V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v11"/><path d="m14.5 8.6 2.9-.8a1 1 0 0 1 1.2.7l2.7 10.1"/><path d="M3 19h18"/></svg>
@@ -514,7 +514,7 @@
 <div class="sheet-backdrop" id="name-sheet">
   <div class="sheet sheet-sm" role="dialog" aria-labelledby="name-heading">
     <div class="sheet-head">
-      <h2 id="name-heading">Save this pairing</h2>
+      <h2 id="name-heading">Save this arrangement</h2>
       <button class="sheet-close" data-close title="Close">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
       </button>
@@ -542,7 +542,7 @@
     <div class="card">
       <div class="card-title">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-        Send this pairing by link
+        Send this arrangement by link
       </div>
       <p class="card-desc" id="share-desc">Both scores travel inside the link, with the tempo, intro and sound settings, so it works for anyone. Opening it again never makes a second copy.</p>
       <button class="btn btn-primary" id="share-make">Create a link</button>
@@ -567,7 +567,7 @@
       </div>
       <div class="export-list" id="export-list"></div>
       <div class="filename-row">
-        <input type="text" id="export-name" class="text-field" placeholder="my-pairings" maxlength="50" autocomplete="off">
+        <input type="text" id="export-name" class="text-field" placeholder="my-arrangements" maxlength="50" autocomplete="off">
         <span class="filename-ext">.json</span>
       </div>
       <button class="btn btn-primary" id="export-go">Download</button>
@@ -578,7 +578,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Restore from a backup
       </div>
-      <p class="card-desc">Pairings in the file are added to your pairings. One you already have is not added twice, and a newer version replaces an older one.</p>
+      <p class="card-desc">Arrangements in the file are added to your arrangements. One you already have is not added twice, and a newer version replaces an older one.</p>
       <input type="file" id="import-file" accept=".json,application/json" hidden>
       <button class="btn" id="import-btn">Choose a file…</button>
       <span class="status-msg" id="import-status"></span>
@@ -589,8 +589,8 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         Start over
       </div>
-      <p class="card-desc">Deletes every pairing you have saved and clears the sandbox. The poems and ostinatos in Rhythm Poetry and Ostinato Builder are not touched.</p>
-      <button class="btn btn-danger" id="reset-btn">Delete every pairing</button>
+      <p class="card-desc">Deletes every arrangement you have saved and clears the sandbox. The poems and ostinatos in Rhythm Poetry and Ostinato Builder are not touched.</p>
+      <button class="btn btn-danger" id="reset-btn">Delete every arrangement</button>
       <span class="status-msg" id="reset-status"></span>
     </div>
   </div>
