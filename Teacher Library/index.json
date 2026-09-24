@@ -1,7 +1,7 @@
 {
   "format": "evm-index",
   "formatVersion": 1,
-  "generatedAt": "2026-09-24T12:49:52.884Z",
+  "generatedAt": "2026-09-24T13:24:22.355Z",
   "items": [
     {
       "app": "music-stand",
@@ -10,6 +10,15 @@
       "title": "Chicken Wing with Shakers and Sticks",
       "updatedAt": 1790222136048,
       "path": "music-stand--pair_1790220660136_ggye.json",
+      "book": "More songs"
+    },
+    {
+      "app": "ostinato-builder",
+      "kind": "ostinato",
+      "id": "song_1790256191335_w1a9",
+      "title": "Chickenwing beat",
+      "updatedAt": 1790256191335,
+      "path": "ostinato-builder--song_1790256191335_w1a9.json",
       "book": "More songs"
     },
     {
