@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="lib/evm-shelf.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -500,7 +501,6 @@
       <button class="btn" id="shelf-btn" title="Books your teacher has put on the shelf">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v14"/><path d="M9 19V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v11"/><path d="m14.5 8.6 2.9-.8a1 1 0 0 1 1.2.7l2.7 10.1"/><path d="M3 19h18"/></svg>
         <span>Teacher Library</span>
-        <span class="soon-tag" id="shelf-soon">Soon</span>
       </button>
       <button class="btn" id="pair-saveas">Save as…</button>
       <button class="btn" id="pair-share-open">Share &amp; backup</button>
@@ -599,9 +599,9 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="lib/evm-library.js"></script>
-<!-- The Teacher Library shelf joins here once pairings can be published
-     (see README → Joining the Librarian): lib/evm-shelf.js + .css, and
-     the adapter in script.js (connectShelf) takes it from there. -->
+<!-- The Teacher Library shelf, shared with every app (EVM Library/). The
+     adapter is connectShelf() in script.js. -->
+<script src="lib/evm-shelf.js"></script>
 <script src="lib/instruments/js/virtual-instruments.js"></script>
 <script src="lib/instruments/js/instrument-icons.js"></script>
 <script src="script.js"></script>

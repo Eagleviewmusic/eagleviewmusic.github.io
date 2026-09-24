@@ -97,12 +97,91 @@
         return !lyric || tidy === '[key of c] [a] start[d1] here[d1]';
       },
       data: rec => ({ content: rec.content })
+    },
+    /* Music Stand pairings: a poem and an ostinato kept together, with the
+       tempo, intro and sound that suit them. A pairing links to songs in
+       the teacher's own Rhythm Poetry and Ostinato Builder, which no
+       student has — so what is published carries both of them WHOLE,
+       frozen into copies from the apps' libraries at the moment it is
+       published (pairingData). One file is then all a student needs.
+       A pairing counts as changed when either of its songs has been
+       edited since, so it never goes out of date quietly (pairingUpdated). */
+    {
+      app: 'music-stand', name: 'Music Stand', key: 'music_stand_pairings_v1',
+      reserved: id => id === 'sandbox',
+      kind: () => 'pairing',
+      blank: rec => !PAIR_SIDES.some(side => hasSong(rec.songs && rec.songs[side])),
+      data: rec => pairingData(rec),
+      updatedAt: rec => pairingUpdated(rec),
+      detail: rec => PAIR_SIDES.map(side => {
+        const s = rec.songs && rec.songs[side];
+        if (!hasSong(s)) return null;
+        const live = linkedRecord(side, s);
+        return (live && live.title) || s.title || (side === 'poem' ? 'a poem' : 'an ostinato');
+      }).filter(Boolean).join(' + '),
+      parts: rec => PAIR_SIDES.map(side => {
+        const s = rec.songs && rec.songs[side];
+        return s && s.src === 'library' && s.id && !/^sandbox/.test(s.id) ? PAIR_APPS[side].app + '|' + s.id : null;
+      }).filter(Boolean)
     }
   ];
 
-  const APP_ORDER = ['rhythm-poetry', 'ostinato-builder', 'song-writer'];
-  const APP_NAMES = { 'rhythm-poetry': 'Rhythm Poetry', 'ostinato-builder': 'Ostinato Builder', 'song-writer': 'Song Writer' };
-  const KIND_NAMES = { poem: 'Poem', rhythm: 'Rhythm', ostinato: 'Ostinato', song: 'Song' };
+  const APP_ORDER = ['rhythm-poetry', 'ostinato-builder', 'song-writer', 'music-stand'];
+  const APP_NAMES = { 'rhythm-poetry': 'Rhythm Poetry', 'ostinato-builder': 'Ostinato Builder', 'song-writer': 'Song Writer', 'music-stand': 'Music Stand' };
+  const KIND_NAMES = { poem: 'Poem', rhythm: 'Rhythm', ostinato: 'Ostinato', song: 'Song', pairing: 'Pairing' };
+
+  /* ------------------------------------------------------------------
+     PAIRINGS' SONGS. Each side of a pairing is either a link to a song in
+     the teacher's app library ({ src: 'library', id, data }) or the
+     stand's own copy ({ src: 'data', data }). A link is resolved against
+     the app's library as it is NOW — the stand itself would open that
+     version — and falls back to the copy the stand kept if the song has
+     gone. Everything published is a copy: { src: 'data', title, data }.
+     ------------------------------------------------------------------ */
+  const PAIR_SIDES = ['poem', 'ost'];
+  const PAIR_APPS = {
+    poem: { app: 'rhythm-poetry', key: 'rhythm_poetry_song_library_v3' },
+    ost:  { app: 'ostinato-builder', key: 'ostinato_builder_library_v1' }
+  };
+  const SONG_HEADER = ['id', 'createdAt', 'updatedAt', 'isCustom', 'received', 'receivedAt',
+                       'derivedFrom', 'book', 'sandbox', 'savedAt'];
+  const hasSong = s => !!(s && typeof s === 'object' && (s.data || s.id));
+  let partLibs = {};              // app libraries read for this collect()
+
+  function linkedRecord(side, song) {
+    if (!song || song.src !== 'library' || !song.id || /^sandbox/.test(song.id)) return null;
+    const key = PAIR_APPS[side].key;
+    if (!partLibs[key]) partLibs[key] = readLibrary(key);
+    const rec = partLibs[key][song.id];
+    return rec && typeof rec === 'object' ? rec : null;
+  }
+
+  function frozenSong(side, song) {
+    if (!hasSong(song)) return null;
+    const live = linkedRecord(side, song);
+    const from = live || song.data;
+    if (!from || typeof from !== 'object') return null;
+    const data = {};
+    Object.keys(from).forEach(k => { if (SONG_HEADER.indexOf(k) === -1) data[k] = from[k]; });
+    const title = (live && live.title) || song.title || data.title || '';
+    if (title) data.title = title;
+    return { src: 'data', id: null, title: title, data: data };
+  }
+
+  function pairingData(rec) {
+    const songs = {};
+    PAIR_SIDES.forEach(side => { songs[side] = frozenSong(side, rec.songs && rec.songs[side]); });
+    return { songs: songs, settings: rec.settings || {} };
+  }
+
+  function pairingUpdated(rec) {
+    let t = 0;
+    PAIR_SIDES.forEach(side => {
+      const live = linkedRecord(side, rec.songs && rec.songs[side]);
+      if (live) t = Math.max(t, Number(live.updatedAt || live.createdAt) || 0);
+    });
+    return t;
+  }
 
   let items = [];              // everything offered, one per app + id
   let published = null;       // { 'app|id': indexEntry } — null until read, false if unreachable
@@ -150,6 +229,7 @@
   }
 
   function collect() {
+    partLibs = {};
     const byKey = new Map();
     SOURCES.forEach(src => {
       const lib = readLibrary(src.key);
@@ -167,7 +247,8 @@
            every download would look like a newer version to the students. */
         const idTime = Number((String(id).match(/_(\d{12,})/) || [])[1]) || 1;
         const createdAt = Number(rec.createdAt) || idTime;
-        const updatedAt = Number(rec.updatedAt) || createdAt;
+        /* A pairing is as new as the newest of itself and its two songs. */
+        const updatedAt = Math.max(Number(rec.updatedAt) || createdAt, src.updatedAt ? src.updatedAt(rec) : 0);
         const item = {
           app: src.app,
           from: src.from || '',
@@ -183,6 +264,8 @@
              One saved before that has none: say so, since the students
              would get their own settings instead. */
           noSettings: !!src.settings && !rec.layout,
+          detail: src.detail ? src.detail(rec) : '',
+          parts: src.parts ? src.parts(rec) : [],
           record: Object.assign({}, rec, { id: id, createdAt: createdAt, updatedAt: updatedAt }),
           dataOf: src.data || null
         };
@@ -309,6 +392,12 @@
     meta.textContent = bits.join(' · ');
     main.appendChild(title);
     main.appendChild(meta);
+    if (item.detail) {
+      const d = document.createElement('span');
+      d.className = 'item-detail';
+      d.textContent = item.detail;
+      main.appendChild(d);
+    }
     pick.appendChild(box);
     pick.appendChild(main);
 
@@ -334,6 +423,37 @@
       t.textContent = 'No Layout Settings yet';
       t.title = 'This piece was saved before pieces kept their Layout Settings. Open it in the app, set it up, and save it (turn Auto-save on, or Save as…) — then its settings travel with it.';
       tags.appendChild(t);
+    }
+    /* A pairing carries its songs whole, so it needs nothing else to
+       work. Its poem and ostinato can still go out on their own too, for
+       students to open in the apps — one tap ticks them. */
+    const partItems = (item.parts || []).map(k => items.find(i => i.app + '|' + i.id === k))
+      .filter(i => i && !i.blank);
+    if (item.app === 'music-stand' && s !== 'blank') {
+      const t = document.createElement('span');
+      t.className = 'tag';
+      t.textContent = 'Carries its poem & ostinato';
+      t.title = 'Students need only this file: the poem and the ostinato travel inside it, as they are now in your apps.';
+      tags.appendChild(t);
+    }
+    if (partItems.length) {
+      const all = partItems.every(i => ticked.has(i.app + '|' + i.id));
+      const b = document.createElement('button');
+      b.className = 'text-btn tick-parts';
+      b.type = 'button';
+      b.textContent = all ? 'Its songs are ticked' : 'Tick its songs too';
+      b.title = 'Also publish ' + partItems.map(i => '“' + i.title + '”').join(' and ') +
+        ' in their own apps, so students can open them there as well. Not needed for the pairing itself.';
+      b.disabled = all;
+      b.addEventListener('click', () => {
+        const book = bookOf(item);
+        partItems.forEach(i => {
+          ticked.add(i.app + '|' + i.id);
+          if (book && !bookOf(i)) setBook(i, book);
+        });
+        render();
+      });
+      tags.appendChild(b);
     }
     if (item.received) {
       const t = document.createElement('span');

@@ -141,7 +141,7 @@ reserved id `sandbox` (like the apps' sandboxes: in the map, never an item).
   "updatedAt": 1790214835480,
   "received": true, "receivedAt": 1790214900000,      // shared with you
   "derivedFrom": "pair_…",                            // Save as… / Save my copy
-  "book": "Winter Songs",                             // taken out from the shelf (later)
+  "book": "Winter Songs",                             // taken out from the shelf
   "filedAs": "f1x2y3…",                               // see below
   "songs": {
     "poem": { "src": "library", "id": "hickory-dickory-dock", "title": "…", "data": { …Rhythm Poetry's share record… } },
@@ -169,54 +169,42 @@ reserved id `sandbox` (like the apps' sandboxes: in the map, never an item).
   `settings`) are given an id, dates (from `savedAt`, never "now") and
   `isCustom` once, when the stand first opens.
 
-## Joining the Librarian (next)
+## The Teacher Library
 
-Designed in; not switched on yet. The stand already keeps pairings as EVM
-items in the storage key the Librarian would read, already files links and
-files by the import rule, already writes backups as EVM bundles, and already
-draws books in its Pairings sheet (records with `book`, with **Put back**). The
-Pairings sheet has the **Teacher Library** button, marked *Soon*, and
-`connectShelf()` in `script.js` holds the whole shelf adapter. What is left:
+Pairings go out to students the way songs do: the teacher publishes them from
+the **Librarian**, into a **book**, and students take the book off the shelf.
 
-1. **The shelf learns the word.** In `EVM Library/evm-shelf.js`, add
-   `pairing: ['pairing', 'pairings']` to `KIND` and `'music-stand': 'Music Stand'`
-   to `APP_NAME`; copy it (and `evm-shelf.css`) out to every app's `lib/` and
-   run `check-copies.sh` (add the Music Stand's shelf files to it).
-2. **The stand loads it.** Add `lib/evm-shelf.css` / `lib/evm-shelf.js` to
-   `index.html` (after `lib/evm-library.js`, where the comment is). The *Soon* tag
-   hides itself and the button opens the shelf; `connectShelf()` runs `sync()` on
-   every visit. The stand writes only its own pairings, so — unlike the apps in a
-   pane — it is allowed a shelf.
-3. **The Librarian reads pairings.** A `SOURCES` entry in `Librarian/script.js`:
-   `app: 'music-stand'`, `key: 'music_stand_pairings_v1'`, `reserved: id => id === 'sandbox'`,
-   `kind: () => 'pairing'`, `blank:` neither side has a song, and a `data:` that
-   turns every `src: "library"` song into its copy (`{ src: 'data', title, data }`)
-   — a student does not have the teacher's library. Add it to `APP_ORDER` /
-   `APP_NAMES` / `KIND_NAMES`, and to the Teacher Library tab's lists in `panel.js`.
-4. **Decide one question first:** when a pairing's poem is itself published
-   (same id in the same book), should the published pairing point at it, so
-   an update to the poem reaches the pairing? Today's answer is no — a pairing
-   is a saved moment, carrying its own copies — and that is the simpler rule.
+**One file is everything.** A pairing links to songs in the teacher's own
+Rhythm Poetry and Ostinato Builder, which no student has, so what is published
+carries both songs **whole**. When the Librarian publishes a pairing it freezes
+each linked song into a copy from the app's library as it is at that moment
+(the version the stand itself would open), falling back to the copy the stand
+kept if the song has gone. The envelope is `{ app: 'music-stand', kind:
+'pairing', data: { songs: { poem, ost }, settings } }`, every song `{ src:
+'data', title, data }`. A student needs nothing else — nothing is looked up in
+their own apps.
 
-## Timing
+**It never goes out of date quietly.** In the Librarian a pairing is as new as
+the newest of itself and its two songs, so editing the poem or the ostinato
+after publishing shows the pairing as *Changed since you published*. Publishing
+it again sends the new copies; the student's stand replaces its shared copy at
+the next visit.
 
-One clock for both sides. The Music Stand owns the only `AudioContext`; the apps are
-handed a view of it (a `Proxy`) whose `currentTime` the Music Stand sets to the moment
-each note is due while the app sounds it. Every voice in both apps reads the
-clock once and schedules from that reading, so notes land on the audio clock to
-the sample — measured: every onset exactly on the tick grid, none late.
+**Its songs can go out too, but need not.** A pairing row in the Librarian
+offers *Tick its songs too*, for when students should also open the poem and
+the ostinato in their own apps. It puts them in the same book.
 
-Both sides count the same **beat** (a quarter in 4/4, a dotted quarter in 6/8),
-so one tempo drives both. The running order:
+**On the student's stand** the shelf is the same one every app has
+(`lib/evm-shelf.js`, adapter in `connectShelf()`, `words: 'pairings'`):
+**Pairings → Teacher Library**. The books out are one list for the whole site,
+so a book taken out in Rhythm Poetry is out here too. A pairing from a book is
+Shared (read-only, *Save my copy*), listed under its book with **Put back**,
+replaced when the teacher publishes a newer version, and gone when its book is
+put back or its file is deleted — a *Save my copy* of it stays.
 
-1. **Count-in** — one bar of clicks (optional).
-2. **Intro** — the ostinato alone, 0/1/2/4 times round.
-3. **The poem** — a pickup comes in on the last beat of the intro. The ostinato
-   starts again at the poem's bar 1 on every pass, so their bar 1s always meet.
-4. **Loop** — round again, or stop at the end.
-
-Mismatched meters are allowed and noted in the ostinato's heading
-("3 beats against 4", "4/4 against 6/8").
+The teacher's own pairings are never touched by the shelf (it skips a record
+with the same id that is not shared), so the teacher sees the book on the shelf
+without it filing a second copy of their own work.
 
 ## Layout
 
@@ -443,7 +431,6 @@ in words.
 
 ## Not built yet
 
-- Pairings on the Teacher Library shelf — see **Joining the Librarian**.
 - Sharing the room between more than two scores. The solver tries every
   combination, which is fine for two apps and a handful of shapes each and
   will not be for five; when a third arrives it wants a proper packing rather

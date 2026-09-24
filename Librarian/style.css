@@ -23,6 +23,7 @@
   --rp: #E0642F;
   --ob: #4F5BD5;
   --sw: #9C168E;
+  --ms: linear-gradient(135deg, #E0642F, #5B4BD6);   /* the Music Stand: both sides */
 
   --r-sm: 10px;
   --r-md: 14px;
@@ -162,6 +163,7 @@ html.in-iframe .home-link { visibility: hidden; }
 .group-rhythm-poetry .group-head::before { background: var(--rp); }
 .group-ostinato-builder .group-head::before { background: var(--ob); }
 .group-song-writer .group-head::before { background: var(--sw); }
+.group-music-stand .group-head::before { background: var(--ms); }
 
 .item {
   display: flex; align-items: center; gap: 12px;
@@ -180,6 +182,10 @@ html.in-iframe .home-link { visibility: hidden; }
 .item-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .item-title { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item-meta { font-size: 12px; color: var(--ink-3); font-weight: 700; }
+/* a pairing's two songs, under its name */
+.item-detail { font-size: 12.5px; color: var(--ink-2); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tick-parts { font-size: 12px; padding: 2px 6px; }
+.tick-parts:disabled { opacity: .6; cursor: default; }
 .item-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
 .item-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
 
@@ -361,6 +367,7 @@ body:not(.lib-can-edit) .lib-edit-only { display: none; }
 .lib-song.app-rhythm-poetry::before { background: var(--rp); }
 .lib-song.app-ostinato-builder::before { background: var(--ob); }
 .lib-song.app-song-writer::before { background: var(--sw); }
+.lib-song.app-music-stand::before { background: var(--ms); }
 .lib-song-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .lib-song-title { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lib-song-meta { font-size: 12px; font-weight: 700; color: var(--ink-3); }

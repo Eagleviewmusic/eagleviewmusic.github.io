@@ -3347,13 +3347,18 @@
   });
 
   /* ---- the Teacher Library ----
-     Designed in, switched on later. The shelf (EVM Library/evm-shelf.js)
-     already knows how to take a book out, keep it in step with the
-     Teacher Library and put it back; all an app hands it is this adapter.
-     What the stand still needs before its pairings can be on the shelf —
-     the Librarian learning to read and publish them, and the shelf
-     learning the word "pairing" — is in the README, under Joining the
-     Librarian. Until then the button says Soon, and nothing is loaded. */
+     The shelf (lib/evm-shelf.js, shared with every app) takes a book out,
+     keeps it in step with the Teacher Library on every visit, and puts it
+     back; this adapter is all the stand hands it. The books a student has
+     out are one list for the whole site, so a book taken out in Rhythm
+     Poetry is out here too, and its pairings arrive the next time the
+     stand opens.
+
+     A published pairing carries its poem and its ostinato whole (the
+     Librarian freezes them into copies when it publishes), so one file is
+     everything a student needs: nothing is looked up in their own
+     Rhythm Poetry or Ostinato Builder. The stand writes only its own
+     pairings here — unlike the apps in its panes, it may have a shelf. */
   let shelfConnected = false;
 
   function connectShelf() {
@@ -3366,7 +3371,8 @@
       incoming: rec => normalizePairing(rec, rec.id || 'incoming'),
       key: pairingKey,
       changed: shelfChanged,
-      openSong: id => { openPairingRecord(id); closeSheet(pairSheet); }
+      openSong: id => { openPairingRecord(id); closeSheet(pairSheet); },
+      words: 'pairings'
     });
     shelfConnected = true;
     EVMShelf.sync();
@@ -3389,10 +3395,10 @@
     else if (gone) toast(gone === 1 ? 'A pairing from your books left your pairings' : gone + ' pairings from your books left your pairings');
   }
 
-  $('shelf-soon').hidden = !!window.EVMShelf;
   $('shelf-btn').addEventListener('click', () => {
-    if (shelfConnected) { closeSheet(pairSheet); EVMShelf.openSheet(); return; }
-    toast('Books of pairings from the Teacher Library are coming to the Music Stand next');
+    if (!shelfConnected) { toast('The Teacher Library could not be loaded'); return; }
+    closeSheet(pairSheet);
+    EVMShelf.openSheet();
   });
 
   /* Another tab changed the pairings (saved one, deleted one): the list

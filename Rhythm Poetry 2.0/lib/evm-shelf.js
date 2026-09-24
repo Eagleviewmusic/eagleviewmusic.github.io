@@ -42,6 +42,8 @@
      changed(summary)                     after anything was filed or removed:
                                           redraw, and move off a song that left
      openSong(id)                         optional: open a song from a book
+     words:      'pairings'               optional: what this app keeps, in the
+                                          shelf's sentences (default 'songs')
    }
    ========================================================================== */
 (function (root) {
@@ -56,13 +58,16 @@
   const KIND = {
     poem: ['poem', 'poems'], rhythm: ['rhythm', 'rhythms'],
     ostinato: ['ostinato', 'ostinatos'], song: ['song', 'songs'],
-    scale: ['scale', 'scales'], layout: ['layout', 'layouts']
+    scale: ['scale', 'scales'], layout: ['layout', 'layouts'],
+    pairing: ['pairing', 'pairings']
   };
   const APP_NAME = {
     'rhythm-poetry': 'Rhythm Poetry', 'ostinato-builder': 'Ostinato Builder',
     'song-writer': 'Song Writer', 'rainbow-xylophone': 'Rainbow Xylophone',
-    'key-blocks': 'Key Blocks', 'virtual-drum-kit': 'Drum Kit'
+    'key-blocks': 'Key Blocks', 'virtual-drum-kit': 'Drum Kit',
+    'music-stand': 'Music Stand'
   };
+  const things = () => (A && A.words) || 'songs';
 
   let A = null;                   // the adapter
   let index = null;               // last index read this visit (or from cache)
@@ -200,7 +205,7 @@
 
   function putBack(book) {
     const ok = confirm('Put “' + book + '” back on the shelf?\n\n'
-      + 'Its songs leave your library. Anything you saved as your own (Save my copy) stays.');
+      + 'Its ' + things() + ' leave your library. Anything you saved as your own (Save my copy) stays.');
     if (!ok) return Promise.resolve(false);
     putBackNow(book);
     render();
@@ -326,7 +331,7 @@
       return;
     }
     body.appendChild(el('p', 'evm-shelf-intro',
-      'Take a book off the shelf and its songs join your library. Put it back when you’re done — anything you saved as your own stays yours.'));
+      'Take a book off the shelf and its ' + things() + ' join your library. Put it back when you’re done — anything you saved as your own stays yours.'));
 
     const shelf = el('div', 'evm-shelf-shelf');
     shown.forEach(b => {
@@ -387,7 +392,7 @@
     actions.appendChild(btn);
     body.appendChild(actions);
     if (isOut) body.appendChild(el('p', 'evm-shelf-fine',
-      'These songs are in your library under “' + b.name + '”. They stay as your teacher made them; Save my copy keeps your changes as your own.'));
+      'These ' + things() + ' are in your library under “' + b.name + '”. They stay as your teacher made them; Save my copy keeps your changes as your own.'));
   }
 
   /* ---------------- start-up ---------------- */

@@ -49,6 +49,11 @@
   --divider: 10px;
   --gutter: 8px;
 
+  /* what the shared Teacher Library shelf (lib/evm-shelf.css) calls the
+     app's accent and its second paper — here, the stand's ink and ground */
+  --accent:      var(--ink);
+  --paper-2:     var(--ground);
+
   --font: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-round: 'Baloo 2', 'Nunito', system-ui, sans-serif;
 }
@@ -381,16 +386,6 @@ body.editing .editing-flag { display: inline-block; }
 .btn-danger { background: var(--danger-soft); border-color: #EBC3CA; color: var(--danger); }
 .btn-danger:hover, .btn-danger:active { background: var(--danger); border-color: var(--danger); color: #fff; }
 .btn:disabled { opacity: .45; cursor: default; }
-
-/* Not there yet, and honest about it. */
-.soon-tag {
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--ground);
-  font-size: 10.5px; font-weight: 800; letter-spacing: .05em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
 
 .text-field {
   width: 100%;
