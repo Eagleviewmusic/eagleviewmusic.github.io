@@ -84,8 +84,16 @@
      ================================================================== */
 
   const state = {
+    /* What is open: the sandbox (pairingId null) or a pairing from the
+       stand's library. `name` is that pairing's title; `shared` and `book`
+       say it came from someone else, and so is never saved into; and
+       `autoSave` is the switch on the top bar — off when a pairing is
+       opened, as in both apps. See PAIRINGS below. */
     name: '',
     pairingId: null,
+    shared: false,
+    book: '',
+    autoSave: false,
     bpm: 92,
     countIn: false,
     leadIn: 1,            // times round the ostinato goes before the poem
@@ -161,14 +169,19 @@
     catch (e) { toast('There was no room to save — the browser storage is full'); return false; }
   }
 
+  /* The session is what is on the stand right now, saved or not. Every
+     save of it also saves the work where it belongs — into the sandbox,
+     or into the open pairing while auto-save is on (saveWorking). */
   let sessionTimer = null;
   function saveSession() {
     clearTimeout(sessionTimer);
-    sessionTimer = setTimeout(() => writeJSON(SESSION_KEY, sessionRecord()), 250);
+    sessionTimer = setTimeout(flushSession, 250);
   }
   function flushSession() {
     clearTimeout(sessionTimer);
     writeJSON(SESSION_KEY, sessionRecord());
+    saveWorking();
+    refreshLibraryChrome();
   }
   window.addEventListener('beforeunload', flushSession);
   document.addEventListener('visibilitychange', () => {
@@ -188,9 +201,10 @@
 
   function sessionRecord() {
     return Object.assign(settingsRecord(), {
-      v: 1,
+      v: 2,
       name: state.name,
       pairingId: state.pairingId,
+      autoSave: state.autoSave,
       editing: state.editing,
       layout: JSON.parse(JSON.stringify(state.layout)),
       views: JSON.parse(JSON.stringify(state.views)),
@@ -403,6 +417,12 @@
       origin: entry.origin || null
     };
     s.info = info;
+    s.from = src === 'library' ? libraryEntry(side, entry.id) : null;
+    /* A copy kept in a pairing comes back from the app a little tidied
+       (the app fills in what the link left out). That is the same piece,
+       so the stored copy takes the tidied form quietly — otherwise the
+       pairing would look changed the moment it was opened. */
+    if (o.settle) settleStored(o.settle, side);
 
     if (!o.keepMutes) resetVoiceMutes(side, info);
     if (!o.keepTempo && (side === 'poem' || !state.songs.poem)) setBpm(info.bpm, { quiet: true });
@@ -417,6 +437,16 @@
     scheduleSplit();
     saveSession();
     return true;
+  }
+
+  /* What the app's library says about a song opened from it — whether it
+     is the app's sandbox, a song shared with this browser, or one from a
+     Teacher Library book — for the pane's heading. Read once, when the
+     song is opened. */
+  function libraryEntry(side, id) {
+    const b = sides[side].bridge;
+    const list = b ? safe(() => b.listSongs(), []) : [];
+    return list.find(song => song.id === id) || null;
   }
 
   function resetVoiceMutes(side, info) {
@@ -444,7 +474,7 @@
     if (on === state.editing) return;
     state.editing = on;
     document.body.classList.toggle('editing', on);
-    $('edit-btn').setAttribute('aria-pressed', String(on));
+    syncEditSwitch();
     /* Editing while the music runs would be writing under the plan the
        conductor is already reading from. */
     if (on && isPlaying()) stopPlayback();
@@ -504,6 +534,7 @@
   function clearSide(side) {
     state.songs[side] = null;
     sides[side].info = null;
+    sides[side].from = null;
     sides[side].pending = null;
     sides[side].stale = false;
     sides[side].empty.classList.remove('opening');
@@ -536,6 +567,10 @@
              + (info.pickupBeats ? ' + pickup' : '');
       }
       $(side + '-meta').textContent = meta;
+      const src = sourceOf(side);
+      $(side + '-src').textContent = src.word;
+      sides[side].pane.querySelector('.pane-title').title = src.title
+        || ('Choose ' + (side === 'poem' ? 'a poem' : 'an ostinato'));
 
       /* Said in the heading rather than left to be noticed: from here on
          this is not the song that is in the app, and anyone coming back
@@ -579,10 +614,28 @@
     note.title = title;
     note.hidden = !text;
 
-    const titles = SIDES.map(side => state.songs[side] && state.songs[side].title).filter(Boolean);
-    $('pair-chip-label').textContent = state.name || (titles.length ? titles.join(' + ') : 'New pairing');
-    document.title = (state.name || titles.join(' + ') || 'Music Stand')
-      + (titles.length || state.name ? ' — Music Stand' : '');
+    refreshLibraryChrome();
+  }
+
+  /* Where a pane's song came from, in a word for the heading and a
+     sentence for its title: the same words the apps' own song chips use.
+     A library song is live — edited in its app, it opens edited here; a
+     copy is the stand's own and does not follow the app. */
+  function sourceOf(side) {
+    const song = state.songs[side];
+    const name = APPS[side].name;
+    if (!song) return { word: '', title: '' };
+    if (song.src === 'library') {
+      const e = sides[side].from;
+      if (isSandboxId(song.id)) {
+        return { word: 'Sandbox', title: name + '’s sandbox, as it is there now. Change it in ' + name + ' and it changes here.' };
+      }
+      if (e && e.book) return { word: e.book, title: 'From the “' + e.book + '” book of the Teacher Library, in ' + name + '.' };
+      if (e && e.received) return { word: 'Shared', title: 'Shared with you, in your ' + name + ' library.' };
+      return { word: 'Library', title: 'From your ' + name + ' library. Change it there and it changes here.' };
+    }
+    return { word: 'Copy', title: 'A copy kept on the stand' + (state.pairingId ? ', in this pairing' : '')
+      + '. Changing it in ' + name + ' does not change it here.' };
   }
 
 
@@ -1020,8 +1073,7 @@
       const b = sides[side].bridge;
       if (b && state.songs[side]) safe(() => b.stop());
     });
-    $('readout-poem').textContent = '';
-    $('readout-ost').textContent = '';
+    ['readout-poem', 'readout-ost', 'where-poem', 'where-ost'].forEach(id => { $(id).textContent = ''; });
     setPlayGlyph(false);
     SIDES.forEach(side => { if (sides[side].stale) reopen(side); });
   }
@@ -1075,6 +1127,11 @@
     }
     poemEl.textContent = p;
     ostEl.textContent = o;
+    /* The same words in each pane's heading, beside the score they are
+       about; the toolbar's copy is for present mode, where the headings
+       are hidden. */
+    $('where-poem').textContent = p;
+    $('where-ost').textContent = o;
   }
 
 
@@ -1082,54 +1139,101 @@
      TEMPO
      ================================================================== */
 
-  const bpmInput = $('bpm-input');
+  const bpmBtn = $('bpm-btn');
+  const bpmValue = $('bpm-value');
 
   function setBpm(value, opts) {
     const v = clamp(Math.round(Number(value) || state.bpm), BPM_MIN, BPM_MAX);
     const changed = v !== state.bpm;
     state.bpm = v;
-    if (document.activeElement !== bpmInput) bpmInput.value = String(v);
-    $('bpm-slider').value = String(v);
-    $('tempo-pop-value').textContent = String(v);
+    bpmValue.textContent = String(v);
     if (changed) { retime(); saveSession(); }
-    if (!(opts && opts.quiet)) syncTempoPop();
   }
 
-  /* Committed as it is typed, not on blur: focus can fail to land in a
-     background tab, and a popover opening takes it away. */
-  bpmInput.addEventListener('input', () => {
-    const digits = bpmInput.value.replace(/\D/g, '');
-    if (digits !== bpmInput.value) bpmInput.value = digits;
-    const n = Number(digits);
-    if (n >= BPM_MIN && n <= BPM_MAX) setBpm(n);
-  });
-  bpmInput.addEventListener('blur', () => { bpmInput.value = String(state.bpm); });
-  bpmInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === 'Escape') { bpmInput.blur(); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); setBpm(state.bpm + (e.shiftKey ? 5 : 1)); bpmInput.value = String(state.bpm); }
-    else if (e.key === 'ArrowDown') { e.preventDefault(); setBpm(state.bpm - (e.shiftKey ? 5 : 1)); bpmInput.value = String(state.bpm); }
-  });
-  bpmInput.addEventListener('focus', () => bpmInput.select());
+  /* Tap to type, as in Rhythm Poetry. The number is taken as soon as it
+     is a real tempo — focus can fail to land in a background tab — and
+     the box closes on Enter, on blur, or on a tap anywhere else. */
+  bpmBtn.addEventListener('click', () => {
+    if (bpmBtn.querySelector('.bpm-input')) return;
+    $('bpm-gauge-wrap').classList.remove('show');
+    const before = state.bpm;
+    const unit = bpmBtn.querySelector('.bpm-unit');
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.inputMode = 'numeric';
+    input.min = String(BPM_MIN);
+    input.max = String(BPM_MAX);
+    input.value = String(state.bpm);
+    input.className = 'bpm-input';
+    input.setAttribute('aria-label', 'Tempo in beats per minute');
+    bpmBtn.replaceChildren(input);
+    input.focus();
+    input.select();
 
-  $('bpm-up').addEventListener('click', e => setBpm(state.bpm + (e.shiftKey ? 5 : 1)));
-  $('bpm-down').addEventListener('click', e => setBpm(state.bpm - (e.shiftKey ? 5 : 1)));
-  $('bpm-slider').addEventListener('input', e => setBpm(e.target.value));
-
-  function syncTempoPop() {
-    SIDES.forEach(side => {
-      const btn = $('tempo-from-' + side);
-      const info = state.songs[side] && sides[side].info;
-      btn.disabled = !info;
-      btn.textContent = (side === 'poem' ? 'The poem' : 'The ostinato') + (info ? ' (' + info.bpm + ')' : '');
-      btn.classList.toggle('active', !!info && info.bpm === state.bpm);
+    const typed = () => {
+      const n = parseInt(input.value, 10);
+      return n >= BPM_MIN && n <= BPM_MAX ? n : null;
+    };
+    let closed = false;
+    const close = keep => {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener('pointerdown', onOutside, true);
+      if (!keep) setBpm(before);
+      bpmBtn.replaceChildren(bpmValue, unit);
+      bpmValue.textContent = String(state.bpm);
+    };
+    const onOutside = ev => { if (ev.target !== input) close(true); };
+    input.addEventListener('input', () => { const n = typed(); if (n !== null) setBpm(n); });
+    input.addEventListener('blur', () => close(true));
+    input.addEventListener('click', ev => ev.stopPropagation());
+    input.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter') { ev.preventDefault(); close(true); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); close(false); }
+      else if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') {
+        ev.preventDefault();
+        setBpm(state.bpm + (ev.key === 'ArrowUp' ? 1 : -1) * (ev.shiftKey ? 5 : 1));
+        input.value = String(state.bpm);
+      }
     });
-  }
-  SIDES.forEach(side => {
-    $('tempo-from-' + side).addEventListener('click', () => {
-      const info = state.songs[side] && sides[side].info;
-      if (info) setBpm(info.bpm);
-    });
+    setTimeout(() => document.addEventListener('pointerdown', onOutside, true), 0);
   });
+
+  /* Hover to slide, as in Rhythm Poetry: a slider above the button, for a
+     real mouse only (on a board or a touch laptop a tap would open it on
+     top of its own typing). A short grace period lets the mouse cross the
+     gap from the button to the slider. */
+  (function tempoGauge() {
+    const wrap = $('bpm-gauge-wrap'), slider = $('bpm-gauge'), label = $('bpm-gauge-label');
+    let hideTimer = null, dragging = false;
+    const fine = () => window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    function show() {
+      if (!fine() || bpmBtn.querySelector('.bpm-input')) return;
+      clearTimeout(hideTimer);
+      slider.value = String(state.bpm);
+      label.textContent = state.bpm + ' BPM';
+      wrap.classList.add('show');
+      const r = bpmBtn.getBoundingClientRect();
+      const w = wrap.offsetWidth || 260;
+      wrap.style.bottom = (window.innerHeight - r.top + 10) + 'px';
+      wrap.style.left = clamp(r.left + r.width / 2 - w / 2, 10, window.innerWidth - w - 10) + 'px';
+    }
+    function scheduleHide() {
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => { if (!dragging) wrap.classList.remove('show'); }, 150);
+    }
+    bpmBtn.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') show(); });
+    bpmBtn.addEventListener('mouseleave', scheduleHide);
+    wrap.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+    wrap.addEventListener('mouseleave', scheduleHide);
+    slider.addEventListener('pointerdown', () => { dragging = true; });
+    window.addEventListener('pointerup', () => { if (dragging) { dragging = false; scheduleHide(); } });
+    slider.addEventListener('input', () => {
+      const v = parseInt(slider.value, 10);
+      label.textContent = v + ' BPM';
+      setBpm(v);
+    });
+  })();
 
 
   /* ==================================================================
@@ -1137,9 +1241,9 @@
      ================================================================== */
 
   function syncSequence() {
-    $('countin-btn').setAttribute('aria-pressed', String(state.countIn));
+    $('countin-btn').classList.toggle('on', state.countIn);
+    $('countin-btn').setAttribute('aria-checked', String(state.countIn));
     $('loop-btn').setAttribute('aria-pressed', String(state.loop));
-    $('leadin-value').textContent = state.leadIn ? state.leadIn + '×' : 'Off';
     document.querySelectorAll('#leadin-seg [data-leadin]').forEach(b => {
       b.classList.toggle('active', Number(b.dataset.leadin) === state.leadIn);
     });
@@ -1409,7 +1513,13 @@
      this is the solver's answer, so it cannot be read back off the
      setting — and everything that measures the room needs the answer,
      not the setting. */
-  let liveArrange = 'stacked';
+  /* Where Automatic starts: side by side on a computer or any screen
+     wider than it is tall, one above the other on a screen held upright.
+     The solver moves off it only when the other arrangement draws the two
+     scores clearly larger (see `better`). */
+  const shapeDefault = () => (window.innerWidth >= window.innerHeight ? 'side' : 'stacked');
+  let liveArrange = shapeDefault();
+  let liveLandscape = window.innerWidth >= window.innerHeight;
 
   function effectiveArrange() { return liveArrange; }
 
@@ -1438,8 +1548,10 @@
     $('arrange-side').classList.toggle('active', state.layout.arrange === 'side');
     $('first-poem').classList.toggle('active', state.layout.first === 'poem');
     $('first-ost').classList.toggle('active', state.layout.first === 'ost');
-    document.querySelectorAll('#layout-pop [data-show]').forEach(b => {
-      b.classList.toggle('active', b.dataset.show === state.layout.show);
+    document.querySelectorAll('[data-show-tab]').forEach(b => {
+      const on = b.dataset.showTab === state.layout.show;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', String(on));
     });
     $('split-auto').classList.toggle('active', currentSplit() === 'auto');
     $('split-even').classList.toggle('active', currentSplit() === 0.5);
@@ -1590,8 +1702,14 @@
   }
 
   /* Near enough is a tie, and a tie must not make the screen jump about:
-     it goes to what is already on screen, and then to the longer line,
-     which is the choice a reader would make. */
+     it goes to what is already on screen — which starts as the screen's
+     own shape (shapeDefault) — and then to the longer line, which is the
+     choice a reader would make.
+     Trap: a score's natural size shifts a little with the box it was last
+     fitted into, so each arrangement can look slightly better when measured
+     from the other one. A fixed preference ("ties go to side by side") made
+     the second settling pass flip a portrait tablet from stacked back to
+     side. Keeping what is on screen is what holds it still. */
   const TIE = 0.02;
 
   function better(cand, best) {
@@ -1777,8 +1895,8 @@
   $('first-ost').addEventListener('click', () => setLayout({ first: 'ost' }));
   $('split-auto').addEventListener('click', () => setLayout({ split: 'auto' }));
   $('split-even').addEventListener('click', () => setLayout({ split: 0.5 }));
-  document.querySelectorAll('#layout-pop [data-show]').forEach(b => {
-    b.addEventListener('click', () => setLayout({ show: b.dataset.show }));
+  document.querySelectorAll('[data-show-tab]').forEach(b => {
+    b.addEventListener('click', () => setLayout({ show: b.dataset.showTab }));
   });
 
   /* ---- dragging the line between them ---- */
@@ -1842,7 +1960,17 @@
   window.addEventListener('resize', () => {
     closePopovers();
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => { applyArrangement(); scheduleSplit(); }, 120);
+    resizeTimer = setTimeout(() => {
+      /* Turned from wide to tall or back (a tablet rotated, a window
+         dragged narrow): Automatic starts again from the new shape. */
+      const landscape = window.innerWidth >= window.innerHeight;
+      if (landscape !== liveLandscape) {
+        liveLandscape = landscape;
+        if (state.layout.arrange === 'auto') liveArrange = shapeDefault();
+      }
+      applyArrangement();
+      scheduleSplit();
+    }, 120);
   });
 
 
@@ -2042,10 +2170,8 @@
     });
   }
 
-  wirePopover('layout-btn', 'layout-pop');
-  wirePopover('tempo-btn', 'tempo-pop', syncTempoPop);
-  wirePopover('leadin-btn', 'leadin-pop');
-  wirePopover('mixer-btn', 'mixer-pop', renderMixer);
+  wirePopover('view-btn', 'view-pop', syncEditSwitch);
+  wirePopover('mixer-btn', 'mixer-pop', () => { renderMixer(); syncSequence(); });
   document.querySelectorAll('.pane-view').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
@@ -2114,31 +2240,106 @@
     b.addEventListener('click', () => { picker.filter = b.dataset.filter; renderPickerList(); });
   });
 
+  /* ---- the library, drawn the apps' way ----
+     A group is a heading with its icon and a rule, then rows; a row is a
+     badge, the name (with a Shared tag where it applies) and a line
+     under it, and its buttons. The pickers and the pairings list both
+     use these, so the stand's lists read like the apps' Songs sheets. */
+  const ICONS = {
+    sandbox: '<path d="M4 20h16"/><path d="M6 20l1.5-6h9L18 20"/><path d="M12 14V4"/><path d="M12 4l5 3-5 3"/>',
+    book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+    shared: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+    poem: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    ost: '<circle cx="6" cy="17" r="3"/><circle cx="18" cy="15" r="3"/><path d="M9 17V5l12-2v12"/><path d="M9 9l12-2"/>',
+    pair: '<rect x="3" y="4.5" width="8" height="15" rx="2"/><rect x="13" y="4.5" width="8" height="15" rx="2"/>',
+    star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"/>'
+  };
+
+  function libGroup(list, icon, title, opts) {
+    const o = opts || {};
+    const group = document.createElement('section');
+    group.className = 'library-group';
+    if (o.color) group.style.setProperty('--group', o.color);
+    const head = document.createElement('div');
+    head.className = 'library-group-head';
+    head.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICONS[icon] + '</svg>'
+      + '<span class="library-group-title"></span><span class="library-group-rule"></span>';
+    head.querySelector('.library-group-title').textContent = title;
+    if (o.headButton) head.appendChild(o.headButton);
+    group.appendChild(head);
+    list.appendChild(group);
+    return group;
+  }
+
+  function libEmpty(group, text) {
+    const empty = document.createElement('div');
+    empty.className = 'library-empty';
+    empty.textContent = text;
+    group.appendChild(empty);
+  }
+
+  /* One row. `badge` is a text (a meter) or an element; `whole` makes the
+     row itself the button, as in the pickers, where opening is the only
+     thing to do. */
+  function libRow(o) {
+    const row = document.createElement(o.whole ? 'button' : 'div');
+    row.className = 'lib-row' + (o.current ? ' is-current' : '') + (o.extraClass ? ' ' + o.extraClass : '');
+    const badge = document.createElement('span');
+    badge.className = 'meter-badge';
+    if (typeof o.badge === 'string') badge.textContent = o.badge;
+    else if (o.badge) { badge.classList.add('pair-badge'); badge.appendChild(o.badge); }
+    const main = document.createElement('span');
+    main.className = 'lib-main';
+    const title = document.createElement('span');
+    title.className = 'lib-title';
+    title.textContent = o.title;
+    if (o.shared) {
+      const tag = document.createElement('span');
+      tag.className = 'shared-tag';
+      tag.textContent = 'Shared';
+      tag.title = 'Shared with you: it stays as it was sent.';
+      title.appendChild(tag);
+    }
+    main.appendChild(title);
+    if (o.sub) {
+      const sub = document.createElement('span');
+      sub.className = 'lib-sub';
+      sub.textContent = o.sub;
+      main.appendChild(sub);
+    }
+    const actions = document.createElement('span');
+    actions.className = 'lib-actions';
+    (o.actions || []).forEach(a => actions.appendChild(a));
+    row.append(badge, main, actions);
+    if (o.whole && o.onOpen) row.addEventListener('click', o.onOpen);
+    return row;
+  }
+
+  function libButton(label, cls, onClick, title) {
+    const b = document.createElement(onClick ? 'button' : 'span');
+    b.className = 'lib-btn' + (cls ? ' ' + cls : '');
+    b.textContent = label;
+    if (title) b.title = title;
+    if (onClick) b.addEventListener('click', e => { e.stopPropagation(); onClick(e, b); });
+    return b;
+  }
+
   function songRow(song, current, onPick) {
-    const row = document.createElement('button');
-    row.className = 'song-row' + (current ? ' current' : '');
-    const main = document.createElement('div');
-    main.className = 'song-main';
-    const title = document.createElement('div');
-    title.className = 'song-title';
-    title.textContent = song.title;
-    const sub = document.createElement('div');
-    sub.className = 'song-sub';
-    const bits = [song.meter[0] + '/' + song.meter[1]];
+    const bits = [];
     if (song.measures) bits.push(song.measures + (song.measures === 1 ? ' bar' : ' bars'));
     bits.push(song.bpm + ' BPM');
     if (song.preview) bits.push(song.preview);
-    sub.textContent = bits.join(' · ');
-    main.append(title, sub);
-    row.appendChild(main);
-    if (current) {
-      const badge = document.createElement('span');
-      badge.className = 'song-badge';
-      badge.textContent = 'Open';
-      row.appendChild(badge);
-    }
-    row.addEventListener('click', onPick);
-    return row;
+    return libRow({
+      whole: true,
+      current: current,
+      badge: song.meter[0] + '/' + song.meter[1],
+      title: song.title,
+      shared: !!song.received && !song.book,
+      sub: bits.join(' · '),
+      extraClass: song.sandbox ? 'sandbox-row' : '',
+      actions: [current ? libButton('Open now', 'is-active') : libButton('Open', 'open-btn')],
+      onOpen: onPick
+    });
   }
 
   function renderPickerList() {
@@ -2152,7 +2353,7 @@
 
     const bridge = sides[side].bridge;
     if (!bridge) {
-      list.innerHTML = '<div class="list-empty">' + APPS[side].name + ' is still opening…</div>';
+      list.innerHTML = '<div class="library-empty">' + APPS[side].name + ' is still opening…</div>';
       foot.textContent = '';
       return;
     }
@@ -2161,30 +2362,34 @@
     if (side === 'poem') songs = songs.filter(s => s.kind === picker.filter);
 
     const current = state.songs[side];
+    const color = side === 'poem' ? 'var(--poem)' : 'var(--ost)';
+    const add = (group, items) => items.forEach(song => {
+      const isCurrent = !!current && current.src === 'library' && current.id === song.id;
+      group.appendChild(songRow(song, isCurrent, () => {
+        if (loadInto(side, { src: 'library', id: song.id })) closeSheet(pickerSheet);
+      }));
+    });
+
+    /* The app's own order: scratch work, the teacher's books, what was
+       shared, your own, and the examples it came with. */
     const scratch = songs.filter(s => s.sandbox);
-    const mine = songs.filter(s => !s.sandbox && s.isCustom);
+    const books = {};
+    songs.filter(s => !s.sandbox && s.book).forEach(s => { (books[s.book] = books[s.book] || []).push(s); });
+    const shared = songs.filter(s => !s.sandbox && !s.book && s.received);
+    const mine = songs.filter(s => !s.sandbox && !s.book && !s.received && s.isCustom);
     const theirs = songs.filter(s => !s.sandbox && !s.isCustom);
-    const group = (label, items) => {
-      if (!items.length) return;
-      const h = document.createElement('div');
-      h.className = 'song-group-label';
-      h.textContent = label;
-      list.appendChild(h);
-      items.forEach(song => {
-        const isCurrent = !!current && current.src === 'library' && current.id === song.id;
-        list.appendChild(songRow(song, isCurrent, () => {
-          if (loadInto(side, { src: 'library', id: song.id })) closeSheet(pickerSheet);
-        }));
-      });
-    };
-    group('Sandbox — scratch work', scratch);
-    group(side === 'poem' ? 'Yours' : 'Your ostinatos', mine);
-    group(side === 'poem' ? 'Examples' : 'Starters', theirs);
-    if (!songs.length) {
-      list.innerHTML = '<div class="list-empty">Nothing here yet.</div>';
-    }
+
+    if (scratch.length) add(libGroup(list, 'sandbox', 'Sandbox — scratch work'), scratch);
+    Object.keys(books).sort((a, b) => a.localeCompare(b)).forEach(book => add(libGroup(list, 'book', book), books[book]));
+    if (shared.length) add(libGroup(list, 'shared', 'Shared with you'), shared);
+    const yours = libGroup(list, side, side === 'ost' ? 'Your ostinatos'
+      : picker.filter === 'rhythm' ? 'Your rhythms' : 'Your poems', { color: color });
+    if (mine.length) add(yours, mine);
+    else libEmpty(yours, 'None of your own yet — make one in ' + APPS[side].name + ' and it appears here.');
+    if (theirs.length) add(libGroup(list, 'star', side === 'poem' ? 'Examples' : 'Starters'), theirs);
+
     foot.textContent = 'This is your ' + APPS[side].name + ' library in this browser. Songs are opened, never changed. '
-      + 'The sandbox is the scratch page from the app itself, and is shown as it is there right now.';
+      + 'A song opened from here stays linked: change it in ' + APPS[side].name + ' and it changes on the stand.';
   }
 
   /* ---- a pasted link ---- */
@@ -2243,7 +2448,7 @@
   }
 
   function openParsed(parsed, opts) {
-    if (parsed.kind === 'pair') { openPairingData(parsed.data); return true; }
+    if (parsed.kind === 'pair') { closeSheet(pickerSheet); return openLinkPairing(parsed.data); }
     const ok = loadInto(parsed.kind, { data: parsed.data });
     if (ok && opts && opts.from && opts.from !== parsed.kind) {
       toast('That link is ' + (parsed.kind === 'poem' ? 'a poem' : 'an ostinato') + ' — it is open on that side');
@@ -2284,90 +2489,167 @@
 
 
   /* ==================================================================
-     PAIRINGS
-     A poem and an ostinato kept together, with the tempo, intro and
-     mixer that suit them. Stored by the Music Stand, apart from both apps.
+     PAIRINGS — THE STAND'S OWN LIBRARY
+     ------------------------------------------------------------------
+     A pairing is a poem and an ostinato kept together, with the tempo,
+     intro and sound that suit them. It is kept the way every Eagle View
+     Music app keeps what it saves (EVM Library/README.md): an item with
+     an id made once, `createdAt` and `updatedAt` (which moves only when
+     something actually changed), and the header that says it was shared
+     with you (`received`), which pairing it was saved from
+     (`derivedFrom`) and — once the Teacher Library shelf reaches the
+     stand — which book it came in (`book`).
+
+     And it behaves the way a song does in Rhythm Poetry and Ostinato
+     Builder:
+       - the SANDBOX is scratch work, kept under the reserved id
+         'sandbox' in the same map, always saving itself, and never
+         listed, shared by id, or published as a pairing;
+       - a saved pairing opens with AUTO-SAVE off, and turning it on is
+         what keeps the changes (New and Save as… start with it on);
+       - a pairing that came in a link is SHARED: read-only, with Save my
+         copy in place of Auto-save, and opening the same link again
+         finds it instead of adding another (EVMLibrary.file).
+
+     Stored in PAIRINGS_KEY as an id map, which is what the Librarian
+     reads. Nothing here writes to either app's library.
      ================================================================== */
 
+  const EVM = window.EVMLibrary;
+  const APP_SLUG = 'music-stand';
+  const SANDBOX_ID = 'sandbox';
+  const SANDBOX_TITLE = 'Pairing sandbox';
+  const isReserved = id => id === SANDBOX_ID;
+  const clone = v => JSON.parse(JSON.stringify(v));
+  /* Read before any session is adopted: what New and a cleared sandbox
+     start from. */
+  const DEFAULT_SETTINGS = clone(settingsRecord());
+
   const pairSheet = $('pair-sheet');
+  const shareSheet = $('share-sheet');
+  const nameSheet = $('name-sheet');
 
-  function readPairings() {
-    const all = readJSON(PAIRINGS_KEY);
-    return all && typeof all === 'object' ? all : {};
+  /* An old record that says nothing of its date is dated by its id
+     (pair_<ms>) — never "now", or it would look newer than it is. */
+  function idTime(id) {
+    const m = /_(\d{12,})/.exec(String(id || ''));
+    return m ? Number(m[1]) : 0;
   }
 
-  function openPairSheet() {
-    $('pair-name').value = state.name;
-    $('pair-name').classList.remove('input-error');
-    $('share-row').hidden = true;
-    renderPairList();
-    openSheet(pairSheet);
+  function cleanSong(s) {
+    if (!s || typeof s !== 'object' || !(s.data || s.id)) return null;
+    const linked = s.src === 'library' && !!s.id;
+    const out = { src: linked ? 'library' : 'data', id: linked ? String(s.id) : null,
+                  title: typeof s.title === 'string' ? s.title : '', data: s.data || null };
+    if (s.edited) out.edited = true;
+    if (s.origin && s.origin.id) out.origin = { src: s.origin.src || 'library', id: String(s.origin.id) };
+    return out;
   }
 
-  function renderPairList() {
-    const list = $('pair-list');
-    list.innerHTML = '';
-    const all = readPairings();
-    const ids = Object.keys(all).sort((a, b) => (all[b].savedAt || 0) - (all[a].savedAt || 0));
-    if (!ids.length) {
-      list.innerHTML = '<div class="list-empty">Nothing saved yet. Name the pairing above and save it to find it here next time.</div>';
-      return;
-    }
-    ids.forEach(id => {
-      const rec = all[id];
-      const row = document.createElement('div');
-      row.className = 'song-row' + (id === state.pairingId ? ' current' : '');
-      row.setAttribute('role', 'button');
-      row.tabIndex = 0;
-      const main = document.createElement('div');
-      main.className = 'song-main';
-      const title = document.createElement('div');
-      title.className = 'song-title';
-      title.textContent = rec.title || 'Untitled pairing';
-      const sub = document.createElement('div');
-      sub.className = 'song-sub';
-      const parts = SIDES.map(side => rec.songs && rec.songs[side] && rec.songs[side].title).filter(Boolean);
-      sub.textContent = (parts.join(' + ') || 'Empty') + ' · ' + (rec.settings && rec.settings.bpm || '') + ' BPM';
-      main.append(title, sub);
+  /* Every record read goes through here, so an old one (title, savedAt,
+     songs, settings — from before pairings were items) comes out in the
+     same shape as a new one. */
+  function normalizePairing(rec, id) {
+    if (!rec || typeof rec !== 'object') return null;
+    const sandbox = id === SANDBOX_ID;
+    const created = Number(rec.createdAt) || Number(rec.savedAt) || idTime(id) || Date.now();
+    const title = typeof rec.title === 'string' && rec.title.trim() ? rec.title.trim().slice(0, 60) : '';
+    const out = {
+      id: id,
+      title: sandbox ? SANDBOX_TITLE : (title || 'Untitled pairing'),
+      isCustom: true,
+      createdAt: created,
+      updatedAt: Number(rec.updatedAt) || Number(rec.savedAt) || created,
+      songs: { poem: cleanSong(rec.songs && rec.songs.poem), ost: cleanSong(rec.songs && rec.songs.ost) },
+      settings: rec.settings && typeof rec.settings === 'object' ? clone(rec.settings) : {}
+    };
+    if (!sandbox) EVM.carry(rec, out);
+    if (typeof rec.filedAs === 'string') out.filedAs = rec.filedAs;
+    return out;
+  }
 
-      const actions = document.createElement('div');
-      actions.className = 'row-actions';
-      const del = document.createElement('button');
-      del.className = 'icon-btn danger';
-      del.title = 'Delete this pairing';
-      del.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg>';
-      /* Two taps: the first turns the button into the question. */
-      del.addEventListener('click', e => {
-        e.stopPropagation();
-        if (!del.classList.contains('confirm')) {
-          del.classList.add('confirm');
-          del.textContent = 'Delete?';
-          setTimeout(() => { if (del.isConnected) renderPairList(); }, 3000);
-          return;
-        }
-        const next = readPairings();
-        delete next[id];
-        writeJSON(PAIRINGS_KEY, next);
-        if (state.pairingId === id) state.pairingId = null;
-        renderPairList();
-        saveSession();
+  function readLibrary() {
+    const raw = readJSON(PAIRINGS_KEY);
+    const lib = {};
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      Object.keys(raw).forEach(id => {
+        const rec = normalizePairing(raw[id], id);
+        if (rec) lib[id] = rec;
       });
-      actions.appendChild(del);
+    }
+    return lib;
+  }
+  function writeLibrary(lib) { return writeJSON(PAIRINGS_KEY, lib); }
 
-      row.append(main, actions);
-      const open = () => { openPairingRecord(id, rec); closeSheet(pairSheet); };
-      row.addEventListener('click', open);
-      row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
-      list.appendChild(row);
-    });
+  /* ---- what counts as the same pairing ----
+     The content key (EVMLibrary's `key`): both scores and the settings,
+     with ids, titles-of-the-pairing and dates left out. A score is
+     compared by what it holds, not by where it came from, so a pairing
+     linked to a library song changes when that song does, and a link to
+     it and a copy of it with the same notes are the same pairing. Blank —
+     nothing on either side — is null, and is never filed. */
+  const DATA_SKIP = ['id', 'createdAt', 'updatedAt', 'isCustom', 'received', 'receivedAt',
+                     'derivedFrom', 'book', 'sandbox', 'savedAt'];
+
+  function songContent(s) {
+    if (!s || !(s.data || s.id)) return null;
+    if (!s.data) return { ref: s.id };
+    const d = {};
+    Object.keys(s.data).forEach(k => { if (DATA_SKIP.indexOf(k) === -1) d[k] = s.data[k]; });
+    return d;
   }
 
-  /* A pairing is a saved moment. A sandbox is scratch work that gets
-     cleared and rewritten, so a pairing keeps the copy it had rather than
-     the sandbox's id — which would open whatever the sandbox holds by the
-     time the pairing is next used. The session itself stays live. */
+  function settingsContent(st) {
+    const s = st || {};
+    return {
+      bpm: s.bpm, countIn: !!s.countIn, leadIn: s.leadIn, loop: s.loop !== false,
+      wordsSound: s.wordsSound || 'tone', wordsStrength: s.wordsStrength || 1,
+      mute: s.mute || {}, voiceMute: s.voiceMute || {}, vol: s.vol || {}
+    };
+  }
+
+  function pairingKey(rec) {
+    if (!rec) return null;
+    const songs = { poem: songContent(rec.songs && rec.songs.poem), ost: songContent(rec.songs && rec.songs.ost) };
+    if (!songs.poem && !songs.ost) return null;
+    return EVM.stableStringify({ songs: songs, settings: settingsContent(rec.settings) });
+  }
+
+  /* What a link or a file is matched by when it arrives. A pairing that
+     came that way remembers the fingerprint of what it arrived as
+     (`filedAs`), because opening it lets the apps tidy the scores inside
+     (see settleStored) — and a link from before ids travelled can only be
+     recognised by its content, which must still be the content it came
+     with, or every visit to a page with that link on it would add another
+     copy. */
+  function fingerprint(text) {
+    let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (let i = 0; i < text.length; i++) {
+      const c = text.charCodeAt(i);
+      h1 = Math.imul(h1 ^ c, 2654435761);
+      h2 = Math.imul(h2 ^ c, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return 'f' + (h2 >>> 0).toString(36) + (h1 >>> 0).toString(36);
+  }
+
+  function fileKey(rec) {
+    const k = pairingKey(rec);
+    if (k === null) return null;
+    return rec.filedAs || fingerprint(k);
+  }
+
+  const fileOpts = received => ({
+    key: fileKey, reserved: isReserved, newId: () => EVM.newId('pair'), received: !!received
+  });
+
+  /* A pairing is a saved moment. An app's sandbox is scratch work that
+     gets cleared and rewritten, so a pairing keeps the copy it had rather
+     than the sandbox's id — which would open whatever the sandbox holds by
+     the time the pairing is next used. The stand's own sandbox stays live. */
   function pairingSongs() {
-    const songs = JSON.parse(JSON.stringify(state.songs));
+    const songs = clone(state.songs);
     SIDES.forEach(side => {
       const song = songs[side];
       if (song && isSandboxId(song.id)) { song.src = 'data'; song.id = null; }
@@ -2375,13 +2657,75 @@
     return songs;
   }
 
-  function applyPairing(songs, settings) {
+  /* What is on the stand, as a pairing would keep it. */
+  function workingRecord() {
+    return { title: state.name, songs: pairingSongs(), settings: settingsRecord() };
+  }
+
+  function standTitles() {
+    return SIDES.map(side => state.songs[side] && state.songs[side].title).filter(Boolean);
+  }
+
+  /* ---- saving ----
+     Called with every save of the session. The sandbox always keeps
+     itself; a pairing only while auto-save is on; a shared pairing never. */
+  function saveWorking() {
+    if (!state.pairingId) {
+      const lib = readLibrary();
+      const prev = lib[SANDBOX_ID];
+      const next = { id: SANDBOX_ID, title: SANDBOX_TITLE, isCustom: true,
+                     createdAt: prev ? prev.createdAt : Date.now(),
+                     songs: clone(state.songs), settings: settingsRecord() };
+      next.updatedAt = prev && pairingKey(prev) === pairingKey(next) ? prev.updatedAt : Date.now();
+      lib[SANDBOX_ID] = next;
+      return writeLibrary(lib);
+    }
+    if (state.shared || !state.autoSave) return false;
+    const lib = readLibrary();
+    const prev = lib[state.pairingId];
+    if (!prev) return false;
+    const next = Object.assign({}, prev, workingRecord(), { title: state.name || prev.title });
+    delete next.updatedAt;
+    EVM.stamp(next, prev, pairingKey);
+    lib[state.pairingId] = next;
+    return writeLibrary(lib);
+  }
+
+  /* See loadInto: a copy the app has tidied is put back tidied, without
+     calling it a change. Only a copy (a linked song follows its app and
+     is saved the ordinary way), and only while that pairing is open. */
+  function settleStored(id, side) {
+    if (state.pairingId !== id) return;
+    const song = state.songs[side];
+    if (!song || song.src !== 'data' || song.edited || !song.data) return;
+    const lib = readLibrary();
+    const rec = lib[id];
+    const kept = rec && rec.songs[side];
+    if (!kept || kept.src !== 'data') return;
+    if (EVM.stableStringify(songContent(kept)) === EVM.stableStringify(songContent(song))) return;
+    kept.data = clone(song.data);
+    writeLibrary(lib);
+  }
+
+  function hasUnsavedChanges() {
+    if (!state.pairingId) return false;
+    const prev = readLibrary()[state.pairingId];
+    if (!prev) return false;
+    return pairingKey(prev) !== pairingKey(workingRecord())
+      || (!state.shared && (state.name || prev.title) !== prev.title);
+  }
+
+  /* ---- opening ---- */
+
+  /* Everything a pairing does not say goes back to the stand's defaults,
+     so one pairing's count-in cannot leak into the next. */
+  function applyPairing(songs, settings, id) {
     if (isPlaying()) stopPlayback();
-    adoptSettings(settings);
+    adoptSettings(Object.assign(clone(DEFAULT_SETTINGS), settings || {}));
     SIDES.forEach(side => {
       const song = songs && songs[side];
       if (song && (song.data || song.id)) {
-        loadInto(side, song, { keepTempo: true, keepMutes: true });
+        loadInto(side, song, { keepTempo: true, keepMutes: true, settle: id || null });
       } else {
         clearSide(side);
       }
@@ -2389,92 +2733,678 @@
     syncAll();
   }
 
-  function openPairingRecord(id, rec) {
+  /* `noFlush` when the session on screen must not be saved first: at
+     start-up, before it has been put back, and after a link has just
+     written the sandbox. */
+  function openPairingRecord(id, opts) {
+    const o = opts || {};
+    if (id === SANDBOX_ID) return openSandbox(o);
+    const rec = readLibrary()[id];
+    if (!rec) return false;
+    if (!o.noFlush) flushSession();
     state.pairingId = id;
-    state.name = rec.title || '';
-    applyPairing(rec.songs, rec.settings);
+    state.name = rec.title;
+    state.shared = !!rec.received;
+    state.book = rec.received && rec.book ? String(rec.book) : '';
+    state.autoSave = !!o.autoSave && !state.shared;
+    applyPairing(rec.songs, rec.settings, id);
     saveSession();
-    toast('Opened “' + (rec.title || 'pairing') + '”');
+    if (!o.quiet) toast('Opened “' + rec.title + '”');
+    return true;
   }
 
-  /* From a link: the songs travel whole, so they open as copies. */
-  function openPairingData(data) {
+  function openSandbox(opts) {
+    const o = opts || {};
+    if (!o.noFlush) flushSession();
+    const rec = readLibrary()[SANDBOX_ID];
     state.pairingId = null;
-    state.name = typeof data.title === 'string' ? data.title : '';
-    const songs = {};
-    if (data.poem) songs.poem = { data: data.poem };
-    if (data.ost) songs.ost = { data: data.ost };
-    applyPairing(songs, data.settings);
-    saveSession();
-  }
-
-  $('pair-save').addEventListener('click', () => {
-    const name = $('pair-name').value.trim();
-    if (!name) {
-      $('pair-name').classList.add('input-error');
-      $('pair-name').focus();
-      toast('Give the pairing a name to save it');
-      return;
-    }
-    const all = readPairings();
-    /* Saving under a new name makes a new pairing; the same name updates
-       the one that is open. */
-    let id = state.pairingId;
-    if (!id || !all[id] || all[id].title !== name) {
-      id = Object.keys(all).find(k => all[k].title === name) || ('pair_' + Date.now());
-    }
-    all[id] = {
-      title: name,
-      savedAt: Date.now(),
-      songs: pairingSongs(),
-      settings: settingsRecord()
-    };
-    if (writeJSON(PAIRINGS_KEY, all)) {
-      state.pairingId = id;
-      state.name = name;
-      refreshHeads();
-      renderPairList();
-      saveSession();
-      toast('Saved “' + name + '”');
-    }
-  });
-
-  $('pair-name').addEventListener('input', () => $('pair-name').classList.remove('input-error'));
-  $('pair-name').addEventListener('keydown', e => { if (e.key === 'Enter') $('pair-save').click(); });
-
-  $('pair-new').addEventListener('click', () => {
-    if (isPlaying()) stopPlayback();
     state.name = '';
-    state.pairingId = null;
-    SIDES.forEach(clearSide);
-    $('pair-name').value = '';
+    state.shared = false;
+    state.book = '';
+    state.autoSave = false;
+    applyPairing(rec ? rec.songs : null, rec ? rec.settings : null, null);
     saveSession();
-    closeSheet(pairSheet);
-  });
+    return true;
+  }
 
-  $('pair-share').addEventListener('click', () => {
-    if (!state.songs.poem && !state.songs.ost) {
-      toast('Choose a poem or an ostinato first');
+  /* ---- the top bar: where the work is going ---- */
+
+  const ICON_SAVING = '<path d="M20 6 9 17l-5-5"/>';
+  const ICON_NOT_SAVING = '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>';
+  const ICON_COPY = '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>';
+
+  function chipKicker() {
+    if (!state.pairingId) return 'Sandbox';
+    if (state.shared) return state.book || 'Shared';
+    return 'Pairing';
+  }
+
+  function refreshLibraryChrome() {
+    const sandbox = !state.pairingId;
+    const titles = standTitles();
+    const label = sandbox ? (titles.length ? titles.join(' + ') : 'Empty stand') : (state.name || 'Untitled pairing');
+
+    const chip = $('pair-chip');
+    chip.classList.toggle('is-sandbox', sandbox);
+    $('pair-chip-kicker').textContent = chipKicker();
+    $('pair-chip-label').textContent = label;
+    chip.title = sandbox
+      ? 'Sandbox — scratch work, kept between visits but not in your pairings'
+      : (state.shared ? 'Shared with you: ' : 'Pairing: ') + label;
+
+    $('sandbox-clear-btn').hidden = !sandbox;
+
+    const t = $('autosave-toggle');
+    t.hidden = sandbox;
+    if (!sandbox) {
+      const on = state.autoSave && !state.shared;
+      t.classList.toggle('is-off', !on);
+      t.classList.toggle('is-shared', state.shared);
+      t.setAttribute('aria-pressed', String(on));
+      t.title = state.shared
+        ? 'A shared pairing stays exactly as it was sent, so you can always go back to it. Press to save your own copy and keep your changes.'
+        : on
+        ? 'Auto-save is on: every change is saved to this pairing. Press to stop saving.'
+        : 'Auto-save is off: your changes are not being saved. Press to save them and start saving again.';
+      $('autosave-label').textContent = state.shared ? 'Save my copy' : (on ? 'Auto-save' : 'Not saving');
+      t.querySelector('.autosave-icon').innerHTML = state.shared ? ICON_COPY : (on ? ICON_SAVING : ICON_NOT_SAVING);
+    }
+
+    document.title = (sandbox ? (titles.join(' + ') || 'Music Stand') : label)
+      + (titles.length || !sandbox ? ' — Music Stand' : '');
+  }
+
+  /* Turning it back on is the moment to ask about the work done while it
+     was off: save it, or leave it on screen only and stay off. The same
+     question, in the same words, as both apps ask. */
+  function setAutoSave(on) {
+    if (!state.pairingId) return;
+    if (state.shared) { openNameSheet('copy'); return; }
+    if (on && hasUnsavedChanges()) {
+      const title = state.name || 'this pairing';
+      const ok = confirm('Save the changes you have made to “' + title + '”?\n\n'
+        + 'OK saves them and turns auto-save on.\n'
+        + 'Cancel leaves auto-save off, and “' + title + '” stays as it was saved.');
+      if (!ok) { refreshLibraryChrome(); return; }
+      state.autoSave = true;
+      flushSession();
+      toast('Saved — auto-save on');
+    } else {
+      state.autoSave = !!on;
+      flushSession();
+    }
+    if (pairSheet.classList.contains('open')) renderPairList();
+  }
+
+  $('autosave-toggle').addEventListener('click', () => setAutoSave(!state.autoSave));
+  $('sandbox-clear-btn').addEventListener('click', clearSandbox);
+
+  function clearSandbox() {
+    if (!confirm('Clear the sandbox and start with an empty stand? This can’t be undone.')) return;
+    const lib = readLibrary();
+    delete lib[SANDBOX_ID];
+    writeLibrary(lib);
+    if (!state.pairingId) {
+      if (isPlaying()) stopPlayback();
+      adoptSettings(clone(DEFAULT_SETTINGS));
+      SIDES.forEach(clearSide);
+      syncAll();
+      saveSession();
+    }
+    if (pairSheet.classList.contains('open')) renderPairList();
+    toast('Sandbox cleared');
+  }
+
+  /* ---- the Pairings sheet ---- */
+
+  function openPairSheet() {
+    renderPairList();
+    openSheet(pairSheet);
+  }
+
+  function pairBadge(rec) {
+    const frag = document.createDocumentFragment();
+    SIDES.forEach(side => {
+      const i = document.createElement('i');
+      i.className = side + (rec.songs && rec.songs[side] ? ' on' : '');
+      frag.appendChild(i);
+    });
+    return frag;
+  }
+
+  function pairSub(rec) {
+    const parts = SIDES.map(side => rec.songs && rec.songs[side] && rec.songs[side].title).filter(Boolean);
+    const bpm = rec.settings && rec.settings.bpm;
+    return (parts.join(' + ') || 'Nothing on the stand yet') + (bpm ? ' · ' + bpm + ' BPM' : '');
+  }
+
+  function renderPairList() {
+    const lib = readLibrary();
+    const sandbox = !state.pairingId;
+
+    /* what is open */
+    $('now-open-title').textContent = sandbox ? 'Sandbox' : (state.name || 'Untitled pairing');
+    const badge = $('now-open-badge');
+    badge.textContent = sandbox ? 'Sandbox' : state.shared ? (state.book ? 'From a book' : 'Shared') : 'Pairing';
+    badge.className = 'kind-badge' + (sandbox ? ' is-sandbox' : state.shared ? ' is-shared' : '');
+    $('now-open-note').textContent = sandbox
+      ? 'Scratch work. It stays here between visits but is not in your pairings — use Save as… to keep it.'
+      : state.shared
+      ? 'Shared with you. It stays exactly as it was sent, so you can always come back to it — use Save my copy to keep your own with your changes.'
+      : (state.autoSave ? '' : 'Auto-save is off: changes on the stand are not kept until you turn it on.');
+    $('pair-saveas').textContent = state.shared ? 'Save my copy' : 'Save as…';
+
+    const list = $('pair-list');
+    list.innerHTML = '';
+
+    /* the sandbox, first and on its own, as in both apps */
+    const sb = lib[SANDBOX_ID] || { songs: {}, settings: {} };
+    const sbGroup = libGroup(list, 'sandbox', 'Sandbox');
+    sbGroup.appendChild(libRow({
+      current: sandbox,
+      extraClass: 'sandbox-row',
+      badge: pairBadge(sb),
+      title: 'Pairing sandbox',
+      sub: 'Scratch work — not in your pairings · ' + pairSub(sb),
+      actions: [
+        sandbox ? libButton('Open now', 'is-active')
+                : libButton('Open', 'open-btn', () => { openSandbox(); closeSheet(pairSheet); }),
+        libButton('Clear', '', clearSandbox, 'Start the sandbox over with an empty stand')
+      ]
+    }));
+
+    const ids = Object.keys(lib).filter(id => !isReserved(id))
+      .sort((a, b) => String(lib[a].title).localeCompare(String(lib[b].title)));
+
+    /* books from the Teacher Library, each with its way back */
+    const books = {};
+    ids.filter(id => lib[id].received && lib[id].book).forEach(id => {
+      (books[lib[id].book] = books[lib[id].book] || []).push(id);
+    });
+    Object.keys(books).sort((a, b) => a.localeCompare(b)).forEach(book => {
+      let back = null;
+      if (window.EVMShelf && shelfConnected) {
+        back = document.createElement('button');
+        back.className = 'book-head-btn';
+        back.textContent = 'Put back';
+        back.title = 'Put this book back on the Teacher Library shelf';
+        back.addEventListener('click', () => EVMShelf.putBack(book));
+      }
+      const g = libGroup(list, 'book', book, { headButton: back });
+      books[book].forEach(id => g.appendChild(pairRow(lib[id])));
+    });
+
+    const shared = ids.filter(id => lib[id].received && !lib[id].book);
+    if (shared.length) {
+      const g = libGroup(list, 'shared', 'Shared with you');
+      shared.forEach(id => g.appendChild(pairRow(lib[id])));
+    }
+
+    const mine = ids.filter(id => !lib[id].received);
+    const g = libGroup(list, 'pair', 'Your pairings', { color: 'var(--ink)' });
+    if (mine.length) mine.forEach(id => g.appendChild(pairRow(lib[id])));
+    else libEmpty(g, 'Nothing saved yet. Put a poem and an ostinato on the stand, then Save as… to keep them together.');
+  }
+
+  function pairRow(rec) {
+    const id = rec.id;
+    const current = id === state.pairingId;
+    const actions = [];
+
+    /* With auto-save off, the pairing on the stand and the one saved are
+       two different things — so where the button would say "Open now" it
+       offers the saved one back instead. */
+    if (current && !(state.autoSave && !state.shared) && hasUnsavedChanges()) {
+      actions.push(libButton('Reopen', 'open-btn', () => {
+        if (!confirm('Reopen “' + rec.title + '” as it was saved?\n\nThe changes you have made since opening it are lost.')) return;
+        openPairingRecord(id, { noFlush: true, quiet: true });
+        closeSheet(pairSheet);
+        toast('Reopened as saved');
+      }, 'Open the saved version again, losing the changes on the stand'));
+    } else if (current) {
+      actions.push(libButton('Open now', 'is-active'));
+    } else {
+      actions.push(libButton('Open', 'open-btn', () => { openPairingRecord(id); closeSheet(pairSheet); }));
+    }
+
+    /* A shared pairing keeps the name it was sent with, so it stays
+       recognisable; one from a book leaves with its book (Put back). */
+    if (!rec.received) {
+      actions.push(libButton('Rename', 'rename-btn', () => openNameSheet('rename', id)));
+    }
+    if (!(rec.received && rec.book)) {
+      actions.push(libButton('×', 'delete-btn', (e, btn) => {
+        /* Two taps: the first turns the button into the question. */
+        if (!btn.classList.contains('confirm')) {
+          btn.classList.add('confirm');
+          btn.textContent = 'Delete?';
+          setTimeout(() => { if (btn.isConnected) renderPairList(); }, 3000);
+          return;
+        }
+        deletePairing(id);
+      }, 'Delete this pairing'));
+    }
+
+    return libRow({
+      current: current,
+      badge: pairBadge(rec),
+      title: rec.title,
+      shared: !!rec.received && !rec.book,
+      sub: pairSub(rec),
+      actions: actions
+    });
+  }
+
+  function deletePairing(id) {
+    const lib = readLibrary();
+    const title = lib[id] ? lib[id].title : 'pairing';
+    delete lib[id];
+    writeLibrary(lib);
+    if (state.pairingId === id) openSandbox({ noFlush: true });
+    renderPairList();
+    toast('Deleted “' + title + '”');
+  }
+
+  /* ---- naming: New, Save as…, Save my copy, Rename ---- */
+
+  let naming = null;   // { mode, id }
+
+  const NAMING = {
+    new:    { heading: 'New pairing', ok: 'Create',
+              sub: 'Give it a name. It starts as an empty stand, and saves itself as you work.' },
+    saveAs: { heading: 'Save as a new pairing', ok: 'Save',
+              sub: 'Everything on the stand now — both scores, the tempo, the intro and the sound — kept together under a name.' },
+    copy:   { heading: 'Save my copy', ok: 'Save my copy',
+              sub: 'A shared pairing stays exactly as it was sent. Your copy is yours to change, and saves itself.' },
+    rename: { heading: 'Rename', ok: 'Rename', sub: 'A new name for this pairing.' }
+  };
+
+  function openNameSheet(mode, id) {
+    const m = NAMING[mode];
+    naming = { mode: mode, id: id || null };
+    $('name-heading').textContent = m.heading;
+    $('name-sub').textContent = m.sub;
+    $('name-ok').textContent = m.ok;
+    const input = $('name-input');
+    const lib = readLibrary();
+    input.value = mode === 'rename' ? (lib[id] ? lib[id].title : '')
+      : mode === 'new' ? ''
+      : (state.name || standTitles().join(' + '));
+    input.classList.remove('input-error');
+    if (mode !== 'rename' && mode !== 'new' && !state.songs.poem && !state.songs.ost) {
+      toast('Put a poem or an ostinato on the stand first');
       return;
     }
+    openSheet(nameSheet);
+    setTimeout(() => { input.focus(); input.select(); }, 40);
+  }
+
+  function confirmName() {
+    const input = $('name-input');
+    const name = input.value.replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (!name) {
+      input.classList.add('input-error');
+      input.focus();
+      return;
+    }
+    const mode = naming && naming.mode;
+    const lib = readLibrary();
+    const now = Date.now();
+
+    if (mode === 'rename') {
+      const rec = lib[naming.id];
+      if (rec && rec.title !== name) {
+        rec.title = name;
+        rec.updatedAt = now;
+        writeLibrary(lib);
+        if (state.pairingId === naming.id) state.name = name;
+      }
+      closeSheet(nameSheet);
+      refreshLibraryChrome();
+      renderPairList();
+      return;
+    }
+
+    const id = EVM.newId('pair');
+    if (mode === 'new') {
+      lib[id] = { id: id, title: name, isCustom: true, createdAt: now, updatedAt: now,
+                  songs: { poem: null, ost: null }, settings: clone(DEFAULT_SETTINGS) };
+      writeLibrary(lib);
+      closeSheet(nameSheet);
+      closeSheet(pairSheet);
+      openPairingRecord(id, { autoSave: true, quiet: true });
+      toast('Made “' + name + '” — it saves itself as you work');
+      return;
+    }
+
+    /* Save as… and Save my copy: what is on the stand, under a new id,
+       remembering which pairing it came from. The stand does not reopen
+       anything — it is already showing it — it simply starts saving
+       there. An app's sandbox is frozen into a copy on the way in. */
+    const rec = Object.assign(workingRecord(), {
+      id: id, title: name, isCustom: true, createdAt: now, updatedAt: now
+    });
+    if (state.pairingId) rec.derivedFrom = state.pairingId;
+    lib[id] = rec;
+    writeLibrary(lib);
+    state.songs = clone(rec.songs);
+    state.pairingId = id;
+    state.name = name;
+    state.shared = false;
+    state.book = '';
+    state.autoSave = true;
+    closeSheet(nameSheet);
+    closeSheet(pairSheet);
+    refreshHeads();
+    saveSession();
+    toast(mode === 'copy' ? 'Saved your copy — auto-save on' : 'Saved “' + name + '” — auto-save on');
+  }
+
+  $('name-ok').addEventListener('click', confirmName);
+  $('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') confirmName(); });
+  $('name-input').addEventListener('input', () => $('name-input').classList.remove('input-error'));
+
+  $('pair-chip').addEventListener('click', openPairSheet);
+  $('pair-new').addEventListener('click', () => openNameSheet('new'));
+  $('pair-saveas').addEventListener('click', () => openNameSheet(state.shared ? 'copy' : 'saveAs'));
+  $('pair-share-open').addEventListener('click', openShareSheet);
+
+  /* ---- links ----
+     A pairing link carries both scores whole, so it works for anyone. It
+     also carries the pairing's id and dates — but only when the link
+     holds exactly what is saved under that id (EVMLibrary.shareHeader),
+     so a link made from unsaved changes can never overwrite the saved
+     pairing at the other end. A link made in the sandbox says so, and
+     lands in the other person's sandbox, as the apps' sandbox links do. */
+
+  function songPayload(side) {
+    const song = state.songs[side];
+    return song && song.data ? clone(song.data) : null;
+  }
+
+  function makeShareLink() {
+    if (!state.songs.poem && !state.songs.ost) {
+      toast('Put a poem or an ostinato on the stand first');
+      return null;
+    }
+    flushSession();
     const payload = {
       stand: 1,
-      title: $('pair-name').value.trim() || state.name || '',
-      poem: state.songs.poem ? state.songs.poem.data : null,
-      ost: state.songs.ost ? state.songs.ost.data : null,
+      title: state.name || standTitles().join(' + '),
+      poem: songPayload('poem'),
+      ost: songPayload('ost'),
       settings: settingsRecord()
     };
-    const link = window.location.origin + window.location.pathname
+    if (!state.pairingId) payload.sandbox = true;
+    else if (!hasUnsavedChanges()) Object.assign(payload, EVM.shareHeader(readLibrary()[state.pairingId], pairingKey));
+    return window.location.origin + window.location.pathname
       + '?pair=' + encodeURIComponent(encodeBase64Json(payload));
-    const input = $('share-link');
-    const status = $('share-status');
-    input.value = link;
+  }
+
+  /* From a link, pasted or followed. Filed first — "make sure this is
+     here", not "add a pairing" — then opened, read-only. */
+  function openLinkPairing(data, opts) {
+    const o = opts || {};
+    const songs = {};
+    SIDES.forEach(side => {
+      const d = data && data[side];
+      if (d && typeof d === 'object') songs[side] = { src: 'data', title: typeof d.title === 'string' ? d.title : '', data: d };
+    });
+    if (!songs.poem && !songs.ost) { toast('That pairing link has nothing in it'); return false; }
+    const titles = SIDES.map(side => songs[side] && songs[side].title).filter(Boolean);
+    const base = {
+      title: typeof data.title === 'string' && data.title.trim() ? data.title : (titles.join(' + ') || 'Shared pairing'),
+      songs: songs,
+      settings: data.settings && typeof data.settings === 'object' ? data.settings : {}
+    };
+
+    if (!o.boot) flushSession();
+    const lib = readLibrary();
+
+    if (data.sandbox) {
+      lib[SANDBOX_ID] = normalizePairing(Object.assign(base, { createdAt: Date.now() }), SANDBOX_ID);
+      writeLibrary(lib);
+      openSandbox({ noFlush: true });
+      toast('That pairing is in your sandbox');
+      return true;
+    }
+
+    const id = data.id && !isReserved(String(data.id)) && String(data.id) !== 'shared' ? String(data.id) : null;
+    const incoming = normalizePairing(Object.assign(base, { createdAt: data.createdAt, updatedAt: data.updatedAt }), id || 'incoming');
+    if (!id) delete incoming.id;
+    incoming.filedAs = fingerprint(pairingKey(incoming) || '');
+    const result = EVM.file(lib, incoming, fileOpts(true));
+    if (result.action === 'blank') { toast('That pairing link has nothing in it'); return false; }
+    writeLibrary(lib);
+    openPairingRecord(result.id, { noFlush: true, quiet: true });
+    const t = result.record.title;
+    toast({
+      added: 'Added “' + t + '” to your pairings',
+      same: 'Opened “' + t + '” from your pairings',
+      matched: 'Opened “' + t + '” from your pairings',
+      updated: 'Updated “' + t + '” to the newest version',
+      kept: 'Opened “' + t + '” — you already have a newer version'
+    }[result.action] || 'Opened “' + t + '”');
+    return true;
+  }
+
+  /* ---- Share & backup ---- */
+
+  function openShareSheet() {
+    $('share-row').hidden = true;
+    $('share-status').textContent = '';
+    $('import-status').textContent = '';
+    $('reset-status').textContent = '';
+    $('share-desc').textContent = !state.pairingId
+      ? 'Both scores travel inside the link, with the tempo, intro and sound settings, so it works for anyone. A link from the sandbox lands in their sandbox.'
+      : 'Both scores travel inside the link, with the tempo, intro and sound settings, so it works for anyone. It arrives as a shared pairing, and opening it again never makes a second copy.';
+    renderExportList();
+    closeSheet(pairSheet);
+    openSheet(shareSheet);
+  }
+
+  $('share-make').addEventListener('click', () => {
+    const link = makeShareLink();
+    if (!link) return;
+    $('share-link').value = link;
     $('share-row').hidden = false;
     copyText(link).then(ok => {
-      status.textContent = ok ? 'Link copied — it carries both songs, so it works for anyone.' : 'Select the link above and copy it.';
-      status.className = 'status-msg ' + (ok ? 'ok' : '');
-      if (!ok) { input.focus(); input.select(); }
+      $('share-status').textContent = ok ? 'Link copied to your clipboard.' : 'Select the link and copy it.';
+      $('share-status').className = 'status-msg ' + (ok ? 'ok' : '');
+      if (!ok) { $('share-link').focus(); $('share-link').select(); }
     });
+  });
+  $('share-copy').addEventListener('click', () => {
+    const v = $('share-link').value;
+    if (!v) return;
+    copyText(v).then(ok => {
+      $('share-status').textContent = ok ? 'Link copied to your clipboard.' : 'Select the link and copy it.';
+      $('share-status').className = 'status-msg ' + (ok ? 'ok' : '');
+    });
+  });
+
+  function renderExportList() {
+    const lib = readLibrary();
+    const box = $('export-list');
+    box.innerHTML = '';
+    const ids = Object.keys(lib).filter(id => !isReserved(id))
+      .sort((a, b) => String(lib[a].title).localeCompare(String(lib[b].title)));
+    if (!ids.length) {
+      box.innerHTML = '<div class="lib-sub" style="padding:10px">Nothing saved yet.</div>';
+      return;
+    }
+    ids.forEach(id => {
+      const label = document.createElement('label');
+      label.className = 'export-item';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = id;
+      cb.checked = true;
+      const title = document.createElement('span');
+      title.textContent = lib[id].title;
+      const sub = document.createElement('span');
+      sub.className = 'lib-sub';
+      sub.textContent = lib[id].received ? (lib[id].book || 'Shared') : '';
+      label.append(cb, title, sub);
+      box.appendChild(label);
+    });
+  }
+
+  $('export-all').addEventListener('click', () => { $('export-list').querySelectorAll('input').forEach(i => { i.checked = true; }); });
+  $('export-none').addEventListener('click', () => { $('export-list').querySelectorAll('input').forEach(i => { i.checked = false; }); });
+
+  /* A backup is an EVM bundle — the same envelopes the Librarian writes,
+     one per pairing — so it is already the shape the Teacher Library
+     takes. A backup is yours: each envelope says whether it was shared,
+     so it comes back the way it went. Library-linked songs keep their
+     link and their copy: restored here they open live, restored anywhere
+     else they open from the copy. */
+  $('export-go').addEventListener('click', () => {
+    const lib = readLibrary();
+    const ids = [...$('export-list').querySelectorAll('input:checked')].map(i => i.value).filter(id => lib[id]);
+    if (!ids.length) { toast('Tick at least one pairing'); return; }
+    const items = ids.map(id => {
+      const env = EVM.toEnvelope(lib[id], { app: APP_SLUG, kind: 'pairing' });
+      env.received = !!lib[id].received;
+      return env;
+    });
+    const bundle = { format: 'evm-bundle', formatVersion: EVM.FORMAT_VERSION, app: APP_SLUG,
+                     exportedAt: new Date().toISOString(), items: items };
+    const name = ($('export-name').value.trim() || 'my-pairings').replace(/[\\/:*?"<>|]+/g, '-');
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast(ids.length === 1 ? 'Downloaded 1 pairing' : 'Downloaded ' + ids.length + ' pairings');
+  });
+
+  $('import-btn').addEventListener('click', () => $('import-file').click());
+  $('import-file').addEventListener('change', e => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const status = $('import-status');
+    const reader = new FileReader();
+    reader.onload = () => {
+      let json = null;
+      try { json = JSON.parse(String(reader.result)); } catch (err) { json = null; }
+      const items = json ? EVM.readItems(json, {
+        app: APP_SLUG, looksLike: v => !!(v && typeof v === 'object' && v.songs)
+      }) : [];
+      if (!items.length) {
+        status.textContent = items.otherApp
+          ? 'That file is for another app — there are no pairings in it.'
+          : 'No pairings were found in that file.';
+        status.className = 'status-msg error';
+        return;
+      }
+      flushSession();
+      const lib = readLibrary();
+      const count = { added: 0, updated: 0, same: 0 };
+      items.forEach(item => {
+        const id = item.id && !isReserved(String(item.id)) ? String(item.id) : null;
+        const incoming = normalizePairing(item, id || 'incoming');
+        if (!incoming) return;
+        if (!id) delete incoming.id;
+        const r = EVM.file(lib, incoming, fileOpts(false));
+        if (r.action === 'added') count.added++;
+        else if (r.action === 'updated') count.updated++;
+        else if (r.action !== 'blank') count.same++;
+      });
+      writeLibrary(lib);
+      const bits = [];
+      if (count.added) bits.push(count.added + ' added');
+      if (count.updated) bits.push(count.updated + ' updated');
+      if (count.same) bits.push(count.same + ' already here');
+      status.textContent = bits.length ? 'Done: ' + bits.join(', ') + '.' : 'Nothing to add.';
+      status.className = 'status-msg ok';
+      renderExportList();
+    };
+    reader.readAsText(file);
+  });
+
+  $('reset-btn').addEventListener('click', () => {
+    if (!confirm('Delete every pairing you have saved, and clear the sandbox?\n\n'
+      + 'The poems and ostinatos in Rhythm Poetry and Ostinato Builder are not touched. This can’t be undone.')) return;
+    writeLibrary({});
+    if (isPlaying()) stopPlayback();
+    state.pairingId = null;
+    state.name = '';
+    state.shared = false;
+    state.book = '';
+    state.autoSave = false;
+    adoptSettings(clone(DEFAULT_SETTINGS));
+    SIDES.forEach(clearSide);
+    syncAll();
+    flushSession();
+    renderExportList();
+    $('reset-status').textContent = 'Every pairing has been deleted.';
+    $('reset-status').className = 'status-msg ok';
+  });
+
+  /* ---- the Teacher Library ----
+     Designed in, switched on later. The shelf (EVM Library/evm-shelf.js)
+     already knows how to take a book out, keep it in step with the
+     Teacher Library and put it back; all an app hands it is this adapter.
+     What the stand still needs before its pairings can be on the shelf —
+     the Librarian learning to read and publish them, and the shelf
+     learning the word "pairing" — is in the README, under Joining the
+     Librarian. Until then the button says Soon, and nothing is loaded. */
+  let shelfConnected = false;
+
+  function connectShelf() {
+    if (!window.EVMShelf) return false;
+    EVMShelf.init({
+      app: APP_SLUG,
+      disabled: false,
+      load: readLibrary,
+      save: writeLibrary,
+      incoming: rec => normalizePairing(rec, rec.id || 'incoming'),
+      key: pairingKey,
+      changed: shelfChanged,
+      openSong: id => { openPairingRecord(id); closeSheet(pairSheet); }
+    });
+    shelfConnected = true;
+    EVMShelf.sync();
+    return true;
+  }
+
+  /* After the shelf filed or removed pairings: move off one that left,
+     show a newer version of the one on the stand, and redraw. */
+  function shelfChanged(summary) {
+    const lib = readLibrary();
+    if (state.pairingId && !lib[state.pairingId]) openSandbox({ noFlush: true });
+    else if (state.pairingId && state.shared && summary.updated.indexOf(state.pairingId) !== -1) {
+      openPairingRecord(state.pairingId, { noFlush: true, quiet: true });
+    }
+    if (pairSheet.classList.contains('open')) renderPairList();
+    refreshLibraryChrome();
+    const n = summary.added.length, up = summary.updated.length, gone = summary.removed.length;
+    if (n) toast(n === 1 ? 'A pairing from your books is in your pairings' : n + ' pairings from your books are in your pairings');
+    else if (up) toast(up === 1 ? 'Your teacher updated a pairing in your books' : 'Your teacher updated ' + up + ' pairings in your books');
+    else if (gone) toast(gone === 1 ? 'A pairing from your books left your pairings' : gone + ' pairings from your books left your pairings');
+  }
+
+  $('shelf-soon').hidden = !!window.EVMShelf;
+  $('shelf-btn').addEventListener('click', () => {
+    if (shelfConnected) { closeSheet(pairSheet); EVMShelf.openSheet(); return; }
+    toast('Books of pairings from the Teacher Library are coming to the Music Stand next');
+  });
+
+  /* Another tab changed the pairings (saved one, deleted one): the list
+     and the chip follow. The pairing on the stand is left as it is. */
+  window.addEventListener('storage', e => {
+    if (e.key !== PAIRINGS_KEY) return;
+    if (state.pairingId && !readLibrary()[state.pairingId]) {
+      state.pairingId = null; state.name = ''; state.shared = false; state.book = '';
+      saveSession();
+    }
+    if (pairSheet.classList.contains('open')) renderPairList();
+    refreshLibraryChrome();
   });
 
   /* navigator.clipboard is missing outright on plain http, so the throw
@@ -2500,8 +3430,6 @@
     }
   }
 
-  $('pair-chip').addEventListener('click', openPairSheet);
-
 
   /* ==================================================================
      PRESENT MODE
@@ -2526,6 +3454,17 @@
   }
 
   $('edit-btn').addEventListener('click', () => setEditing(!state.editing));
+
+  /* The Edit switch in the View popover, and the flag on the View button
+     that says editing is on while the popover is closed. */
+  function syncEditSwitch() {
+    const sw = $('edit-btn');
+    sw.classList.toggle('on', state.editing);
+    sw.setAttribute('aria-checked', String(state.editing));
+    $('view-btn').title = state.editing
+      ? 'View — editing is on: the scores answer the pointer'
+      : 'View — how the stand is laid out, and editing';
+  }
 
   /* Two taps to undo a piece of work: the first turns the chip into the
      question, the way the pairing list's delete does. */
@@ -2618,9 +3557,7 @@
      ================================================================== */
 
   function syncAll() {
-    bpmInput.value = String(state.bpm);
-    $('bpm-slider').value = String(state.bpm);
-    $('tempo-pop-value').textContent = String(state.bpm);
+    bpmValue.textContent = String(state.bpm);
     syncSequence();
     syncViewPops();
     renderMixer();
@@ -2643,7 +3580,7 @@
   if (session && session.editing === true) {
     state.editing = true;
     document.body.classList.add('editing');
-    $('edit-btn').setAttribute('aria-pressed', 'true');
+    syncEditSwitch();
   }
 
   let linkPair = null;
@@ -2656,17 +3593,64 @@
     }
   } catch (e) {}
 
+  /* Pairings saved before they were items (title, savedAt, songs,
+     settings) are given an id, dates and isCustom, once, so the
+     Librarian and a backup find the same shape in every record. */
+  (function upgradeLibrary() {
+    const raw = readJSON(PAIRINGS_KEY);
+    if (!raw || typeof raw !== 'object') return;
+    const old = Object.keys(raw).some(id => raw[id] && (!raw[id].id || !raw[id].updatedAt));
+    if (old) writeLibrary(readLibrary());
+  })();
+
+  /* Before there was a sandbox, what was on the stand with no pairing
+     open lived only in the session. It becomes the sandbox, once — before
+     a link followed on this very visit can put something else on the
+     stand. */
+  (function sandboxFromOldSession() {
+    if (!session || session.pairingId || !session.songs) return;
+    const lib = readLibrary();
+    if (lib[SANDBOX_ID]) return;
+    const songs = { poem: cleanSong(session.songs.poem), ost: cleanSong(session.songs.ost) };
+    if (!songs.poem && !songs.ost) return;
+    const now = Date.now();
+    lib[SANDBOX_ID] = { id: SANDBOX_ID, title: SANDBOX_TITLE, isCustom: true, createdAt: now, updatedAt: now,
+                        songs: songs, settings: Object.assign(clone(DEFAULT_SETTINGS), settingsRecord()) };
+    writeLibrary(lib);
+  })();
+
   if (linkPair) {
-    openPairingData(linkPair);
+    openLinkPairing(linkPair, { boot: true });
   } else if (session) {
-    state.name = typeof session.name === 'string' ? session.name : '';
-    state.pairingId = session.pairingId || null;
+    /* What was on the stand last time, saved or not. The pairing it
+       belonged to is looked up again: deleted since, the work on the stand
+       becomes the sandbox's rather than being lost. */
+    const lib = readLibrary();
+    const id = session.pairingId && lib[session.pairingId] ? String(session.pairingId) : null;
+    state.pairingId = id;
+    state.name = id ? lib[id].title : '';
+    state.shared = !!(id && lib[id].received);
+    state.book = state.shared && lib[id].book ? String(lib[id].book) : '';
+    state.autoSave = !!(id && !state.shared && session.autoSave === true);
     SIDES.forEach(side => {
       const song = session.songs && session.songs[side];
-      if (song && (song.data || song.id)) loadInto(side, song, { keepTempo: true, keepMutes: true, quiet: true });
+      if (song && (song.data || song.id)) {
+        loadInto(side, song, { keepTempo: true, keepMutes: true, quiet: true });
+      }
     });
+  } else {
+    /* No session at all: whatever the sandbox holds. */
+    const sb = readLibrary()[SANDBOX_ID];
+    if (sb) {
+      adoptSettings(Object.assign(clone(DEFAULT_SETTINGS), sb.settings || {}));
+      SIDES.forEach(side => {
+        const song = sb.songs[side];
+        if (song) loadInto(side, song, { keepTempo: true, keepMutes: true, quiet: true });
+      });
+    }
   }
 
+  connectShelf();
   syncAll();
   document.body.classList.add('booting');
   setTimeout(endBooting, 3000);        // never leave the scores hidden

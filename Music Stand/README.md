@@ -8,6 +8,38 @@ app in a frame, opened in an embedded mode (`?embed=music-stand`). The app draws
 own score and makes its own sounds; the Music Stand chooses the songs, sizes the
 panes, keeps time and owns the mixer.
 
+## The screen
+
+The stand is laid out the way both apps are, so moving between the three feels
+like one family:
+
+- **Top bar** — the way home (*‹ Eagle View*) and the mark on the left; in the
+  middle the one big switch, **Poem · Both · Ostinato** (the stand's version of
+  Rhythm Poetry's Rhythm / Poetry); on the right, where the work is going: the
+  pairing chip (*Sandbox*, *Pairing*, *Shared* or a book's name, over the title),
+  with **Clear** beside it in the sandbox and **Auto-save / Not saving / Save my
+  copy** beside it on a pairing.
+- **Pane headings** — each is the pane's song chip: the side and where the song
+  came from (*Poem · Library*, *Ostinato · Copy*, *· Sandbox*, *· Shared*, or a
+  book), over the title; then the meter and bars, *Edited here* when it applies,
+  and — while it plays — which bar it is on. Mute and View on the right.
+- **Toolbar** — one row at every width, so the height goes to the scores:
+  Play and Loop; the tempo (**BPM**: tap to type, or hover with a mouse for
+  Rhythm Poetry's slider to drag left and right); **Mixer** — Count-in at the
+  top, then a column each for **Rhythm Poetry** (voices, words sound, strength,
+  volume) and **Ostinato Builder** (voices and instruments, the Intro, volume);
+  **View** — arrangement, order, sizes, and the **Edit the scores** switch
+  (while editing is on the View button says *Editing*; it is where the stand's
+  own settings go as it grows); and **Present**. The pairings are reached from
+  the chip at the top right.
+- **Sheets** — *Pairings* is the apps' Songs sheet, *Share & backup* is theirs
+  card for card, and the song pickers list an app's library in the app's own
+  groups: Sandbox, the Teacher Library's books, Shared with you, yours, and the
+  examples it came with.
+
+The stand's own colours stay neutral — the orange and the indigo belong to the
+two sides — so wherever the apps use their accent, the stand uses its ink.
+
 ## Running it
 
 The Music Stand and both apps **must be served from the same website** (same origin).
@@ -23,7 +55,9 @@ Claude Apps/
   Ostinato Builder 2.0/
 ```
 
-The paths are in `APPS` at the top of `script.js`. Locally, the `music-stand` entry in
+The paths are in `APPS` at the top of `script.js`. `lib/evm-library.js` is a
+byte-identical copy of `EVM Library/evm-library.js` (checked by that folder's
+`check-copies.sh`), and must be promoted with the stand. Locally, the `music-stand` entry in
 `.claude/launch.json` serves the whole `Claude Apps` folder on port 8795; open
 `http://localhost:8795/Music%20Stand/`.
 
@@ -44,12 +78,10 @@ the deployed site, those are the songs made there.
 - **From a link** — any Share link from either app. It is sorted by its shape,
   not its address (`tracks` → ostinato, `poetryState`/`rhythmState` → poem), so
   pasting on the wrong side still works. Pasting anywhere on the page works too.
-- **Pairings** — a poem + ostinato + tempo/intro/mixer, saved in the Music Stand
-  (`music_stand_pairings_v1`), or shared as a `?pair=` link that carries both songs whole.
-  A pairing is a saved moment, so a sandbox in it is kept **as a copy**, not by
-  id — the sandbox gets cleared and rewritten, and a pairing that pointed at it
-  would open whatever it held by then. (The live session, by contrast, stays
-  linked to the sandbox.)
+- **Pairings** — see below. A pairing is a saved moment, so an app's sandbox in
+  it is kept **as a copy**, not by id — the sandbox gets cleared and rewritten,
+  and a pairing that pointed at it would open whatever it held by then. (The
+  stand's own sandbox, by contrast, stays linked to it.)
 
 ### What the Music Stand sees of the apps' saving
 
@@ -62,6 +94,109 @@ themselves.
 The last session is kept in `music_stand_session_v1`. (Both keys were `pop_*` when
 this app was the Poetry Ostinato Player; they are copied across once, and old
 `?pair=` links, which mark themselves `pop`, still open.)
+
+## Pairings — the stand's library
+
+A pairing is a poem and an ostinato kept together, with the tempo, intro and
+sound that suit them. The stand keeps them the way every Eagle View Music app
+keeps what it saves (`EVM Library/README.md`), and behaves the way a song does
+in Rhythm Poetry and Ostinato Builder:
+
+- **The sandbox** is scratch work: whatever is on the stand when no pairing is
+  open. It keeps itself between visits, is never listed as a pairing, and
+  **Clear** (top bar, or its row) empties it. Save as… is how it becomes a
+  pairing.
+- **A saved pairing opens with auto-save off.** Changes on the stand are not
+  kept until the switch is turned on, which first asks whether to save them —
+  the apps' own question in the apps' own words. With it off, the pairing's row
+  offers **Reopen** (the saved version, losing the changes). New and Save as…
+  start with it on.
+- **A shared pairing** — one that came in a link — is **read-only**: the switch
+  reads **Save my copy**, and the copy is yours (`derivedFrom` the shared one).
+  It keeps the name it was sent with (no Rename).
+- **Links never pile up.** A `?pair=` link is filed before it is opened
+  (`EVMLibrary.file`): the same link again finds the pairing already here; a
+  newer version of it (same id, later `updatedAt`) replaces the old one; a link
+  from before ids travelled is matched by what it holds. This is what makes a
+  pairing link safe to put on a Google Site, where the page reopens it on every
+  visit. The id travels only when the link holds exactly what is saved
+  (`EVMLibrary.shareHeader`). A link made in the sandbox says so and lands in
+  the other person's sandbox, as the apps' sandbox links do.
+- **Share & backup** — send by link; download a backup (an EVM bundle, one
+  envelope per pairing, each saying whether it was shared); restore from one
+  (the same filing rule, so nothing is added twice); and Start over, which
+  deletes every pairing and clears the sandbox and touches neither app.
+
+### The record
+
+`music_stand_pairings_v1` is an id map. The sandbox is kept in it under the
+reserved id `sandbox` (like the apps' sandboxes: in the map, never an item).
+
+```json
+{
+  "id": "pair_1790214827585_3x6s",
+  "title": "Hickory Dickory Dock + Three layers",
+  "isCustom": true,
+  "createdAt": 1790214827585,
+  "updatedAt": 1790214835480,
+  "received": true, "receivedAt": 1790214900000,      // shared with you
+  "derivedFrom": "pair_…",                            // Save as… / Save my copy
+  "book": "Winter Songs",                             // taken out from the shelf (later)
+  "filedAs": "f1x2y3…",                               // see below
+  "songs": {
+    "poem": { "src": "library", "id": "hickory-dickory-dock", "title": "…", "data": { …Rhythm Poetry's share record… } },
+    "ost":  { "src": "data", "id": null, "title": "…", "data": { …Ostinato Builder's share record… },
+              "edited": true, "origin": { "src": "library", "id": "…" } }
+  },
+  "settings": { "bpm": 92, "countIn": false, "leadIn": 1, "loop": true,
+                "wordsSound": "tone", "wordsStrength": 1,
+                "mute": {…}, "voiceMute": {…}, "vol": {…} }
+}
+```
+
+- A song with `src: "library"` is live — opened by id from its app's library,
+  with `data` as the copy to fall back on. `src: "data"` is the stand's own copy.
+  Links, and anything published, carry copies only.
+- **The content key** (what "the same pairing" means) is both songs' `data`
+  (ids and dates left out) and the settings. Blank = nothing on either side,
+  which is never filed.
+- `updatedAt` moves only when that key or the title changes (`EVMLibrary.stamp`).
+- Opening a pairing lets the apps tidy the copies inside it; the stored copy
+  takes the tidied form without being called a change. A pairing that arrived
+  by link or file keeps `filedAs`, the fingerprint of what it arrived as, so
+  that an id-less link is still recognised after its copy has been tidied.
+- Records from before pairings were items (`title`, `savedAt`, `songs`,
+  `settings`) are given an id, dates (from `savedAt`, never "now") and
+  `isCustom` once, when the stand first opens.
+
+## Joining the Librarian (next)
+
+Designed in; not switched on yet. The stand already keeps pairings as EVM
+items in the storage key the Librarian would read, already files links and
+files by the import rule, already writes backups as EVM bundles, and already
+draws books in its Pairings sheet (records with `book`, with **Put back**). The
+Pairings sheet has the **Teacher Library** button, marked *Soon*, and
+`connectShelf()` in `script.js` holds the whole shelf adapter. What is left:
+
+1. **The shelf learns the word.** In `EVM Library/evm-shelf.js`, add
+   `pairing: ['pairing', 'pairings']` to `KIND` and `'music-stand': 'Music Stand'`
+   to `APP_NAME`; copy it (and `evm-shelf.css`) out to every app's `lib/` and
+   run `check-copies.sh` (add the Music Stand's shelf files to it).
+2. **The stand loads it.** Add `lib/evm-shelf.css` / `lib/evm-shelf.js` to
+   `index.html` (after `lib/evm-library.js`, where the comment is). The *Soon* tag
+   hides itself and the button opens the shelf; `connectShelf()` runs `sync()` on
+   every visit. The stand writes only its own pairings, so — unlike the apps in a
+   pane — it is allowed a shelf.
+3. **The Librarian reads pairings.** A `SOURCES` entry in `Librarian/script.js`:
+   `app: 'music-stand'`, `key: 'music_stand_pairings_v1'`, `reserved: id => id === 'sandbox'`,
+   `kind: () => 'pairing'`, `blank:` neither side has a song, and a `data:` that
+   turns every `src: "library"` song into its copy (`{ src: 'data', title, data }`)
+   — a student does not have the teacher's library. Add it to `APP_ORDER` /
+   `APP_NAMES` / `KIND_NAMES`, and to the Teacher Library tab's lists in `panel.js`.
+4. **Decide one question first:** when a pairing's poem is itself published
+   (same id in the same book), should the published pairing point at it, so
+   an update to the poem reaches the pairing? Today's answer is no — a pairing
+   is a saved moment, carrying its own copies — and that is the simpler rule.
 
 ## Timing
 
@@ -111,7 +246,14 @@ frames, so an arrangement can be judged without first being committed to and
 undone.
 
 **Automatic** (the default for both the arrangement and the sizes) hands all
-three to the stand. Choosing an arrangement yourself, naming a number of bars
+three to the stand. It starts from the screen's own shape — **side by side on a
+computer or any screen wider than it is tall, one above the other on a screen
+held upright** — and moves off it only when the other arrangement draws the two
+scores clearly (more than 2%) larger; a near tie keeps what is on screen. Turning
+a tablet round starts it again from the new shape. (Keeping what is on screen
+matters: a score's natural size shifts a little with the box it was last fitted
+into, so each arrangement can look slightly better measured from the other, and
+a fixed "ties go to side by side" rule flipped a portrait tablet back and forth.) Choosing an arrangement yourself, naming a number of bars
 in a View menu, or dragging the line takes that one back; the rest stay
 automatic. Double-click the line to give the split back.
 
@@ -140,7 +282,7 @@ present mode simply gives the solver the whole screen to work with.
 
 ## Editing
 
-**Edit**, in the top bar, hands both scores back to the pointer. What you
+**Edit the scores**, the switch in the View popover, hands both scores back to the pointer. What you
 can reach is the score's own controls: the beat divisions, the joins, the
 repeat marks, a word you tap and retype, and a **+** and **×** on the
 closing bar line for adding and removing bars. The apps' own chrome stays
@@ -156,7 +298,8 @@ offer: the score on the stand is yours to pull about.
 
 What it does change is the pairing. A score edited here stops being the
 library's copy and becomes this stand's own: the heading says **Edited
-here**, and **Save pairing** keeps it, changes and all. Where the score
+here**, and the pairing keeps it, changes and all — at once in the sandbox or
+with auto-save on, or with Save as…. Where the score
 came from a library, the chip is also the way back — press it twice to
 throw the changes away and open the saved version again.
 
@@ -203,7 +346,7 @@ with its own mutes, the stand starts its mixer from them, and from then on the
 mixer is the answer. So muting in a pane never marks a piece edited, and the
 badges work whether or not editing is on.
 
-**Strength** (mixer, under the poem) is how full the poem's voice is — ×1, ×2 or
+**Strength** (Mixer, under Rhythm Poetry) is how full the poem's voice is — ×1, ×2 or
 ×3. A tone gains the octave above it and then the one above that; a drum gains
 another instrument (tom and shaker, then the snare, then the claves). It is
 Rhythm Poetry's own switch, reached from here and sent with each note, because
@@ -220,7 +363,7 @@ it too and adding an entry to `APPS`.
 | --- | --- |
 | `app`, `version` | `'rhythm-poetry'` / `'ostinato-builder'`, `1` |
 | `libraryKey` | the `localStorage` key of the app's library (for live updates) |
-| `listSongs()` | `[{ id, title, kind, meter, bpm, measures?, isCustom, createdAt, preview, sandbox? }]` — the live library, then any sandbox, flagged `sandbox: true` (a sandbox is not a library song: it is not among the app's own lists, so it is offered separately) |
+| `listSongs()` | `[{ id, title, kind, meter, bpm, measures?, isCustom, createdAt, updatedAt, received, book, preview, sandbox? }]` — the live library, then any sandbox, flagged `sandbox: true` (a sandbox is not a library song: it is not among the app's own lists, so it is offered separately). `received` and `book` let the picker group songs the way the app does: shared with you, and the Teacher Library book a song came in |
 | `openLibrarySong(id)` | open a library song; returns `info()` or `null` |
 | `loadSong(record)` | open a song record (a share-link payload); returns `info()` or `null` |
 | `snapshot()` | the open song as a record, the same shape the app shares |
@@ -300,6 +443,7 @@ in words.
 
 ## Not built yet
 
+- Pairings on the Teacher Library shelf — see **Joining the Librarian**.
 - Sharing the room between more than two scores. The solver tries every
   combination, which is fine for two apps and a handful of shapes each and
   will not be for five; when a third arrives it wants a proper packing rather

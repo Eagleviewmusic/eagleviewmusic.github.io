@@ -9354,6 +9354,10 @@
         bpm: st.BPM || 82,
         isCustom: !!song.isCustom,
         createdAt: song.createdAt || 0,
+        updatedAt: song.updatedAt || song.createdAt || 0,
+        // shared with this browser, and the Teacher Library book it came in
+        received: !!song.received,
+        book: song.received && song.book ? String(song.book) : '',
         preview: words.slice(0, 14).join(' ')
       };
     }

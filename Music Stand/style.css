@@ -6,11 +6,19 @@
    app's accent — Rhythm Poetry's orange for the poem, Ostinato
    Builder's indigo for the ostinato — so a glance says which
    side is which. The brand mark is the one place the two meet.
+
+   The FORMS are the apps' own, so that moving between the three
+   feels like one family: the top bar's home link, centre switch
+   and chip cluster; the toolbar's groups; the Songs sheet with
+   its now-open card, its groups and its rows; the Share &
+   backup cards. Where the apps use their accent, the stand uses
+   its ink, which belongs to neither side.
    ============================================================ */
 
 :root {
   --ground:      #EEEDF0;
   --ground-2:    #E4E3E9;
+  --paper:       #F7F6F9;
   --surface:     #FFFFFF;
   --ink:         #1E2238;
   --ink-2:       #555A72;
@@ -25,19 +33,21 @@
   --ost-soft:    #E6E3FA;
 
   --danger:      #C73A4E;
+  --danger-soft: #FBE9EC;
   --good:        #2E8B6B;
 
   --r-sm: 10px;
   --r-md: 14px;
   --r-lg: 20px;
+  --r-xl: 28px;
   --shadow-1: 0 1px 2px rgba(30,34,56,.06), 0 2px 8px rgba(30,34,56,.06);
   --shadow-2: 0 4px 12px rgba(30,34,56,.10), 0 12px 32px rgba(30,34,56,.12);
   --shadow-3: 0 12px 28px rgba(30,34,56,.16), 0 32px 64px rgba(30,34,56,.20);
 
   --topbar-h: 56px;
-  --head-h: 38px;
-  --divider: 12px;
-  --gutter: 12px;
+  --head-h: 44px;
+  --divider: 10px;
+  --gutter: 8px;
 
   --font: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-round: 'Baloo 2', 'Nunito', system-ui, sans-serif;
@@ -73,65 +83,189 @@ svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap
 
 /* ============================================================
    TOP BAR
+   Three columns, as in Rhythm Poetry: the way home, the one
+   switch in the middle, and where the work is going.
    ============================================================ */
 
 .topbar {
   flex: 0 0 var(--topbar-h);
-  display: flex;
+  display: grid;
+  /* the two sides share what the switch leaves, and give way before
+     they overlap it: the chip's name is the part that shortens */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
-  padding: 0 var(--gutter);
+  padding: 0 14px;
   background: var(--surface);
   border-bottom: 1px solid var(--hairline);
   position: relative;
   z-index: 5;
 }
 
-.home-link {
-  display: grid; place-items: center;
-  width: 32px; height: 32px;
-  border-radius: 50%;
-  color: var(--ink-3);
-}
-.home-link svg { width: 20px; height: 20px; }
-.home-link:hover { background: var(--ground); color: var(--ink); }
+.topbar-left { justify-self: start; display: flex; align-items: center; gap: 6px; min-width: 0; }
 
-.brand { display: flex; align-items: baseline; gap: 10px; flex: none; }
+.home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px 7px 8px;
+  border-radius: 999px;
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.home-link svg { width: 17px; height: 17px; }
+.home-link:hover, .home-link:active { background: var(--ground); color: var(--ink); }
+html.in-iframe .home-link { display: none; }
+
+.brand { display: flex; align-items: center; gap: 8px; flex: none; }
 /* The mark is the two panes on one stand: the poem's sheet in Rhythm
    Poetry's orange, the ostinato's in Ostinato Builder's indigo. */
-.brand-mark { width: 30px; height: 30px; align-self: center; flex: none; }
+.brand-mark { width: 28px; height: 28px; flex: none; }
 .brand-mark .sheet-poem { fill: var(--poem); }
 .brand-mark .sheet-ost  { fill: var(--ost); }
 .brand-mark .stand-line { fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .brand-mark .staff-line { fill: none; stroke: #fff; stroke-width: 1.1; stroke-linecap: round; opacity: .85; }
 .brand-name {
   font-family: var(--font-round);
-  font-weight: 600;
-  font-size: 15px;
-  color: var(--ink-2);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--ink);
   white-space: nowrap;
 }
 
-.pair-chip {
-  display: flex; align-items: center; gap: 8px;
-  height: 36px;
-  padding: 0 12px;
-  margin: 0 auto;
-  max-width: min(420px, 40vw);
+/* --- what is on the stand --- */
+.show-switch {
+  justify-self: center;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--ground);
+  border-radius: 999px;
+}
+.show-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-family: var(--font-round);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition: background .18s, color .18s, box-shadow .18s;
+}
+.show-tab svg { width: 18px; height: 18px; }
+.show-tab:hover, .show-tab:active { color: var(--ink); }
+.show-tab.active { background: var(--surface); box-shadow: var(--shadow-1); color: var(--ink); }
+.show-tab[data-show-tab="poem"].active { color: var(--poem); }
+.show-tab[data-show-tab="ost"].active  { color: var(--ost); }
+.show-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.show-dot.poem { background: var(--poem); }
+.show-dot.ost  { background: var(--ost); }
+
+/* --- where the work is going --- */
+.chip-cluster {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Auto-save, as in both apps. On, it is quiet; off, it is the one thing
+   on the bar that is not normal, so it says so in the warning ink with a
+   dashed edge. On a shared pairing it is not a warning but the way to
+   keep your changes: Save my copy. */
+.autosave-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  height: 42px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  background: var(--ground);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  color: var(--ink-3);
+  transition: background .15s, color .15s, border-color .15s;
+}
+.autosave-toggle:hover, .autosave-toggle:active { background: var(--ground-2); color: var(--ink-2); }
+.autosave-icon { width: 15px; height: 15px; flex: none; }
+.autosave-toggle.is-off {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.autosave-toggle.is-off.is-shared {
+  border-style: solid;
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+/* Clear, only in the sandbox: quiet until reached for, then red. */
+.sandbox-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  min-height: 38px;
+  padding: 0 11px;
   border-radius: 999px;
   background: var(--ground);
-  border: 1px solid var(--hairline);
-  font-weight: 700;
-  font-size: 14px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-3);
+  transition: background .15s, color .15s;
 }
-.pair-chip:hover { border-color: var(--hairline-2); background: var(--ground-2); }
-.pair-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pair-chip-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
-.pair-chip-dot.poem { background: var(--poem); }
-.pair-chip-dot.ost  { background: var(--ost); }
-.caret { width: 16px; height: 16px; color: var(--ink-3); flex: none; }
+.sandbox-clear svg { width: 15px; height: 15px; flex: none; }
+.sandbox-clear:hover, .sandbox-clear:active { background: var(--danger-soft); color: var(--danger); }
 
-.topbar-right { display: flex; align-items: center; gap: 8px; }
+.pair-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 280px;
+  min-height: 42px;
+  padding: 6px 10px 6px 12px;
+  border-radius: 999px;
+  background: var(--ground);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  transition: background .15s;
+}
+.pair-chip:hover, .pair-chip:active { background: var(--ground-2); }
+.pair-chip-dots { display: flex; flex-direction: column; gap: 3px; flex: none; }
+.pair-chip-dots .dot { width: 8px; height: 8px; border-radius: 50%; }
+.pair-chip-dots .dot.poem { background: var(--poem); }
+.pair-chip-dots .dot.ost  { background: var(--ost); }
+.pair-chip-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.1; text-align: left; }
+.pair-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* where the work is going: Sandbox, Pairings, Shared, or a book */
+.pair-chip-kicker {
+  font-size: 9.5px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* the sandbox reads as unfiled: a dashed edge and no fill */
+.pair-chip.is-sandbox {
+  background: transparent;
+  border: 1.5px dashed var(--ink-2);
+  padding: 4.5px 8.5px 4.5px 10.5px;
+}
+.caret { width: 15px; height: 15px; color: var(--ink-3); flex: none; }
 
 
 /* ============================================================
@@ -158,8 +292,12 @@ svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap
 .seg-btn svg { width: 17px; height: 17px; }
 .seg-btn:hover { color: var(--ink); }
 .seg-btn.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
+.seg-btn:disabled { opacity: .45; cursor: default; }
 .seg-wide { display: flex; width: 100%; }
 .seg-wide .seg-btn { flex: 1; }
+/* three words with pictures: stacked in a column when the popover is narrow */
+.seg-arrange .seg-btn { height: auto; min-height: 30px; padding: 6px 8px; flex-direction: column; gap: 3px; font-size: 12.5px; border-radius: 12px; }
+.seg-arrange { border-radius: 16px; }
 /* EASY is written the way both apps write it on their dots button:
    four letters in four of its colours, on dark once it is chosen. */
 .seg-btn.easy-seg { gap: 0; letter-spacing: .04em; }
@@ -170,17 +308,22 @@ svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap
 .seg-btn.easy-seg b:nth-child(4) { color: #5DB2F5; }
 .seg-btn.easy-seg.active { background: #1F2433; }
 
+/* The toolbar's buttons, in the apps' outlined form. */
 .tool-btn {
-  display: flex; align-items: center; gap: 6px;
-  height: 36px;
-  padding: 0 11px;
-  border-radius: var(--r-sm);
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1.5px solid var(--hairline-2);
   font-weight: 700;
   font-size: 14px;
-  color: var(--ink-2);
+  color: var(--ink);
+  white-space: nowrap;
+  transition: background .14s, border-color .14s, color .14s;
 }
-.tool-btn svg { width: 19px; height: 19px; }
-.tool-btn:hover, .tool-btn.open { background: var(--ground); color: var(--ink); }
+.tool-btn svg { width: 19px; height: 19px; flex: none; }
+.tool-btn:hover, .tool-btn.open { background: var(--ground); border-color: var(--ink-3); }
 .tool-value {
   font-family: var(--font-round);
   font-weight: 700;
@@ -192,57 +335,77 @@ svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap
 }
 .tool-btn:hover .tool-value, .tool-btn.open .tool-value { background: var(--surface); }
 
-/* Edit is a mode, not an errand: while it is on it stays lit, because
-   everything the panes will now answer follows from it. The stand has no
-   accent of its own on purpose — the two sides carry the colour — so the
-   lit state is the ink, which belongs to neither. */
-#edit-btn[aria-pressed="true"],
-#edit-btn[aria-pressed="true"]:hover {
+/* Editing is a mode, not an errand, and its switch lives in the View
+   popover — so while it is on, the View button says so. The stand has no
+   accent of its own on purpose; the lit state is the ink, which belongs
+   to neither side. */
+.editing-flag {
+  display: none;
+  padding: 1px 7px;
+  border-radius: 999px;
   background: var(--ink);
-  color: var(--surface);
+  color: #fff;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .05em;
+  text-transform: uppercase;
 }
+body.editing #view-btn { border-color: var(--ink); }
+body.editing .editing-flag { display: inline-block; }
 
 .icon-btn {
   display: grid; place-items: center;
-  width: 30px; height: 30px;
-  border-radius: 8px;
+  width: 32px; height: 32px;
+  border-radius: 9px;
   color: var(--ink-3);
+  flex: none;
 }
 .icon-btn svg { width: 18px; height: 18px; }
 .icon-btn:hover, .icon-btn.open { background: var(--ground); color: var(--ink); }
 
 .btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  height: 38px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 40px;
   padding: 0 16px;
   border-radius: 999px;
-  border: 1px solid var(--hairline-2);
+  border: 1.5px solid var(--hairline-2);
   background: var(--surface);
   font-weight: 700;
   font-size: 14px;
+  color: var(--ink);
+  white-space: nowrap;
+  transition: background .14s, border-color .14s;
 }
-.btn:hover { background: var(--ground); }
+.btn svg { width: 17px; height: 17px; }
+.btn:hover, .btn:active { background: var(--ground); border-color: var(--ink-3); }
 .btn-primary { background: var(--ink); border-color: var(--ink); color: #fff; }
-.btn-primary:hover { background: #2E3350; }
+.btn-primary:hover, .btn-primary:active { background: #2E3350; border-color: #2E3350; }
+.btn-danger { background: var(--danger-soft); border-color: #EBC3CA; color: var(--danger); }
+.btn-danger:hover, .btn-danger:active { background: var(--danger); border-color: var(--danger); color: #fff; }
 .btn:disabled { opacity: .45; cursor: default; }
 
-.toggle-btn {
-  display: flex; align-items: center; gap: 7px;
-  height: 36px;
-  padding: 0 12px;
-  border-radius: var(--r-sm);
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--ink-2);
+/* Not there yet, and honest about it. */
+.soon-tag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--ground);
+  font-size: 10.5px; font-weight: 800; letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
-.toggle-btn:hover { background: var(--ground); }
-.toggle-dot {
-  width: 10px; height: 10px; border-radius: 50%;
-  border: 2px solid var(--ink-3);
-  transition: background .15s, border-color .15s;
+
+.text-field {
+  width: 100%;
+  height: 44px;
+  padding: 0 13px;
+  border: 1.5px solid var(--hairline-2);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  outline: none;
 }
-.toggle-btn[aria-pressed="true"] { color: var(--ink); }
-.toggle-btn[aria-pressed="true"] .toggle-dot { background: var(--good); border-color: var(--good); }
+.text-field:focus { border-color: var(--ink-2); }
+.text-field.input-error { border-color: var(--danger); background: var(--danger-soft); }
 
 
 /* ============================================================
@@ -306,26 +469,33 @@ svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap
   min-width: 0;
 }
 .pane-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--side); flex: none; }
-.pane-kind {
-  font-family: var(--font-round);
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--side);
-  text-transform: uppercase;
-  letter-spacing: .06em;
-}
+
+/* The heading is the pane's song chip: which side, where the song came
+   from, and its name — the same two lines as the chip in the apps. */
 .pane-title {
   display: flex; align-items: center; gap: 4px;
   min-width: 0;
-  height: 28px;
-  padding: 0 6px 0 8px;
-  border-radius: 8px;
+  padding: 3px 6px 3px 8px;
+  border-radius: 10px;
+  text-align: left;
+}
+.pane-title:hover { background: var(--ground); }
+.pane-title > svg { width: 15px; height: 15px; color: var(--ink-3); flex: none; }
+.pane-title-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.12; }
+.pane-kicker {
+  display: flex; gap: 5px;
+  font-size: 10px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pane-kind { color: var(--side); }
+.pane-src { color: var(--ink-3); }
+.pane-src:not(:empty)::before { content: '·'; margin-right: 5px; }
+.pane-title-label {
   font-weight: 800;
   font-size: 15px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.pane-title svg { width: 15px; height: 15px; color: var(--ink-3); flex: none; }
-.pane-title:hover { background: var(--ground); }
-.pane-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pane-meta {
   font-size: 13px;
   font-weight: 600;
@@ -345,6 +515,20 @@ svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap
   text-overflow: ellipsis;
   min-width: 0;
 }
+/* where this side is, while it plays */
+.pane-where {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--side);
+  background: var(--side-soft);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.pane-where:empty { display: none; }
+/* while it plays, where it is matters more than the meters' note */
+.pane-head:has(.pane-where:not(:empty)) .meter-note { display: none; }
 
 /* This score is no longer the one in its own app. Said quietly, beside
    the meter, and only while it is true. Where there is a saved version to
@@ -472,91 +656,144 @@ body.dragging .grip { background: var(--ink-2); transform: scale(1.15); }
 
 
 /* ============================================================
-   TRANSPORT
+   TOOLBAR
+   One row, always: Play and Loop, the tempo, then Mixer, View and
+   Present. The rest of the height belongs to the two scores.
    ============================================================ */
 
 .transport {
   flex: 0 0 auto;
   background: var(--surface);
   border-top: 1px solid var(--hairline);
-  padding: 10px var(--gutter) calc(10px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
   position: relative;
   z-index: 5;
 }
 .transport-inner {
   display: flex;
   align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
   gap: 10px;
-  flex-wrap: wrap;
+  min-height: 64px;
+  padding: 8px 14px;
+}
+
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-left: 12px;
+  border-left: 1px solid var(--hairline);
 }
 
 /* The one button that plays both, so it wears both colours. */
 .play-btn {
-  width: 52px; height: 52px;
+  width: 50px; height: 50px;
   flex: none;
   display: grid; place-items: center;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--poem), var(--ost));
   color: #fff;
-  box-shadow: var(--shadow-2);
-  transition: transform .1s;
+  box-shadow: 0 3px 0 rgba(0,0,0,.13);
+  transition: transform .12s, box-shadow .12s;
 }
-.play-btn:active { transform: scale(.95); }
-.play-glyph { font-size: 21px; margin-left: 3px; line-height: 1; }
-.play-btn.playing { background: var(--ink); }
-.play-btn.playing .play-glyph { margin-left: 0; font-size: 19px; }
+.play-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 0 rgba(0,0,0,.13); }
+.play-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.13); }
+.play-glyph { font-size: 20px; margin-left: 3px; line-height: 1; }
+.play-btn.playing { background: var(--danger); }
+.play-btn.playing .play-glyph { margin-left: 0; font-size: 18px; }
 
-.tempo {
-  display: flex; align-items: center; gap: 2px;
-  padding: 3px;
-  border-radius: 999px;
-  background: var(--ground);
-  border: 1px solid var(--hairline);
-}
-.step-btn {
-  width: 32px; height: 32px;
+/* Round again, or stop at the end. Lit while it will go round. */
+.loop-btn {
+  width: 40px; height: 40px;
+  flex: none;
+  display: grid; place-items: center;
   border-radius: 50%;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--ink-2);
-  line-height: 1;
+  background: var(--ground);
+  color: var(--ink-3);
+  transition: background .15s, color .15s;
 }
-.step-btn:hover { background: var(--surface); color: var(--ink); }
-.bpm-field {
-  display: flex; align-items: baseline; gap: 4px;
-  padding: 0 4px;
-  cursor: text;
-}
-.bpm-field input {
-  width: 3.1ch;
-  border: 0;
-  background: transparent;
-  text-align: right;
+.loop-btn svg { width: 18px; height: 18px; }
+.loop-btn:hover { color: var(--ink); }
+.loop-btn[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+/* The tempo, as Rhythm Poetry has it: the number, small; tap to type,
+   hover for a slider. */
+.bpm-btn { gap: 4px; padding: 0 13px; min-width: 88px; justify-content: center; }
+.bpm-value { font-family: var(--font-round); font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.bpm-unit  { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--ink-3); }
+.bpm-input {
+  width: 58px;
   font-family: var(--font-round);
-  font-weight: 800;
-  font-size: 22px;
-  line-height: 1;
-  padding: 0;
-  outline: none;
-}
-.bpm-unit { font-size: 11.5px; font-weight: 800; color: var(--ink-3); letter-spacing: .05em; }
-.tempo-more { width: 28px; height: 28px; padding: 0; justify-content: center; border-radius: 50%; }
-.tempo-more svg { width: 16px; height: 16px; }
-
-.tool-group {
-  display: flex; align-items: center; gap: 2px;
-  padding-left: 8px;
-  border-left: 1px solid var(--hairline);
-}
-.mixer-btn { border-left: 1px solid var(--hairline); border-radius: 0 var(--r-sm) var(--r-sm) 0; padding-left: 14px; }
-
-.readout {
-  margin-left: auto;
-  display: flex; align-items: center; gap: 8px;
-  font-size: 13.5px;
+  font-size: 16px;
   font-weight: 700;
-  min-width: 0;
+  text-align: center;
+  color: var(--ink);
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  outline: none;
+  padding: 2px 0;
 }
+.bpm-input::-webkit-outer-spin-button,
+.bpm-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Rhythm Poetry's hover gauge: a small floating card above the button
+   with a slider to drag, so the button's own tap still types. Mouse only. */
+.hover-gauge {
+  position: fixed;
+  z-index: 65;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  width: 260px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-3);
+}
+.hover-gauge.show { display: flex; }
+.hover-gauge-label {
+  flex: none;
+  min-width: 58px;
+  font-family: var(--font-round);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.gauge-slider {
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  appearance: none;
+  border-radius: 999px;
+  background: var(--hairline);
+  cursor: pointer;
+}
+.gauge-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--ink);
+  border: 3px solid var(--surface);
+  box-shadow: 0 1px 4px rgba(30,34,56,.3);
+  cursor: pointer;
+}
+.gauge-slider::-moz-range-thumb {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--ink);
+  border: 3px solid var(--surface);
+  cursor: pointer;
+}
+@media (hover: none), (pointer: coarse) {
+  .hover-gauge { display: none !important; }
+}
+
+.readout { display: none; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 700; min-width: 0; }
 .readout-part {
   display: flex; align-items: center; gap: 6px;
   padding: 4px 10px;
@@ -577,7 +814,7 @@ body.dragging .grip { background: var(--ink-2); transform: scale(1.15); }
 .popover {
   position: fixed;
   z-index: 40;
-  width: 300px;
+  width: 310px;
   max-width: calc(100vw - 16px);
   max-height: calc(100vh - 80px);
   overflow: auto;
@@ -589,8 +826,9 @@ body.dragging .grip { background: var(--ink-2); transform: scale(1.15); }
   display: none;
 }
 .popover.open { display: block; }
-.popover-wide { width: 520px; }
-.popover-wide.open { display: flex; gap: 18px; }
+.popover-wide { width: 560px; }
+.mixer-top { padding-bottom: 6px; margin-bottom: 12px; border-bottom: 1px solid var(--hairline); }
+.mixer-cols { display: flex; gap: 18px; }
 
 .pop-section + .pop-section { margin-top: 14px; }
 .pop-label {
@@ -655,6 +893,9 @@ body.dragging .grip { background: var(--ink-2); transform: scale(1.15); }
   box-shadow: 0 1px 2px rgba(0,0,0,.2);
   transition: transform .15s;
 }
+.switch-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.switch-text small { font-size: 12px; font-weight: 600; color: var(--ink-3); line-height: 1.35; }
+.switch-row { gap: 12px; }
 .switch-row.on .switch { background: var(--good); }
 .switch-row.on .switch::after { transform: translateX(15px); }
 
@@ -668,8 +909,6 @@ body.dragging .grip { background: var(--ink-2); transform: scale(1.15); }
   font-weight: 700;
   font-size: 15px;
   color: var(--side);
-  text-transform: uppercase;
-  letter-spacing: .06em;
   margin-bottom: 8px;
 }
 .mixer-voices { display: flex; flex-direction: column; gap: 4px; }
@@ -720,6 +959,7 @@ button.voice-pic:hover { border-color: var(--side); background: var(--side-soft)
 
 /* ============================================================
    SHEETS
+   The apps' sheets: a paper card that scrolls as a whole.
    ============================================================ */
 
 .sheet-backdrop {
@@ -728,47 +968,251 @@ button.voice-pic:hover { border-color: var(--side); background: var(--side-soft)
   display: none;
   align-items: center;
   justify-content: center;
-  padding: 16px;
-  background: rgba(30,34,56,.35);
+  padding: 22px;
+  background: rgba(30,34,56,.38);
+  backdrop-filter: blur(3px);
 }
 .sheet-backdrop.open { display: flex; }
 .sheet {
-  width: 520px;
-  max-width: 100%;
-  max-height: min(680px, calc(100vh - 32px));
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 18px;
-  background: var(--surface);
-  border-radius: var(--r-lg);
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 22px;
+  background: var(--paper);
+  border-radius: var(--r-xl);
   box-shadow: var(--shadow-3);
-  overflow: hidden;
+  animation: sheet-in .2s cubic-bezier(.2,.9,.3,1);
 }
-.sheet-head { display: flex; align-items: center; gap: 10px; }
-.sheet-head h2 { flex: 1; margin: 0; font-family: var(--font-round); font-size: 22px; }
+.sheet-sm { max-width: 420px; }
+.sheet-md { max-width: 600px; }
+.sheet-lg { max-width: 720px; }
+@keyframes sheet-in {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+.sheet-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.sheet-head h2 { flex: 1; margin: 0; font-family: var(--font-round); font-size: 23px; font-weight: 700; }
 .sheet .pane-dot { background: var(--side, var(--ink)); }
-.sheet-text { margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
-.sheet-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
-.sheet-actions .status-msg { margin-right: auto; }
-.picker-pane { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
-.picker-foot { margin: 0; }
-
-.song-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  overflow: auto;
-  min-height: 60px;
-  padding: 2px;
+.sheet-close {
+  display: grid; place-items: center;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  color: var(--ink-3);
+  flex: none;
 }
+.sheet-close svg { width: 18px; height: 18px; }
+.sheet-close:hover { background: var(--hairline); color: var(--ink); }
+.sheet-sub { margin: 0 0 14px; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+.sheet-tabs { margin-bottom: 14px; }
+.sheet-foot { display: flex; justify-content: flex-end; align-items: center; gap: 9px; margin-top: 16px; }
+.sheet-foot-split { justify-content: space-between; }
+.sheet-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 18px; }
+.picker-pane { display: flex; flex-direction: column; gap: 12px; }
+.picker-filter { margin-bottom: 2px; }
+.picker-foot { margin: 4px 0 0; }
+
+/* ---- the library: what is open ---- */
+.now-open {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 12px 15px;
+  margin-bottom: 14px;
+  border-radius: var(--r-md);
+  background: var(--ground);
+}
+.now-open-label {
+  font-size: 11px; font-weight: 800; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.now-open-title {
+  flex: 1;
+  min-width: 100px;
+  font-family: var(--font-round);
+  font-size: 17px; font-weight: 700;
+}
+.now-open-note { flex-basis: 100%; font-size: 13px; color: var(--ink-2); line-height: 1.4; }
+.now-open-note:empty { display: none; }
+.kind-badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px; font-weight: 800; letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--ink);
+  white-space: nowrap;
+}
+.kind-badge.is-sandbox { background: transparent; color: var(--ink-2); box-shadow: inset 0 0 0 1.5px var(--ink-2); }
+.kind-badge.is-shared { background: var(--ink-2); }
+
+/* ---- the library: groups and rows ---- */
+.library-groups { display: flex; flex-direction: column; gap: 20px; }
+.library-group-head { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }
+.library-group-head svg { width: 16px; height: 16px; color: var(--group, var(--ink-2)); flex: none; }
+.library-group-title {
+  font-size: 12px; font-weight: 800; letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--group, var(--ink-2));
+}
+.library-group-rule { flex: 1; height: 1px; background: var(--hairline); }
+.book-head-btn {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1.5px solid var(--hairline-2);
+  font-size: 12px; font-weight: 800;
+  color: var(--ink-2);
+}
+.book-head-btn:hover { background: var(--ground); color: var(--ink); }
+
+.lib-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 13px;
+  margin-bottom: 6px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1.5px solid var(--hairline);
+  transition: border-color .14s, box-shadow .14s;
+}
+.lib-row:hover { border-color: var(--hairline-2); }
+.lib-row.is-current { border-color: var(--row, var(--ink)); box-shadow: 0 0 0 3px var(--row-soft, var(--ground-2)); }
+button.lib-row { width: 100%; text-align: left; cursor: pointer; }
+.lib-row.sandbox-row { border-style: dashed; background: var(--paper); }
+.lib-row.sandbox-row.is-current { border-style: solid; }
+
+.meter-badge {
+  flex: none;
+  min-width: 46px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: var(--ground);
+  font-family: var(--font-round);
+  font-size: 13px; font-weight: 700;
+  text-align: center;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+/* a pairing's badge is its two sides, lit where it has something */
+.pair-badge { display: flex; gap: 4px; align-items: center; justify-content: center; }
+.pair-badge i { width: 9px; height: 9px; border-radius: 50%; background: var(--hairline-2); }
+.pair-badge i.poem.on { background: var(--poem); }
+.pair-badge i.ost.on  { background: var(--ost); }
+
+.lib-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.lib-title {
+  font-size: 15px; font-weight: 700; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lib-sub {
+  font-size: 12.5px; font-weight: 600; color: var(--ink-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.shared-tag {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1.5px solid var(--hairline-2);
+  font-size: 11px; font-weight: 800; letter-spacing: .02em;
+  color: var(--ink-3);
+  vertical-align: 2px;
+}
+.lib-actions { display: flex; gap: 5px; flex: none; }
+.lib-btn {
+  height: 33px;
+  padding: 0 12px;
+  border-radius: 9px;
+  background: var(--ground);
+  font-size: 13px; font-weight: 700; color: var(--ink-2);
+  white-space: nowrap;
+  transition: background .13s, color .13s;
+}
+.lib-btn:hover { background: var(--hairline); color: var(--ink); }
+.lib-btn.open-btn { background: var(--row, var(--ink)); color: #fff; }
+.lib-btn.open-btn:hover { filter: brightness(1.1); }
+.lib-btn.is-active { background: transparent; color: var(--row, var(--ink)); cursor: default; }
+.lib-btn.delete-btn { width: 33px; padding: 0; font-size: 15px; }
+.lib-btn.delete-btn:hover { background: var(--danger); color: #fff; }
+.lib-btn.delete-btn.confirm { width: auto; padding: 0 10px; background: var(--danger); color: #fff; font-size: 12.5px; }
+/* a whole-row button (the song pickers) shows its Open pill on hover */
+button.lib-row .lib-btn.open-btn { opacity: 0; transition: opacity .12s; }
+button.lib-row:hover .lib-btn.open-btn,
+button.lib-row:focus-visible .lib-btn.open-btn { opacity: 1; }
+
+.library-empty {
+  padding: 22px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--ink-3);
+  background: var(--surface);
+  border: 1.5px dashed var(--hairline-2);
+  border-radius: var(--r-md);
+}
+
+/* the pickers colour their rows by the side they open on */
+#picker-sheet .sheet { --row: var(--side); --row-soft: var(--side-soft); }
+
+/* ---- share & backup cards ---- */
+.card {
+  padding: 17px;
+  margin-bottom: 14px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+}
+.card:last-child { margin-bottom: 0; }
+.card-danger { background: var(--danger-soft); border-color: #F0D3D8; }
+.card-title {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 7px;
+  font-family: var(--font-round);
+  font-size: 16px; font-weight: 700;
+}
+.card-title svg { width: 17px; height: 17px; color: var(--ink-2); }
+.card-danger .card-title, .card-danger .card-title svg { color: var(--danger); }
+.card-desc { margin: 0 0 12px; font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+.card-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.text-tools { display: flex; gap: 5px; }
+.text-tool {
+  padding: 4px 10px;
+  border-radius: 7px;
+  font-size: 12px; font-weight: 800;
+  color: var(--ink-2);
+}
+.text-tool:hover { background: var(--ground); color: var(--ink); }
+.export-list {
+  max-height: 210px;
+  overflow-y: auto;
+  padding: 5px;
+  margin-bottom: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--paper);
+}
+.export-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 14px; font-weight: 600;
+}
+.export-item:hover { background: var(--ground); }
+.export-item input { width: 17px; height: 17px; accent-color: var(--ink); flex: none; cursor: pointer; }
+.export-item .lib-sub { margin-left: auto; }
+.filename-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.filename-row .text-field { flex: 1; }
+.filename-ext { font-size: 14px; font-weight: 700; color: var(--ink-3); }
+.share-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.share-row .text-field { flex: 1; min-width: 200px; font-size: 12.5px; font-weight: 400; }
 
 /* the instrument picker — the app's own grid, at the stand's size */
 .instrument-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
   gap: 10px;
-  overflow: auto;
   padding: 2px;
 }
 .instrument-card {
@@ -792,64 +1236,19 @@ button.voice-pic:hover { border-color: var(--side); background: var(--side-soft)
   background: var(--ost-soft);
   color: var(--ost);
 }
-.song-row {
-  display: flex; align-items: center; gap: 12px;
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--hairline);
-  text-align: left;
-}
-.song-row:hover { border-color: var(--side, var(--ink-2)); background: var(--ground); }
-.song-row.current { border-color: var(--side, var(--ink)); box-shadow: inset 0 0 0 1px var(--side, var(--ink)); }
-.song-main { flex: 1; min-width: 0; }
-.song-title { font-weight: 800; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.song-sub {
-  font-size: 12.5px;
-  color: var(--ink-3);
-  font-weight: 600;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.song-badge {
-  flex: none;
-  font-size: 11.5px;
-  font-weight: 800;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: var(--ground);
-  color: var(--ink-2);
-}
-.song-group-label {
-  font-size: 12px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: .07em;
-  color: var(--ink-3);
-  margin: 8px 2px 0;
-}
-.song-group-label:first-child { margin-top: 0; }
-.list-empty { font-size: 14px; color: var(--ink-3); padding: 14px 4px; text-align: center; }
 
-.row-actions { display: flex; gap: 4px; flex: none; }
-.row-actions .icon-btn.danger:hover { color: var(--danger); }
-.row-actions .icon-btn.confirm { color: #fff; background: var(--danger); width: auto; padding: 0 10px; font-size: 12.5px; font-weight: 800; }
-
-textarea, .field input, .share-row input {
+textarea {
   width: 100%;
-  border: 1px solid var(--hairline-2);
-  border-radius: 12px;
+  border: 1.5px solid var(--hairline-2);
+  border-radius: var(--r-md);
   padding: 10px 12px;
   background: var(--surface);
-  font-size: 14px;
   outline: none;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
 }
-textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
-textarea:focus, .field input:focus { border-color: var(--ink-2); }
-.field { display: flex; flex-direction: column; gap: 5px; }
-.field-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); }
-.pair-current { display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--hairline); }
-.share-row { display: flex; flex-direction: column; gap: 4px; }
-.share-row input { font-size: 12.5px; color: var(--ink-2); }
+textarea:focus { border-color: var(--ink-2); }
 
 .status-msg { font-size: 13px; font-weight: 700; color: var(--ink-2); }
 .status-msg.error { color: var(--danger); }
@@ -878,13 +1277,14 @@ textarea:focus, .field input:focus { border-color: var(--ink-2); }
 /* ============================================================
    PRESENT MODE
    The two scores and nothing else. The pane headings and the top
-   bar go; the transport shrinks to a small bar that fades until
-   it is wanted. Layout is untouched — present shows what was set.
+   bar go; the toolbar shrinks to a small bar that fades until
+   it is wanted — Play, the tempo and where the music is. Layout
+   is untouched: present shows what was set.
    ============================================================ */
 
 body.present .topbar { display: none; }
 body.present .pane-head { display: none; }
-/* the floating transport gets a strip of its own, so it never sits on
+/* the floating toolbar gets a strip of its own, so it never sits on
    the last instrument's notes */
 body.present .panes { padding: 8px 8px 74px; }
 body.present .pane { border-radius: 10px; }
@@ -894,7 +1294,7 @@ body.present .transport {
   transform: translateX(-50%);
   width: auto;
   max-width: calc(100vw - 24px);
-  padding: 8px 10px;
+  padding: 0;
   border: 1px solid var(--hairline);
   border-radius: 999px;
   box-shadow: var(--shadow-3);
@@ -903,12 +1303,11 @@ body.present .transport {
 }
 body.present .transport:hover,
 body.present .transport:focus-within { opacity: 1; }
-body.present .transport .tool-group,
-body.present .transport .mixer-btn,
-body.present .transport .tempo-more { display: none; }
-body.present .transport-inner { flex-wrap: nowrap; }
-body.present .readout { margin-left: 0; }
+body.present .transport-inner { min-height: 0; padding: 7px 9px; }
+body.present .tool-group { display: none; }
+body.present .readout { display: flex; }
 body.present .play-btn { width: 44px; height: 44px; }
+body.present .loop-btn { width: 36px; height: 36px; }
 body.present .present-exit {
   display: grid; place-items: center;
   width: 40px; height: 40px;
@@ -920,24 +1319,50 @@ body.present .present-exit svg { width: 20px; height: 20px; }
 
 
 /* ============================================================
-   SMALL SCREENS
+   SMALLER SCREENS
+   Both bars stay one row at every width: words give way to icons
+   before anything wraps.
    ============================================================ */
 
+@media (max-width: 1100px) {
+  .brand-name { display: none; }
+  .show-tab { padding: 8px 14px; }
+}
+
 @media (max-width: 900px) {
-  .brand-name, .seg-label, .tool-label { display: none; }
-  #leadin-btn .tool-label { display: inline; }   /* "1×" alone says nothing */
-  .tool-btn { padding: 0 9px; }
-  .readout { width: 100%; margin-left: 0; order: 10; }
+  /* the switch keeps its dots and picture; the room goes to the chip */
+  .show-label { display: none; }
+  .show-tab { padding: 8px 13px; }
+  .pane-meta { display: none; }
+}
+
+@media (max-width: 720px) {
+  .home-link span { display: none; }
+  .home-link { padding: 7px; }
+  .autosave-label, .sandbox-clear-label { display: none; }
+  .autosave-toggle, .sandbox-clear { width: 38px; height: 38px; min-height: 0; padding: 0; justify-content: center; }
+  .tool-label { display: none; }
+  .tool-btn { padding: 0 11px; }
+  .bpm-btn { min-width: 0; }
 }
 
 @media (max-width: 640px) {
-  :root { --gutter: 8px; --topbar-h: 52px; }
-  .pair-chip { max-width: none; flex: 1; margin: 0; }
-  .topbar { gap: 8px; }
-  .home-link { display: none; }
-  .pane-meta, .meter-note { display: none; }
-  .transport-inner { gap: 6px; }
-  .popover-wide.open { flex-direction: column; }
+  :root { --gutter: 6px; --topbar-h: 52px; }
+  /* no room for symmetry: the way home and the switch take what they
+     need, and the chip takes the rest */
+  .topbar { gap: 6px; padding: 0 8px; grid-template-columns: auto auto minmax(0, 1fr); }
+  .brand { display: none; }
+  .show-tab { padding: 7px 10px; }
+  .pair-chip { max-width: none; }
+  .meter-note, .edited-chip { display: none; }
+  .transport-inner { gap: 6px; padding: 6px 8px; min-height: 58px; }
+  .tool-group { padding-left: 6px; gap: 5px; }
+  .play-btn { width: 46px; height: 46px; }
+  .editing-flag { display: none !important; }
+  .mixer-cols { flex-direction: column; }
+  .sheet { padding: 18px; border-radius: var(--r-lg); }
+  .sheet-backdrop { padding: 10px; }
+  .lib-btn.rename-btn { display: none; }
   /* one screen too narrow for two scores side by side */
   #arrange-side { display: none; }
 
@@ -950,7 +1375,7 @@ body.present .present-exit svg { width: 20px; height: 20px; }
      stamps does not mean anything.
 
      The heights come from the stand, which asks each score how tall it
-     is at the size the width allows — see mobileHeights(). */
+     is at the size the width allows — see applyNarrow(). */
   body.narrow .panes {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
@@ -960,6 +1385,7 @@ body.present .present-exit svg { width: 20px; height: 20px; }
   body.narrow #pane-ost { flex: 0 0 auto; }
   /* nothing to drag when nothing is being shared */
   body.narrow .divider { display: none; }
+  body.narrow.editing #view-btn::after {
+    content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ink);
+  }
 }
-
-.field input.input-error { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(199,58,78,.12); }

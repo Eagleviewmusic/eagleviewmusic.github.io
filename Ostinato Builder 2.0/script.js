@@ -7438,6 +7438,10 @@
         instruments: (rec.tracks || []).map(t => t.instrument),
         isCustom: !starter,
         createdAt: rec.createdAt || 0,
+        updatedAt: rec.updatedAt || rec.createdAt || 0,
+        // shared with this browser, and the Teacher Library book it came in
+        received: !!rec.received,
+        book: rec.received && rec.book ? String(rec.book) : '',
         preview: (rec.tracks || []).map(t => instrumentMeta(t.instrument).label).join(' · ')
       };
     }
