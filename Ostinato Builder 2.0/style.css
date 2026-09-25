@@ -675,7 +675,6 @@ html.in-iframe .home-link { display: none; }
   background: var(--surface);
   transition: border-color .18s, background .18s;
 }
-.dots.playing { border-color: var(--sound); background: var(--sound-soft); }
 
 /* Scoped to the dots row on purpose. The notation engine names its
    augmentation dots `class="dot"` too, and an unscoped rule here reaches
@@ -826,7 +825,7 @@ html.in-iframe .home-link { display: none; }
 .play-btn:hover,
 .play-btn:active { transform: scale(1.05); }
 .play-btn:active { transform: scale(.96); }
-.play-btn.playing { background: var(--ink); }
+.play-btn.playing { background: var(--danger); }
 .play-glyph { font-size: 21px; line-height: 1; margin-left: 2px; }
 .play-btn.playing .play-glyph { margin-left: 0; }
 
@@ -836,7 +835,7 @@ html.in-iframe .home-link { display: none; }
   gap: 7px;
   height: 44px;
   padding: 0 15px;
-  border-radius: 999px;
+  border-radius: var(--r-md);
   background: var(--paper-2);
   color: var(--ink);
   font-size: 15px;
@@ -883,7 +882,7 @@ html.in-iframe .home-link { display: none; }
   justify-content: center;
   gap: 0;
   width: 44px;
-  height: 48px;
+  height: 54px;
   border-radius: var(--r-md);
   background: var(--paper-2);
   transition: background .13s;
@@ -911,7 +910,7 @@ html.in-iframe .home-link { display: none; }
   align-items: center;
   height: 44px;
   padding: 0 4px;
-  border-radius: 999px;
+  border-radius: var(--r-md);
   background: var(--paper-2);
 }
 .step-btn {
@@ -1116,13 +1115,34 @@ html.in-iframe .home-link { display: none; }
   box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--c);
 }
 
-/* The button beside Play reads EASY, a letter in each circle's colour. */
+/* ---- the beat-dot button ----
+   Drawn as Rhythm Poetry draws it: a rounded square holding the dot row,
+   tinted while the dots are up. */
+.dots-btn {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: var(--r-md);
+  background: var(--paper-2);
+  color: var(--ink-3);
+  transition: background .13s, color .13s;
+}
+.dots-btn svg { width: 24px; height: 24px; }
+.dots-btn:hover,
+.dots-btn:active { background: var(--hairline); }
+.dots-btn.active { background: var(--accent-soft); color: var(--accent); }
+
+/* In EASY it reads EASY, a letter in each circle's colour. */
 .dots-btn .easy-label {
   display: none;
+  font-family: var(--font-round);
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: .06em;
 }
+.dots-btn.easy { width: auto; min-width: 44px; padding: 0 10px; }
 .dots-btn.easy svg { display: none; }
 .dots-btn.easy .easy-label { display: inline; }
 .dots-btn.easy,
@@ -1168,18 +1188,21 @@ html.in-iframe .home-link { display: none; }
 .easy-pic .rhythm-svg { position: static; overflow: visible; }
 .easy-select { width: 100%; min-width: 0; max-width: none; }
 
-/* --- the beat that is sounding, lit under the notation ---
-   Off by default: the dots row lighting up is the quiet way to follow
-   playback. With the dots turned off there is nothing left to watch, so
-   this puts the same wash behind the notes instead. The border is drawn
-   on the transparent one the box already carries, so nothing shifts when
-   it comes on. */
-.notes-box.playing { transition: background .12s, border-color .12s; }
+/* --- the beat that is sounding ---
+   Two lights, each with its own switch in View (body.light-beats,
+   body.light-notes): the box of dots above the beat, and a box round its
+   notes. Both are drawn the same way — the sounding colour's wash inside,
+   its line round the edge, thickened by a ring outside the border so
+   nothing shifts when it comes on — and Rhythm Poetry draws its two
+   exactly so, in its own colour. */
+.notes-box.playing { transition: background .12s, border-color .12s, box-shadow .12s; }
+body.light-beats .dots.playing,
 body.light-notes .notes-box.playing {
-  background: var(--sound-soft);
   border-color: var(--sound);
-  border-radius: var(--r-md);
+  background: var(--sound-soft);
+  box-shadow: 0 0 0 1.5px var(--sound);
 }
+body.light-notes .notes-box.playing { border-radius: var(--r-md); }
 /* Bar and beat numbers are two switches on one row. Either can go on its
    own and the row keeps its height, so the tracks do not jump; only with
    both off does the row itself go. A beat number that is hidden takes its
@@ -1375,6 +1398,8 @@ body.show-syllables .track-head { padding-bottom: 28px; }
   flex-direction: column;
   gap: 14px;
   width: min(300px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
   padding: 16px;
   background: var(--surface);
   border-radius: var(--r-lg);
@@ -1511,31 +1536,41 @@ body.show-syllables .track-head { padding-bottom: 28px; }
 
 .sheet-narrow { width: min(420px, 100%); }
 
-.now-editing { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.now-editing {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 9px;
+  margin: 14px 20px 0;
+  padding: 12px 15px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+}
 .now-editing-label {
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: .08em;
+  letter-spacing: .07em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
-.now-editing-note {
-  font-size: 12.5px;
-  color: var(--ink-2);
-  line-height: 1.4;
-  white-space: normal;
-  max-width: 340px;
-}
-.now-editing-note[hidden] { display: none; }
 .now-editing-title {
+  flex: 1;
+  min-width: 100px;
   font-family: var(--font-round);
-  font-size: 19px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.now-editing-note {
+  flex-basis: 100%;
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.4;
+}
+.now-editing-note[hidden] { display: none; }
 
 .sheet-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
 .sheet-scroll { overflow-y: auto; gap: 0; padding: 0; }
@@ -1561,7 +1596,7 @@ body.show-syllables .track-head { padding-bottom: 28px; }
   gap: 6px;
   height: 40px;
   padding: 0 15px;
-  border-radius: 999px;
+  border-radius: var(--r-md);
   background: var(--paper-2);
   color: var(--ink);
   font-size: 14px;
@@ -1652,56 +1687,72 @@ body.show-syllables .track-head { padding-bottom: 28px; }
   line-height: 1.4;
 }
 
-/* --- the song list --- */
-.library-list { padding: 12px 14px 20px; overflow-y: auto; }
+/* --- the song list ---
+   Drawn as Rhythm Poetry and the Music Stand draw theirs: each group under
+   an icon and a rule, each ostinato a card of its own, and Open a real
+   button in the accent. */
+.library-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 20px 20px;
+  overflow-y: auto;
+}
 
 .library-group-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 6px 6px;
+  gap: 9px;
+  margin-bottom: 9px;
 }
 .library-group-title {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: .08em;
+  letter-spacing: .07em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--accent);
   white-space: nowrap;
 }
 .library-group-rule { flex: 1; height: 1px; background: var(--hairline); }
-/* a book from the Teacher Library (lib/evm-shelf.js): its icon, beside the name */
-.library-group-head svg { flex: none; width: 14px; height: 14px; color: var(--ink-3); }
+.library-group-head svg { flex: none; width: 16px; height: 16px; color: var(--accent); }
+/* the sandbox: scratch pages, drawn unfiled; a book from the Teacher
+   Library (lib/evm-shelf.js) in plain ink */
+.library-group-sandbox .library-group-title,
+.library-group-sandbox .library-group-head svg { color: var(--ink-2); }
+.library-group-book .library-group-title,
+.library-group-book .library-group-head svg { color: var(--ink); }
 
 .library-song {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
+  gap: 11px;
+  padding: 10px 13px;
+  margin-bottom: 6px;
   border-radius: var(--r-md);
-  transition: background .13s;
+  background: var(--surface);
+  border: 1.5px solid var(--hairline);
+  transition: border-color .14s, box-shadow .14s;
 }
 .library-song:hover,
-.library-song:active { background: var(--paper); }
-.library-song.current { background: var(--accent-soft); }
+.library-song:active { border-color: var(--hairline-2); }
+.library-song.current { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
 /* the sandbox row: scratch work, drawn unfiled */
-.sandbox-song { border: 1.5px dashed var(--hairline-2); }
-.sandbox-song.current { border-style: solid; border-color: var(--accent); }
+.sandbox-song { border-style: dashed; background: var(--paper); }
+.sandbox-song.current { border-style: solid; }
 
 .meter-badge {
   flex: none;
-  width: 34px;
-  padding: 3px 0;
-  text-align: center;
+  min-width: 42px;
+  padding: 4px 7px;
   border-radius: 7px;
   background: var(--paper-2);
-  font-family: var(--font-signature);
-  font-size: 12px;
-  font-weight: 900;
+  font-family: var(--font-round);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
   color: var(--ink-2);
 }
-.library-song.current .meter-badge { background: #fff; color: var(--accent); }
 
 .library-song-title {
   flex: 1;
@@ -1730,26 +1781,29 @@ body.show-syllables .track-head { padding-bottom: 28px; }
   white-space: nowrap;
 }
 
-.library-song-actions { display: flex; align-items: center; gap: 4px; flex: none; }
+.library-song-actions { display: flex; align-items: center; gap: 5px; flex: none; }
 
 .lib-btn {
-  height: 30px;
-  padding: 0 11px;
-  border-radius: 999px;
+  height: 33px;
+  padding: 0 12px;
+  border-radius: 9px;
+  background: var(--paper-2);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink-2);
-  background: transparent;
   transition: background .13s, color .13s;
 }
 .lib-btn:hover,
-.lib-btn:active { background: var(--surface); color: var(--accent); }
-.lib-btn.is-current { color: var(--accent); cursor: default; }
+.lib-btn:active { background: var(--hairline); color: var(--ink); }
+.lib-btn.open-btn { background: var(--accent); color: #fff; }
+.lib-btn.open-btn:hover,
+.lib-btn.open-btn:active { background: var(--accent-deep); color: #fff; }
+.lib-btn.is-current { background: transparent; color: var(--accent); cursor: default; }
 .lib-btn.is-current:hover,
 .lib-btn.is-current:active { background: transparent; }
-.lib-btn.danger { width: 30px; padding: 0; font-size: 17px; }
+.lib-btn.danger { width: 33px; padding: 0; font-size: 15px; }
 .lib-btn.danger:hover,
-.lib-btn.danger:active { background: var(--danger-soft); color: var(--danger); }
+.lib-btn.danger:active { background: var(--danger); color: #fff; }
 
 .library-empty {
   padding: 10px 8px 14px;
@@ -1757,20 +1811,48 @@ body.show-syllables .track-head { padding-bottom: 28px; }
   color: var(--ink-3);
 }
 
-/* --- backup --- */
-.backup-section {
+/* --- Share & backup ---
+   The cards Rhythm Poetry and the Music Stand use: white on the paper,
+   each titled with its icon. Scoped, because .card-title and .card-desc
+   also dress the Layout settings and lesson sheets. */
+.backup-cards { padding: 16px 20px 4px; background: var(--paper); }
+.backup-card {
   display: flex;
   flex-direction: column;
-  gap: 9px;
   align-items: flex-start;
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--hairline);
+  padding: 17px;
+  margin-bottom: 14px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
 }
-.backup-section:last-child { border-bottom: none; }
-.backup-title { margin: 0; font-size: 15px; font-weight: 800; }
-.backup-note { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.45; }
-.backup-head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; }
-.backup-danger .backup-title { color: var(--danger); }
+.backup-card .card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 7px;
+  font-family: var(--font-round);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.backup-card .card-title svg { flex: none; width: 17px; height: 17px; color: var(--accent); }
+.backup-card .card-desc { margin: 0 0 12px; font-size: 13.5px; line-height: 1.5; }
+.backup-card .card-head-row { width: 100%; align-items: baseline; }
+.backup-card .inline-check { margin-bottom: 12px; }
+.backup-card .inline-check em { font-style: normal; color: var(--ink-3); }
+.backup-card .export-list { margin-bottom: 12px; }
+.backup-card .share-row { margin-top: 12px; }
+.backup-card .status-msg:not(:empty) { margin-top: 8px; }
+.backup-card-danger { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 18%, var(--surface)); }
+.backup-card-danger .card-title,
+.backup-card-danger .card-title svg { color: var(--danger); }
+/* On the pink card the pink button needs its edge, as the other two draw it. */
+.backup-card-danger .btn-danger { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--danger) 32%, var(--surface)); }
+
+.filename-row { display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 12px; }
+.filename-row .text-field { flex: 1; }
+.filename-ext { font-size: 14px; font-weight: 700; color: var(--ink-3); }
 
 .text-tools { display: flex; gap: 2px; }
 .text-tool {
@@ -1826,8 +1908,8 @@ body.capturing .dots.easy .dot { visibility: visible; }
 body.capturing .instrument-btn { border-color: transparent; }
 /* a saved picture is a score, not a snapshot of playback: whichever beat
    happens to be sounding when the button is pressed must not be lit in it */
-body.capturing .dots.playing { background: var(--surface); border-color: var(--hairline-2); }
-body.capturing .notes-box.playing { background: none; border-color: transparent; }
+body.capturing .dots.playing { background: var(--surface); border-color: var(--hairline-2); box-shadow: none; }
+body.capturing .notes-box.playing { background: none; border-color: transparent; box-shadow: none; }
 body.capturing .ruler-beat.playing { color: var(--ink-3); border-bottom-color: transparent; }
 
 /* The picture is the whole piece on white, not the window on to it.
@@ -1938,7 +2020,7 @@ body.present-mode .instrument-btn:active {
   line-height: 1;
   transition: background .18s;
 }
-.present-play.playing { background: var(--ink); }
+.present-play.playing { background: var(--danger); }
 
 .present-exit {
   display: inline-flex;
@@ -2268,22 +2350,77 @@ body.present-mode .instrument-btn:active {
 .popover-link {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 9px;
   width: 100%;
-  padding: 10px;
+  padding: 9px 10px;
   border-radius: var(--r-sm);
-  background: var(--paper-2);
-  font-size: 15px;
-  font-weight: 800;
-  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink-2);
   text-align: left;
   transition: background .13s, color .13s;
 }
+.popover-link svg { width: 16px; height: 16px; flex: none; }
 .popover-link:hover,
-.popover-link:active { background: var(--accent-soft); color: var(--accent); }
-.popover-link svg { flex: none; color: var(--ink-3); }
-.popover-link:hover svg { color: var(--accent); }
+.popover-link:active { background: var(--paper-2); color: var(--ink); }
+.popover-link-strong { color: var(--ink); }
+.popover-link-strong svg { color: var(--accent); }
+
+/* ---- the tempo slider ----
+   Rhythm Poetry's hover gauge: a small card above the BPM button with a
+   slider to drag, so the button's own tap still types. Mouse only. */
+.hover-gauge {
+  position: fixed;
+  z-index: 65;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  width: 260px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-3);
+}
+.hover-gauge.show { display: flex; }
+.hover-gauge-label {
+  flex: none;
+  min-width: 58px;
+  font-family: var(--font-round);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.gauge-slider {
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  appearance: none;
+  border-radius: 999px;
+  background: var(--hairline);
+  cursor: pointer;
+}
+.gauge-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--surface);
+  box-shadow: 0 1px 4px rgba(27,35,64,.3);
+  cursor: pointer;
+}
+.gauge-slider::-moz-range-thumb {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--surface);
+  cursor: pointer;
+}
+@media (hover: none), (pointer: coarse) {
+  .hover-gauge { display: none !important; }
+}
+body.present-mode .hover-gauge { display: none !important; }
 
 /* ---- the kit ---- */
 .kit-grid {
@@ -2603,3 +2740,48 @@ body.embedded .instrument-btn:not(.fixed) { pointer-events: auto; cursor: pointe
    it has rather than run off the bottom of the frame. */
 body.embedded .sheet-backdrop { padding: 10px; }
 body.embedded .sheet { max-height: 100%; }
+
+
+/* ============================================================
+   HOW THIS WORKS
+   Rhythm Poetry's help sheet, in this app's colours.
+   ============================================================ */
+.help-body { padding: 16px 20px 22px; }
+.help-side-note {
+  margin: 0 0 16px;
+  padding: 12px 15px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.help-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 13px; }
+.help-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.help-list b { color: var(--ink); }
+
+.help-key {
+  flex: none;
+  min-width: 30px; height: 30px;
+  /* inline-grid so the badges used mid-sentence do not become block-level */
+  display: inline-grid; place-items: center;
+  vertical-align: middle;
+  padding: 0 7px;
+  border-radius: 8px;
+  background: var(--paper-2);
+  border: 1px solid var(--hairline-2);
+  font-size: 14px; font-weight: 800; color: var(--ink-2);
+}
+.help-list > li > .help-key { margin-top: 1px; }
+
+.dot-demo { flex: none; display: flex; gap: 4px; align-items: center; height: 30px; }
+.dot-demo .dot { width: 13px; height: 13px; border-radius: 50%; display: block; }
+.dot-demo .dot.on  { background: var(--sound); }
+.dot-demo .dot.off { background: var(--rest); }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Rhythm &amp; Poetry</title>
+  <title>Rhythm Poetry</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Noto+Serif:wght@700;900&family=Andika:wght@400;700&family=Atkinson+Hyperlegible:wght@400;700&family=Literata:opsz,wght@7..72,600;7..72,700&display=swap" rel="stylesheet">
@@ -22,10 +22,13 @@
 
 <!-- ============ TOP BAR ============ -->
 <header class="topbar">
-  <a href="../index.html" class="home-link" title="Back to Eagle View Music">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-    <span>Eagle View</span>
-  </a>
+  <div class="topbar-left">
+    <a href="../index.html" class="home-link" title="Back to Eagle View Music">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      <span>Eagle View</span>
+    </a>
+    <span class="app-mark">Rhythm Poetry</span>
+  </div>
 
   <div class="side-switch" role="tablist" aria-label="Choose a side">
     <button class="side-tab" id="rhythm-mode-btn" role="tab" aria-selected="true">
@@ -56,7 +59,7 @@
       <span class="autosave-label" id="autosave-label">Auto-save</span>
     </button>
 
-  <button class="song-chip" id="song-chip" title="Songs &amp; library">
+  <button class="song-chip" id="song-chip" title="Library">
     <span class="song-chip-text">
       <span class="song-chip-kicker" id="song-chip-kicker">Library</span>
       <span class="song-chip-label" id="song-chip-label">Instructions</span>
@@ -126,7 +129,7 @@
 <footer class="toolbar" id="toolbar">
   <div class="toolbar-inner">
 
-    <button class="play-btn" id="play-button" title="Play / stop (Space)">
+    <button class="play-btn" id="play-button" title="Play / pause (Space)">
       <span class="play-glyph" id="play-glyph">▶</span>
     </button>
 
@@ -163,7 +166,7 @@
     <div class="toolbar-break" aria-hidden="true"></div>
 
     <div class="tool-group">
-      <select id="rhythm-systems-dropdown" class="tool-select rhythm-only" title="Which syllables to show">
+      <select id="rhythm-systems-dropdown" class="tool-select rhythm-only" title="Counting system">
         <option>Simplified Kodály</option>
         <option>Beat Centered Kodály</option>
         <option>Gordon System</option>
@@ -187,13 +190,6 @@
     </div>
 
     <div class="tool-group">
-      <button class="tool-btn" id="library-btn" title="Songs &amp; library">
-        <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-        </svg>
-        <span class="tool-label">Songs</span>
-      </button>
       <button class="tool-btn present-btn" id="present-btn" title="Present mode — big and clean for the class">
         <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/>
@@ -222,7 +218,7 @@
     </button>
     <button class="switch-row active" id="intro-toggle">
       <span class="switch-name">Count-in</span>
-      <span class="switch-desc">A bar of beats, counted out on screen, before the music starts</span>
+      <span class="switch-desc">Begin with a one-bar count-in</span>
       <span class="switch-pill"></span>
     </button>
   </div>
@@ -245,9 +241,9 @@
 <div class="popover popover-wide" id="view-popover" role="dialog" aria-label="View options">
   <div class="popover-scroll">
 
-    <div class="popover-title">Size</div>
+    <div class="popover-title">Scale</div>
     <div class="seg seg-wide" role="group" aria-label="How the staff is sized">
-      <button class="seg-btn active" id="fit-mode-btn">Fit&nbsp;width</button>
+      <button class="seg-btn active" id="fit-mode-btn">Justify&nbsp;width</button>
       <button class="seg-btn" id="fixed-mode-btn">Fixed</button>
     </div>
     <p class="popover-note" id="size-mode-note">The staff resizes itself to fill the screen.</p>
@@ -255,7 +251,7 @@
     <div class="zoom-row">
       <button class="zoom-btn" id="zoom-out-btn" title="Smaller">−</button>
       <input type="range" class="zoom-slider" id="zoom-slider" min="40" max="300" step="5" value="100"
-             aria-label="Size">
+             aria-label="Scale">
       <button class="zoom-btn" id="zoom-in-btn" title="Bigger">+</button>
     </div>
     <div class="zoom-readout">
@@ -290,9 +286,9 @@
       <button class="seg-btn active" id="overflow-scroll-btn">Scroll&nbsp;across</button>
       <button class="seg-btn" id="overflow-wrap-btn">Wrap&nbsp;to&nbsp;fit</button>
     </div>
-    <p class="popover-note">Wrap treats the edges as walls — zooming in breaks measures onto new lines instead of running off the side.</p>
+    <p class="popover-note">Wrap treats the edges as walls — zooming in breaks bars onto new lines instead of running off the side.</p>
 
-    <div class="popover-title">Measures per line</div>
+    <div class="popover-title">Bars on a line</div>
     <div class="chip-row" id="mpl-row">
       <button class="chip active" data-mpl="auto">Auto</button>
       <button class="chip" data-mpl="1">1</button>
@@ -304,6 +300,20 @@
       <button class="chip" data-mpl="8">8</button>
     </div>
     <p class="popover-note">A maximum, not a rule — you can still split single lines with the <b>↵</b> on any barline.</p>
+
+    <div class="popover-title">While it plays</div>
+    <div class="switch-list">
+      <button class="switch-row" id="light-beats-toggle">
+        <span class="switch-name">Light up the beat boxes</span>
+        <span class="switch-desc">The box of circles above the beat that is sounding</span>
+        <span class="switch-pill"></span>
+      </button>
+      <button class="switch-row active" id="light-notes-toggle">
+        <span class="switch-name">Light up the notes</span>
+        <span class="switch-desc">A box around the notes that are sounding</span>
+        <span class="switch-pill"></span>
+      </button>
+    </div>
 
     <div class="popover-title">While you work</div>
     <div class="switch-list">
@@ -332,14 +342,6 @@
     <p class="popover-note">What is on the page, and which rhythms can be written on it.</p>
 
     <div class="popover-divider"></div>
-    <button class="popover-link" id="layout-reset-btn">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/></svg>
-      Undo my line splits
-    </button>
-    <button class="popover-link" id="start-clear-btn">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-      Clear the start-here marker
-    </button>
     <button class="popover-link" id="help-btn">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
       How this works
@@ -354,24 +356,24 @@
      in style.css) — the button's normal tap behavior is unchanged there. -->
 <div class="hover-gauge" id="bpm-gauge-wrap" aria-hidden="true">
   <span class="hover-gauge-label" id="bpm-gauge-label">88 BPM</span>
-  <input type="range" class="zoom-slider" id="bpm-gauge" min="40" max="240" step="1" tabindex="-1" aria-label="Tempo">
+  <input type="range" class="zoom-slider" id="bpm-gauge" min="30" max="300" step="1" tabindex="-1" aria-label="Tempo">
 </div>
 
 <div class="hover-gauge" id="size-gauge-wrap" aria-hidden="true">
   <span class="hover-gauge-label" id="size-gauge-label">100%</span>
-  <input type="range" class="zoom-slider" id="size-gauge" min="40" max="300" step="5" tabindex="-1" aria-label="Size">
+  <input type="range" class="zoom-slider" id="size-gauge" min="40" max="300" step="5" tabindex="-1" aria-label="Scale">
 </div>
 
 <!-- ============ SHEET: SONGS / LIBRARY ============ -->
 <div class="sheet-backdrop" id="library-sheet">
   <div class="sheet sheet-lg">
     <div class="sheet-head">
-      <h2 id="library-sheet-title">Songs</h2>
+      <h2 id="library-sheet-title">Library</h2>
       <button class="sheet-close" data-close="library-sheet" title="Close">&times;</button>
     </div>
 
     <div class="now-editing">
-      <span class="now-editing-label">Now editing</span>
+      <span class="now-editing-label">Now open</span>
       <span class="now-editing-title" id="now-editing-title">Instructions</span>
       <span class="side-badge" id="now-editing-badge">Rhythm</span>
       <span class="now-editing-note" id="now-editing-note"></span>
@@ -389,7 +391,10 @@
       <button class="btn" id="saveAsBtn">Save as…</button>
       <button class="btn" id="importExportBtn">Share &amp; backup</button>
       <button class="btn" id="lessonSetupBtn">Set up for students</button>
-      <button class="btn" id="copy-visual-btn" title="Download a picture of this song">Save picture</button>
+      <button class="btn" id="copy-visual-btn" title="Download a picture of this song">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <span>Save picture</span>
+      </button>
     </div>
 
     <label class="inline-check" for="picture-color-dots">
@@ -652,13 +657,13 @@
         Tempo &amp; length
       </div>
       <div class="seg seg-wide" id="lesson-tempo-seg" role="group" aria-label="How free the tempo is">
-        <button class="seg-btn active" data-tempo="any">Any&nbsp;tempo</button>
-        <button class="seg-btn" data-tempo="range">A&nbsp;range</button>
+        <button class="seg-btn active" data-tempo="any">Any</button>
+        <button class="seg-btn" data-tempo="range">Between</button>
         <button class="seg-btn" data-tempo="locked">Locked</button>
       </div>
       <div class="lesson-range" id="lesson-tempo-range" hidden>
-        <label>From <input type="number" id="lesson-tempo-min" class="text-field" min="21" max="600" /></label>
-        <label>to <input type="number" id="lesson-tempo-max" class="text-field" min="21" max="600" /></label>
+        <label>From <input type="number" id="lesson-tempo-min" class="text-field" min="30" max="300" /></label>
+        <label>to <input type="number" id="lesson-tempo-max" class="text-field" min="30" max="300" /></label>
         <span class="lesson-unit">BPM</span>
       </div>
       <p class="card-desc lesson-hint" id="lesson-tempo-note"></p>
@@ -667,7 +672,7 @@
       <div class="switch-list" id="lesson-length"></div>
       <div class="lesson-range">
         <label>At most <input type="number" id="lesson-max-measures" class="text-field" min="1" max="64" placeholder="any" /></label>
-        <span class="lesson-unit">measures</span>
+        <span class="lesson-unit">bars</span>
       </div>
     </div>
 
@@ -689,7 +694,7 @@
     <div class="card">
       <div class="card-title">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-        What else they get
+        What else comes with it
       </div>
       <div class="switch-list" id="lesson-shell"></div>
     </div>
@@ -743,9 +748,11 @@
       <li><span class="help-key">🔗</span>
         <div><b>Link two beats</b> to write dotted rhythms and ties across the beat.</div></li>
       <li><span class="help-key">▸</span>
-        <div><b>Tap any measure</b> to mark where playback should begin — handy for drilling one spot. Tap it again to clear it.</div></li>
+        <div><b>Tap any bar</b> to mark where playback should begin — handy for drilling one spot. Tap it again to clear it.</div></li>
       <li><span class="help-key">＋</span>
-        <div><b>Add or remove measures</b> with the + and × at the end of the last line.</div></li>
+        <div><b>Add or remove bars</b> with the + and × at the end of the last line.</div></li>
+      <li><span class="help-key">↵</span>
+        <div><b>Split a line</b> at any bar line; <span class="help-key">↰</span> joins it back. You can hide these handles under View → While you work.</div></li>
       <li><span class="help-key">⛶</span>
         <div><b>Present</b> hides every control and fills the screen. Press <span class="help-key">Esc</span> to come back.</div></li>
       <li><span class="help-key">␣</span>

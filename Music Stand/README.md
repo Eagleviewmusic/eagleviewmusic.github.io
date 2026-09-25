@@ -16,7 +16,7 @@ like one family:
 - **Top bar** — the way home (*‹ Eagle View*) and the mark on the left; in the
   middle the one big switch, **Poem · Both · Ostinato** (the stand's version of
   Rhythm Poetry's Rhythm / Poetry); on the right, where the work is going: the
-  arrangement chip (*Sandbox*, *Arrangement*, *Shared* or a book's name, over the title),
+  Library chip (*Sandbox*, *Library*, *Shared* or a book's name, over the title),
   with **Clear** beside it in the sandbox and **Auto-save / Not saving / Save my
   copy** beside it on an arrangement.
 - **Pane headings** — each is the pane's song chip: the side and where the song
@@ -26,13 +26,15 @@ like one family:
 - **Toolbar** — one row at every width, so the height goes to the scores:
   Play and Loop; the tempo (**BPM**: tap to type, or hover with a mouse for
   Rhythm Poetry's slider to drag left and right); **Mixer** — Count-in at the
-  top, then a column each for **Rhythm Poetry** (voices, words sound, strength,
+  top, then a column each for **Rhythm Poetry** (voices, rhythm sound, strength,
   volume) and **Ostinato Builder** (voices and instruments, the Intro, volume);
-  **View** — **Layout** (automatic, stacked, side by side), order, sizes, and the **Edit the scores** switch
+  **View** — **Layout** (automatic, stacked, side by side), order, sizes, the **Edit the scores** switch
   (while editing is on the View button says *Editing*; it is where the stand's
-  own settings go as it grows); and **Present**. The arrangements are reached from
-  the chip at the top right.
-- **Sheets** — *Arrangements* is the apps' Songs sheet, *Share & backup* is theirs
+  own settings go as it grows) and **How this works** at its foot; and
+  **Present**, tinted in the two sides' colours. Present mode keeps only Play
+  and Exit, as the apps' present bars do. The Library (the arrangements) is
+  reached from the chip at the top right.
+- **Sheets** — *Library* is the apps' Library sheet, *Share & backup* is theirs
   card for card, and the song pickers list an app's library in the app's own
   groups: Sandbox, the Teacher Library's books, Shared with you, yours, and the
   examples it came with.
@@ -110,8 +112,11 @@ in Rhythm Poetry and Ostinato Builder:
 
 - **The sandbox** is scratch work: whatever is on the stand when no arrangement is
   open. It keeps itself between visits, is never listed as an arrangement, and
-  **Clear** (top bar, or its row) empties it. Save as… is how it becomes a
-  arrangement.
+  **Clear** (top bar, or its row) empties it. Save as… is how it becomes an
+  arrangement. **New arrangement** with the name left blank saves nothing: it
+  empties the sandbox without asking and opens it, as the apps' New does.
+- **Rename** opens the naming window; **×** asks *Delete "…"?* first, the
+  same question the apps ask (it used to be two taps).
 - **A saved arrangement opens with auto-save off.** Changes on the stand are not
   kept until the switch is turned on, which first asks whether to save them —
   the apps' own question in the apps' own words. With it off, the arrangement's row
@@ -217,7 +222,7 @@ the ostinato in their own apps. It puts them in the same book.
 
 **On the student's stand** the shelf is the same one every app has
 (`lib/evm-shelf.js`, adapter in `connectShelf()`, `words: 'pairings'`):
-**Arrangements → Teacher Library**. The books out are one list for the whole site,
+**Library → Teacher Library**. The books out are one list for the whole site,
 so a book taken out in Rhythm Poetry is out here too. An arrangement from a book is
 Shared (read-only, *Save my copy*), listed under its book with **Put back**,
 replaced when the teacher publishes a newer version, and gone when its book is
@@ -357,6 +362,13 @@ pane and never written to the app's prefs. The EASY circles show the lit rhythm
 at all times and only take a tap while Edit is on; a tap writes ordinary
 rhythm data and comes back through `onEdit` like any other edit. The circles
 come from the app's own Layout Settings (`layout.easy`), read from its storage.
+
+**What lights while it plays.** Both panes' View menus have *While it plays:
+Light up the beat boxes / Light up the notes* — two view keys, `lightBeats` and
+`lightNotes`, the same two switches in each app's own View and drawn the same
+way in both (the sounding colour's wash, a ring round the edge). They are
+independent, kept per pane, and never written to the app's prefs. The stand
+starts the poem with the notes lit and the ostinato with both.
 
 **Mutes are the stand's, not the piece's.** The button in the mixer and the badge
 on the instrument in the pane are one switch seen twice, and each moves the other

@@ -66,7 +66,7 @@
       <svg class="autosave-icon" viewBox="0 0 24 24" aria-hidden="true"></svg>
       <span class="autosave-label" id="autosave-label">Auto-save</span>
     </button>
-    <button class="pair-chip" id="pair-chip" title="Arrangements &amp; library">
+    <button class="pair-chip" id="pair-chip" title="Library">
       <span class="pair-chip-dots" aria-hidden="true"><span class="dot poem"></span><span class="dot ost"></span></span>
       <span class="pair-chip-text">
         <span class="pair-chip-kicker" id="pair-chip-kicker">Sandbox</span>
@@ -229,6 +229,7 @@
 
     <button class="present-exit" id="present-exit" title="Leave present mode (Esc)">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9L4 4m0 0v5m0-5h5"/><path d="M15 9l5-5m0 0v5m0-5h-5"/><path d="M9 15l-5 5m0 0v-5m0 5h5"/><path d="M15 15l5 5m0 0v-5m0 5h-5"/></svg>
+      <span>Exit</span>
     </button>
   </div>
 </footer>
@@ -237,7 +238,7 @@
      it (Rhythm Poetry's hover gauge). Never on touch — a tap types. -->
 <div class="hover-gauge" id="bpm-gauge-wrap" aria-hidden="true">
   <span class="hover-gauge-label" id="bpm-gauge-label">92 BPM</span>
-  <input type="range" class="gauge-slider" id="bpm-gauge" min="30" max="260" step="1" tabindex="-1" aria-label="Tempo">
+  <input type="range" class="gauge-slider" id="bpm-gauge" min="30" max="300" step="1" tabindex="-1" aria-label="Tempo">
 </div>
 
 
@@ -287,14 +288,20 @@
       <span class="switch"></span>
     </button>
   </div>
+  <div class="pop-section pop-foot">
+    <button class="pop-link" id="help-btn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+      How this works
+    </button>
+  </div>
 </div>
 
 <!-- Mixer: the count-in for both, then each app's own voices and
      sounds, under the app's name. -->
 <div class="popover popover-wide" id="mixer-pop" role="dialog" aria-label="Mixer">
   <div class="mixer-top">
-    <button class="switch-row" id="countin-btn" role="switch" aria-checked="false" title="Click one bar before the music starts">
-      <span class="switch-text"><span>Count-in</span><small>One bar of clicks, counted out on screen, before the music starts.</small></span>
+    <button class="switch-row" id="countin-btn" role="switch" aria-checked="false">
+      <span class="switch-text"><span>Count-in</span><small>Begin with a one-bar count-in</small></span>
       <span class="switch"></span>
     </button>
   </div>
@@ -302,13 +309,13 @@
     <div class="mixer-col poem">
       <div class="mixer-head"><span class="pane-dot"></span>Rhythm Poetry</div>
       <div class="mixer-voices" id="mixer-poem"></div>
-      <div class="pop-label small">Words sound like</div>
+      <div class="pop-label small">Rhythm sound</div>
       <div class="seg seg-wide" role="group">
-        <button class="seg-btn" id="words-tone">A tone</button>
-        <button class="seg-btn" id="words-drum">A drum</button>
+        <button class="seg-btn" id="words-tone">Pitch</button>
+        <button class="seg-btn" id="words-drum">Drum</button>
       </div>
       <div class="pop-label small">Strength</div>
-      <div class="seg seg-wide" role="group" aria-label="How full the words sound">
+      <div class="seg seg-wide" role="group" aria-label="How full the rhythm sound is">
         <button class="seg-btn" data-strength="1">&times;1</button>
         <button class="seg-btn" data-strength="2">&times;2</button>
         <button class="seg-btn" data-strength="3">&times;3</button>
@@ -336,12 +343,12 @@
 <!-- View: poem -->
 <div class="popover" id="view-poem-pop" role="dialog" aria-label="How the poem is shown">
   <div class="pop-section">
-    <div class="pop-label">Size</div>
+    <div class="pop-label">Scale</div>
     <div class="seg seg-wide" role="group">
       <button class="seg-btn" data-rp-size="page" title="The whole poem fits its pane">Whole poem</button>
-      <button class="seg-btn" data-rp-size="fit" title="Fill the width and scroll down as it plays">Fill the width</button>
+      <button class="seg-btn" data-rp-size="fit" title="Fill the pane from side to side, and scroll down as it plays">Justify width</button>
     </div>
-    <label class="slider-row"><span>Scale</span><input type="range" min="50" max="160" step="5" id="rp-zoom"><span class="slider-val" id="rp-zoom-val">100%</span></label>
+    <label class="slider-row"><input type="range" min="50" max="160" step="5" id="rp-zoom" aria-label="Scale"><span class="slider-val" id="rp-zoom-val">100%</span></label>
   </div>
   <div class="pop-section">
     <div class="pop-label">Words</div>
@@ -372,9 +379,15 @@
       <button class="seg-btn easy-seg" data-dots-side="poem" data-dots="easy" title="EASY — one coloured circle for each whole rhythm; tap one to write it while editing"><b>E</b><b>A</b><b>S</b><b>Y</b></button>
     </div>
   </div>
+  <!-- The same two lights, the same way round, in both panes' menus. -->
+  <div class="pop-section switches">
+    <div class="pop-label">While it plays</div>
+    <button class="switch-row" data-rp-switch="lightBeats"><span>Light up the beat boxes</span><span class="switch"></span></button>
+    <button class="switch-row" data-rp-switch="lightNotes"><span>Light up the notes</span><span class="switch"></span></button>
+  </div>
   <div class="pop-section switches">
     <button class="switch-row" data-rp-switch="showMeasureNumbers"><span>Bar numbers</span><span class="switch"></span></button>
-    <button class="switch-row" data-rp-switch="followPlayback"><span>Follow while it plays</span><span class="switch"></span></button>
+    <button class="switch-row" data-rp-switch="followPlayback"><span>Follow along</span><span class="switch"></span></button>
   </div>
 </div>
 
@@ -383,9 +396,9 @@
   <div class="pop-section">
     <div class="pop-label">Layout</div>
     <div class="seg seg-wide" role="group">
-      <button class="seg-btn" data-ob-layout="systems">Lines</button>
       <button class="seg-btn" data-ob-layout="pages">Pages</button>
-      <button class="seg-btn" data-ob-layout="scroll">Scroll across</button>
+      <button class="seg-btn" data-ob-layout="systems">Lines</button>
+      <button class="seg-btn" data-ob-layout="scroll">Scroll</button>
     </div>
   </div>
   <div class="pop-section" id="ob-perpage-section">
@@ -400,7 +413,7 @@
     <p class="pop-note" id="ob-perpage-note">The stand picks the number that draws both scores largest in the room it has.</p>
   </div>
   <div class="pop-section" id="ob-zoom-section">
-    <label class="slider-row"><span>Size</span><input type="range" min="40" max="180" step="5" id="ob-zoom"><span class="slider-val" id="ob-zoom-val">100%</span></label>
+    <label class="slider-row"><span>Scale</span><input type="range" min="40" max="180" step="5" id="ob-zoom"><span class="slider-val" id="ob-zoom-val">100%</span></label>
   </div>
   <div class="pop-section">
     <div class="pop-label">Above the beats</div>
@@ -411,7 +424,11 @@
     </div>
   </div>
   <div class="pop-section switches">
+    <div class="pop-label">While it plays</div>
+    <button class="switch-row" data-ob-switch="lightBeats"><span>Light up the beat boxes</span><span class="switch"></span></button>
     <button class="switch-row" data-ob-switch="lightNotes"><span>Light up the notes</span><span class="switch"></span></button>
+  </div>
+  <div class="pop-section switches">
     <button class="switch-row" data-ob-switch="showSyllables"><span>Syllables</span><span class="switch"></span></button>
     <button class="switch-row" data-ob-switch="showBarNumbers"><span>Bar numbers</span><span class="switch"></span></button>
     <button class="switch-row" data-ob-switch="showBeatNumbers"><span>Beat numbers</span><span class="switch"></span></button>
@@ -449,7 +466,7 @@
     </div>
 
     <div class="picker-pane" id="picker-link" hidden>
-      <p class="sheet-sub">In <span id="picker-app-name">Rhythm Poetry</span>, open <b>Songs → Share &amp; backup → Create a link</b>. Paste that link here.</p>
+      <p class="sheet-sub">In <span id="picker-app-name">Rhythm Poetry</span>, open <b>Library → Share &amp; backup → Create a link</b>. Paste that link here.</p>
       <textarea id="link-input" rows="3" spellcheck="false" placeholder="https://…?song=…"></textarea>
       <div class="sheet-foot sheet-foot-split">
         <span class="status-msg" id="link-status"></span>
@@ -481,7 +498,7 @@
 <div class="sheet-backdrop" id="pair-sheet">
   <div class="sheet sheet-lg" role="dialog" aria-labelledby="pair-heading">
     <div class="sheet-head">
-      <h2 id="pair-heading">Arrangements</h2>
+      <h2 id="pair-heading">Library</h2>
       <button class="sheet-close" data-close title="Close">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
       </button>
@@ -547,7 +564,7 @@
       </div>
       <p class="card-desc" id="share-desc">Both scores travel inside the link, with the tempo, intro and sound settings, so it works for anyone. Opening it again never makes a second copy.</p>
       <button class="btn btn-primary" id="share-make">Create a link</button>
-      <div class="share-row" id="share-row" hidden>
+      <div class="share-row" id="share-row">
         <input type="text" id="share-link" class="text-field" readonly>
         <button class="btn" id="share-copy">Copy</button>
         <span class="status-msg" id="share-status"></span>
@@ -579,7 +596,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Restore from a backup
       </div>
-      <p class="card-desc">Arrangements in the file are added to your arrangements. One you already have is not added twice, and a newer version replaces an older one.</p>
+      <p class="card-desc">Arrangements in the file are added to your library. One you already have is not added twice, and a newer version replaces an older one.</p>
       <input type="file" id="import-file" accept=".json,application/json" hidden>
       <button class="btn" id="import-btn">Choose a file…</button>
       <span class="status-msg" id="import-status"></span>
@@ -594,6 +611,40 @@
       <button class="btn btn-danger" id="reset-btn">Delete every arrangement</button>
       <span class="status-msg" id="reset-status"></span>
     </div>
+  </div>
+</div>
+
+<!-- How this works: one screen of what each control does, as in Rhythm
+     Poetry. -->
+<div class="sheet-backdrop" id="help-sheet">
+  <div class="sheet sheet-md" role="dialog" aria-labelledby="help-heading">
+    <div class="sheet-head">
+      <h2 id="help-heading">How this works</h2>
+      <button class="sheet-close" data-close title="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <p class="help-side-note">The Music Stand plays a poem from Rhythm Poetry and an ostinato from Ostinato Builder together, on one beat.</p>
+    <ul class="help-list">
+      <li><span class="help-key">♪</span>
+        <div><b>Choose the music</b> by tapping the name at the top of each score. Pick from that app&rsquo;s Library, or paste a link.</div></li>
+      <li><span class="help-key">▶</span>
+        <div><b>Play</b> starts both together. <span class="help-key">⟲</span> <b>Loop</b> goes round again when the poem ends.</div></li>
+      <li><span class="help-key">🎚</span>
+        <div><b>Mixer</b> has the count-in, an intro where the ostinato plays alone first, and every voice on or off. Tap an instrument&rsquo;s picture to change it.</div></li>
+      <li><span class="help-key">👁</span>
+        <div><b>View</b> sets side by side or stacked, which score comes first, and their sizes. Drag the line between the scores to resize; double-click it to let the stand choose.</div></li>
+      <li><span class="help-key">✎</span>
+        <div><b>Edit the scores</b> (in View) lets you change either score right here. Changes stay on the stand, and the apps are not touched.</div></li>
+      <li><span class="help-key">🔊</span>
+        <div><b>The eye and speaker on each score</b> set how it is shown, and mute it.</div></li>
+      <li><span class="help-key">📚</span>
+        <div><b>Library</b> saves the pair as an arrangement and shares it by link.</div></li>
+      <li><span class="help-key">⛶</span>
+        <div><b>Present</b> shows just the two scores, full screen. Press <span class="help-key">Esc</span> to come back.</div></li>
+      <li><span class="help-key">␣</span>
+        <div><b>Spacebar</b> starts and stops the music.</div></li>
+    </ul>
   </div>
 </div>
 

@@ -56,6 +56,9 @@
   const EVM = window.EVMLibrary;
   const container = document.getElementById('poem');
   const EMBEDDED = !!window.MUSIC_STAND_EMBED;
+  /* The tempo range, the same in all three apps: typing, the hover
+     slider and a lesson's range all stay inside it. */
+  const TEMPO_MIN = 30, TEMPO_MAX = 300;
 
   const DEFAULT_SONGS = {
     'instructions': {
@@ -542,6 +545,11 @@
     showBeatNumbers: false,
     showLineTools: true,
     followPlayback: true,
+    /* What lights while it plays, each on its own: the box of circles
+       above the beat that is sounding, and a box around its notes. The
+       same two switches as Ostinato Builder, drawn the same way. */
+    lightBeats: false,
+    lightNotes: true,
     colorDotsInPicture: false
   };
 
@@ -1305,8 +1313,8 @@
   }
 
   function tempoLocked() { return !!policy && policy.tempo.locked; }
-  function tempoMin() { return policy ? policy.tempo.min : 21; }
-  function tempoMax() { return policy ? policy.tempo.max : 600; }
+  function tempoMin() { return policy ? policy.tempo.min : TEMPO_MIN; }
+  function tempoMax() { return policy ? policy.tempo.max : TEMPO_MAX; }
   function clampTempo(v) { return Math.max(tempoMin(), Math.min(tempoMax(), v)); }
 
   /* Adding or removing a measure changes how the piece sounds, so both ask
@@ -1336,7 +1344,7 @@
     return {
       v: POLICY_VERSION,
       sides: { rhythm: true, poetry: true },
-      tempo: { min: 40, max: 240, locked: false },
+      tempo: { min: TEMPO_MIN, max: TEMPO_MAX, locked: false },
       structure: { maxMeasures: null, canAdd: true, canRemove: true },
       /* circles: which dots the beat-dot button offers — 'easy',
          'regular' or 'both'. */
@@ -1363,9 +1371,11 @@
     if (src.tempo) {
       const lo = parseInt(src.tempo.min, 10);
       const hi = parseInt(src.tempo.max, 10);
-      if (!isNaN(lo)) p.tempo.min = Math.max(21, Math.min(600, lo));
-      if (!isNaN(hi)) p.tempo.max = Math.max(21, Math.min(600, hi));
+      if (!isNaN(lo)) p.tempo.min = Math.max(TEMPO_MIN, Math.min(TEMPO_MAX, lo));
+      if (!isNaN(hi)) p.tempo.max = Math.max(TEMPO_MIN, Math.min(TEMPO_MAX, hi));
       if (p.tempo.min > p.tempo.max) { const t = p.tempo.min; p.tempo.min = p.tempo.max; p.tempo.max = t; }
+      // 40-240 was what "Any" meant before the range became 30-300.
+      if (p.tempo.min === 40 && p.tempo.max === 240) { p.tempo.min = TEMPO_MIN; p.tempo.max = TEMPO_MAX; }
       p.tempo.locked = !!src.tempo.locked;
     }
 
@@ -1915,17 +1925,24 @@
     stage.scrollTo(opts);
   }
 
+  /* Both boxes of the beat are marked every time — its circles and its
+     notes — and body.light-beats / body.light-notes decide which of them
+     shows, so the two switches cost nothing while it plays. */
   function highlightNotesBox(position) {
-    notesBoxElements.forEach(box => { if (box) box.classList.remove('playing'); });
+    clearHighlights();
     if (position < notesBoxElements.length) {
       const currentElement = notesBoxElements[position];
       currentElement.classList.add('playing');
+      const circles = currentElement.parentElement
+        && currentElement.parentElement.querySelector(':scope > .circles');
+      if (circles) circles.classList.add('playing');
       scrollToElement(currentElement);
     }
   }
 
   function clearHighlights() {
     notesBoxElements.forEach(box => { if (box) box.classList.remove('playing'); });
+    document.querySelectorAll('.circles.playing').forEach(el => el.classList.remove('playing'));
   }
 
   /* ==================================================================
@@ -3055,7 +3072,6 @@
   const newSongBtnLabel = document.getElementById('newSongBtnLabel');
   const saveAsBtn = document.getElementById('saveAsBtn');
   const shelfBtn = document.getElementById('shelfBtn');
-  const libraryBtn = document.getElementById('library-btn');
   const songChip = document.getElementById('song-chip');
   const songChipKicker = document.getElementById('song-chip-kicker');
   const songChipLabel = document.getElementById('song-chip-label');
@@ -3069,7 +3085,8 @@
   const newSongModal = document.getElementById('newSongModal');
   const newSongTitleInput = document.getElementById('newSongTitleInput');
   const confirmNewSongBtn = document.getElementById('confirmNewSongBtn');
-  let titlePromptIntent = 'new'; // 'new' | 'saveAs'
+  let titlePromptIntent = 'new'; // 'new' | 'saveAs' | 'rename'
+  let renameTarget = null;        // { id, side, title } while renaming
 
   const librarySongList = document.getElementById('librarySongList');
 
@@ -3693,7 +3710,12 @@
     const heading = document.getElementById('newSongModalHeading');
     const subtext = document.getElementById('newSongModalSubtext');
 
-    if (titlePromptIntent === 'saveAs' && isSandboxId(getCurrentSongId())) {
+    if (titlePromptIntent === 'rename') {
+      const renaming = renameTarget && renameTarget.side === 'poetry' ? 'poem' : 'rhythm';
+      if (heading) heading.textContent = 'Rename';
+      if (subtext) subtext.textContent = `A new name for this ${renaming}.`;
+      if (confirmNewSongBtn) confirmNewSongBtn.textContent = 'Rename';
+    } else if (titlePromptIntent === 'saveAs' && isSandboxId(getCurrentSongId())) {
       if (heading) heading.textContent = 'Save to your library';
       if (subtext) subtext.textContent = `Your sandbox stays as it is. This adds a copy to your library as a new ${noun}, and you carry on in that copy.`;
       if (confirmNewSongBtn) confirmNewSongBtn.textContent = 'Save to library';
@@ -3707,7 +3729,7 @@
       if (confirmNewSongBtn) confirmNewSongBtn.textContent = 'Save';
     } else {
       if (heading) heading.textContent = isRhythm ? 'Create a new rhythm' : 'Create a new poem';
-      if (subtext) subtext.textContent = 'Give it a name so you can find it later.';
+      if (subtext) subtext.textContent = 'Give it a name so you can find it later, or leave it blank for a fresh page in your sandbox.';
       if (confirmNewSongBtn) confirmNewSongBtn.textContent = 'Create';
     }
 
@@ -3716,12 +3738,14 @@
     }
   }
 
-  function showNewSongModal(intent) {
+  function showNewSongModal(intent, target) {
     if (isPlaying || isPaused) stopPlayback();
     if (!newSongModal) return;
     titlePromptIntent = intent || 'new';
+    renameTarget = titlePromptIntent === 'rename' ? target : null;
     updateNewSongModalTexts();
-    newSongTitleInput.value = titlePromptIntent === 'saveAs' && !isSandboxId(getCurrentSongId())
+    newSongTitleInput.value = titlePromptIntent === 'rename' ? (target.title || '')
+      : titlePromptIntent === 'saveAs' && !isSandboxId(getCurrentSongId())
       ? `${getCurrentSongTitle() || 'Untitled'} ${openedReceived ? '(my copy)' : 'copy'}`
       : '';
     newSongTitleInput.classList.remove('input-error');
@@ -3783,7 +3807,21 @@
 
   function createNewSong(title) {
     const trimmed = (title && title.trim()) ? title.trim() : '';
-    if (!trimmed) { rejectEmptyTitle(); return; }
+    if (!trimmed) {
+      /* No name, so nothing goes in the library: a blank page in this
+         side's sandbox instead, cleared without asking (the user's call).
+         A lesson has no sandbox, so there a name is still needed. */
+      if (lessonMeta) { rejectEmptyTitle(); return; }
+      saveCurrentSongToLibrary();
+      leavePieceLayout();
+      const side = currentMode;
+      clearSandbox(side);
+      hideNewSongModal();
+      closeSheet('library-sheet');
+      if (getCurrentSongId() !== SANDBOX_IDS[side]) loadSongById(SANDBOX_IDS[side]);
+      toast('A blank page in your sandbox');
+      return;
+    }
 
     saveCurrentSongToLibrary();
     // a new piece starts from your own settings, not a shared piece's
@@ -3811,6 +3849,23 @@
     closeSheet('library-sheet');
     loadSongById(id, { autoSave: true });
     toast(side === 'rhythm' ? 'New rhythm created' : 'New poem created');
+  }
+
+  function renameSong(title) {
+    const trimmed = (title && title.trim()) ? title.trim() : '';
+    if (!trimmed) { rejectEmptyTitle(); return; }
+    const target = renameTarget;
+    const lib = getStoredLibrary();
+    if (!target || !lib[target.id]) { hideNewSongModal(); return; }
+    lib[target.id].title = trimmed;
+    lib[target.id].updatedAt = Date.now();
+    saveStoredLibrary(lib);
+    if (target.id === currentSongIds[target.side]) {
+      currentSongTitles[target.side] = trimmed;
+      updateSongChip();
+    }
+    hideNewSongModal();
+    renderLibrarySongList();
   }
 
   function saveCurrentSongAs(title) {
@@ -3846,7 +3901,7 @@
 
   function showManageLibraryModal() {
     if (librarySheetTitle) {
-      librarySheetTitle.textContent = lessonMeta ? lessonMeta.title : 'Songs';
+      librarySheetTitle.textContent = lessonMeta ? lessonMeta.title : 'Library';
     }
     saveCurrentSongToLibrary();
     updateSongChip();
@@ -3862,12 +3917,12 @@
     rhythm: {
       label: 'Rhythms',
       icon: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
-      empty: 'No rhythms yet. Make one with “New rhythm”.'
+      empty: 'No rhythms yet — press New rhythm to make one.'
     },
     poetry: {
       label: 'Poems',
       icon: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
-      empty: 'No poems yet. Make one with “New poem”.'
+      empty: 'No poems yet — press New poem to make one.'
     }
   };
 
@@ -3917,7 +3972,7 @@
     clearBtn.title = 'Start this sandbox over with a blank page';
     clearBtn.addEventListener('click', () => {
       const name = side === 'rhythm' ? 'rhythm' : 'poetry';
-      if (!confirm(`Clear the ${name} sandbox and start with a blank page? This can’t be undone.`)) return;
+      if (!confirm(`Clear the ${name} sandbox and start with a blank page? This cannot be undone.`)) return;
       clearSandbox(side);
       renderLibrarySongList();
       toast('Sandbox cleared');
@@ -4013,19 +4068,7 @@
     renameBtn.className = 'lib-action-btn';
     renameBtn.textContent = 'Rename';
     renameBtn.addEventListener('click', () => {
-      const newTitle = prompt('New name:', song.title);
-      if (newTitle && newTitle.trim()) {
-        const lib = getStoredLibrary();
-        if (!lib[id]) return;
-        lib[id].title = newTitle.trim();
-        lib[id].updatedAt = Date.now();
-        saveStoredLibrary(lib);
-        if (id === currentSongIds[side]) {
-          currentSongTitles[side] = newTitle.trim();
-          updateSongChip();
-        }
-        renderLibrarySongList();
-      }
+      showNewSongModal('rename', { id: id, side: side, title: song.title });
     });
 
     const deleteBtn = document.createElement('button');
@@ -4413,7 +4456,7 @@
     const checkboxes = exportSongList.querySelectorAll('input[type="checkbox"]:checked');
     
     if (checkboxes.length === 0) {
-      alert('Please select at least one song to download.');
+      toast('Tick at least one song first');
       return;
     }
 
@@ -4446,6 +4489,7 @@
     downloadLink.click();
     document.body.removeChild(downloadLink);
     URL.revokeObjectURL(url);
+    toast('Backup saved to your downloads');
   }
 
   function handleFileUpload(event) {
@@ -4458,14 +4502,18 @@
         const json = JSON.parse(e.target.result);
         /* A backup, an old export, a raw library, or a Librarian file —
            see EVM.readItems. */
-        const importedSongs = EVM.readItems(json, {
+        let importedSongs = EVM.readItems(json, {
           app: 'rhythm-poetry',
           looksLike: v => !!(v.poetryState || v.rhythmState || v.words || v.title)
-        }).filter(song => song && (song.title || song.poetryState || song.rhythmState || song.words));
+        });
+        const otherApp = importedSongs.otherApp || 0;   // Librarian items meant for another app
+        importedSongs = importedSongs.filter(song => song && (song.title || song.poetryState || song.rhythmState || song.words));
 
         if (importedSongs.length === 0) {
           if (uploadStatusMsg) {
-            uploadStatusMsg.textContent = 'No valid songs found in file.';
+            uploadStatusMsg.textContent = otherApp
+              ? 'That file holds work for a different app, not songs.'
+              : 'No songs found in that file.';
             uploadStatusMsg.className = 'status-msg error';
           }
           return;
@@ -4499,7 +4547,7 @@
 
         if (uploadStatusMsg) {
           const said = parts.join(', ');
-          uploadStatusMsg.textContent = '✓ ' + said.charAt(0).toUpperCase() + said.slice(1) + '.';
+          uploadStatusMsg.textContent = said.charAt(0).toUpperCase() + said.slice(1) + '.';
           uploadStatusMsg.className = 'status-msg';
         }
 
@@ -4507,7 +4555,7 @@
       } catch (err) {
         console.error('Error parsing JSON file:', err);
         if (uploadStatusMsg) {
-          uploadStatusMsg.textContent = 'Invalid JSON file format.';
+          uploadStatusMsg.textContent = 'That file is not readable as JSON.';
           uploadStatusMsg.className = 'status-msg error';
         }
       }
@@ -4516,7 +4564,7 @@
   }
 
   function handleResetAllUserData() {
-    const confirmed = confirm("Are you sure you want to delete all user data and restore the app to its default settings? This will delete all custom songs and cannot be undone.");
+    const confirmed = confirm('Delete every song you have made, put the examples back, and put the layout settings back to everything-on? This cannot be undone.');
     if (!confirmed) return;
 
     try {
@@ -4547,7 +4595,7 @@
       renderExportSongList();
 
       if (resetStatusMsg) {
-        resetStatusMsg.textContent = '✓ Songs and layout settings restored to defaults!';
+        resetStatusMsg.textContent = 'Everything deleted, examples restored.';
         resetStatusMsg.className = 'status-msg';
         setTimeout(() => {
           resetStatusMsg.textContent = '';
@@ -4559,7 +4607,7 @@
     } catch (err) {
       console.error('Error resetting user data:', err);
       if (resetStatusMsg) {
-        resetStatusMsg.textContent = 'Failed to reset user data.';
+        resetStatusMsg.textContent = 'Something went wrong, so not everything was reset. Try again.';
         resetStatusMsg.className = 'status-msg error';
       }
     }
@@ -4667,7 +4715,7 @@
     sandboxClearBtn.addEventListener('click', () => {
       const side = currentMode;
       if (getCurrentSongId() !== SANDBOX_IDS[side]) return;
-      if (!confirm(`Clear the ${side} sandbox and start with a blank page? This can\u2019t be undone.`)) return;
+      if (!confirm(`Clear the ${side} sandbox and start with a blank page? This cannot be undone.`)) return;
       if (isPlaying || isPaused) stopPlayback();
       clearSandbox(side);
       toast('Sandbox cleared');
@@ -4706,21 +4754,6 @@
     renderLayoutPickup();
   }
 
-  const startClearBtn = document.getElementById('start-clear-btn');
-  if (startClearBtn) {
-    startClearBtn.addEventListener('click', () => {
-      const st = getActiveState();
-      if (st.selectedPlayStartPosition === null) {
-        toast('No start marker set');
-      } else {
-        st.selectedPlayStartPosition = null;
-        render();
-        toast('Start marker cleared');
-      }
-      closeAllPopovers();
-    });
-  }
-
   // --- Size, overflow and line-length controls ---
   const zoomInBtn = document.getElementById('zoom-in-btn');
   const zoomOutBtn = document.getElementById('zoom-out-btn');
@@ -4734,7 +4767,6 @@
   const overflowWrapBtn = document.getElementById('overflow-wrap-btn');
   const mplRow = document.getElementById('mpl-row');
   const lineToolsToggle = document.getElementById('line-tools-toggle');
-  const layoutResetBtn = document.getElementById('layout-reset-btn');
   const pictureColorDots = document.getElementById('picture-color-dots');
 
   const ZOOM_MIN = 40, ZOOM_MAX = 300, ZOOM_STEP = 10;
@@ -4901,6 +4933,17 @@
     });
   }
 
+  const lightBeatsToggle = document.getElementById('light-beats-toggle');
+  const lightNotesToggle = document.getElementById('light-notes-toggle');
+  [[lightBeatsToggle, 'lightBeats'], [lightNotesToggle, 'lightNotes']].forEach(([btn, key]) => {
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      view[key] = !view[key];
+      saveViewPrefs();
+      syncViewControls();
+    });
+  });
+
   const followToggle = document.getElementById('follow-toggle');
   if (followToggle) {
     followToggle.addEventListener('click', () => {
@@ -4916,13 +4959,6 @@
       lineToolsToggle.classList.toggle('active', view.showLineTools);
       document.body.classList.toggle('hide-line-tools', !view.showLineTools);
       saveViewPrefs();
-    });
-  }
-
-  if (layoutResetBtn) {
-    layoutResetBtn.addEventListener('click', () => {
-      clearLineOverrides();
-      closeAllPopovers();
     });
   }
 
@@ -4954,7 +4990,12 @@
 
     if (lineToolsToggle) lineToolsToggle.classList.toggle('active', view.showLineTools);
     if (followToggle) followToggle.classList.toggle('active', view.followPlayback);
+    if (lightBeatsToggle) lightBeatsToggle.classList.toggle('active', !!view.lightBeats);
+    if (lightNotesToggle) lightNotesToggle.classList.toggle('active', !!view.lightNotes);
     if (pictureColorDots) pictureColorDots.checked = view.colorDotsInPicture;
+
+    document.body.classList.toggle('light-beats', !!view.lightBeats);
+    document.body.classList.toggle('light-notes', !!view.lightNotes);
 
     document.body.classList.toggle('hide-measure-numbers', !view.showMeasureNumbers);
     document.body.classList.toggle('hide-line-tools', !view.showLineTools);
@@ -4977,8 +5018,36 @@
     // present mode shows the layout the user built — it does not invent one
     document.body.classList.toggle('present-mode', presentMode);
     closeAllPopovers();
+    presentFullScreen(presentMode);
     requestAnimationFrame(() => render());
   }
+
+  /* True full screen for present mode, as the Music Stand does it. Never
+     from inside a frame (the page around it owns the screen), and a browser
+     that says no just leaves present mode filling the window. Leaving full
+     screen with the browser's own Esc leaves present mode too. */
+  function presentFullScreen(on) {
+    if (EMBEDDED || document.documentElement.classList.contains('in-iframe')) return;
+    const root = document.documentElement;
+    const current = document.fullscreenElement || document.webkitFullscreenElement;
+    try {
+      if (on && !current) {
+        const go = root.requestFullscreen || root.webkitRequestFullscreen;
+        const p = go && go.call(root);
+        if (p && p.catch) p.catch(() => {});
+      } else if (!on && current) {
+        const leave = document.exitFullscreen || document.webkitExitFullscreen;
+        const p = leave && leave.call(document);
+        if (p && p.catch) p.catch(() => {});
+      }
+    } catch (e) {}
+  }
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(type => {
+    document.addEventListener(type, () => {
+      const current = document.fullscreenElement || document.webkitFullscreenElement;
+      if (!current && presentMode) setPresentMode(false);
+    });
+  });
 
   if (presentBtn) presentBtn.addEventListener('click', () => setPresentMode(true));
   if (presentExitBtn) presentExitBtn.addEventListener('click', () => setPresentMode(false));
@@ -5078,9 +5147,9 @@
 
   function typedTempo(raw) {
     const n = parseInt(raw, 10);
-    if (isNaN(n) || n <= 20 || n > 600) return null;
-    // A lesson can narrow this to a range; without one it is the 21-600
-    // the field has always accepted.
+    if (isNaN(n) || n < TEMPO_MIN || n > TEMPO_MAX) return null;
+    // A lesson can narrow this to a range; without one it is the
+    // TEMPO_MIN-TEMPO_MAX all three apps share.
     return clampTempo(n);
   }
 
@@ -5096,8 +5165,8 @@
       const input = document.createElement('input');
       input.type = 'number';
       input.inputMode = 'numeric';
-      input.min = String(Math.max(21, tempoMin()));
-      input.max = String(Math.min(600, tempoMax()));
+      input.min = String(Math.max(TEMPO_MIN, tempoMin()));
+      input.max = String(Math.min(TEMPO_MAX, tempoMax()));
       input.value = currentBPM;
       input.className = 'bpm-input';
       input.setAttribute('aria-label', 'Tempo in beats per minute');
@@ -5149,8 +5218,7 @@
     });
   }
 
-  // Hover-scrub the tempo. Range covers the practical classroom span (Grave
-  // to Prestissimo); anything further out is still reachable by typing.
+  // Hover-scrub the tempo, over the same range typing allows.
   setupHoverGauge({
     trigger: bpmButton,
     wrap: document.getElementById('bpm-gauge-wrap'),
@@ -5418,7 +5486,8 @@
 
   function submitTitlePrompt() {
     const value = newSongTitleInput ? newSongTitleInput.value : '';
-    if (titlePromptIntent === 'saveAs') saveCurrentSongAs(value);
+    if (titlePromptIntent === 'rename') renameSong(value);
+    else if (titlePromptIntent === 'saveAs') saveCurrentSongAs(value);
     else createNewSong(value);
   }
 
@@ -5433,7 +5502,6 @@
     });
   }
 
-  if (libraryBtn) libraryBtn.addEventListener('click', showManageLibraryModal);
   if (songChip) songChip.addEventListener('click', showManageLibraryModal);
 
   if (importExportBtn) importExportBtn.addEventListener('click', () => {
@@ -7027,7 +7095,7 @@
       const join = document.createElement('button');
       join.className = 'line-tool join';
       join.innerHTML = JOIN_ICON;
-      join.title = 'Bring the next measure up onto this line';
+      join.title = 'Bring the next bar up onto this line';
       join.addEventListener('click', (e) => {
         e.stopPropagation();
         setLineOverride(o.joinAt, 'join');
@@ -7045,7 +7113,7 @@
       deleteBtn.type = 'button';
       deleteBtn.className = 'delete-measure-btn';
       deleteBtn.textContent = 'X';
-      deleteBtn.title = 'Delete last measure';
+      deleteBtn.title = 'Delete the last bar';
       deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const config = getLayoutConfig();
@@ -7085,7 +7153,7 @@
       addBtn.type = 'button';
       addBtn.className = 'add-measure-btn';
       addBtn.textContent = '+';
-      addBtn.title = 'Add a new measure';
+      addBtn.title = 'Add a bar';
       addBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const config = getLayoutConfig();
@@ -7146,15 +7214,6 @@
 
     saveCurrentSongToLibrary();
     render();
-  }
-
-  function clearLineOverrides() {
-    const st = getActiveState();
-    const had = st.lineOverrides && Object.keys(st.lineOverrides).length > 0;
-    st.lineOverrides = {};
-    saveCurrentSongToLibrary();
-    render();
-    toast(had ? 'Line splits undone' : 'No line splits to undo');
   }
 
   function revalidateSyncopations() {
@@ -7658,7 +7717,6 @@
     showHide(copyVisualBtn, shellAllows('picture'));
     showHide(pictureColorDots ? pictureColorDots.closest('.inline-check') : null, shellAllows('picture'));
 
-    showHide(libraryBtn, libraryMode() !== 'none');
     showHide(songChip, libraryMode() !== 'none');
 
     // Writing words is the one editor a lesson can take away outright.
@@ -7702,8 +7760,8 @@
 
     const gauge = document.getElementById('bpm-gauge');
     if (gauge) {
-      gauge.min = String(Math.max(40, tempoMin()));
-      gauge.max = String(Math.min(240, tempoMax()));
+      gauge.min = String(Math.max(TEMPO_MIN, tempoMin()));
+      gauge.max = String(Math.min(TEMPO_MAX, tempoMax()));
     }
 
     /* Close the toolbar over whatever has gone: a group with nothing left
@@ -7870,8 +7928,8 @@
   const SHOW_SWITCHES = [
     { key: 'showDots', name: 'Beat dots',
       desc: 'The tappable circles above each note' },
-    { key: 'showMeasureNumbers', name: 'Measure numbers',
-      desc: 'Small numbers above each measure' },
+    { key: 'showMeasureNumbers', name: 'Bar numbers',
+      desc: 'Small numbers above each bar' },
     { key: 'showBeatNumbers', name: 'Beat numbers',
       desc: 'A count line under the staff — 1, 2, 3, 4' }
   ];
@@ -8214,11 +8272,11 @@
     if (!layoutMeterNote) return;
     const total = layout.meters.simple.length + layout.meters.compound.length;
     layoutMeterNote.textContent = total === METERS.simple.length + METERS.compound.length
-      ? 'Every meter. Tap the numbers on the staff to change between them.'
+      ? 'Every meter. Tap the numbers on the toolbar to change between them.'
       : total === 1
-        ? 'One meter only, so the numbers on the staff stop being a button and just read '
+        ? 'One meter only, so the numbers on the toolbar stop being a button and just read '
           + layout.meters.simple.concat(layout.meters.compound)[0] + '.'
-        : 'Tapping the numbers on the staff walks these ' + total + '.';
+        : 'Tapping the numbers on the toolbar walks these ' + total + '.';
   }
 
   function renderLayoutPickup() {
@@ -8226,8 +8284,8 @@
     layoutPickupList.innerHTML = '';
     const st = getActiveState();
     layoutPickupList.appendChild(switchRow(
-      'Pickup measure',
-      'This piece starts on a partial measure',
+      'Pickup bar',
+      'This piece starts on a partial bar',
       !!st.hasPickupMeasure,
       () => {
         st.hasPickupMeasure = !st.hasPickupMeasure;
@@ -8368,7 +8426,7 @@
     if (!layoutJoinsList) return;
     layoutJoinsList.innerHTML = '';
     layoutJoinsList.appendChild(switchRow(
-      'Tied beats within and between measures',
+      'Tied beats within and between bars',
       'Carrying a note over a barline',
       false,
       null,
@@ -8643,8 +8701,8 @@
   ];
 
   const LENGTH_SWITCHES = [
-    { key: 'canAdd',    name: 'Add measures',    desc: 'The + at the end of the last line' },
-    { key: 'canRemove', name: 'Remove measures', desc: 'The × at the end of the last line' }
+    { key: 'canAdd',    name: 'Add bars',    desc: 'The + at the end of the last line' },
+    { key: 'canRemove', name: 'Remove bars', desc: 'The × at the end of the last line' }
   ];
 
   let draft = null;         // { title, policy, songIds }
@@ -8809,7 +8867,7 @@
     if (!tempoSeg) return;
     const t = draft.policy.tempo;
     const mode = t.locked ? 'locked'
-      : (t.min > 40 || t.max < 240) ? 'range' : 'any';
+      : (t.min > TEMPO_MIN || t.max < TEMPO_MAX) ? 'range' : 'any';
     tempoSeg.querySelectorAll('.seg-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.tempo === mode);
     });
@@ -8849,8 +8907,8 @@
     shellList.appendChild(switchRow(
       'Move between the exercises',
       draft.songIds.length > 1
-        ? 'The Songs button, holding this lesson’s ' + draft.songIds.length + ' exercises'
-        : 'The Songs button — with one exercise there is nothing to move to',
+        ? 'The Library at the top, holding this lesson’s ' + draft.songIds.length + ' exercises'
+        : 'The Library at the top — with one exercise there is nothing to move to',
       draft.policy.shell.library !== 'none',
       () => {
         draft.policy.shell.library = draft.policy.shell.library === 'none' ? 'lesson' : 'none';
@@ -8861,7 +8919,7 @@
     if (draft.policy.sides.rhythm) {
       const sub = document.createElement('div');
       sub.className = 'lesson-sub';
-      sub.textContent = 'Syllable systems';
+      sub.textContent = 'Counting systems';
       shellList.appendChild(sub);
 
       const row = document.createElement('div');
@@ -9164,9 +9222,9 @@
       const btn = e.target.closest('.seg-btn');
       if (!btn) return;
       const t = draft.policy.tempo;
-      if (btn.dataset.tempo === 'any') { t.locked = false; t.min = 40; t.max = 240; }
+      if (btn.dataset.tempo === 'any') { t.locked = false; t.min = TEMPO_MIN; t.max = TEMPO_MAX; }
       else if (btn.dataset.tempo === 'locked') { t.locked = true; }
-      else { t.locked = false; if (t.min === 40 && t.max === 240) { t.min = 60; t.max = 120; } }
+      else { t.locked = false; if (t.min === TEMPO_MIN && t.max === TEMPO_MAX) { t.min = 60; t.max = 120; } }
       renderTempo();
     });
   }
@@ -9175,7 +9233,7 @@
     if (!input) return;
     input.addEventListener('change', () => {
       const v = parseInt(input.value, 10);
-      if (!isNaN(v)) draft.policy.tempo[key] = Math.max(21, Math.min(600, v));
+      if (!isNaN(v)) draft.policy.tempo[key] = Math.max(TEMPO_MIN, Math.min(TEMPO_MAX, v));
       if (draft.policy.tempo.min > draft.policy.tempo.max) {
         const t = draft.policy.tempo.min;
         draft.policy.tempo.min = draft.policy.tempo.max;
@@ -9359,7 +9417,8 @@
     }
 
     const VIEW_KEYS = ['sizeMode', 'zoomPct', 'textPct', 'lyricFont', 'overflow',
-                       'showDots', 'easyMode', 'showMeasureNumbers', 'followPlayback'];
+                       'showDots', 'easyMode', 'showMeasureNumbers', 'followPlayback',
+                       'lightBeats', 'lightNotes'];
 
     /* Bars on a line, chosen for the pane. This app's own 'auto' reads the
        width of the screen, which in a pane beside an ostinato is the wrong

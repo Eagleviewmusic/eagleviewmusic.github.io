@@ -56,7 +56,7 @@
     }
   };
 
-  const BPM_MIN = 30, BPM_MAX = 260;
+  const BPM_MIN = 30, BPM_MAX = 300;
   const SESSION_KEY  = 'music_stand_session_v1';
   const PAIRINGS_KEY = 'music_stand_pairings_v1';
 
@@ -126,14 +126,16 @@
     views: {
       poem: { sizeMode: 'page', zoomPct: 100, measuresPerLine: 'auto',
               textPct: 100, lyricFont: 'rounded',
-              showDots: true, easyMode: false, showMeasureNumbers: true, followPlayback: true },
+              showDots: true, easyMode: false, showMeasureNumbers: true, followPlayback: true,
+              lightBeats: false, lightNotes: true },
       /* `Lines` with the number left to the stand: in a pane the whole
          ostinato should be on show — a pane that turns its own pages
          under a stand that is already turning them is one page too many
          — and how many bars to a line is a question about the pane,
          which is the stand's to answer. */
       ost:  { layout: 'systems', measuresPerPage: 'auto', zoomPct: 100, showDots: true, easyMode: false,
-              lightNotes: true, showSyllables: false, showBarNumbers: true, showBeatNumbers: true }
+              lightBeats: true, lightNotes: true, showSyllables: false, showBarNumbers: true,
+              showBeatNumbers: true }
     },
     /* { src: 'library' | 'data', id, title, data, edited?, origin? } —
        `data` is always the latest snapshot and `id` only means something
@@ -2255,6 +2257,9 @@
     sheet.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => closeSheet(sheet)));
   });
 
+  /* How this works, from the foot of the View popover. */
+  $('help-btn').addEventListener('click', () => openSheet($('help-sheet')));
+
 
   /* ---- choosing a song for one side ---- */
 
@@ -2843,7 +2848,7 @@
   function chipKicker() {
     if (!state.pairingId) return 'Sandbox';
     if (state.shared) return state.book || 'Shared';
-    return 'Arrangement';
+    return 'Library';
   }
 
   function refreshLibraryChrome() {
@@ -2856,8 +2861,8 @@
     $('pair-chip-kicker').textContent = chipKicker();
     $('pair-chip-label').textContent = label;
     chip.title = sandbox
-      ? 'Sandbox — scratch work, kept between visits but not in your arrangements'
-      : (state.shared ? 'Shared with you: ' : 'Arrangement: ') + label;
+      ? 'Sandbox — scratch work, kept between visits but not in your library'
+      : (state.shared ? 'Shared with you: ' : 'Library: ') + label;
 
     $('sandbox-clear-btn').hidden = !sandbox;
 
@@ -2907,7 +2912,7 @@
   $('sandbox-clear-btn').addEventListener('click', clearSandbox);
 
   function clearSandbox() {
-    if (!confirm('Clear the sandbox and start with an empty stand? This can’t be undone.')) return;
+    if (!confirm('Clear the sandbox and start with an empty stand? This cannot be undone.')) return;
     const lib = readLibrary();
     delete lib[SANDBOX_ID];
     writeLibrary(lib);
@@ -2952,10 +2957,10 @@
     /* what is open */
     $('now-open-title').textContent = sandbox ? 'Sandbox' : (state.name || 'Untitled arrangement');
     const badge = $('now-open-badge');
-    badge.textContent = sandbox ? 'Sandbox' : state.shared ? (state.book ? 'From a book' : 'Shared') : 'Arrangement';
+    badge.textContent = sandbox ? 'Sandbox' : state.shared ? (state.book ? 'From a book' : 'Shared') : 'Library';
     badge.className = 'kind-badge' + (sandbox ? ' is-sandbox' : state.shared ? ' is-shared' : '');
     $('now-open-note').textContent = sandbox
-      ? 'Scratch work. It stays here between visits but is not in your arrangements — use Save as… to keep it.'
+      ? 'Scratch work. It stays here between visits but is not in your library — use Save as… to keep it there.'
       : state.shared
       ? 'Shared with you. It stays exactly as it was sent, so you can always come back to it — use Save my copy to keep your own with your changes.'
       : (state.autoSave ? '' : 'Auto-save is off: changes on the stand are not kept until you turn it on.');
@@ -2972,7 +2977,7 @@
       extraClass: 'sandbox-row',
       badge: pairBadge(sb),
       title: 'Arrangement sandbox',
-      sub: 'Scratch work — not in your arrangements · ' + pairSub(sb),
+      sub: 'Scratch work — not in your library · ' + pairSub(sb),
       actions: [
         sandbox ? libButton('Open now', 'is-active')
                 : libButton('Open', 'open-btn', () => { openSandbox(); closeSheet(pairSheet); }),
@@ -3040,14 +3045,8 @@
       actions.push(libButton('Rename', 'rename-btn', () => openNameSheet('rename', id)));
     }
     if (!(rec.received && rec.book)) {
-      actions.push(libButton('×', 'delete-btn', (e, btn) => {
-        /* Two taps: the first turns the button into the question. */
-        if (!btn.classList.contains('confirm')) {
-          btn.classList.add('confirm');
-          btn.textContent = 'Delete?';
-          setTimeout(() => { if (btn.isConnected) renderPairList(); }, 3000);
-          return;
-        }
+      actions.push(libButton('×', 'delete-btn', () => {
+        if (!confirm('Delete “' + rec.title + '”?')) return;
         deletePairing(id);
       }, 'Delete this arrangement'));
     }
@@ -3078,7 +3077,7 @@
 
   const NAMING = {
     new:    { heading: 'New arrangement', ok: 'Create',
-              sub: 'Give it a name. It starts as an empty stand, and saves itself as you work.' },
+              sub: 'Give it a name and it saves itself as you work, or leave it blank for an empty stand in your sandbox.' },
     saveAs: { heading: 'Save as a new arrangement', ok: 'Save',
               sub: 'Everything on the stand now — both scores, the tempo, the intro and the sound — kept together under a name.' },
     copy:   { heading: 'Save my copy', ok: 'Save my copy',
@@ -3109,6 +3108,19 @@
   function confirmName() {
     const input = $('name-input');
     const name = input.value.replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (!name && naming && naming.mode === 'new') {
+      /* No name, so nothing goes in the library: an empty stand in the
+         sandbox instead, cleared without asking (the user's call). */
+      closeSheet(nameSheet);
+      closeSheet(pairSheet);
+      flushSession();
+      const fresh = readLibrary();
+      delete fresh[SANDBOX_ID];
+      writeLibrary(fresh);
+      openSandbox({ noFlush: true });
+      toast('An empty stand in your sandbox');
+      return;
+    }
     if (!name) {
       input.classList.add('input-error');
       input.focus();
@@ -3248,9 +3260,9 @@
     openPairingRecord(result.id, { noFlush: true, quiet: true });
     const t = result.record.title;
     toast({
-      added: 'Added “' + t + '” to your arrangements',
-      same: 'Opened “' + t + '” from your arrangements',
-      matched: 'Opened “' + t + '” from your arrangements',
+      added: 'Added “' + t + '” to your library',
+      same: 'Opened “' + t + '” from your library',
+      matched: 'Opened “' + t + '” from your library',
       updated: 'Updated “' + t + '” to the newest version',
       kept: 'Opened “' + t + '” — you already have a newer version'
     }[result.action] || 'Opened “' + t + '”');
@@ -3260,7 +3272,7 @@
   /* ---- Share & backup ---- */
 
   function openShareSheet() {
-    $('share-row').hidden = true;
+    $('share-link').value = '';
     $('share-status').textContent = '';
     $('import-status').textContent = '';
     $('reset-status').textContent = '';
@@ -3276,7 +3288,6 @@
     const link = makeShareLink();
     if (!link) return;
     $('share-link').value = link;
-    $('share-row').hidden = false;
     copyText(link).then(ok => {
       $('share-status').textContent = ok ? 'Link copied to your clipboard.' : 'Select the link and copy it.';
       $('share-status').className = 'status-msg ' + (ok ? 'ok' : '');
@@ -3398,7 +3409,7 @@
 
   $('reset-btn').addEventListener('click', () => {
     if (!confirm('Delete every arrangement you have saved, and clear the sandbox?\n\n'
-      + 'The poems and ostinatos in Rhythm Poetry and Ostinato Builder are not touched. This can’t be undone.')) return;
+      + 'The poems and ostinatos in Rhythm Poetry and Ostinato Builder are not touched. This cannot be undone.')) return;
     writeLibrary({});
     if (isPlaying()) stopPlayback();
     state.pairingId = null;
@@ -3459,9 +3470,9 @@
     if (pairSheet.classList.contains('open')) renderPairList();
     refreshLibraryChrome();
     const n = summary.added.length, up = summary.updated.length, gone = summary.removed.length;
-    if (n) toast(n === 1 ? 'An arrangement from your books is in your arrangements' : n + ' arrangements from your books are in your arrangements');
+    if (n) toast(n === 1 ? 'An arrangement from your books is in your library' : n + ' arrangements from your books are in your library');
     else if (up) toast(up === 1 ? 'Your teacher updated an arrangement in your books' : 'Your teacher updated ' + up + ' arrangements in your books');
-    else if (gone) toast(gone === 1 ? 'An arrangement from your books left your arrangements' : gone + ' arrangements from your books left your arrangements');
+    else if (gone) toast(gone === 1 ? 'An arrangement from your books left your library' : gone + ' arrangements from your books left your library');
   }
 
   $('shelf-btn').addEventListener('click', () => {

@@ -47,7 +47,7 @@
       <svg class="autosave-icon" viewBox="0 0 24 24" width="15" height="15"></svg>
       <span class="autosave-label" id="autosave-label">Auto-save</span>
     </button>
-    <button class="chip" id="song-chip" title="Songs &amp; library">
+    <button class="chip" id="song-chip" title="Library">
       <span class="chip-text">
         <span class="chip-kicker" id="song-chip-kicker">Library</span>
         <span class="chip-label" id="song-chip-label">Untitled ostinato</span>
@@ -113,8 +113,8 @@
      Shown while a teacher is trying their own lesson on.
      ============================================================ -->
 <div class="preview-bar" id="preview-bar" hidden>
-  <span>You are looking at the lesson as a student would.</span>
-  <button class="btn" id="preview-exit-btn">Back to setting it up</button>
+  <span>Previewing as a student</span>
+  <button class="btn" id="preview-exit-btn">Leave preview</button>
 </div>
 
 <!-- ============================================================
@@ -130,11 +130,11 @@
          switch off: turning the dots off to read the notation and back on
          to edit it is something a class does every few minutes. The chains
          that join beats belong to the dots, so they come and go with them. -->
-    <button class="tool-btn dots-btn active" id="dots-btn" title="Hide the tappable dots"
-            aria-pressed="true">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
-           stroke-width="2" aria-hidden="true">
-        <circle cx="7.5" cy="12" r="3.2"/><circle cx="16.5" cy="12" r="3.2"/>
+    <button class="dots-btn active" id="dots-btn" title="Hide the beat dots" aria-pressed="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2.5" y="7" width="19" height="10" rx="5"/>
+        <circle cx="8.6" cy="12" r="2.3" fill="currentColor" stroke="none"/>
+        <circle cx="15.4" cy="12" r="2.3" fill="currentColor" stroke="none"/>
       </svg>
       <span class="easy-label" aria-hidden="true"><b>E</b><b>A</b><b>S</b><b>Y</b></span>
     </button>
@@ -158,17 +158,18 @@
       <span class="tool-label">Sound</span>
     </button>
 
-    <div class="stepper" id="measure-stepper" title="How many measures long the ostinato is">
-      <button class="step-btn" id="measures-minus" aria-label="One measure fewer">−</button>
+    <div class="stepper" id="measure-stepper" title="How many bars long the ostinato is">
+      <button class="step-btn" id="measures-minus" aria-label="One bar fewer">−</button>
       <span class="step-body">
         <span class="step-value" id="measures-value">1</span>
         <span class="step-unit" id="measures-unit">bar</span>
       </span>
-      <button class="step-btn" id="measures-plus" aria-label="One measure more">+</button>
+      <button class="step-btn" id="measures-plus" aria-label="One bar more">+</button>
     </div>
 
-    <button class="tool-btn" id="settings-btn" title="What to show on the page">
+    <button class="tool-btn" id="settings-btn" title="View options">
       <svg viewBox="0 0 24 24" width="20" height="20"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span class="tool-label">View</span>
     </button>
 
     <!-- Last on the row, named and in the accent, the way Rhythm Poetry
@@ -183,6 +184,14 @@
     </button>
   </div>
 </footer>
+
+<!-- The tempo slider, shown above the BPM button while the mouse is on
+     it, as in Rhythm Poetry and the Music Stand. Never on touch: a tap
+     types. -->
+<div class="hover-gauge" id="bpm-gauge-wrap" aria-hidden="true">
+  <span class="hover-gauge-label" id="bpm-gauge-label">92 BPM</span>
+  <input type="range" class="gauge-slider" id="bpm-gauge" min="30" max="300" step="1" tabindex="-1" aria-label="Tempo">
+</div>
 
 <!-- ============================================================
      SOUND
@@ -213,7 +222,7 @@
     <button class="switch-row" id="count-in-toggle">
       <span class="switch-text">
         <span class="switch-name">Count-in</span>
-        <span class="switch-desc" id="count-in-desc">Clicks before the music starts</span>
+        <span class="switch-desc" id="count-in-desc">Begin with a one-bar count-in</span>
       </span>
       <span class="switch" aria-hidden="true"></span>
     </button>
@@ -229,7 +238,7 @@
     <div class="seg" role="group" aria-label="How the score is laid out">
       <button class="seg-btn active" id="layout-pages">Pages</button>
       <button class="seg-btn" id="layout-systems">Lines</button>
-      <button class="seg-btn" id="layout-scroll">Scroll across</button>
+      <button class="seg-btn" id="layout-scroll">Scroll</button>
     </div>
 
     <div class="popover-field" id="per-page-field">
@@ -238,10 +247,10 @@
     </div>
 
     <div class="popover-field" id="zoom-field" hidden>
-      <span>Size</span>
+      <span>Scale</span>
       <div class="slider-row">
         <input type="range" class="slider" id="zoom-slider" min="40" max="220" step="5" value="100"
-               aria-label="Size" />
+               aria-label="Scale" />
         <span class="slider-readout" id="zoom-readout">100%</span>
       </div>
     </div>
@@ -270,19 +279,35 @@
 
   <div class="popover-section" id="settings-play">
     <h3 class="popover-title">While it plays</h3>
+    <button class="switch-row active" id="light-beats-toggle">
+      <span>Light up the beat boxes</span>
+      <span class="switch" aria-hidden="true"></span>
+    </button>
     <button class="switch-row" id="light-notes-toggle">
       <span>Light up the notes</span>
       <span class="switch" aria-hidden="true"></span>
     </button>
-    <p class="popover-note">The beat that is sounding lights under the notation — worth turning on when the dots are off.</p>
+    <p class="popover-note">The box of dots above the beat that is sounding, and a box around its notes — either, both or neither. With the dots off, only the notes can light.</p>
   </div>
 
   <div class="popover-section popover-foot" id="layout-settings-section">
-    <button class="popover-link" id="layout-settings-btn">
-      <span>Layout settings…</span>
-      <svg viewBox="0 0 24 24" width="16" height="16"><path d="m9 18 6-6-6-6"/></svg>
+    <button class="popover-link popover-link-strong" id="layout-settings-btn">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/>
+        <circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/>
+        <circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/>
+        <circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>
+      </svg>
+      Layout settings…
     </button>
     <p class="popover-note">Meters, instruments and which rhythms the dots can be tapped into.</p>
+  </div>
+
+  <div class="popover-section popover-foot" id="help-section">
+    <button class="popover-link" id="help-btn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+      How this works
+    </button>
   </div>
 </div>
 
@@ -305,16 +330,18 @@
      LIBRARY
      ============================================================ -->
 <div class="sheet-backdrop" id="library-sheet">
-  <div class="sheet" role="dialog" aria-label="Songs and library">
+  <div class="sheet" role="dialog" aria-labelledby="library-sheet-title">
     <div class="sheet-head">
-      <div class="now-editing">
-        <span class="now-editing-label">Now editing</span>
-        <span class="now-editing-title" id="now-editing-title">Untitled ostinato</span>
-        <span class="now-editing-note" id="now-editing-note" hidden></span>
-      </div>
+      <h2 id="library-sheet-title">Library</h2>
       <button class="sheet-close" id="library-close" aria-label="Close">
         <svg viewBox="0 0 24 24" width="20" height="20"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
       </button>
+    </div>
+
+    <div class="now-editing">
+      <span class="now-editing-label">Now open</span>
+      <span class="now-editing-title" id="now-editing-title">Untitled ostinato</span>
+      <span class="now-editing-note" id="now-editing-note" hidden></span>
     </div>
 
     <div class="sheet-actions">
@@ -329,7 +356,7 @@
       <button class="btn" id="save-copy-btn">Save as…</button>
       <button class="btn" id="share-backup-btn">Share &amp; backup</button>
       <button class="btn" id="lesson-setup-btn" title="Send a link that opens with just the task you set">
-        Set up for students…
+        Set up for students
       </button>
       <button class="btn" id="save-picture-btn" title="Download a picture of this ostinato">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
@@ -431,14 +458,17 @@
       </button>
     </div>
 
-    <div class="sheet-body sheet-scroll">
-      <section class="backup-section">
-        <h3 class="backup-title">Send this ostinato to someone</h3>
-        <p class="backup-note">The whole piece travels inside the link — nothing is uploaded anywhere.</p>
+    <div class="sheet-body sheet-scroll backup-cards">
+      <section class="backup-card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          Send this ostinato by link
+        </div>
+        <p class="card-desc">The whole piece travels inside the link — nothing is uploaded anywhere.</p>
         <label class="inline-check" id="lock-layout-row">
           <input type="checkbox" id="lock-layout-check" />
-          <span>Lock my layout settings into the link — they get the same meters, rhythms,
-                joins and instruments, and cannot widen them. The dots button still works.</span>
+          <span>Lock my layout settings into the link <em>(they get the same meters, rhythms,
+                joins and instruments, and cannot widen them — the beat-dot button still works)</em></span>
         </label>
         <button class="btn btn-primary" id="make-link-btn">Create a link</button>
         <div class="share-row" id="share-row" hidden>
@@ -448,33 +478,44 @@
         <span class="status-msg" id="share-status"></span>
       </section>
 
-      <section class="backup-section">
-        <h3 class="backup-title">Download a backup</h3>
-        <div class="backup-head-row">
-          <span class="backup-note">Pick what to save.</span>
+      <section class="backup-card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download a backup
+        </div>
+        <div class="card-head-row">
+          <p class="card-desc">Choose what to include:</p>
           <span class="text-tools">
             <button class="text-tool" id="export-all">All</button>
             <button class="text-tool" id="export-none">None</button>
           </span>
         </div>
         <div class="export-list" id="export-list"></div>
-        <label class="field-label" for="export-filename">File name</label>
-        <input type="text" id="export-filename" class="text-field" placeholder="my-ostinatos"
-               maxlength="50" autocomplete="off" />
+        <div class="filename-row">
+          <input type="text" id="export-filename" class="text-field" placeholder="my-ostinatos"
+                 maxlength="50" autocomplete="off" aria-label="File name" />
+          <span class="filename-ext">.json</span>
+        </div>
         <button class="btn btn-primary" id="export-btn">Download</button>
       </section>
 
-      <section class="backup-section">
-        <h3 class="backup-title">Open a backup</h3>
-        <p class="backup-note">Ostinatos in the file are added to your library. One you already have is not added twice, and a newer version replaces an older one.</p>
+      <section class="backup-card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Restore from a backup
+        </div>
+        <p class="card-desc">Ostinatos in the file are added to your library. One you already have is not added twice, and a newer version replaces an older one.</p>
         <input type="file" id="import-file" accept=".json,application/json" hidden />
         <button class="btn" id="import-btn">Choose a file…</button>
         <span class="status-msg" id="import-status"></span>
       </section>
 
-      <section class="backup-section backup-danger">
-        <h3 class="backup-title">Start over</h3>
-        <p class="backup-note">Deletes every ostinato you have made and puts the starters back. This cannot be undone.</p>
+      <section class="backup-card backup-card-danger">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Start over
+        </div>
+        <p class="card-desc">Deletes every ostinato you have made, puts the starters back, and puts the layout settings back to everything-on. This cannot be undone.</p>
         <button class="btn btn-danger" id="reset-btn">Delete everything</button>
         <span class="status-msg" id="reset-status"></span>
       </section>
@@ -544,7 +585,7 @@
       <section class="settings-card">
         <h3 class="card-title">Easy mode</h3>
         <p class="card-desc">
-          Press the dots button beside Play until it reads EASY, and every beat offers a row of
+          Press the beat-dot button beside Play until it reads EASY, and every beat offers a row of
           coloured circles instead of its dots. Each circle writes a whole rhythm in one tap, and
           tapping the lit one again turns it into a rest. The longer notes only appear on the
           beats they can start on. Choose how many circles there are, and what each one writes.
@@ -603,9 +644,9 @@
           <button class="seg-btn" data-tempo="locked">Locked</button>
         </div>
         <div class="range-row" id="lesson-tempo-range" hidden>
-          <input type="number" id="lesson-tempo-min" class="text-field num" min="30" max="260" />
+          <input type="number" id="lesson-tempo-min" class="text-field num" min="30" max="300" />
           <span class="range-dash">to</span>
-          <input type="number" id="lesson-tempo-max" class="text-field num" min="30" max="260" />
+          <input type="number" id="lesson-tempo-max" class="text-field num" min="30" max="300" />
           <span class="range-unit">BPM</span>
         </div>
         <p class="card-desc" id="lesson-tempo-note"></p>
@@ -642,7 +683,7 @@
 
       <section class="settings-card">
         <div class="lesson-actions">
-          <button class="btn" id="lesson-preview-btn">Try it as a student</button>
+          <button class="btn" id="lesson-preview-btn">Preview as a student</button>
           <button class="btn btn-primary" id="lesson-link-btn">Create the link</button>
         </div>
         <div class="share-row" id="lesson-link-row" hidden>
@@ -661,6 +702,42 @@
         <h3 class="card-title">Lessons you have made</h3>
         <div class="lesson-saved-list" id="lesson-saved-list"></div>
       </section>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     HOW THIS WORKS
+     As in Rhythm Poetry: one screen of what each control does.
+     ============================================================ -->
+<div class="sheet-backdrop" id="help-sheet">
+  <div class="sheet" role="dialog" aria-labelledby="help-heading">
+    <div class="sheet-head">
+      <h2 id="help-heading">How this works</h2>
+      <button class="sheet-close" id="help-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body sheet-scroll help-body">
+      <p class="help-side-note">An ostinato is a short pattern that repeats. Each instrument gets its own line, and the lines play together, round and round.</p>
+      <ul class="help-list">
+        <li><b class="dot-demo"><i class="dot on"></i><i class="dot off"></i></b>
+          <div><b>Tap a dot</b> to turn that part of the beat into a sound or a rest. The notes redraw themselves.</div></li>
+        <li><span class="help-key">+</span>
+          <div><b>Split a beat</b> into smaller notes. Press <span class="help-key">−</span> to go back.</div></li>
+        <li><span class="help-key">🔗</span>
+          <div><b>Join two beats</b> with the chain between them, for half and whole notes.</div></li>
+        <li><span class="help-key">%</span>
+          <div><b>Repeat a beat or a bar:</b> point at an empty beat or a bar line and tap the repeat mark to copy the one before it.</div></li>
+        <li><span class="help-key">🥁</span>
+          <div><b>Change an instrument</b> by tapping its picture. The speaker on the picture mutes that line, and <b>Add</b>, under the last picture, brings in another.</div></li>
+        <li><span class="help-key">＋</span>
+          <div><b>Set the length</b> with the bar counter on the toolbar, or the + and × where the music ends.</div></li>
+        <li><span class="help-key">⛶</span>
+          <div><b>Present</b> hides every control and fills the screen. Press <span class="help-key">Esc</span> to come back.</div></li>
+        <li><span class="help-key">␣</span>
+          <div><b>Spacebar</b> starts and stops the music.</div></li>
+      </ul>
     </div>
   </div>
 </div>

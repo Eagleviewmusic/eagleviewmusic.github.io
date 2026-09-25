@@ -82,6 +82,9 @@
      it and runs early. */
   const EVM = window.EVMLibrary;
   const EMBEDDED = !!window.MUSIC_STAND_EMBED;
+  /* The tempo range, the same in all three apps: typing, the hover
+     slider and a lesson's range all stay inside it. */
+  const BPM_MIN = 30, BPM_MAX = 300;
   const RN = window.RhythmNotation;
   const VI = window.VirtualInstruments;
   /* The glyph file declares `const GLYPHS_LELAND` at the top level of a
@@ -465,7 +468,7 @@
     if (allowedTop.indexOf(numerator) === -1) numerator = denominator === 8 ? 6 : 4;
 
     const measures = Math.max(1, Math.min(MAX_MEASURES, Math.round(Number(src.measures) || 1)));
-    const bpm = Math.max(30, Math.min(260, Math.round(Number(src.bpm) || 92)));
+    const bpm = Math.max(BPM_MIN, Math.min(BPM_MAX, Math.round(Number(src.bpm) || 92)));
 
     const tracks = (Array.isArray(src.tracks) ? src.tracks : []).slice(0, MAX_TRACKS).map(t => {
       const source = t && typeof t === 'object' ? t : {};
@@ -1215,10 +1218,11 @@
     showBarNumbers: true,
     showBeatNumbers: true,
 
-    /* The dots row lighting up is the quiet way to watch playback, and
-       turning the dots off leaves only the sound. This is the other
-       option: the beat that is sounding lights under the notation, which
-       is the only thing left to look at once the dots are gone. */
+    /* What lights while it plays, each on its own: the box of dots above
+       the beat that is sounding, and a box around its notes — the one
+       thing left to follow once the dots are off. The same two switches
+       as Rhythm Poetry, drawn the same way. */
+    lightBeats: true,
     lightNotes: false,
 
     /* 'pages'  a fixed number of bars at a time, each page scaled to fill
@@ -1294,8 +1298,8 @@
   const POLICY_VERSION = 1;
 
   /* The meters each denominator offers, in the order the numeral cycles —
-     the same list the time signature has always walked. */
-  const METER_ORDER = { 4: [2, 3, 4, 5, 6], 8: [6, 9, 12] };
+     the same order as Rhythm Poetry's, so from 4/4 the next is 3/4. */
+  const METER_ORDER = { 4: [4, 3, 2, 6, 5], 8: [6, 9, 12] };
 
   const METERS = {
     simple:   METER_ORDER[4].map(n => n + '/4'),
@@ -2003,7 +2007,7 @@
   function blankPolicy() {
     return {
       v: POLICY_VERSION,
-      tempo: { min: 40, max: 240, locked: false },
+      tempo: { min: BPM_MIN, max: BPM_MAX, locked: false },
       structure: { maxMeasures: null, maxTracks: null, canAdd: true, canRemove: true },
       /* circles: which dots the button beside Play offers — 'easy',
          'regular' or 'both'. */
@@ -2032,6 +2036,8 @@
       if (p.tempo.min > p.tempo.max) {
         const t = p.tempo.min; p.tempo.min = p.tempo.max; p.tempo.max = t;
       }
+      // 40-240 was what "Any" meant before the range became 30-300.
+      if (p.tempo.min === 40 && p.tempo.max === 240) { p.tempo.min = BPM_MIN; p.tempo.max = BPM_MAX; }
       p.tempo.locked = !!src.tempo.locked;
     }
 
@@ -4102,7 +4108,6 @@
      gets one — focus can fail to land at all in a background tab, and a
      sheet opening over the toolbar takes focus with it. */
   const bpmButton = document.getElementById('bpm-button');
-  const BPM_MIN = 30, BPM_MAX = 260;
 
   function setBpm(value) {
     let n = Math.round(Number(value));
@@ -4115,11 +4120,20 @@
     return true;
   }
 
+  /* Closing happens once. Taking the field away blurs it, and the blur
+     handler would otherwise close it again from inside the first close
+     (the browser throws when innerHTML is set re-entrantly). */
+  let closingBpm = false;
   function closeBpmEditor() {
     const input = bpmButton.querySelector('input');
-    if (!input) return;
-    bpmButton.innerHTML = '<span class="bpm-value" id="bpm-value">' + song.bpm + '</span>'
-                        + '<span class="bpm-unit">BPM</span>';
+    if (!input || closingBpm) return;
+    closingBpm = true;
+    try {
+      bpmButton.innerHTML = '<span class="bpm-value" id="bpm-value">' + song.bpm + '</span>'
+                          + '<span class="bpm-unit">BPM</span>';
+    } finally {
+      closingBpm = false;
+    }
   }
 
   bpmButton.addEventListener('click', () => {
@@ -4131,8 +4145,6 @@
     const input = document.createElement('input');
     input.type = 'number';
     input.className = 'inline-input';
-    input.min = String(BPM_MIN);
-    input.max = String(BPM_MAX);
     input.value = String(song.bpm);
     input.min = String(tempoMin());
     input.max = String(tempoMax());
@@ -4150,6 +4162,49 @@
       if (e.key === 'Escape') { e.preventDefault(); setBpm(before); closeBpmEditor(); }
     });
   });
+
+  /* Hover to slide, as in Rhythm Poetry and the Music Stand: a slider
+     above the button, for a real mouse only (on a board or a touch laptop
+     a tap would open it on top of its own typing). A short grace period
+     lets the mouse cross the gap from the button to the slider. */
+  (function tempoGauge() {
+    const wrap = document.getElementById('bpm-gauge-wrap');
+    const slider = document.getElementById('bpm-gauge');
+    const label = document.getElementById('bpm-gauge-label');
+    if (!wrap || !slider || !label) return;
+    let hideTimer = null, dragging = false;
+    const fine = () => window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    function show() {
+      if (!fine() || tempoLocked() || bpmButton.querySelector('input')) return;
+      clearTimeout(hideTimer);
+      slider.min = String(tempoMin());
+      slider.max = String(tempoMax());
+      slider.value = String(song.bpm);
+      label.textContent = song.bpm + ' BPM';
+      wrap.classList.add('show');
+      const r = bpmButton.getBoundingClientRect();
+      const w = wrap.offsetWidth || 260;
+      wrap.style.bottom = (window.innerHeight - r.top + 10) + 'px';
+      wrap.style.left = Math.max(10, Math.min(window.innerWidth - w - 10, r.left + r.width / 2 - w / 2)) + 'px';
+    }
+    function scheduleHide() {
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => { if (!dragging) wrap.classList.remove('show'); }, 150);
+    }
+    bpmButton.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') show(); });
+    bpmButton.addEventListener('mouseleave', scheduleHide);
+    bpmButton.addEventListener('click', () => wrap.classList.remove('show'));
+    wrap.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+    wrap.addEventListener('mouseleave', scheduleHide);
+    slider.addEventListener('pointerdown', () => { dragging = true; });
+    window.addEventListener('pointerup', () => { if (dragging) { dragging = false; scheduleHide(); } });
+    slider.addEventListener('input', () => {
+      if (!setBpm(slider.value)) return;
+      label.textContent = song.bpm + ' BPM';
+      const readout = document.getElementById('bpm-value');
+      if (readout) readout.textContent = String(song.bpm);
+    });
+  })();
 
   /* ---- meter ---- */
   const timeSignature = document.getElementById('time-signature');
@@ -4291,9 +4346,6 @@
   const countInToggle   = document.getElementById('count-in-toggle');
   const countInDesc     = document.getElementById('count-in-desc');
 
-  const NUMBER_WORDS = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven',
-                        'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];
-
   /* The switch over the instruments reads them the way a group's switch
      does in Layout settings: on when every one sounds, off when none
      does, and halfway when some do. */
@@ -4308,8 +4360,7 @@
     const state = voicesState();
     voicesToggle.classList.toggle('active', state === 'all');
     voicesToggle.classList.toggle('partial', state === 'some');
-    const n = countInBeats();
-    countInDesc.textContent = (NUMBER_WORDS[n] || n) + ' clicks before the music starts';
+    countInDesc.textContent = 'Begin with a one-bar count-in';
 
     /* One row per line of the score, in its order, with its picture —
        two lines playing the same instrument are two rows. A muted line
@@ -4400,7 +4451,8 @@
     { id: 'bar-numbers-toggle',  key: 'showBarNumbers' },
     { id: 'beat-numbers-toggle', key: 'showBeatNumbers' },
     /* nothing is drawn differently, only a body class — so no render,
-       and flipping it mid-playback does not interrupt what is lit */
+       and flipping one mid-playback does not interrupt what is lit */
+    { id: 'light-beats-toggle',  key: 'lightBeats', soft: true },
     { id: 'light-notes-toggle',  key: 'lightNotes', soft: true }
   ];
 
@@ -4467,6 +4519,7 @@
     document.body.classList.toggle('hide-bar-numbers', !view.showBarNumbers);
     document.body.classList.toggle('hide-beat-numbers', !view.showBeatNumbers);
     document.body.classList.toggle('show-syllables', !!view.showSyllables);
+    document.body.classList.toggle('light-beats', !!view.lightBeats);
     document.body.classList.toggle('light-notes', !!view.lightNotes);
 
     const paged = isPaged(), systems = isSystems(), blocks = inBlocks();
@@ -4591,8 +4644,8 @@
   ];
 
   const SHOW_SWITCHES = [
-    { key: 'showDots', name: 'Tappable dots',
-      desc: 'The circles above each beat and the chains that join them — the button beside Play flips these too' },
+    { key: 'showDots', name: 'Beat dots',
+      desc: 'The circles above each beat and the chains that join them — the beat-dot button flips these too' },
     { key: 'showBarNumbers', name: 'Bar numbers',
       desc: 'Which bar is which, along the top of the score' },
     { key: 'showBeatNumbers', name: 'Beat numbers',
@@ -5282,8 +5335,8 @@
   }
 
   const DOTS_TITLES = {
-    regular: 'Show the tappable dots',
-    off:     'Hide the dots',
+    regular: 'Show the beat dots',
+    off:     'Hide the beat dots',
     easy:    'EASY — one tap, one rhythm'
   };
 
@@ -5347,7 +5400,35 @@
        would fit the score to the height it is leaving behind. */
     requestAnimationFrame(() => { syncHeadColumn(); applyLayout(); });
     presentBtn.classList.toggle('active', presentMode);
+    presentFullScreen(presentMode);
   }
+
+  /* True full screen for present mode, as the Music Stand does it. Never
+     from inside a frame (the page around it owns the screen), and a browser
+     that says no just leaves present mode filling the window. Leaving full
+     screen with the browser's own Esc leaves present mode too. */
+  function presentFullScreen(on) {
+    if (EMBEDDED || document.documentElement.classList.contains('in-iframe')) return;
+    const root = document.documentElement;
+    const current = document.fullscreenElement || document.webkitFullscreenElement;
+    try {
+      if (on && !current) {
+        const go = root.requestFullscreen || root.webkitRequestFullscreen;
+        const p = go && go.call(root);
+        if (p && p.catch) p.catch(() => {});
+      } else if (!on && current) {
+        const leave = document.exitFullscreen || document.webkitExitFullscreen;
+        const p = leave && leave.call(document);
+        if (p && p.catch) p.catch(() => {});
+      }
+    } catch (e) {}
+  }
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(type => {
+    document.addEventListener(type, () => {
+      const current = document.fullscreenElement || document.webkitFullscreenElement;
+      if (!current && presentMode) setPresentMode(false);
+    });
+  });
 
   presentBtn.addEventListener('click', e => { e.stopPropagation(); setPresentMode(true); });
   presentExitBtn.addEventListener('click', () => setPresentMode(false));
@@ -5360,8 +5441,8 @@
     if (e.key === 'Escape') {
       /* Close the topmost thing that is open; only stop the music if
          nothing was. */
-      const sheets = [pictureModal, titleModal, backupSheet,
-                      layoutSheet, lessonSetupSheet, librarySheet]
+      const sheets = [document.getElementById('help-sheet'), pictureModal, titleModal,
+                      backupSheet, layoutSheet, lessonSetupSheet, librarySheet]
         .filter(el => el && el.classList.contains('open'));
       const hadPopover = settingsPopover.classList.contains('open')
                       || soundPopover.classList.contains('open')
@@ -5453,7 +5534,7 @@
        "Open now" offers the saved one back instead. */
     const canReopen = isCurrent && !autoSaveOn();
     const open = document.createElement('button');
-    open.className = 'lib-btn' + (isCurrent && !canReopen ? ' is-current' : '');
+    open.className = 'lib-btn' + (isCurrent && !canReopen ? ' is-current' : ' open-btn');
     open.textContent = canReopen ? 'Reopen' : (isCurrent ? 'Open now' : 'Open');
     open.disabled = isCurrent && !canReopen;
     if (canReopen) {
@@ -5502,24 +5583,14 @@
     const rename = document.createElement('button');
     rename.className = 'lib-btn';
     rename.textContent = 'Rename';
-    rename.addEventListener('click', () => {
-      const next = prompt('New name:', record.title);
-      if (!next || !next.trim()) return;
-      const lib = getStoredLibrary();
-      if (!lib[id]) return;
-      lib[id].title = next.trim();
-      lib[id].updatedAt = Date.now();
-      saveStoredLibrary(lib);
-      if (id === song.id) { song.title = next.trim(); updateSongChip(); }
-      renderLibraryList();
-    });
+    rename.addEventListener('click', () => askForTitle('rename', id));
 
     const remove = document.createElement('button');
     remove.className = 'lib-btn danger';
     remove.innerHTML = '&times;';
     remove.title = 'Delete this ostinato';
     remove.addEventListener('click', () => {
-      if (!confirm('Delete “' + record.title + '”? This cannot be undone.')) return;
+      if (!confirm('Delete “' + record.title + '”?')) return;
       const lib = getStoredLibrary();
       delete lib[id];
       saveStoredLibrary(lib);
@@ -5547,12 +5618,19 @@
     return row;
   }
 
-  function libraryGroup(label, ids, lib, emptyText) {
+  /* The group icons, as Rhythm Poetry and the Music Stand draw them. */
+  const SANDBOX_ICON = '<path d="M4 20h16"/><path d="M6 20l1.5-6h9L18 20"/><path d="M12 14V4"/><path d="M12 4l5 3-5 3"/>';
+  const YOURS_ICON = '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>';
+  const STARTERS_ICON = '<path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6l-5.4 2.9 1.2-6-4.5-4.2 6.1-.7z"/>';
+
+  function libraryGroup(label, ids, lib, emptyText, icon) {
     const section = document.createElement('section');
     const head = document.createElement('div');
     head.className = 'library-group-head';
-    head.innerHTML = '<span class="library-group-title">' + label + '</span>'
+    head.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + icon + '</svg>'
+                   + '<span class="library-group-title"></span>'
                    + '<span class="library-group-rule"></span>';
+    head.querySelector('.library-group-title').textContent = label;
     section.appendChild(head);
 
     if (!ids.length) {
@@ -5656,7 +5734,7 @@
     actions.className = 'library-song-actions';
 
     const open = document.createElement('button');
-    open.className = 'lib-btn' + (isCurrent ? ' is-current' : '');
+    open.className = 'lib-btn' + (isCurrent ? ' is-current' : ' open-btn');
     open.textContent = isCurrent ? 'Open now' : 'Open';
     open.disabled = isCurrent;
     if (!isCurrent) {
@@ -5698,7 +5776,7 @@
     if (lessonMeta) {
       const ids = lessonMeta.songIds.filter(id => lib[id]);
       libraryList.appendChild(libraryGroup(lessonMeta.title || 'This lesson', ids, lib,
-        'Nothing came with this lesson.'));
+        'Nothing came with this lesson.', YOURS_ICON));
       return;
     }
 
@@ -5706,9 +5784,11 @@
        library ostinato, so it is not listed with them. A lesson has no
        sandbox — there the library is the lesson. */
     const sandboxSection = document.createElement('section');
+    sandboxSection.className = 'library-group-sandbox';
     const sandboxHead = document.createElement('div');
     sandboxHead.className = 'library-group-head';
-    sandboxHead.innerHTML = '<span class="library-group-title">Sandbox</span>'
+    sandboxHead.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + SANDBOX_ICON + '</svg>'
+                          + '<span class="library-group-title">Sandbox</span>'
                           + '<span class="library-group-rule"></span>';
     sandboxSection.appendChild(sandboxHead);
     sandboxSection.appendChild(buildSandboxRow());
@@ -5721,9 +5801,9 @@
     const mine = ids.mine.filter(id => !isShelfSong(lib[id]));
     const starters = ids.starters.filter(id => !isShelfSong(lib[id]));
     libraryList.appendChild(libraryGroup('Yours', mine, lib,
-      'Nothing yet — press New ostinato, or save a copy of a starter.'));
+      'Nothing yet — press New ostinato, or save a copy of a starter.', YOURS_ICON));
     libraryList.appendChild(libraryGroup('Starters', starters, lib,
-      'The starters have all been deleted.'));
+      'The starters have all been deleted.', STARTERS_ICON));
   }
 
 
@@ -5741,10 +5821,24 @@
   const titleSub     = document.getElementById('title-modal-sub');
   const titleConfirm = document.getElementById('title-confirm');
 
-  let titleIntent = 'new';   // 'new' | 'copy'
+  let titleIntent = 'new';   // 'new' | 'copy' | 'rename'
+  let renameId = null;
 
-  function askForTitle(intent) {
+  function askForTitle(intent, id) {
     titleIntent = intent;
+    renameId = intent === 'rename' ? id : null;
+    if (intent === 'rename') {
+      const record = getStoredLibrary()[id];
+      if (!record) return;
+      titleHeading.textContent = 'Rename';
+      titleSub.textContent = 'A new name for this ostinato.';
+      titleConfirm.textContent = 'Rename';
+      titleInput.value = record.title || '';
+      titleStatus.textContent = '';
+      openSheet(titleModal);
+      setTimeout(() => { titleInput.focus(); titleInput.select(); }, 40);
+      return;
+    }
     const making = intent === 'new';
     const fromSandbox = !making && isSandbox(song.id);
     // Save as… on a shared ostinato is how a student keeps their changes.
@@ -5752,7 +5846,7 @@
     titleHeading.textContent = making ? 'Create a new ostinato'
       : (fromSandbox ? 'Save to your library' : (fromShared ? 'Save my copy' : 'Save as…'));
     titleSub.textContent = making
-      ? 'Give it a name so you can find it later.'
+      ? 'Give it a name so you can find it later, or leave it blank for a fresh page in your sandbox.'
       : (fromSandbox
         ? 'Your sandbox stays as it is. This adds a copy to your library, and you carry on in that copy.'
         : fromShared
@@ -5769,15 +5863,43 @@
 
   function submitTitle() {
     const value = titleInput.value.trim();
+    if (!value && titleIntent === 'new' && !lessonMeta) {
+      /* No name, so nothing goes in the library: a blank page in the
+         sandbox instead, cleared without asking (the user's call). A
+         lesson has no sandbox, so there a name is still needed. */
+      closeSheet(titleModal);
+      closeSheet(librarySheet);
+      if (isPlaying) stopPlayback();
+      flushAutosave();
+      clearSandbox();
+      if (song.id !== SANDBOX_ID) openSong(ensureSandbox());
+      toast('A blank page in your sandbox');
+      return;
+    }
     if (!value) {
       titleStatus.textContent = 'It needs a name.';
       titleStatus.className = 'status-msg error';
       titleInput.focus();
       return;
     }
+    if (titleIntent === 'rename') {
+      closeSheet(titleModal);
+      renameSong(renameId, value);
+      return;
+    }
     closeSheet(titleModal);
     closeSheet(librarySheet);
     if (titleIntent === 'new') createSong(value); else saveCopy(value);
+  }
+
+  function renameSong(id, name) {
+    const lib = getStoredLibrary();
+    if (!lib[id]) return;
+    lib[id].title = name;
+    lib[id].updatedAt = Date.now();
+    saveStoredLibrary(lib);
+    if (id === song.id) { song.title = name; updateSongChip(); }
+    renderLibraryList();
   }
 
   titleConfirm.addEventListener('click', submitTitle);
@@ -5786,6 +5908,14 @@
     if (e.key === 'Enter') { e.preventDefault(); submitTitle(); }
   });
   wireSheet(titleModal, 'title-modal-close');
+
+  /* ---- How this works ---- */
+  const helpSheet = document.getElementById('help-sheet');
+  document.getElementById('help-btn').addEventListener('click', () => {
+    closeSettings();
+    openSheet(helpSheet);
+  });
+  wireSheet(helpSheet, 'help-close');
 
   document.getElementById('new-song-btn').addEventListener('click', () => askForTitle('new'));
   document.getElementById('save-copy-btn').addEventListener('click', () => askForTitle('copy'));
@@ -6070,7 +6200,7 @@
   });
 
   document.getElementById('reset-btn').addEventListener('click', () => {
-    if (!confirm('Delete every ostinato you have made and put the starters back? This cannot be undone.')) return;
+    if (!confirm('Delete every ostinato you have made, put the starters back, and put the layout settings back to everything-on? This cannot be undone.')) return;
     clearTimeout(autosaveTimer);          // nothing on screen should survive this
     try {
       localStorage.removeItem(LIBRARY_KEY);
@@ -6947,19 +7077,19 @@
     if (!circlesNote) return;
     const names = easySet('simple').map(c => c.name.toLowerCase()).join(', ');
     circlesNote.textContent = mode === 'easy'
-      ? 'The button beside Play gives them the EASY circles and nothing else — one tap, one rhythm: '
+      ? 'The beat-dot button gives them the EASY circles and nothing else — one tap, one rhythm: '
         + names + '. Change these in Layout settings.'
       : mode === 'regular'
         ? 'The ordinary dots, one to a slot, with the + and − buttons and the chains. No EASY.'
         : mode === 'both'
-          ? 'The button beside Play walks the dots, then nothing, then EASY, so they can use either.'
-          : 'The rhythms stay as you wrote them. The dots button still shows and hides the dots.';
+          ? 'The beat-dot button walks the dots, then nothing, then EASY, so they can use either.'
+          : 'The rhythms stay as you wrote them. The beat-dot button still shows and hides the dots.';
   }
 
   function renderTempo() {
     if (!tempoSeg) return;
     const t = draft.policy.tempo;
-    const mode = t.locked ? 'locked' : (t.min > 40 || t.max < 240) ? 'range' : 'any';
+    const mode = t.locked ? 'locked' : (t.min > BPM_MIN || t.max < BPM_MAX) ? 'range' : 'any';
     tempoSeg.querySelectorAll('.seg-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.tempo === mode);
     });
@@ -7000,8 +7130,8 @@
     shellList.appendChild(switchRow(
       'Move between the ostinatos',
       draft.songIds.length > 1
-        ? 'The name at the top, holding this lesson’s ' + draft.songIds.length + ' ostinatos'
-        : 'The name at the top — with one ostinato there is nothing to move to',
+        ? 'The Library at the top, holding this lesson’s ' + draft.songIds.length + ' ostinatos'
+        : 'The Library at the top — with one ostinato there is nothing to move to',
       draft.policy.shell.library !== 'none',
       () => {
         draft.policy.shell.library = draft.policy.shell.library === 'none' ? 'lesson' : 'none';
@@ -7313,9 +7443,9 @@
       const btn = e.target.closest('.seg-btn');
       if (!btn) return;
       const t = draft.policy.tempo;
-      if (btn.dataset.tempo === 'any') { t.locked = false; t.min = 40; t.max = 240; }
+      if (btn.dataset.tempo === 'any') { t.locked = false; t.min = BPM_MIN; t.max = BPM_MAX; }
       else if (btn.dataset.tempo === 'locked') { t.locked = true; }
-      else { t.locked = false; if (t.min === 40 && t.max === 240) { t.min = 60; t.max = 120; } }
+      else { t.locked = false; if (t.min === BPM_MIN && t.max === BPM_MAX) { t.min = 60; t.max = 120; } }
       renderTempo();
     });
   }
@@ -7690,7 +7820,7 @@
     }
 
     const VIEW_KEYS = ['layout', 'measuresPerPage', 'zoomPct', 'showDots', 'easyMode', 'showSyllables',
-                       'syllableSystem', 'lightNotes', 'showBarNumbers', 'showBeatNumbers'];
+                       'syllableSystem', 'lightBeats', 'lightNotes', 'showBarNumbers', 'showBeatNumbers'];
 
     function songSummary(id, rec, starter) {
       return {

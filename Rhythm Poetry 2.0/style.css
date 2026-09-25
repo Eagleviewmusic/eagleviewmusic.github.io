@@ -121,8 +121,25 @@ svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap
   z-index: 40;
 }
 
-.home-link {
+/* The way home and the app's name, as in Ostinato Builder and the Music
+   Stand. */
+.topbar-left {
   justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.app-mark {
+  font-family: var(--font-round);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.home-link {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -132,6 +149,7 @@ svg[viewBox] { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap
   text-decoration: none;
   font-size: 14px;
   font-weight: 700;
+  white-space: nowrap;
   transition: background .15s, color .15s;
 }
 .home-link svg { width: 17px; height: 17px; }
@@ -651,10 +669,18 @@ body.capturing .circles.easy .circle { visibility: visible; }
   border-bottom: 5px solid transparent;
 }
 
-/* currently sounding */
-.notes-box.playing {
+/* --- the beat that is sounding ---
+   Two lights, each with its own switch in View (body.light-beats,
+   body.light-notes): the box of circles above the beat, and a box round
+   its notes. Both are drawn the same way — the sounding colour's wash
+   inside, its line round the edge, thickened by a ring outside the
+   border so nothing shifts when it comes on — and Ostinato Builder
+   draws its two exactly so, in its own colour. */
+body.light-beats .circles.playing,
+body.light-notes .notes-box.playing {
+  border-color: var(--sound);
   background: var(--sound-soft);
-  box-shadow: inset 0 0 0 2px var(--sound);
+  box-shadow: 0 0 0 1.5px var(--sound);
 }
 
 /* --- words & chant syllables --- */
@@ -1812,6 +1838,13 @@ body.present-mode .word:active { background: transparent; }
   .tool-select { max-width: 150px; font-size: 13px; }
 }
 
+/* With the app's name beside it and the side switch in the middle, the
+   way home gives up its words first. */
+@media (max-width: 900px) {
+  .home-link span { display: none; }
+  .home-link { padding: 7px; }
+}
+
 /* ---- phone ---- */
 @media (max-width: 720px) {
   :root {
@@ -1826,6 +1859,7 @@ body.present-mode .word:active { background: transparent; }
   .topbar { grid-template-columns: auto 1fr auto; gap: 6px; padding: 0 8px; }
   .home-link span { display: none; }
   .home-link { padding: 7px; }
+  .app-mark { display: none; }
 
   .side-switch { padding: 3px; gap: 3px; }
   .side-tab { padding: 8px 14px; font-size: 14px; }
@@ -1933,6 +1967,13 @@ body.capturing:not(.capture-color) .circle {
 body.capturing:not(.capture-color) .notes-box.selected,
 body.capturing:not(.capture-color) .notes-box.playing {
   background: transparent;
+  box-shadow: none;
+  border-color: transparent;
+}
+/* a picture is the score, not whichever beat happened to be sounding */
+body.capturing .circles.playing {
+  background: var(--surface);
+  border-color: var(--hairline-2);
   box-shadow: none;
 }
 body.capturing:not(.capture-color) .notes-box.selected::before { display: none; }

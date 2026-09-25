@@ -329,6 +329,18 @@ html.in-iframe .home-link { display: none; }
 }
 .tool-btn svg { width: 19px; height: 19px; flex: none; }
 .tool-btn:hover, .tool-btn.open { background: var(--ground); border-color: var(--ink-3); }
+/* Present ends the row tinted, as it does in Rhythm Poetry and Ostinato
+   Builder. The stand has no accent of its own, so the tint is its two
+   sides, softly — the Play button's colours. */
+.tool-btn.present-btn {
+  background: linear-gradient(135deg, var(--poem-soft), var(--ost-soft));
+  border-color: transparent;
+}
+.tool-btn.present-btn:hover {
+  background: linear-gradient(135deg, var(--poem), var(--ost));
+  border-color: transparent;
+  color: #fff;
+}
 .tool-value {
   font-family: var(--font-round);
   font-weight: 700;
@@ -1299,18 +1311,27 @@ body.present .transport {
 body.present .transport:hover,
 body.present .transport:focus-within { opacity: 1; }
 body.present .transport-inner { min-height: 0; padding: 7px 9px; }
-body.present .tool-group { display: none; }
-body.present .readout { display: flex; }
+/* Play and Exit, as in Rhythm Poetry's and Ostinato Builder's present
+   bars. The tempo, Loop and where the music is stay in the ordinary
+   toolbar. */
+body.present .tool-group,
+body.present .loop-btn,
+body.present .bpm-btn,
+body.present .readout { display: none; }
+body.present .transport-inner { gap: 12px; }
 body.present .play-btn { width: 44px; height: 44px; }
-body.present .loop-btn { width: 36px; height: 36px; }
 body.present .present-exit {
-  display: grid; place-items: center;
-  width: 40px; height: 40px;
-  border-radius: 50%;
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 40px;
+  padding: 0 15px 0 12px;
+  border-radius: 999px;
+  background: var(--ground);
+  font-size: 14px; font-weight: 700;
   color: var(--ink-2);
+  transition: background .14s, color .14s;
 }
-body.present .present-exit:hover { background: var(--ground); color: var(--ink); }
-body.present .present-exit svg { width: 20px; height: 20px; }
+body.present .present-exit:hover { background: var(--ink); color: #fff; }
+body.present .present-exit svg { width: 17px; height: 17px; }
 
 
 /* ============================================================
@@ -1384,3 +1405,61 @@ body.present .present-exit svg { width: 20px; height: 20px; }
     content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ink);
   }
 }
+
+
+/* ============================================================
+   HOW THIS WORKS
+   Rhythm Poetry's help sheet. The note is tinted in the stand's two
+   sides, as its Present button is.
+   ============================================================ */
+.help-side-note {
+  margin: 0 0 16px;
+  padding: 12px 15px;
+  border-radius: var(--r-md);
+  background: linear-gradient(135deg, var(--poem-soft), var(--ost-soft));
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.help-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 13px; }
+.help-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.help-list b { color: var(--ink); }
+
+.help-key {
+  flex: none;
+  min-width: 30px; height: 30px;
+  /* inline-grid so the badges used mid-sentence do not become block-level */
+  display: inline-grid; place-items: center;
+  vertical-align: middle;
+  padding: 0 7px;
+  border-radius: 8px;
+  background: var(--ground);
+  border: 1px solid var(--hairline-2);
+  font-size: 14px; font-weight: 800; color: var(--ink-2);
+}
+.help-list > li > .help-key { margin-top: 1px; }
+
+/* The way to it, at the foot of the View popover, as in the two apps. */
+.pop-foot { padding-top: 10px; border-top: 1px solid var(--hairline); }
+.pop-link {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  text-align: left;
+  transition: background .13s, color .13s;
+}
+.pop-link svg { width: 16px; height: 16px; flex: none; }
+.pop-link:hover { background: var(--ground); color: var(--ink); }
