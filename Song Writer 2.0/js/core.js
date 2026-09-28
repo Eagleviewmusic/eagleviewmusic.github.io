@@ -36,6 +36,7 @@
        'names:changed'  { on }
        'mode:changed'   { editing }
        'chord:played'   { id, midis, source }  'strip' | 'lane' | 'key' | 'number' | 'editor'
+       'chord:cleared'  {}                       the chord's notes leave the keyboard (chords.js clearSounding)
        'view:changed'   { view }    any View-popover setting
        'layout:changed' { layout }  Layout settings (what can be built)
        'policy:changed' { policy }  a lesson opened, closed or previewed

@@ -35,8 +35,11 @@
    LIT KEYS. The selected note's key is filled with its block's colour and
    shows a white lamp, in one row along the top of the keys (a harmony
    stack lights every note); nothing gold (the user's call). A chord from
-   the strip or the lane lights its keys the same way, without the lamp,
-   so the tune and the chord stay apart. A key rings for as long as it is held, in the
+   the panel or the lane lights its keys the same way, without the lamp,
+   so the tune and the chord stay apart. The chord's keys stay lit while
+   you step with the arrows or change a pitch (user, 2026-09-27); a tap on
+   the manuscript — not on a note — or putting the chord panel away
+   clears them (chord:cleared). A key rings for as long as it is held, in the
    Sound popover's Melody sound; sliding a finger across the keys plays
    each one in turn; in Edit, a tap sets the selected block to that pitch
    (SW.score.setActiveNoteMidi).
@@ -619,6 +622,8 @@
   SW.bus.on('score:changed', refreshSong);
   SW.bus.on('score:loaded', () => { lit.chord = []; if (!viewport) return; readSong(); dress(); readSelection(); paint(); start = null; place(true); });
   SW.bus.on('chord:played', d => { lit.chord = (d.midis || []).slice(); if (viewport) paint(); });
+  // a tap on the manuscript, or the chord panel put away (chords.js clearSounding); arrows and pitch changes leave the chord alone
+  SW.bus.on('chord:cleared', () => { lit.chord = []; if (viewport) paint(); });
   SW.bus.on('key:changed', () => { lit.chord = []; render(); });
   SW.bus.on('keyboard:changed', d => {
     if (!viewport) return;

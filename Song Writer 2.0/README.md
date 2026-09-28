@@ -433,7 +433,7 @@ Each file's header comment is the full contract.
   leaves them, then move to hold its line. "In the key" is the song's scale
   (2026-09-27): in C natural minor E♭ A♭ B♭ wear their colours and E A B go
   grey under Focus; the song's own pitches still unlock their keys. The selected note's key takes its block's
-  colour and a white lamp in one row along the top of the keys (no gold); a chord's keys light the same way, without the lamp. Tap to
+  colour and a white lamp in one row along the top of the keys (no gold); a chord's keys light the same way, without the lamp, and stay lit while you step with the arrows or change a pitch — a tap on the manuscript (a line's background, not a note) or putting the chord panel away takes them off (`chord:cleared`, 2026-09-27). Tap to
   hear a key, slide across to play each, in Edit tap to set the pitch.
   Preferences `kbOctaves`, `kbFocus`, `dockHeight` (View, remembered);
   `SW.settings.setKeyboard(patch)` emits `keyboard:changed`. The old key-under-the-

@@ -2021,6 +2021,13 @@
   /* ================= WIRING ================= */
   function init() {
     notationContainer.addEventListener('click', onScoreClick);
+    // a tap on the manuscript itself — a line's background, the space under
+    // the last line — takes the chord's notes off the keyboard (a note, a
+    // word, a slot or a section head handles its own tap; user, 2026-09-27)
+    if (stageEl) stageEl.addEventListener('click', e => {
+      if (e.target.closest('.note, .syllable, .chord-slot, .line-head, .text-input, .add-line-row, .edit-box')) return;
+      if (SW.chords && SW.chords.clearSounding) SW.chords.clearSounding();
+    });
     notationContainer.addEventListener('dblclick', onScoreDblClick);
     notationContainer.addEventListener('pointerup', onScorePointerUp);
 

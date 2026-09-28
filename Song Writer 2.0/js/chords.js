@@ -465,6 +465,15 @@
     S.soundingChord = { id, midis: list };
     SW.bus.emit('chord:played', { id, midis: list, source: source || 'strip' });
   }
+  /* The chord's notes leave the keyboard (user, 2026-09-27): a tap on the
+     manuscript — not on a note — or the chord panel going away clears
+     them; stepping with the arrows or changing a pitch never does, so the
+     chord stays under the tune for as long as it is wanted. */
+  function clearSounding() {
+    if (!S.soundingChord) return;
+    S.soundingChord = null;
+    SW.bus.emit('chord:cleared', {});
+  }
   /* Sound a chord (the id as given — the held buttons are not applied
      here; playPlace does that) and tell the listeners. */
   function play(x, source) {
@@ -517,6 +526,8 @@
   SW.bus.on('scale:changed', () => { S.selectedChord = null; clearMods(); SW.bus.emit('chords:changed', { why: 'scale' }); });
   SW.bus.on('score:loaded', () => { S.selectedChord = null; S.soundingChord = null; clearMods(); SW.bus.emit('chords:changed', { why: 'song' }); });
   SW.bus.on('layout:changed', () => SW.bus.emit('chords:changed', { why: 'layout' }));
+  // the chord panel put away (the Song or Keyboard tab, View, a lesson): its chord leaves the keys
+  ['view:changed', 'policy:changed'].forEach(evt => SW.bus.on(evt, () => { if (SW.settings && !SW.settings.shows('strip')) clearSounding(); }));
   window.addEventListener('blur', clearMods);
 
   SW.chords = {
@@ -524,7 +535,7 @@
     scaleId, scale, scaleGroups,
     board, entry, presetAt, presetLabel, setBoard, boardModel,
     parse, toId, isKnown, sameChord,
-    describe, midis, spellTones, play, playPlace, announce,
+    describe, midis, spellTones, play, playPlace, announce, clearSounding,
     offered, placeShown, placeAllowed, setIndex, setChordSet, describeSet,
     heldMods, setMod, clearMods, isModKey, slotFunc, setSlot, resetSlots, modSlots, withHeld,
     placeForKey, keyOf,
