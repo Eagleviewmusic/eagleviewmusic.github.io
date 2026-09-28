@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Digital Accordion</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#6e0f0b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Accordion">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Michroma + Saira: the Digital style. Cinzel + Fraunces: the Accordion style (fetched only when shown). -->
+  <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Saira:wdth,wght@100..125,500..800&family=Cinzel:wght@600..900&family=Fraunces:opsz,wght@9..144,500..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- the Accordion style is the only look (the Digital lab was retired 2026-09-27); set before the first paint -->
+  <script>document.documentElement.dataset.style = 'accordion';</script>
+</head>
+<body>
+<!-- The logo: an accordion whose bellows are the seven note colours, C to C. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="da-logo" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#f2e8d5"/><rect x="6" y="9" width="12" height="46" rx="3" fill="#2a231c"/><g fill="#f2e8d5"><circle cx="10" cy="16" r="1.7"/><circle cx="14" cy="16" r="1.7"/><circle cx="10" cy="23.5" r="1.7"/><circle cx="14" cy="23.5" r="1.7"/><circle cx="10" cy="31" r="1.7"/><circle cx="14" cy="31" r="1.7"/><circle cx="10" cy="38.5" r="1.7"/><circle cx="14" cy="38.5" r="1.7"/><circle cx="10" cy="46" r="1.7"/><circle cx="14" cy="46" r="1.7"/></g><polygon points="18,12 21.5,16 21.5,48 18,52" fill="#FF3B30"/><polygon points="21.5,16 25,12 25,52 21.5,48" fill="#FF9500"/><polygon points="25,12 28.5,16 28.5,48 25,52" fill="#FFCC00"/><polygon points="28.5,16 32,12 32,52 28.5,48" fill="#34C759"/><polygon points="32,12 35.5,16 35.5,48 32,52" fill="#30c0c6"/><polygon points="35.5,16 39,12 39,52 35.5,48" fill="#007AFF"/><polygon points="39,12 42.5,16 42.5,48 39,52" fill="#AF52DE"/><polygon points="42.5,16 46,12 46,52 42.5,48" fill="#FF3B30"/><g fill="#000" opacity=".2"><polygon points="21.5,16 25,12 25,52 21.5,48"/><polygon points="28.5,16 32,12 32,52 28.5,48"/><polygon points="35.5,16 39,12 39,52 35.5,48"/><polygon points="42.5,16 46,12 46,52 42.5,48"/></g><rect x="46" y="9" width="12" height="46" rx="3" fill="#2a231c"/><rect x="48.5" y="13" width="7" height="38" rx="1" fill="#f2e8d5"/><g stroke="#2a231c" stroke-width=".8"><path d="M48.5 20.6h7"/><path d="M48.5 28.2h7"/><path d="M48.5 35.8h7"/><path d="M48.5 43.4h7"/></g><g fill="#2a231c"><rect x="48.5" y="18.8" width="4" height="3.6"/><rect x="48.5" y="26.4" width="4" height="3.6"/><rect x="48.5" y="41.6" width="4" height="3.6"/></g></symbol>
+</svg>
+<div id="app" class="app">
+
+  <!-- ================= TOP BAR ================= -->
+  <header class="topbar" id="topbar">
+    <div class="brand">
+      <a class="brand-home" id="home-link" href="../index.html" title="Eagle View Music">
+        <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><use href="#da-logo"/></svg>
+      </a>
+      <span class="brand-name"><span class="brand-kicker">Digital</span><span class="brand-word">Accordion</span></span>
+      <span class="model-tag" title="Model DA-1">DA-1</span>
+    </div>
+
+    <div class="key-ctl" id="key-ctl">
+      <div class="ctl-group">
+        <button class="key-arrow" id="key-down" aria-label="Key down">&#9664;</button>
+        <button class="key-name" id="key-name" title="Choose a key">C</button>
+        <button class="key-arrow" id="key-up" aria-label="Key up">&#9654;</button>
+      </div>
+      <div class="ctl-group scale-group">
+        <select id="scale-select" class="scale-select" aria-label="Scale"></select>
+      </div>
+    </div>
+
+    <div class="view-seg" role="tablist" aria-label="View">
+      <button class="seg-btn" data-view="tower" role="tab">Buttons</button>
+      <button class="seg-btn" data-view="panels" role="tab">Panels</button>
+      <button class="seg-btn" data-view="keys" role="tab">Keys</button>
+    </div>
+
+    <div class="actions">
+      <button class="tb-btn" id="library-btn">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <span>Library</span>
+      </button>
+      <button class="tb-btn icon-only" id="settings-btn" aria-label="Settings">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ================= STAGE ================= -->
+  <main class="stage" id="stage" aria-label="Instrument"></main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+
+<!-- ================= SHEET: KEY PICKER ================= -->
+<div class="sheet-backdrop" id="key-sheet">
+  <div class="sheet sheet-narrow" role="dialog" aria-label="Choose a key">
+    <div class="sheet-head"><h2>Key</h2><button class="sheet-close" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body">
+      <div class="key-grid" id="key-grid"></div>
+      <p class="sheet-hint">Spelled the way this scale is usually written. Tap the key name in the top bar any time.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SHEET: LIBRARY ================= -->
+<div class="sheet-backdrop" id="library-sheet">
+  <div class="sheet" role="dialog" aria-label="Library">
+    <div class="sheet-head">
+      <div class="now-editing">
+        <span class="now-label">Now playing</span>
+        <span class="now-title" id="now-title">Untitled</span>
+        <span class="now-note" id="now-note"></span>
+      </div>
+      <button class="sheet-close" data-close aria-label="Close">&times;</button>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn btn-primary" id="save-btn">Save</button>
+      <button class="btn" id="save-as-btn">Save as…</button>
+      <button class="btn" id="new-layout-btn">New from scale</button>
+      <button class="btn btn-primary" id="save-scale-btn" hidden title="Keep this Sandbox as one of your scales">Save scale…</button>
+      <button class="btn" id="share-toggle-btn">Share &amp; backup</button>
+    </div>
+    <div class="share-panel" id="share-panel" hidden>
+      <section class="panel-section">
+        <h3>Send this layout as a link</h3>
+        <p class="panel-note">Everything travels inside the link — blocks, chords, key bindings and sounds. Nothing is uploaded.</p>
+        <button class="btn btn-primary" id="make-link-btn">Create a link</button>
+        <div class="share-row" id="share-row" hidden>
+          <input type="text" id="share-link" class="text-field" readonly>
+          <button class="btn" id="copy-link-btn">Copy</button>
+        </div>
+        <span class="status-msg" id="share-status"></span>
+      </section>
+      <section class="panel-section">
+        <h3>Backup</h3>
+        <p class="panel-note">Download every layout you have made as one file, or open a file to add its layouts to your library.</p>
+        <div class="row-wrap">
+          <button class="btn" id="export-btn">Download my layouts</button>
+          <button class="btn" id="import-btn">Open a backup…</button>
+          <input type="file" id="import-file" accept=".json,application/json" hidden>
+        </div>
+        <span class="status-msg" id="import-status"></span>
+      </section>
+    </div>
+    <div class="library-list" id="library-list"></div>
+  </div>
+</div>
+
+<!-- ================= SHEET: NAME ================= -->
+<div class="sheet-backdrop" id="name-sheet">
+  <div class="sheet sheet-narrow" role="dialog" aria-label="Name this layout">
+    <div class="sheet-head"><h2 id="name-heading">Save layout</h2><button class="sheet-close" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body">
+      <p class="sheet-hint" id="name-sub">Give it a name so you can find it later.</p>
+      <input type="text" id="name-input" class="text-field" placeholder="e.g. E Phrygian jam" maxlength="60" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="sheet-foot">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn btn-primary" id="name-confirm">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SHEET: SETTINGS ================= -->
+<div class="sheet-backdrop" id="settings-sheet">
+  <div class="sheet" role="dialog" aria-label="Settings">
+    <div class="sheet-head"><h2>Settings</h2><button class="sheet-close" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body sheet-scroll">
+
+      <section class="panel-section">
+        <h3>Sounds</h3>
+        <div class="field-row">
+          <label for="melody-sound">Melody</label>
+          <select id="melody-sound" class="select"></select>
+          <input type="range" id="melody-level" min="0" max="1" step="0.02" aria-label="Melody level">
+        </div>
+        <div class="field-row">
+          <label for="chords-sound">Chords</label>
+          <select id="chords-sound" class="select"></select>
+          <input type="range" id="chords-level" min="0" max="1" step="0.02" aria-label="Chords level">
+        </div>
+        <div class="field-row">
+          <label for="reverb-level">Room</label>
+          <input type="range" id="reverb-level" min="0" max="1" step="0.02" aria-label="Reverb">
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <h3>Computer keyboard</h3>
+        <div class="field-row">
+          <label for="key-preset">Hands</label>
+          <select id="key-preset" class="select"></select>
+        </div>
+        <p class="panel-note">Melody runs by scale degree from <kbd>j</kbd>: <kbd>n m , . /</kbd> are 3 4 5 6 7 below it, the rows above climb to <kbd>0</kbd> and <kbd>-</kbd>. <kbd>Shift</kbd> or <kbd>Caps Lock</kbd> lifts the melody an octave. The 8va button on the melody side lifts it an octave too. Hold <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd> <kbd>V</kbd> <kbd>B</kbd> to change any chord — each does what its button by the chord tower says (to start with sus2, add9, sus4, ♭7 and maj7; ♭7 with maj7 gives a 6th). They can also invert the chord: 6, 6/4, and 6/5, 4/3, 4/2, which make it a 7th chord. Every block's keys can be changed in Edit mode.</p>
+        <button class="btn" id="mods-edit-btn" type="button">Choose what Z X C V B do…</button>
+      </section>
+
+      <section class="panel-section">
+        <h3>Layout</h3>
+        <div class="field-row">
+          <label for="melody-design">Panels: notes</label>
+          <select id="melody-design" class="select"></select>
+        </div>
+        <div class="field-row">
+          <label for="chord-set">Chord set</label>
+          <select id="chord-set" class="select"></select>
+        </div>
+        <div class="field-row">
+          <label for="order-select">Sides</label>
+          <select id="order-select" class="select">
+            <option value="chords-left">Chords left · melody right</option>
+            <option value="melody-left">Melody left · chords right</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label for="show-select">Show</label>
+          <select id="show-select" class="select">
+            <option value="both">Chords and melody</option>
+            <option value="chords">Chords only</option>
+            <option value="melody">Melody only</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label for="melody-naming">Note names</label>
+          <select id="melody-naming" class="select">
+            <option value="solfege">Solfège (Do Re Mi)</option>
+            <option value="letter">Letters (C D E)</option>
+            <option value="degree">Degrees (1 2 3)</option>
+            <option value="both">Solfège + letters</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label for="chords-naming">Chord names</label>
+          <select id="chords-naming" class="select">
+            <option value="roman">Roman numerals (I IV V)</option>
+            <option value="letter">Letters (C F G)</option>
+            <option value="both">Numerals + letters</option>
+          </select>
+        </div>
+        <label class="inline-check"><input type="checkbox" id="show-keys-check"><span>Show key bindings — the computer key on each button and panel, and Z X C V B on the chord tabs (the Keys view always shows them)</span></label>
+        <label class="inline-check"><input type="checkbox" id="chord-bend-check"><span>Chords bend the scale — while a chord with a note outside the scale is held, the melody block on that letter follows it (IV/IV in C major turns B into B♭)</span></label>
+        <label class="inline-check"><input type="checkbox" id="chord-tones-check"><span>Show the notes inside each chord block — letters with chord names, scale degrees with roman numerals</span></label>
+      </section>
+
+      <section class="panel-section">
+        <h3>Start again</h3>
+        <p class="panel-note">Rebuild a side from the scale's own preset. Your other side is untouched.</p>
+        <div class="row-wrap">
+          <button class="btn" id="rebuild-melody-btn">Rebuild melody blocks</button>
+          <button class="btn" id="rebuild-chords-btn">Rebuild chord blocks</button>
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <h3>About</h3>
+        <div class="nameplate">
+          <svg viewBox="0 0 64 64" aria-hidden="true" style="stroke:none"><use href="#da-logo"/></svg>
+          <div class="plate-text"><b>Digital Accordion</b><span>Model DA-1 · Eagle View Music</span></div>
+        </div>
+        <p class="panel-note">Digital Accordion (formerly Key Blocks) grows out of Melody Tower and Chord Tower: one tower of notes, one tower of chords, both in the same key, played together on one keyboard. Like an accordion, the left hand plays chord buttons and the right hand plays the melody — the bellows between the two sides open while you play. Tap a button to play it. Slide between buttons. Buttons puts them where Accordion Builder's standard board (or your own board) puts them; Panels stretches them to fill the sides for thumbs, with the notes as a grid or in Design A or B; Keys shows them laid over your keyboard. Unlock a side with its switch to edit its blocks: pitch or chord, size, keys, or add and remove. The chord presets follow each scale's own harmony — I V IV in major, i ♭II ♭III in Phrygian, I7 IV7 V7 in blues — and the scales run from the diatonic modes to pentatonic, whole tone, octatonic and further afield.</p>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SHEET: BLOCK EDITOR (filled by script) ================= -->
+<div class="sheet-backdrop" id="block-sheet">
+  <div class="sheet" role="dialog" aria-label="Edit block">
+    <div class="sheet-head">
+      <h2 id="block-sheet-title">Block</h2>
+      <button class="sheet-close" data-close aria-label="Close">&times;</button>
+    </div>
+    <div class="sheet-body sheet-scroll" id="block-sheet-body"></div>
+    <div class="sheet-foot" id="block-sheet-foot"></div>
+  </div>
+</div>
+
+<!-- ================= SHEET: CHORD BUTTONS (Z X C V B) ================= -->
+<div class="sheet-backdrop" id="mods-sheet">
+  <div class="sheet" role="dialog" aria-label="Chord buttons">
+    <div class="sheet-head"><h2>Chord buttons</h2><button class="sheet-close" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body sheet-scroll" id="mods-body"></div>
+  </div>
+</div>
+
+<!-- ================= SHEET: ADD CHORD ================= -->
+<div class="sheet-backdrop" id="add-chord-sheet">
+  <div class="sheet" role="dialog" aria-label="Add a chord">
+    <div class="sheet-head"><h2>Add a chord</h2><button class="sheet-close" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body sheet-scroll" id="add-chord-body"></div>
+  </div>
+</div>
+
+<!-- ================= SHEET: BIND A KEY ================= -->
+<div class="sheet-backdrop" id="bind-sheet">
+  <div class="sheet" role="dialog" aria-label="Bind a key">
+    <div class="sheet-head"><h2 id="bind-title">Key</h2><button class="sheet-close" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body sheet-scroll" id="bind-body"></div>
+  </div>
+</div>
+
+<script src="lib/keyblocks-layers.js"></script>
+<script src="theory.js"></script>
+<script src="audio.js"></script>
+<script src="pack.js"></script>
+<script src="standard-board.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
