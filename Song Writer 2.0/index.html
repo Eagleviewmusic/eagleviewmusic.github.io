@@ -124,8 +124,8 @@
   <!-- THE EDIT BOX — out while the hat is on (js/components/edit-box.js).
        It takes the whole left column: the chord panel's place and the
        corner under it. With the chords on, the chord panel itself moves
-       into its foot (#eb-chords), pencils and all, so chords are edited
-       there. Every note tool is in it, so nothing is drawn
+       to the end of its scroll (#eb-chords), pencils and all, so chords
+       can still be edited there. Every note tool is in it, so nothing is drawn
        around the note. The sections a lesson or Layout settings take
        away are removed; a tool that cannot act on the selection just now
        is greyed, so no button ever moves under a finger. -->
@@ -147,9 +147,10 @@
       <p class="eb-empty" id="eb-empty">Tap a word to type it.</p>
       <!-- View → Staff notation, the same setting (edit-box.js) -->
       <div class="eb-staff" id="eb-staff"></div>
+      <!-- the chord panel, while the hat is on and the chords are out: last
+           in the scroll — there when wanted, out of the way otherwise -->
+      <div class="eb-chords" id="eb-chords"></div>
     </div>
-    <!-- the chord panel, while the hat is on and the chords are out -->
-    <div class="eb-chords" id="eb-chords"></div>
   </aside>
 
   <!-- LEFT HAND — js/components/chord-strip.js: Digital Accordion's chord

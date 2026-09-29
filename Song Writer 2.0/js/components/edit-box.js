@@ -44,11 +44,11 @@
    toolbar — the chord panel's place and the corner under it, beside the
    keyboard when that is out (style.css WORKSPACE). With the chords on,
    the chord panel itself (#chord-strip, the same element and all its
-   wiring) moves into the box's foot (#eb-chords) while the hat is on,
-   pencils and all — in Edit, chords are there to be edited — and goes
-   back beside the stage when it comes off (seatChords). The corner
-   under it is away while editing. The tools above scroll when the
-   window is short; the chords stay put at the foot.
+   wiring) moves to the END of the box's scroll (#eb-chords, under the
+   Staff notation switch) while the hat is on, pencils and all — in Edit
+   chords play a minor part, so they wait below the tools until scrolled
+   to (the user's call) — and goes back beside the stage when the hat
+   comes off (seatChords). The corner under it is away while editing.
    (Until then it floated and was dragged by its title bar; its old
    place, song_writer_2_edit_box_v1, is no longer read.)
 

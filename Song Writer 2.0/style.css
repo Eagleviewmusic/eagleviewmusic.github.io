@@ -658,14 +658,16 @@ body.editing .edit-box { display: flex; animation: eb-in .18s ease-out; }
 .eb-title { flex: 1; font-family: var(--font-round); font-size: 16px; font-weight: 700; line-height: 1; }
 
 .eb-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; padding: 0 11px 11px; }
-/* the chord panel in the foot (edit-box.js seatChords): a fixed share of
-   the column, so the chords never scroll away; the tools above scroll */
+/* the chord panel at the end of the scroll (edit-box.js seatChords): a
+   minor part of editing, so it waits below the tools until scrolled to.
+   It spans the box's full width (out past the body's padding) and has a
+   height of its own, as its rows share the height they are given. */
 .eb-chords { display: none; }
 body.show-strip .eb-chords {
-  flex: 0 0 auto; height: clamp(230px, 44%, 420px); min-height: 0;
-  display: flex; border-top: 1.5px solid rgba(240,138,0,.32);
+  flex: none; height: 300px; display: flex;
+  margin: 12px -11px -11px; border-top: 1px solid var(--hairline);
 }
-.eb-chords .chord-strip { flex: 1 1 auto; min-width: 0; border-right: none; padding: 9px 10px 10px; }
+.eb-chords .chord-strip { flex: 1 1 auto; min-width: 0; border-right: none; padding: 10px 10px 10px 11px; background: transparent; }
 /* the blocks are smaller down here: a small pencil in the corner, clear of the name */
 .eb-chords .cb-edit { width: 16px; height: 16px; top: 2px; right: 2px; border-radius: 5px; }
 .eb-chords .cb-edit svg { width: 10px; height: 10px; }
