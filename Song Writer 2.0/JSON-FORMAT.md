@@ -15,7 +15,7 @@ import rule are shared by every Eagle View Music app and are defined in
 | Library | `localStorage.song_writer_2_library_v1` | `{ [id]: record }` | 1 |
 | A song's music | `record.score` | the **score model** | 2 |
 | 1.0 text | `record.content` (1.0), text editor, envelopes | the **text format** | 3 |
-| Share link | `?song=<base64 JSON>` | link payload | 4 |
+| Share link | `#song=<base64 JSON>` (`?song=` before 2026-09-28) | link payload | 4 |
 | Backup file | *Share & backup → Download* | `{ app, version: 2, songs }` | 5 |
 | Lesson link | `#lesson=<base64 JSON>` | lesson payload | 6 |
 | Layout settings | `localStorage.song_writer_2_layout_v1`, `record.layout`, links, lessons | layout | 7 |
@@ -139,7 +139,12 @@ The `board` does not travel in the text (the JSON carries it).
 `#`/`b` after the letter an accidental, `{…}` a chord before the syllable.
 A 1.0 song is this text with no values, chords, time or tempo.
 
-## 4. Share link — `?song=`
+## 4. Share link — `#song=`
+
+Written in the hash since 2026-09-28: the part after `#` is never sent to the
+server, so a long song cannot hit GitHub Pages' limit on an address (~8 KB —
+past it the server answers "URI too long" and the app never loads). Links
+made before, with `?song=`, are still read.
 
 ```json
 { "v": 2, "title": "Rain on the Roof", "score": { … },
@@ -157,7 +162,7 @@ A 1.0 song is this text with no values, chords, time or tempo.
   (§1) has the same name, the shared song is filed carrying it too. Without
   the tick the link carries no `layout`, and the song opens with the
   receiver's own settings.
-- Also read: 1.0 links, `#song=` with `{ "title", "content" }`.
+- Also read: 2.0 links made before 2026-09-28 (`?song=`), and 1.0 links, `#song=` with `{ "title", "content" }`.
 - On arrival: `EVM.file` (EVM Library README §2) — filed once, as a shared song.
 
 ## 5. Backup file

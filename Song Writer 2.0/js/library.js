@@ -847,8 +847,13 @@
   }
 
   /* ---------------- share by link ---------------- */
+  /* In the HASH (#song=), as lesson links are: the part after # never
+     leaves the browser, so a long song cannot make the address too long
+     for the server. As ?song= (until 2026-09-28) a song past ~8 KB of
+     address got GitHub Pages' "URI too long" page and never reached the
+     app. Both forms are read. */
   function shareLinkFor(data) {
-    return window.location.origin + window.location.pathname + '?song=' + encodeURIComponent(ui.encodeJson(data));
+    return window.location.origin + window.location.pathname + '#song=' + encodeURIComponent(ui.encodeJson(data));
   }
   function offerLink(link, input, row, textEl, feedbackEl) {
     if (input) input.value = link;
@@ -883,8 +888,9 @@
     offerLink(shareLinkFor(data), $('shareLinkInput'), $('shareLinkContainer'), $('copyShareLinkBtnText'), $('shareLinkFeedback'));
   }
 
-  /* 2.0 links use ?song=, as Rhythm Poetry's do; 1.0's used #song= and
-     carried { title, content }. Both are read. */
+  /* 2.0 links use #song= (since 2026-09-28; ?song= before, as Rhythm
+     Poetry's do); 1.0's used #song= too and carried { title, content }.
+     All are read. */
   function checkUrlForSharedSong() {
     let raw = null;
     if (window.location.hash) {
