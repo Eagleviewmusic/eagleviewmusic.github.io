@@ -3217,8 +3217,12 @@
     };
     if (!state.pairingId) payload.sandbox = true;
     else if (!hasUnsavedChanges()) Object.assign(payload, EVM.shareHeader(readLibrary()[state.pairingId], pairingKey));
+    /* In the HASH (#pair=, 2026-09-28): an arrangement holds two whole
+       pieces, and as ?pair= a big one made an address too long for the
+       server (GitHub Pages refuses past ~8 KB), so the stand never loaded.
+       The part after # never leaves the browser. ?pair= links still open. */
     return window.location.origin + window.location.pathname
-      + '?pair=' + encodeURIComponent(encodeBase64Json(payload));
+      + '#pair=' + encodeURIComponent(encodeBase64Json(payload));
   }
 
   /* From a link, pasted or followed. Filed first — "make sure this is
@@ -3671,7 +3675,9 @@
 
   let linkPair = null;
   try {
-    const params = new URLSearchParams(window.location.search);
+    // #pair= (links since 2026-09-28), or ?pair= (links made before)
+    const inHash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const params = inHash.has('pair') ? inHash : new URLSearchParams(window.location.search);
     if (params.has('pair')) {
       linkPair = decodeBase64Json(params.get('pair'));
       window.history.replaceState(null, document.title, window.location.pathname);
@@ -3705,6 +3711,12 @@
     writeLibrary(lib);
   })();
 
+  /* An arrangement link pasted into the address bar of the stand already
+     open changes only the hash, which loads nothing: start again, so it is
+     read. */
+  window.addEventListener('hashchange', () => {
+    if (/[#&]pair=/.test(window.location.hash)) window.location.reload();
+  });
   if (linkPair) {
     openLinkPairing(linkPair, { boot: true });
   } else if (session) {

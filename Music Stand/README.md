@@ -125,7 +125,11 @@ in Rhythm Poetry and Ostinato Builder:
 - **A shared arrangement** — one that came in a link — is **read-only**: the switch
   reads **Save my copy**, and the copy is yours (`derivedFrom` the shared one).
   It keeps the name it was sent with (no Rename).
-- **Links never pile up.** A `?pair=` link is filed before it is opened
+- **Links carry the arrangement in the hash** (`#pair=`, since 2026-09-28; the apps'
+  song links are `#song=` too). The part after `#` never reaches the server, so a
+  big arrangement cannot make the address too long for GitHub Pages (~8 KB, "URI
+  too long"). `?pair=` / `?song=` links made before still open.
+- **Links never pile up.** A `#pair=` link is filed before it is opened
   (`EVMLibrary.file`): the same link again finds the arrangement already here; a
   newer version of it (same id, later `updatedAt`) replaces the old one; a link
   from before ids travelled is matched by what it holds. This is what makes a

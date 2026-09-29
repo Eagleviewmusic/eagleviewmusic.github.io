@@ -6454,8 +6454,12 @@
        the student last had — the words still arrived, but the syllables
        did not. It locks nothing (speechShowFrom). */
     record.show = speechShow();
+    /* In the HASH (#song=, 2026-09-28), as lesson links are: the part
+       after # never reaches the server, so a long piece cannot make the
+       address too long for it (GitHub Pages refuses past ~8 KB with
+       "URI too long", and the app never loads). ?song= links still open. */
     const base = window.location.origin + window.location.pathname;
-    const link = base + '?song=' + encodeURIComponent(encodeSong(record));
+    const link = base + '#song=' + encodeURIComponent(encodeSong(record));
 
     shareLinkInput.value = link;
     shareRow.hidden = false;
@@ -8027,7 +8031,9 @@
      ================================================================== */
 
   function offerSharedSong() {
-    const params = new URLSearchParams(window.location.search);
+    // #song= (links since 2026-09-28), or ?song= (links made before)
+    const inHash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const params = inHash.has('song') ? inHash : new URLSearchParams(window.location.search);
     if (!params.has('song')) return false;
 
     const decoded = decodeSong(params.get('song'));
@@ -8590,6 +8596,12 @@
     if (!openedFromLesson) toast('That lesson link could not be read');
   }
   if (!openedFromLesson && (EMBEDDED || !offerSharedSong())) restoreLastSong();
+  /* A song or lesson link pasted into the address bar of the app already
+     open changes only the hash, which loads nothing: start again, so it is
+     read (leaving saves the work, as it always does). */
+  if (!EMBEDDED) window.addEventListener('hashchange', () => {
+    if (/[#&](song|lesson)=/.test(window.location.hash)) window.location.reload();
+  });
 
   applyPolicyToShell();
 

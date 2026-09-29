@@ -4270,9 +4270,13 @@
   }
 
   function generateShareLink(songData) {
+    /* In the HASH (#song=, 2026-09-28), as lesson links are: the part
+       after # never reaches the server, so a long piece cannot make the
+       address too long for it (GitHub Pages refuses past ~8 KB with
+       "URI too long", and the app never loads). ?song= links still open. */
     const encoded = encodeSongToUrl(songData);
     const baseUrl = window.location.origin + window.location.pathname;
-    return `${baseUrl}?song=${encodeURIComponent(encoded)}`;
+    return `${baseUrl}#song=${encodeURIComponent(encoded)}`;
   }
 
   /* Through copyToClipboard(), not navigator.clipboard directly. Served
@@ -9755,6 +9759,12 @@
 
   const library = getStoredLibrary();
   const sharedSong = (songIdToLoad || EMBEDDED) ? null : checkUrlForSharedSong();
+  /* A song or lesson link pasted into the address bar of the app already
+     open changes only the hash, which loads nothing: start again, so it is
+     read (leaving saves the work, as it always does). */
+  if (!EMBEDDED) window.addEventListener('hashchange', () => {
+    if (/[#&](song|lesson)=/.test(window.location.hash)) window.location.reload();
+  });
 
   // What was open on each side last time.
   function restoreActiveIds() {
