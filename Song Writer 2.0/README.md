@@ -48,7 +48,7 @@ and calls the others through `SW` at call time.
 ├ task strip (lesson only) ─────────────────────────────────────────────────────────────────────────┤
 ├ workspace grid ───────────────────────────────────────────────────────────────────────────────────┤
 │  chord panel  │  score: lines → [section head] [staff svg] syllables → [chord slot] [blocks] [word]   │
-│  (left hand)  │  (+ Add a line, in Edit)                     the Edit box floats over it, anywhere    │
+│  (left hand)  │  (+ Add a line, in Edit)     with the hat on, the Edit box takes the whole left column │
 ├───────────────┼──────────────────────────────────────────────────────────────────────────────────────┤
 │ chord in hand │  keyboard dock: rainbow keys in a black frame, the whole width  (grip on top: height)  │
 │ 1 2 3 4 Focus │  (with the panel away, [1 2 3 4 · Focus] sits at the dock's left end as before)        │
@@ -95,15 +95,19 @@ press-and-hold for a button's name, and double-tap on a block moves it a step.
 ## The Edit box — no ribbon
 
 2.0's edit ribbon is gone. With the hat on, every tool that acts on the
-selected note is in **one box that floats over the stage**
-(`js/components/edit-box.js`, 2026-09-25 — it replaced the tools drawn around
-the note and the value drawer in the toolbar). It stays out for as long as the
+selected note is in **one box** (`js/components/edit-box.js`, 2026-09-25 — it
+replaced the tools drawn around the note and the value drawer in the toolbar).
+Since 2026-09-28 it no longer floats: it is the workspace's **left column**,
+from the stage's top to the toolbar — the chord panel's place and the corner
+under it, beside the keyboard when that is out. The chord panel is away while
+the hat is on, whether the chords are on or off (`settings.js shows('strip')`);
+the chord lane stays and a slot's picker still writes chords. It stays out for as long as the
 hat is on; nothing is drawn around the note, so the song does not move when the
 hat goes on.
 
 ```
 ┌─────────────────────┐
-│ ⠿ ⛑ Edit          ⌃ │   drag the title bar to move it; ⌃ folds it up
+│ ⛑ Edit              │   the title
 ├─────────────────────┤
 │ RHYTHM              │   the value circles (rhythm-panel.js) and caption
 │ ▮  𝅝  𝅗𝅥             │
@@ -123,11 +127,10 @@ hat goes on.
 └─────────────────────┘
 ```
 
-- **Moving it**: drag the title bar (mouse, finger or pen); it is kept inside
-  the window and remembered on this browser, folded or not
-  (`song_writer_2_edit_box_v1`, as a fraction of the room across and down, so
-  a box parked at an edge stays there when the window changes). Until it is
-  moved it sits at the stage's top right, clear of the chord strip.
+- **Its column**: `--eb-w` wide (200 px; 204 touch, 172 phone, 228 from
+  1500 px); its body scrolls when the window is short. Until 2026-09-28 it was
+  dragged by its title bar and folded (`song_writer_2_edit_box_v1`, no longer
+  read).
 - **Still targets**: what Layout settings or a lesson take away is removed
   (a words-only lesson leaves just "Tap a word to type it"); a tool that
   cannot act on the selection just now is greyed, so no button moves. The word
@@ -250,8 +253,12 @@ until they are written too.
   sixteenth; dots in spaces, clear of an up flag; whole rest centred in its bar.
 - **Time:** a block counts as one beat until it is written; each line starts a
   new bar; bar lines and beams only inside runs of written notes.
-- **1-beat pick-up** (Layout settings → On the page, 2026-09-25; saved with a
-  song's layout like the other switches): every line opens with a one-beat
+- **1-beat pick-up** (switched in Layout settings → On the page, 2026-09-25;
+  since 2026-09-28 the SONG's own — `score.pickup: 1`, `S.pickup`,
+  `SW.score.setPickup`, `[Pickup 1]` in the text format — so share links,
+  backups and the text carry it whatever the layout; a song saved or sent
+  with the old `layout.show.pickup` on takes it as its own in
+  `normalizeSong`): every line opens with a one-beat
   pick-up, so its bar lines fall a beat later (`timing.js` PICK-UP). Lines are
   still padded to whole bars, so each line's pick-up finishes the bar the line
   before left open: that line ends without a closing bar line, the song's last
@@ -268,6 +275,13 @@ until they are written too.
   pick-up lands on its bar line, so every downbeat stays on one grid and
   bar numbers are counted on it. A first note longer than the beat is not a
   pick-up of its own, and the buttons treat it as an ordinary word.
+  **The × on the bar line** (2026-09-28, Edit only; staff.js `syncCut`,
+  score.js `cutPickupBar`): a mouse over the bar line that closes a line's
+  pick-up lights it red with a × over the staff (always faintly shown on
+  touch screens); the × takes that bar line out — the line's pick-up is off
+  and its beat is part of the first bar. Nothing else changes: the bar above
+  is left open (silence), so no stray rests whatever order lines are cut in.
+  Switching the pick-up off or on gives every line a fresh start.
 - View → **Staff notation** off shows every column as a block again.
 
 Not yet: pick-ups longer than a beat (or on the first line only), 6/8, cross-staff (kneed) beams for very wide leaps.
@@ -298,8 +312,8 @@ Two fixes came out of it:
 
 Also added: the audio engine is woken on the first lift of a finger (`app.js wakeOnLift`) —
 the panel's chords are scheduled and already sounded the moment audio woke, but a board's
-browser may differ. Known: on a phone in Edit the floating Edit box covers the first line's
-right-hand slots until it is dragged or folded (the Edit box's own layout, not the panel's).
+browser may differ. (On a phone the floating Edit box used to cover the first line's
+right-hand slots; since 2026-09-28 it is a column of its own.)
 CDP's `Input.synthesizePinchGesture` ignores `touch-action` entirely (it zooms even over
 `touch-action: none`), so the test pinches with two real touch points. Not covered: Safari on
 iPad (the test drives Chrome).

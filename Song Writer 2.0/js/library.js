@@ -106,7 +106,13 @@
     if (!raw || typeof raw !== 'object') return null;
     const id = raw.id || idHint || EVM.newId('song');
     let score;
-    if (raw.score && typeof raw.score === 'object') score = SW.score.normalize(raw.score);
+    /* The 1-beat pick-up was a Layout setting until 2026-09-28
+       (layout.show.pickup); it is the song's own now (score.pickup). A song
+       saved or sent with that setting on takes it as its own. */
+    let rawScore = raw.score;
+    if (rawScore && typeof rawScore === 'object' && rawScore.pickup === undefined
+        && raw.layout && raw.layout.show && raw.layout.show.pickup === true) rawScore = Object.assign({}, rawScore, { pickup: 1 });
+    if (rawScore && typeof rawScore === 'object') score = SW.score.normalize(rawScore);
     else if (typeof raw.content === 'string') score = SW.score.fromText(raw.content);
     else score = SW.score.fromText(NEW_SONG_TEXT);
     const out = {

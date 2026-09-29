@@ -1456,7 +1456,24 @@
             ensureAudio();
             var voice = sounds[id];
             if (!voice) return null;
-            return voice(opts || {}) || null;
+            opts = opts || {};
+            /* opts.gain: this one hit louder or softer, 1 = as tuned. Every
+             * voice wires itself to `analyser` synchronously inside the call
+             * (none of them waits on a timer), so pointing that name at a
+             * gain of its own for the length of the call routes the whole
+             * voice through it without touching the synthesis. */
+            var level = (typeof opts.gain === 'number' && isFinite(opts.gain)) ? Math.max(0, opts.gain) : 1;
+            if (level === 1 || !analyser) return voice(opts) || null;
+            var bus = analyser;
+            var trim = audioContext.createGain();
+            trim.gain.value = level;
+            trim.connect(bus);
+            analyser = trim;
+            try {
+                return voice(opts) || null;
+            } finally {
+                analyser = bus;
+            }
         }
 
         /**

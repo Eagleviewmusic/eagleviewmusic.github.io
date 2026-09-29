@@ -316,6 +316,48 @@
 
   function conformAllTracks() { song.tracks.forEach(conformTrack); }
 
+
+  /* ==================================================================
+     A LINE'S OWN WORDS, AND HOW LOUD IT IS
+     ------------------------------------------------------------------
+     Any syllable under a note can be changed to a word of the line's
+     own — "wet dogs sleep all day" over one group, "nev-er go home" over
+     the next, and then everyone together. Double-click it, type, and
+     Space goes on to the next note (EDITING A SYLLABLE).
+
+     Kept per note, in order: words[k] is what the line's k-th note says,
+     and '' is a note still saying what the counting system says. Like
+     Rhythm Poetry's lyrics the words follow the notes, not the beats, so
+     reshaping the rhythm re-flows them instead of losing any.
+     ================================================================== */
+
+  const WORDS_MAX = 256;       // notes a line's words may reach
+  const WORD_MAX_CHARS = 24;   // one note's worth
+
+  // One note's word: no spaces (Space is what moves on), and not a paragraph
+  function cleanWord(w) {
+    return typeof w === 'string' ? w.replace(/\s+/g, '').slice(0, WORD_MAX_CHARS) : '';
+  }
+
+  // From storage, a file or a link. Trailing blanks say nothing, so they go.
+  function normalizeWords(raw) {
+    if (!Array.isArray(raw)) return [];
+    const out = raw.slice(0, WORDS_MAX).map(cleanWord);
+    while (out.length && !out[out.length - 1]) out.pop();
+    return out;
+  }
+
+  function trackHasWords(track) { return !!(track.words && track.words.some(Boolean)); }
+
+  /* How loud a line plays, 1 as the instrument was tuned. Part of the
+     piece, like its mute: a teacher balancing a loud cowbell under a
+     quiet shaker wants that balance back next time, and in the link. */
+  const VOLUME_MAX = 1.5;
+  function trackVolume(track) {
+    const v = track && track.volume;
+    return (typeof v === 'number' && isFinite(v)) ? Math.max(0, Math.min(VOLUME_MAX, v)) : 1;
+  }
+
   /* Moving a beat to a different division: keep each sound at the point
      in the beat where it already was, as near as the new grid allows. */
   function remapCells(cells, oldSlots, newSlots) {
@@ -482,8 +524,14 @@
       if (source.links && typeof source.links === 'object') {
         Object.keys(source.links).forEach(k => { if (source.links[k]) links[k] = true; });
       }
-      return { id: nextTrackId++, instrument: instrument, muted: !!source.muted,
-               beats: beats, links: links };
+      const out = { id: nextTrackId++, instrument: instrument, muted: !!source.muted,
+                    beats: beats, links: links };
+      // absent unless the line has some — a piece without them keys and saves as it always did
+      const words = normalizeWords(source.words);
+      if (words.length) out.words = words;
+      const volume = trackVolume(source);
+      if (volume !== 1) out.volume = Math.round(volume * 100) / 100;
+      return out;
     });
 
     const out = {
@@ -501,7 +549,24 @@
     EVM.carry(src, out);
     // the Layout Settings it was saved with (A PIECE'S OWN LAYOUT)
     if (src.layout && typeof src.layout === 'object') out.layout = JSON.parse(JSON.stringify(src.layout));
+    // how the sender had it spoken — syllables and words (A PIECE'S OWN LAYOUT)
+    const show = speechShowFrom(src.show);
+    if (show) out.show = show;
     return out;
+  }
+
+  /* The part of a link that says how the piece is spoken: whether the
+     counting syllables were showing and in which system, and whether the
+     lines' own words were. It travels in every link, locked or not — a
+     teacher who set a class up in Takadimi sends Takadimi — but unlike
+     the build rules it locks nothing. */
+  function speechShowFrom(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const out = {};
+    if (raw.syllables !== undefined) out.syllables = !!raw.syllables;
+    if (typeof raw.syllableSystem === 'string' && raw.syllableSystem) out.syllableSystem = raw.syllableSystem;
+    if (raw.words !== undefined) out.words = !!raw.words;
+    return Object.keys(out).length ? out : null;
   }
 
   /* ------------------------------------------------------------------
@@ -526,7 +591,7 @@
   function rawSongKey(rec) {
     const n = normalizeSong(Object.assign({}, rec, { id: (rec && rec.id) || 'x' }));
     ['id', 'title', 'createdAt', 'updatedAt', 'isCustom',
-     'received', 'receivedAt', 'derivedFrom', 'book', 'layout'].forEach(k => { delete n[k]; });
+     'received', 'receivedAt', 'derivedFrom', 'book', 'layout', 'show'].forEach(k => { delete n[k]; });
 
     /* Opening a piece conforms it (conformTrack): beats are padded out to
        the length of the piece with empty beats of the plain division, and
@@ -547,7 +612,11 @@
         beats.pop();
       }
       // a track's id is a counter for this page load, not part of the piece
-      return { instrument: t.instrument, muted: t.muted, beats: beats, links: t.links };
+      const key = { instrument: t.instrument, muted: t.muted, beats: beats, links: t.links };
+      // what a line says, and how loud, are the piece — but only once there are any
+      if (t.words) key.words = t.words;
+      if (t.volume !== undefined) key.volume = t.volume;
+      return key;
     });
     return EVM.stableStringify(n);
   }
@@ -631,12 +700,17 @@
       timeSignatureNumerator: song.timeSignatureNumerator,
       timeSignatureDenominator: song.timeSignatureDenominator,
       measures: song.measures,
-      tracks: song.tracks.map(t => ({
-        instrument: t.instrument,
-        muted: !!t.muted,
-        beats: t.beats.map(b => ({ slots: b.slots, cells: b.cells.slice() })),
-        links: Object.assign({}, t.links)
-      }))
+      tracks: song.tracks.map(t => {
+        const out = {
+          instrument: t.instrument,
+          muted: !!t.muted,
+          beats: t.beats.map(b => ({ slots: b.slots, cells: b.cells.slice() })),
+          links: Object.assign({}, t.links)
+        };
+        if (trackHasWords(t)) out.words = t.words.slice();
+        if (trackVolume(t) !== 1) out.volume = trackVolume(t);
+        return out;
+      })
     };
   }
 
@@ -831,6 +905,7 @@
   /* Everything the toolbar shows belongs to the song, so all of it is
      refreshed together whenever the song underneath changes. */
   function afterSongChange() {
+    dismissWordEdit();
     seedHostMutes();
     conformAllTracks();
     updateMeterDisplay();
@@ -1037,8 +1112,10 @@
   /* `repeatInterval` lets the kit pick its fast-repeat envelope when hits
      land close together — without it, sixteenths at any speed turn to
      mush. The guiro also needs its stroke choosing from the same figure. */
-  function playInstrument(id, intervalMs) {
+  function playInstrument(id, intervalMs, gain) {
     const opts = intervalMs > 0 ? kit.optionsForRepeat(id, intervalMs) : {};
+    // a line's volume (trackVolume); the kit takes it per hit
+    if (typeof gain === 'number' && gain !== 1) opts.gain = gain;
     kit.play(id, opts);
   }
 
@@ -1208,6 +1285,14 @@
   const view = {
     showSyllables: false,
     syllableSystem: 'Simplified Kodály',
+    /* A line's own words (A LINE'S OWN WORDS). On unless asked otherwise:
+       someone wrote them to be read. Off, a line with words falls back to
+       the counting syllables, if those are on. */
+    showWords: true,
+    /* The syllables and words alone, on top of the score's own size — as
+       Rhythm Poetry's Text size. The notes do not change; the beats widen
+       to make room for bigger words. */
+    textPct: 100,
     /* The dots and the chains that join beats are one switch: both are
        the editing layer over the notation, so reading the score means
        putting both away and writing it means bringing both back. */
@@ -1255,13 +1340,20 @@
     if (LAYOUT_MODES.indexOf(view.layout) === -1) view.layout = 'pages';
     if (PER_PAGE_CHOICES.indexOf(view.measuresPerPage) === -1) view.measuresPerPage = 4;
     view.zoomPct = Math.max(40, Math.min(220, Math.round(Number(view.zoomPct) || 100)));
+    view.textPct = clampTextPct(view.textPct);
+  }
+
+  const TEXT_MIN = 60, TEXT_MAX = 250;
+  // from storage or the Music Stand, so never trusted to be in range
+  function clampTextPct(pct) {
+    return Math.max(TEXT_MIN, Math.min(TEXT_MAX, Math.round(Number(pct)) || 100));
   }
 
   function saveViewPrefs() {
     /* While a shared piece's own settings are on screen, its show switches
        are that piece's, not the student's: what is stored keeps their own
        (see A PIECE'S OWN LAYOUT). Zoom and paging are still theirs to change. */
-    const out = pieceLayoutInMemory && pieceOwnShow ? Object.assign({}, view, pieceOwnShow) : view;
+    const out = pieceOwnShow ? Object.assign({}, view, pieceOwnShow) : view;
     try { localStorage.setItem(VIEW_PREFS_KEY, JSON.stringify(out)); } catch (e) {}
   }
 
@@ -1651,9 +1743,16 @@
         barNumbers: view.showBarNumbers,
         beatNumbers: view.showBeatNumbers,
         syllables: view.showSyllables,
-        syllableSystem: view.syllableSystem
+        syllableSystem: view.syllableSystem,
+        words: view.showWords !== false
       }
     };
+  }
+
+  /* The speaking half of that, which every link carries (speechShowFrom). */
+  function speechShow() {
+    return { syllables: !!view.showSyllables, syllableSystem: view.syllableSystem,
+             words: view.showWords !== false };
   }
 
   function applyLayoutSnapshot(snap, lock) {
@@ -1689,6 +1788,7 @@
     if (SYLLABLE_SYSTEMS.indexOf(show.syllableSystem) !== -1) {
       view.syllableSystem = show.syllableSystem;
     }
+    if (show.words !== undefined) view.showWords = !!show.words;
   }
 
   /* ------------------------------------------------------------------
@@ -1715,20 +1815,29 @@
 
   // The view switches a piece carries — what the student gets back after.
   const PIECE_SHOW_KEYS = ['showDots', 'easyMode', 'showBarNumbers', 'showBeatNumbers',
-                           'showSyllables', 'syllableSystem'];
+                           'showSyllables', 'syllableSystem', 'showWords'];
 
   function storedLayoutLocked() {
     try { return !!(JSON.parse(localStorage.getItem(LAYOUT_KEY) || 'null') || {}).locked; }
     catch (e) { return false; }
   }
 
-  // Back from a shared piece: the student's own, as stored.
+  /* Back from a shared piece: the student's own, as stored. The show
+     switches can be the piece's without its build rules being — a plain
+     link carries only how it is spoken — so the two come back apart. */
   function leavePieceLayout() {
-    if (!pieceLayoutInMemory) return;
-    pieceLayoutInMemory = false;
     if (pieceOwnShow) Object.assign(view, pieceOwnShow);
     pieceOwnShow = null;
+    if (!pieceLayoutInMemory) return;
+    pieceLayoutInMemory = false;
     loadLayout();
+  }
+
+  // Put the student's own show switches aside, once, before a piece's go on.
+  function keepOwnShow() {
+    if (pieceOwnShow) return;
+    pieceOwnShow = {};
+    PIECE_SHOW_KEYS.forEach(k => { pieceOwnShow[k] = view[k]; });
   }
 
   /* In the Music Stand a piece is shown with its OWN build rules — EASY's
@@ -1754,15 +1863,19 @@
     const snap = rec && rec.layout && typeof rec.layout === 'object' ? rec.layout : null;
     if (EMBEDDED) { embeddedPieceLayout(snap); return; }
     if (snap && rec.received) {
-      if (!pieceLayoutInMemory) {
-        pieceOwnShow = {};
-        PIECE_SHOW_KEYS.forEach(k => { pieceOwnShow[k] = view[k]; });
-      }
+      keepOwnShow();
       forgetDivisionOffers();
       layout = normalizeLayout(snap.layout || snap);
       if (snap.show) adoptLayoutShow(snap.show);
       layoutLocked = true;
       pieceLayoutInMemory = true;
+    } else if (rec && rec.received && rec.show) {
+      /* A plain link: the sender's syllables and words, on screen for this
+         piece only, and nothing locked — the student's own settings stay
+         stored and come back when anything else is opened. */
+      leavePieceLayout();
+      keepOwnShow();
+      adoptLayoutShow(rec.show);
     } else {
       leavePieceLayout();
       if (snap && !rec.received && !storedLayoutLocked()) applyLayoutSnapshot(snap, false);
@@ -2208,7 +2321,7 @@
     if (ev.kind === 'note') {
       const track = song.tracks[ev.track];
       if (track && !track.muted && trackSounds(track)) {
-        soundAt(due, () => playInstrument(track.instrument, ev.gapTicks * tickMs()));
+        soundAt(due, () => playInstrument(track.instrument, ev.gapTicks * tickMs(), trackVolume(track)));
       }
     } else if (metronomeOn) {
       soundAt(due, () => playClick(ev.beat % beatsPerMeasure() === 0));
@@ -2453,7 +2566,7 @@
      building a rhythm is audible without pressing play. */
   function auditionTrack(track) {
     unlockAudio();
-    if (!track.muted && trackSounds(track)) playInstrument(track.instrument, 0);
+    if (!track.muted && trackSounds(track)) playInstrument(track.instrument, 0, trackVolume(track));
   }
 
 
@@ -2577,6 +2690,8 @@
     layoutAndEngrave();
     applyFit();
     if (wasLit >= 0 && wasLit < totalBeats()) highlightBeat(wasLit);
+    // a note being written keeps its box through the redraw (EDITING A SYLLABLE)
+    if (wordEdit && !mountWordInput()) dismissWordEdit();
     scheduleAutosave();
     if (standAfterRender) standAfterRender();
   }
@@ -2649,7 +2764,9 @@
     from = from || 0;
     if (to == null) to = song.measures;
     const row = document.createElement('div');
-    row.className = 'track' + (trackMuted(track, trackIndex) ? ' muted' : '');
+    const speech = speechFor(track);
+    row.className = 'track' + (trackMuted(track, trackIndex) ? ' muted' : '')
+      + (speech ? ' speaks' : '');
     row.dataset.track = String(trackIndex);
 
     row.appendChild(buildTrackHead(track, trackIndex));
@@ -2669,10 +2786,12 @@
       let at = 0;
       for (let b = group.start; b <= group.end; b++) {
         const slots = track.beats[b].slots;
-        groupOf[b] = { group: group, colours: colours, offset: at };
+        groupOf[b] = { group: group, colours: colours, offset: at, speech: speech };
         at += slots;
       }
     });
+    // which note of the line each slot is, for what is said under it
+    const notes = speech ? notesOfLine(track, groupOf) : null;
 
     const perMeasure = beatsPerMeasure();
     /* Kept by measure number, not by position in this block, so every
@@ -2685,7 +2804,7 @@
       measure.dataset.measure = String(m);
       for (let b = 0; b < perMeasure; b++) {
         const beatIndex = m * perMeasure + b;
-        measure.appendChild(buildBeat(track, beatIndex, groupOf[beatIndex]));
+        measure.appendChild(buildBeat(track, beatIndex, groupOf[beatIndex], notes && notes[beatIndex]));
       }
       inner.appendChild(measure);
       measureEls[m] = measure;
@@ -2883,7 +3002,7 @@
     return row;
   }
 
-  function buildBeat(track, beatIndex, membership) {
+  function buildBeat(track, beatIndex, membership, noteOf) {
     const beat = track.beats[beatIndex];
     const { group, colours, offset } = membership;
     const mine = colours.slice(offset, offset + beat.slots);
@@ -2943,10 +3062,8 @@
     }
     el.appendChild(notes);
 
-    /* ---- what it is called, if the user asked to see it ---- */
-    if (view.showSyllables) {
-      el.appendChild(buildSyllables(beat, mine));
-    }
+    /* ---- what it is called, or what it says ---- */
+    if (membership.speech) el.appendChild(buildSpeech(track, beat, mine, noteOf));
 
     return el;
   }
@@ -3127,26 +3244,104 @@
     return (left.span + right.span) <= joinCap();
   }
 
-  /* Syllables are read beat by beat even inside a joined run: the run
-     changes how long a note lasts, not what the beat is counted as. A slot
-     the run is holding through has nothing to say, and prints a dash. */
-  function buildSyllables(beat, colours) {
-    const words = document.createElement('div');
-    words.className = 'words';
+  /* Is anything said under this line? The counting syllables, if they
+     are on; and a line with words of its own shows those whether or not
+     — unless they have been put away in View. */
+  function speechFor(track) {
+    return !!view.showSyllables || (view.showWords !== false && trackHasWords(track));
+  }
 
-    const spoken = getChantText(beat.cells, view.syllableSystem, beat.slots);
-    colours.forEach((role, i) => {
+  /* Which note of the line each slot starts, per beat: the note's index
+     where a note starts, -1 anywhere else. Read off the same colours the
+     dots and the notation are drawn from, so a word can never sit under a
+     held note or a rest. Counted from the first beat of the piece, so in
+     Lines the words carry on from the block before. */
+  function notesOfLine(track, groupOf) {
+    const out = [];
+    let k = 0;
+    for (let b = 0; b < totalBeats(); b++) {
+      const m = groupOf[b];
+      if (!m) continue;
+      const slots = track.beats[b].slots;
+      out[b] = m.colours.slice(m.offset, m.offset + slots)
+        .map(role => role === 'active' ? k++ : -1);
+    }
+    return out;
+  }
+
+  // How many notes the line starts, across the whole piece.
+  function notesOnLine(track) {
+    let n = 0;
+    trackGroups(track).forEach(g => {
+      groupColours(track, g).forEach(role => { if (role === 'active') n++; });
+    });
+    return n;
+  }
+
+  /* One beat of what is said under a line.
+
+     Syllables are read beat by beat even inside a joined run: the run
+     changes how long a note lasts, not what the beat is counted as. A
+     slot the run is holding through, or resting on, prints a dash.
+
+     A word of the line's own may run on over the slots its note holds —
+     "sleep" on a quarter note has the whole beat — so it spans to the
+     next note in the beat. It still starts under its own notehead: a
+     short word is centred on it, a long one reads on to the right, the
+     way words are set under a song. The beat only widens when a word will
+     not fit the room it has (layoutAndEngrave reads data-span). */
+  function buildSpeech(track, beat, colours, notes) {
+    const row = document.createElement('div');
+    row.className = 'words';
+    const count = !!view.showSyllables;
+    const own = view.showWords !== false;
+    const spoken = count ? getChantText(beat.cells, view.syllableSystem, beat.slots) : [];
+
+    let i = 0;
+    while (i < colours.length) {
       const container = document.createElement('div');
       container.className = 'word-container';
-      const span = document.createElement('span');
-      const text = role === 'active' ? (spoken[i] || '-') : '-';
-      span.className = 'word' + (text === '-' ? ' rest' : '');
-      span.textContent = text;
-      container.appendChild(span);
-      words.appendChild(container);
-    });
-    return words;
+      const note = colours[i] === 'active' && notes ? notes[i] : -1;
+      const custom = note >= 0 && own ? ((track.words && track.words[note]) || '') : '';
+      let span = 1;
+      if (custom) {
+        while (i + span < colours.length && colours[i + span] !== 'active') span++;
+        container.style.gridColumn = 'span ' + span;
+      }
+      container.style.setProperty('--span', String(span));
+      if (note >= 0) container.dataset.note = String(note);
+
+      const text = custom || (count ? (note >= 0 ? (spoken[i] || '-') : '-') : '');
+      const box = document.createElement('span');
+      box.className = 'word-box';
+      const word = document.createElement('span');
+      word.className = 'word' + (text === '-' ? ' rest' : '') + (custom ? ' own' : '');
+      word.dataset.span = String(span);
+      word.textContent = text;
+      box.appendChild(word);
+      container.appendChild(box);
+      row.appendChild(container);
+      i += span;
+    }
+
+    if (wordsEditable()) {
+      row.classList.add('editable');
+      row.title = 'Double-click a syllable to change it';
+      row.addEventListener('dblclick', e => {
+        if (document.body.classList.contains('present-mode')) return;
+        const cell = e.target.closest('[data-note]');
+        if (!cell) return;
+        e.preventDefault();
+        startWordEdit(track, Number(cell.dataset.note));
+      });
+    }
+    return row;
   }
+
+  /* Words are written wherever the rhythm is: a lesson that has fixed the
+     rhythm has fixed what it says, and the Music Stand edits on the score
+     alone. */
+  function wordsEditable() { return !EMBEDDED && rhythmEditable(); }
 
   /* The chain between one beat and the next. Joining is what puts a half
      note, a dotted half or a whole note within reach — no single beat can
@@ -3598,11 +3793,13 @@
 
       let slotW = Math.max(COLUMN_MIN, RN.minSlotWidth(box._slotMap, boxH));
 
-      /* every syllable under this run, beat by beat */
+      /* every syllable under this run, beat by beat — a line's own word
+         shares out over the slots its note holds (buildSpeech) */
       let target = el;
       for (let k = 0; k < span && target; k++) {
         target.querySelectorAll('.words .word').forEach(w => {
-          slotW = Math.max(slotW, w.offsetWidth + WORD_PAD);
+          const over = Number(w.dataset.span) || 1;
+          slotW = Math.max(slotW, (w.offsetWidth + WORD_PAD) / over);
         });
         target = nextGroupEl(target);
       }
@@ -4368,6 +4565,8 @@
     soundVoices.innerHTML = '';
     song.tracks.forEach((track, i) => {
       const meta = instrumentMeta(track.instrument);
+      const wrap = document.createElement('div');
+      wrap.className = 'voice-row' + (trackSounds(track) ? '' : ' silent');
       const row = document.createElement('button');
       row.className = 'voice-switch' + (trackSounds(track) ? ' active' : '')
         + (trackMuted(track, i) ? ' muted' : '');
@@ -4387,8 +4586,48 @@
         if (trackSounds(track)) silenced.add(track); else silenced.delete(track);
         syncSound();
       });
-      soundVoices.appendChild(row);
+      wrap.append(row, buildVolumeSlider(track, meta));
+      soundVoices.appendChild(wrap);
     });
+  }
+
+  /* How loud the line plays, under its switch. Saved with the piece
+     (trackVolume) — unlike the switch above it, which is how today's
+     lesson is being played. Read as each note is handed over, so a
+     slider moved mid-playback is heard on the next note. */
+  function buildVolumeSlider(track, meta) {
+    const level = document.createElement('div');
+    level.className = 'voice-level';
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.className = 'slider voice-slider';
+    slider.min = '0';
+    slider.max = String(VOLUME_MAX * 100);
+    slider.step = '5';
+    slider.value = String(Math.round(trackVolume(track) * 100));
+    slider.setAttribute('aria-label', meta.label + ' volume');
+    const readout = document.createElement('span');
+    readout.className = 'slider-readout';
+    readout.textContent = slider.value + '%';
+    slider.addEventListener('input', () => {
+      const pct = Number(slider.value);
+      if (pct === 100) delete track.volume; else track.volume = pct / 100;
+      readout.textContent = pct + '%';
+      scheduleAutosave();
+    });
+    /* Let go, and hear where it landed — unless it is playing, when the
+       music already says so. */
+    slider.addEventListener('change', () => { if (!isPlaying) auditionTrack(track); });
+    /* Double-click the number to put it back as the instrument was tuned. */
+    readout.title = 'Double-click for 100%';
+    readout.addEventListener('dblclick', () => {
+      delete track.volume;
+      slider.value = '100';
+      readout.textContent = '100%';
+      scheduleAutosave();
+    });
+    level.append(slider, readout);
+    return level;
   }
 
   /* Nothing here needs the loop rebuilding: each is read at the moment
@@ -4429,6 +4668,162 @@
 
 
   /* ==================================================================
+     EDITING A SYLLABLE
+     ------------------------------------------------------------------
+     Double-click what is written under a note and it becomes a little
+     box to type in (A LINE'S OWN WORDS). Space keeps it and moves on to
+     the line's next note, so "wet dogs sleep all day" is typed as it is
+     said (pasted, it lands a word to a note); Enter keeps it and stops, Esc stops without keeping, and a
+     click anywhere else keeps it. Leaving a box empty gives the note its
+     counting syllable back.
+
+     Every edit ends in render(), which rebuilds the score, so the box is
+     not kept in the page: `wordEdit` says which note is being written and
+     render() puts a box back on it (mountWordInput).
+     ================================================================== */
+
+  let wordEdit = null;    // { track, note, draft, shown, fresh } while a note is being written
+  let wordInput = null;   // the box on screen for it
+
+  function startWordEdit(track, note) {
+    if (!wordsEditable() || song.tracks.indexOf(track) === -1) return;
+    if (wordEdit) commitWordEdit();
+    wordEdit = { track: track, note: note, draft: null, shown: '', fresh: true };
+    if (!mountWordInput()) wordEdit = null;
+  }
+
+  function wordCell(track, note) {
+    const i = song.tracks.indexOf(track);
+    return grid.querySelector('.track[data-track="' + i + '"] .word-container[data-note="' + note + '"]');
+  }
+
+  function sizeWordInput(input) {
+    input.style.width = 'calc(' + Math.max(2, input.value.length + 1) + 'ch + 12px)';
+  }
+
+  function mountWordInput() {
+    if (!wordEdit) return false;
+    const cell = wordCell(wordEdit.track, wordEdit.note);
+    if (!cell) return false;
+    // Space can walk off the page: follow it
+    const beatEl = cell.closest('.group');
+    if (isPaged() && beatEl) goToPage(pageOfBeat(Number(beatEl.dataset.beat)));
+    else cell.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (wordEdit.draft === null) {
+      const shown = cell.querySelector('.word');
+      wordEdit.shown = shown && shown.textContent !== '-' ? shown.textContent : '';
+      // words typed or pasted past the last note arrive here to carry on
+      wordEdit.draft = wordEdit.carry ? wordEdit.carry : wordEdit.shown;
+      if (wordEdit.carry) wordEdit.fresh = false;
+    }
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'word-input';
+    input.value = wordEdit.draft;
+    input.spellcheck = false;
+    input.autocomplete = 'off';
+    input.setAttribute('autocapitalize', 'off');
+    input.setAttribute('aria-label', 'What this note says');
+    sizeWordInput(input);
+    cell.classList.add('editing');
+    cell.appendChild(input);
+    wordInput = input;
+
+    input.addEventListener('input', () => {
+      if (input !== wordInput) return;
+      if (!takeSpace(input)) {
+        wordEdit.draft = cleanWord(input.value);
+        sizeWordInput(input);
+      }
+    });
+    input.addEventListener('keydown', e => {
+      if (input !== wordInput) return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        endWordEdit(commitWordEdit());
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        endWordEdit(false);
+      }
+    });
+    // clicking away keeps what was typed
+    input.addEventListener('blur', () => {
+      if (input !== wordInput) return;
+      endWordEdit(commitWordEdit());
+    });
+    input.addEventListener('dblclick', e => e.stopPropagation());
+    input.focus({ preventScroll: true });
+    if (wordEdit.fresh) { input.select(); wordEdit.fresh = false; }
+    // pasted words still to place: the next one goes on the next note
+    if (/\s/.test(input.value)) setTimeout(() => { if (input === wordInput) takeSpace(input); }, 0);
+    return true;
+  }
+
+  /* A space in the box is the word ending. It is read from the text
+     rather than from the key, because a tablet's keyboard does not
+     always say which key it was, and a pasted "wet dogs sleep all day"
+     should land one word to a note just as typing it would. Whatever
+     follows the space is carried on to the next note. */
+  function takeSpace(input) {
+    const parts = input.value.split(/\s+/);
+    if (parts.length < 2) return false;
+    const track = wordEdit.track, next = wordEdit.note + 1;
+    wordEdit.draft = cleanWord(parts[0]);
+    commitWordEdit();
+    moveWordEdit(track, next, parts.slice(1).join(' ').trim());
+    return true;
+  }
+
+  /* Write what is in the box into the line. True if the line changed. A
+     note left saying exactly the syllable it already said stays a
+     counted note, so turning the counting system over later still
+     reaches it. */
+  function commitWordEdit() {
+    if (!wordEdit) return false;
+    const track = wordEdit.track, note = wordEdit.note;
+    const text = cleanWord(wordEdit.draft || '');
+    const before = (track.words && track.words[note]) || '';
+    if (text === before) return false;
+    if (!before && text === wordEdit.shown) return false;
+    const words = (track.words || []).slice();
+    while (words.length <= note) words.push('');
+    words[note] = text;
+    const clean = normalizeWords(words);
+    if (clean.some(Boolean)) track.words = clean; else delete track.words;
+    return true;
+  }
+
+  // On to another note of the same line, or done at the end of it.
+  function moveWordEdit(track, note, carry) {
+    wordInput = null;             // the render below takes the box away; that is not a blur
+    wordEdit = note < notesOnLine(track)
+      ? { track: track, note: note, draft: null, shown: '', fresh: true, carry: carry || '' }
+      : null;
+    render();                     // …and puts one on the next note
+  }
+
+  function endWordEdit(changed) {
+    const input = wordInput;
+    wordInput = null;
+    wordEdit = null;
+    if (changed) { render(); return; }
+    // nothing to redraw: just take the box away, so a click elsewhere still lands
+    if (input) {
+      const cell = input.closest('.word-container');
+      if (cell) cell.classList.remove('editing');
+      input.remove();
+    }
+  }
+
+  // A different piece has come on screen: the note being written went with the old one.
+  function dismissWordEdit() {
+    wordEdit = null;
+    wordInput = null;
+  }
+
+
+  /* ==================================================================
      SETTINGS
      ================================================================== */
 
@@ -4448,6 +4843,7 @@
      only when the page actually looks different afterwards. */
   const SWITCHES = [
     { id: 'syllables-toggle',    key: 'showSyllables' },
+    { id: 'words-toggle',        key: 'showWords' },
     { id: 'bar-numbers-toggle',  key: 'showBarNumbers' },
     { id: 'beat-numbers-toggle', key: 'showBeatNumbers' },
     /* nothing is drawn differently, only a body class — so no render,
@@ -4508,6 +4904,43 @@
   });
   zoomSlider.addEventListener('change', saveViewPrefs);
 
+  /* Text size: the syllables and words alone, as Rhythm Poetry's. The
+     notes keep their size; the layout pass measures every word, so a
+     bigger one widens its beat — a full render, always. One per frame
+     while the slider is dragged. */
+  const textSizeField   = document.getElementById('text-size-field');
+  const textSizeSlider  = document.getElementById('text-size-slider');
+  const textSizeReadout = document.getElementById('text-size-readout');
+  let textSizeFrame = 0;
+
+  function applyTextSize() {
+    view.textPct = clampTextPct(view.textPct);
+    document.documentElement.style.setProperty('--text-scale', String(view.textPct / 100));
+    textSizeSlider.value = String(view.textPct);
+    textSizeReadout.textContent = view.textPct + '%';
+  }
+
+  textSizeSlider.addEventListener('input', () => {
+    view.textPct = clampTextPct(textSizeSlider.value);
+    applyTextSize();
+    cancelAnimationFrame(textSizeFrame);
+    textSizeFrame = requestAnimationFrame(render);
+  });
+  textSizeSlider.addEventListener('change', saveViewPrefs);
+  textSizeReadout.title = 'Double-click for 100%';
+  textSizeReadout.addEventListener('dblclick', () => {
+    view.textPct = 100;
+    applyTextSize();
+    saveViewPrefs();
+    render();
+  });
+  applyTextSize();
+
+  // Is anything spoken on the page at all? Text size only matters if so.
+  function anythingSpoken() {
+    return song.tracks.some(speechFor);
+  }
+
   function syncSettings() {
     SWITCHES.forEach(({ id, key }) => {
       document.getElementById(id).classList.toggle('active', !!view[key]);
@@ -4516,6 +4949,16 @@
     syncSystemOptions();
     systemSelect.value = view.syllableSystem;
     systemField.hidden = !view.showSyllables || systemsOffered().length < 2;
+    textSizeField.hidden = !anythingSpoken();
+    applyTextSize();
+    /* The words switch only means something once a line has words; until
+       then the note says how to give it some. */
+    const anyWords = song.tracks.some(trackHasWords);
+    document.getElementById('words-toggle').hidden = !anyWords;
+    const wordsNote = document.getElementById('words-note');
+    wordsNote.hidden = !wordsEditable();
+    wordsNote.textContent = (anythingSpoken() ? 'Double-click' : 'With Syllables on, double-click')
+      + ' a syllable under the notes to write your own word there. Space moves on to the next note.';
     document.body.classList.toggle('hide-bar-numbers', !view.showBarNumbers);
     document.body.classList.toggle('hide-beat-numbers', !view.showBeatNumbers);
     document.body.classList.toggle('show-syllables', !!view.showSyllables);
@@ -4651,7 +5094,9 @@
     { key: 'showBeatNumbers', name: 'Beat numbers',
       desc: 'The count along the top of the score — 1, 2, 3, 4' },
     { key: 'showSyllables', name: 'Syllables',
-      desc: 'What each beat is counted as, under every track' }
+      desc: 'What each beat is counted as, under every track' },
+    { key: 'showWords', name: 'Each line\u2019s own words',
+      desc: 'Words written for a line, under its notes, in place of the syllables' }
   ];
 
   function switchRow(name, desc, on, onClick) {
@@ -6003,6 +6448,12 @@
       record.layout = layoutSnapshot();
       record.layoutLocked = true;
     }
+    /* How it is spoken travels either way. Without it a teacher who set
+       the class up counting in Takadimi, or who wrote each line its own
+       words and put them on show, sent a link that opened in whatever
+       the student last had — the words still arrived, but the syllables
+       did not. It locks nothing (speechShowFrom). */
+    record.show = speechShow();
     const base = window.location.origin + window.location.pathname;
     const link = base + '?song=' + encodeURIComponent(encodeSong(record));
 
@@ -7607,6 +8058,12 @@
       lib[SANDBOX_ID] = record;
       saveStoredLibrary(lib);
 
+      /* The sandbox is this person's own, so the sender's syllables become
+         theirs, as a locked link's whole layout already does above. */
+      if (decoded.show && !decoded.layout) {
+        adoptLayoutShow(speechShowFrom(decoded.show) || {});
+        saveViewPrefs();
+      }
       adoptSong(normalizeSong(record));
       openedReceived = false;
       openedBook = '';
@@ -7819,8 +8276,12 @@
       toldHost = fingerprint();
     }
 
+    /* showWords and textPct: a line's own words and how big they are
+       drawn (syncSettings clamps the size) — Rhythm Poetry's pane has
+       Text size, and an ostinato's words want the same. */
     const VIEW_KEYS = ['layout', 'measuresPerPage', 'zoomPct', 'showDots', 'easyMode', 'showSyllables',
-                       'syllableSystem', 'lightBeats', 'lightNotes', 'showBarNumbers', 'showBeatNumbers'];
+                       'syllableSystem', 'lightBeats', 'lightNotes', 'showBarNumbers', 'showBeatNumbers',
+                       'showWords', 'textPct'];
 
     function songSummary(id, rec, starter) {
       return {
@@ -7972,7 +8433,7 @@
 
       sound(voice, opts) {
         const track = song.tracks[voice];
-        if (track) playInstrument(track.instrument, (opts && opts.gapMs) || 0);
+        if (track) playInstrument(track.instrument, (opts && opts.gapMs) || 0, trackVolume(track));
       },
 
       /* ---- the mixer's two jobs, done from the pane ------------------

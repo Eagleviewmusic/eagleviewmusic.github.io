@@ -799,6 +799,7 @@
     const wantStaff = line.classList.contains('has-staff') && !!plan;
     if (!wantStaff) {
       if (svg) svg.remove();
+      syncCut(line, null);
       line.style.removeProperty('--staff-prefix');
       line.style.removeProperty('--staff-top');
       return;
@@ -841,13 +842,48 @@
     const activeStack = active && !document.body.classList.contains('capturing') ? active.closest('.harmony-stack') : null;
     const barNumbers = !SW.settings || !SW.settings.layout || !SW.settings.layout.show || SW.settings.layout.show.barNumbers !== false;
     const parts = [];
+    const cuts = [];
     rows.forEach((row, ri) => {
       parts.push(renderRow(row, {
         bs, left, withTime: withTime && ri === 0, lastRow: ri === rows.length - 1,
-        lastLine, le, activeStack, showNames: S.showNames, barNumbers, clock: clock || { at: 0, p0: 0 }, W
+        lastLine, le, activeStack, showNames: S.showNames, barNumbers, clock: clock || { at: 0, p0: 0 }, W, cuts
       }));
     });
     svg.innerHTML = parts.join('');
+    syncCut(line, cuts[0] || null);
+  }
+
+  /* ================= the pick-up's bar line: the × =================
+     In Edit, the bar line that closes a line's pick-up can be taken out
+     (score.js cutPickupBar): a mouse over it shows it lit, with a × above
+     the staff; on a touch screen the × is always there, faintly. An HTML
+     button over the SVG (which takes no pointer), a child of the line. */
+  function syncCut(line, cut) {
+    let el = line.querySelector(':scope > .pickup-cut');
+    const want = cut && S.editing && SW.settings && SW.settings.can('structure');
+    if (!want) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'pickup-cut';
+      el.innerHTML = '<button type="button" class="pickup-cut-btn" title="Take out this bar line — the pick-up joins the bar after it" aria-label="Take out the pick-up’s bar line">'
+        + '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg></button>'
+        + '<span class="pickup-cut-bar" aria-hidden="true"></span>';
+      // never take the selection or a word being typed away (Edit box rule)
+      el.addEventListener('mousedown', e => e.preventDefault());
+      el.addEventListener('pointerdown', e => e.stopPropagation());
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        if (e.target.closest('.pickup-cut-btn')) SW.score.cutPickupBar(line);
+      });
+      line.appendChild(el);
+    }
+    const btn = Math.max(20, Math.min(30, cut.s * 1.4));
+    const top = cut.top - btn - Math.max(4, cut.s * 0.3);
+    el.style.left = n2(cut.x) + 'px';
+    el.style.top = n2(top) + 'px';
+    el.style.height = n2(cut.bottom - top) + 'px';
+    el.style.setProperty('--cut-btn', n2(btn) + 'px');
+    el.style.setProperty('--cut-bar', n2(cut.bottom - cut.top) + 'px');
   }
 
   /* ================= one visual row ================= */
@@ -892,7 +928,13 @@
       if (!ev.notated || !ev.info) return;
       if (ev.rest) p.push(drawRest(ev, g, o));
       else p.push(drawNote(ev, g, o));
-      if (ev.info.barDx !== undefined && evs[i + 1]) p.push(barLine(ev.x + ev.info.barDx));
+      if (ev.info.barDx !== undefined && evs[i + 1]) {
+        p.push(barLine(ev.x + ev.info.barDx));
+        // the bar line that closes the line's pick-up (see syncCut)
+        if (o.cuts && o.le.pickup && ev.bar === 0 && evs[i + 1].bar > 0) {
+          o.cuts.push({ x: ev.x + ev.info.barDx, top: yOf(F5) - lineW / 2, bottom: yOf(E4) + lineW / 2, s });
+        }
+      }
     });
     Object.keys(beamGroups).forEach(id => p.push(drawBeam(beamGroups[id], g)));
     // ties, to the next note in this row (a tie is inside one syllable, so

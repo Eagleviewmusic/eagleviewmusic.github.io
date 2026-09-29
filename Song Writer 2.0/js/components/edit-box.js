@@ -1,13 +1,13 @@
 /* ==========================================================================
    COMPONENT — the Edit box                                       #edit-box
    --------------------------------------------------------------------------
-   Every note tool in one box that floats over the stage while the
-   construction hat is on (it replaced the tools drawn around the
-   selected note, and the value drawer in the toolbar):
+   Every note tool in one box, out while the construction hat is on (it
+   replaced the tools drawn around the selected note, and the value
+   drawer in the toolbar):
 
         ┌─────────────────────┐
-        │ ⠿ ⛑ Edit          ⌃ │   the title bar: drag it to move the box;
-        ├─────────────────────┤   ⌃ folds the box up to this bar
+        │ ⛑ Edit              │   the title
+        ├─────────────────────┤
         │ RHYTHM              │   the value circles (rhythm-panel.js)
         │ ▮  𝅝  𝅗𝅥             │
         │ ♩  ♪  𝅘𝅥𝅯             │
@@ -39,12 +39,15 @@
    is only greyed, so the box never changes shape as the selection steps
    along and no button moves under a finger.
 
-   WHERE IT SITS. Dragged by its title bar (mouse, finger or pen), kept
-   inside the window, and remembered on this browser with whether it is
-   folded (song_writer_2_edit_box_v1): as a fraction of the room the
-   window leaves it across and down, so a box parked at an edge stays at
-   that edge when the window changes size. Until it has been moved it
-   sits at the stage's top right, clear of the chord strip on the left.
+   WHERE IT SITS (2026-09-28, the user's call). No longer floating: it
+   is the workspace's left column, from the top of the stage to the
+   toolbar — the chord panel's place and the corner under it, beside the
+   keyboard when that is out (style.css WORKSPACE). The chord panel is
+   away while the hat is on, whether the chords are on or off
+   (settings.js shows('strip')); the chord lane stays, and a slot's
+   picker still writes chords. Its body scrolls when the window is short.
+   (Until then it floated and was dragged by its title bar; its old
+   place, song_writer_2_edit_box_v1, is no longer read.)
 
    FOCUS. The box never takes the focus (mousedown is cancelled on its
    buttons), so a word being typed stays open and the keys keep working
@@ -62,8 +65,6 @@
   const box = document.getElementById('edit-box');
   const score = document.getElementById('score');
   if (!box || !score) return;
-  const head = document.getElementById('edit-box-head');
-  const foldBtn = document.getElementById('edit-box-fold');
   const secValues = document.getElementById('rhythm-panel');
   const secNote = document.getElementById('eb-note');
   const secSyl = document.getElementById('eb-syllable');
@@ -72,8 +73,6 @@
   const staffSlot = document.getElementById('eb-staff');
   const can = what => SW.settings.can(what);
 
-  const STORE_KEY = 'song_writer_2_edit_box_v1';
-  const EDGE = 8;                                   // the least gap to the window's edge
 
   const ICON = {
     harmony: '<svg viewBox="0 0 18 20" aria-hidden="true"><rect x="5.5" y="1" width="10" height="18" rx="2" fill="currentColor" stroke="none" opacity=".55"/><rect x="1.5" y="7" width="10" height="12" rx="2" fill="currentColor" stroke="none"/></svg>',
@@ -236,7 +235,6 @@
     [secValues, secNote, secSyl, secWords].forEach(s => s.classList.toggle('eb-first', s === shown[0]));
     empty.hidden = shown.length > 0;
     syncStaffSwitch();
-    keepInView();
   }
 
   let timer = 0;
@@ -245,106 +243,13 @@
     timer = setTimeout(render, 24);
   }
 
-  /* ================= where it sits ================= */
-  let spot = null;                                  // { fx, fy } once moved; null = its home
-  let folded = false;
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-    if (saved && isFinite(saved.fx) && isFinite(saved.fy)) spot = { fx: saved.fx, fy: saved.fy };
-    folded = !!(saved && saved.folded);
-  } catch (e) {}
-  function remember() {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(Object.assign({ folded }, spot || {}))); } catch (e) {}
-  }
-
-  const room = () => ({
-    x: Math.max(0, window.innerWidth - box.offsetWidth - 2 * EDGE),
-    y: Math.max(0, window.innerHeight - box.offsetHeight - 2 * EDGE)
-  });
-  function moveTo(left, top) {
-    const r = room();
-    left = Math.round(Math.min(Math.max(left, EDGE), EDGE + r.x));
-    top = Math.round(Math.min(Math.max(top, EDGE), EDGE + r.y));
-    box.style.left = left + 'px';
-    box.style.top = top + 'px';
-  }
-  /* From the remembered spot, or home: the stage's top right. */
-  function place() {
-    if (!S.editing || !box.offsetWidth) return;
-    const r = room();
-    if (spot) { moveTo(EDGE + spot.fx * r.x, EDGE + spot.fy * r.y); return; }
-    const stage = document.getElementById('stage');
-    const top = stage ? stage.getBoundingClientRect().top + 12 : 72;
-    moveTo(window.innerWidth - box.offsetWidth - 16, top);
-  }
-  /* After its size changes: where it is, but still inside the window. */
-  function keepInView() {
-    if (!S.editing || !box.offsetWidth) return;
-    if (!box.style.left) { place(); return; }
-    moveTo(parseFloat(box.style.left), parseFloat(box.style.top));
-  }
-  function spotFromBox() {
-    const r = room();
-    spot = {
-      fx: r.x ? Math.round((parseFloat(box.style.left) - EDGE) / r.x * 1000) / 1000 : 1,
-      fy: r.y ? Math.round((parseFloat(box.style.top) - EDGE) / r.y * 1000) / 1000 : 0
-    };
-  }
-
-  /* ---- dragging by the title bar ---- */
-  let drag = null;
-  head.addEventListener('pointerdown', e => {
-    if (e.target.closest('.eb-fold')) return;
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    e.preventDefault();
-    SW.ui.closeAllPopovers();
-    const r = box.getBoundingClientRect();
-    drag = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top };
-    try { head.setPointerCapture(e.pointerId); } catch (err) {}
-    box.classList.add('dragging');
-  });
-  head.addEventListener('pointermove', e => {
-    if (!drag || e.pointerId !== drag.id) return;
-    moveTo(e.clientX - drag.dx, e.clientY - drag.dy);
-  });
-  function endDrag(e) {
-    if (!drag || e.pointerId !== drag.id) return;
-    drag = null;
-    box.classList.remove('dragging');
-    spotFromBox();
-    remember();
-  }
-  head.addEventListener('pointerup', endDrag);
-  head.addEventListener('pointercancel', endDrag);
-  // a drag's click is not a tap on the song: a word being typed stays open
-  head.addEventListener('click', e => e.stopPropagation());
-
-  /* ---- folding up to the title bar ---- */
-  function applyFold() {
-    box.classList.toggle('folded', folded);
-    foldBtn.setAttribute('aria-expanded', String(!folded));
-    setTitle(foldBtn, folded ? 'Open the box' : 'Fold the box up');
-  }
-  foldBtn.addEventListener('click', e => {
-    e.stopPropagation();
-    SW.ui.closeAllPopovers();
-    folded = !folded;
-    applyFold();
-    keepInView();
-    if (box.style.left) spotFromBox();
-    remember();
-  });
-  applyFold();
-
   // the box never takes the focus from a word being typed, or from the page's keys
   box.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
 
   /* ================= wiring ================= */
-  SW.bus.on('mode:changed', () => { if (S.editing) { render(); place(); } });
+  SW.bus.on('mode:changed', () => { if (S.editing) render(); });
   ['selection', 'score:changed', 'score:loaded', 'layout:changed', 'policy:changed', 'key:changed',
    'edit:armed', 'staff:drawn', 'view:changed', 'words:typing'].forEach(evt => SW.bus.on(evt, schedule));
-  let rt = 0;
-  window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(place, 60); });
 
   SW.editBox = { render, schedule };
 })();

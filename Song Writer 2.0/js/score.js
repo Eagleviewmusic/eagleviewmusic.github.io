@@ -562,9 +562,15 @@
   }
 
   /* ================= PICK-UPS =================
-     With Layout settings → 1-beat pick-up on, every line opens with a
-     one-beat pick-up (timing.js PICK-UP) — until it is taken away, on
-     that line only (data-pickup="off"; `pickup: false` in the model):
+     With the song's pick-up on (`score.pickup`, switched in Layout
+     settings → 1-beat pick-up), every line opens with a one-beat pick-up
+     (timing.js PICK-UP) — until it is taken away, on that line only
+     (data-pickup="off"; `pickup: false` in the model):
+       • the × on its bar line (staff.js draws it; Edit only) takes that
+         bar line out: the pick-up beat joins the bar after it, in the
+         same line. Nothing else is touched — the bar above it used to
+         finish is simply left open (silence in playback), so taking the
+         bar lines out line by line, in any order, leaves no stray rests.
        • Join up on the pick-up takes just that beat up to the end of the
          line above; the rest of the line stays where it is and starts on
          a downbeat. Join up again (its first word is selected for it)
@@ -620,11 +626,11 @@
     return true;
   }
 
-  /* Delete on a pick-up: the beat goes, and rests fill what it left open
-     of the bar above (in the line above's own values: a rest block when
-     that line ends in a block and a beat is all there is to fill). */
-  function deletePickup(pk) {
-    const line = pk.line, prev = previousLine(line);
+  /* The rests that fill what a line's pick-up left open of the bar in
+     the line above, once the pick-up is gone (in that line's own values:
+     a rest block when it ends in a block and a beat is all there is to
+     fill). None when the values offered cannot fill it: the silence does. */
+  function restsForOpenBar(prev) {
     let rests = [];
     if (prev && can('rest')) {
       const pe = SW.timing.lineEvents(prev);
@@ -640,6 +646,14 @@
         if (open) rests = [];                 // the values offered cannot fill it: the silence does
       }
     }
+    return rests;
+  }
+
+  /* Delete on a pick-up: the beat goes, and rests fill what it left open
+     of the bar above. */
+  function deletePickup(pk) {
+    const line = pk.line, prev = previousLine(line);
+    const rests = restsForOpenBar(prev);
     clearTimeout(deleteTimer);
     deleteConfirmationState = false;
     rests.forEach(col => prev.appendChild(createNewSyllable('-', [col])));
@@ -652,6 +666,18 @@
     SW.bus.emit('edit:armed', { armed: false });
     SW.ui.toast(rests.length ? 'Pick-up deleted — a rest fills the bar above' : 'Pick-up deleted');
     changed('syllable');
+  }
+
+  /* The × on a pick-up's bar line: the bar line goes and the pick-up beat
+     joins the bar after it. Nothing moves and nothing is added. */
+  function cutPickupBar(line) {
+    if (!line || !S.editing || !can('structure') || !SW.timing.linePickup(line)) return false;
+    const prev = previousLine(line);
+    line.dataset.pickup = 'off';
+    [prev, line].forEach(l => { if (l) { l.querySelectorAll(':scope > .row-break').forEach(b => b.remove()); updateLineHeight(l); } });
+    SW.ui.toast('Bar line taken out — the pick-up is part of the first bar now');
+    changed('line');
+    return true;
   }
 
   /* Write every block of one line as `v`, or unwrite every note of it —
@@ -827,6 +853,17 @@
     if (!SW.meters.isValid(id) || S.meter === id) return;
     S.meter = id;
     SW.bus.emit('meter:changed', { meter: S.meter, bpm: S.bpm, what: 'meter' });
+    if (!quiet) changed('meter');
+  }
+  /* The song's pick-up (timing.js PICK-UP): 0 or 1 beat, every line.
+     Switching it (Layout settings → 1-beat pick-up) starts every line
+     afresh — each gets its pick-up back, or none has one. */
+  function setPickup(n, quiet) {
+    const v = n ? 1 : 0;
+    if (!quiet) notationContainer.querySelectorAll('.notation-line[data-pickup]').forEach(l => { delete l.dataset.pickup; });
+    if (S.pickup === v) { if (!quiet) changed('meter'); return; }
+    S.pickup = v;
+    SW.bus.emit('meter:changed', { meter: S.meter, bpm: S.bpm, what: 'pickup' });
     if (!quiet) changed('meter');
   }
   /* 30–300 BPM (the family's), narrowed by a lesson's tempo rule. A
@@ -1720,6 +1757,7 @@
     if (S.scale && S.scale !== 'major') out.scale = S.scale;                  // the chord panel's scale (chords.js)
     if (S.meter !== SW.meters.DEFAULT) out.meter = S.meter;
     if (S.bpm !== SW.meters.DEFAULT_BPM) out.bpm = S.bpm;
+    if (S.pickup) out.pickup = S.pickup;                                      // every line opens with a pick-up (timing.js)
     const board = SW.chords ? SW.chords.boardModel() : {};
     if (Object.keys(board).length) out.board = board;                        // re-chorded places on the panel
     out.lines = Array.from(notationContainer.querySelectorAll('.notation-line')).map(line => {
@@ -1747,7 +1785,7 @@
             return sy;
           })
         };
-        if (line.dataset.pickup === 'off') lineOut.pickup = false;   // its pick-up was taken away (PICK-UPS)
+        if (S.pickup && line.dataset.pickup === 'off') lineOut.pickup = false;   // its pick-up was taken away (PICK-UPS)
         return lineOut;
       });
     return out;
@@ -1763,6 +1801,7 @@
     S.board = JSON.parse(JSON.stringify(score.board || {}));
     setMeter(score.meter, true);
     setTempo(score.bpm, true);
+    setPickup(score.pickup, true);
     finishTextEdit();
     notationContainer.innerHTML = '';
     currentNoteIndex = -1;
@@ -1808,10 +1847,12 @@
     }
     if (SW.meters.isValid(raw.meter)) out.meter = raw.meter;
     if (raw.bpm !== undefined && raw.bpm !== null) out.bpm = SW.meters.clampBpm(raw.bpm);
+    // omitted when there is none, so songs from before it keep their keys (library matching)
+    if (raw.pickup === 1 || raw.pickup === true) out.pickup = 1;
     (Array.isArray(raw.lines) ? raw.lines : []).forEach(l => {
       if (!l || typeof l !== 'object') return;
       const line = { label: typeof l.label === 'string' ? l.label.slice(0, 15) : '', syllables: [] };
-      if (l.pickup === false) line.pickup = false;
+      if (l.pickup === false && out.pickup) line.pickup = false;
       (Array.isArray(l.syllables) ? l.syllables : []).forEach(s => {
         if (!s || typeof s !== 'object') return;
         const syl = { text: typeof s.text === 'string' && s.text.length ? s.text : '-', cols: [] };
@@ -1859,6 +1900,7 @@
     if (score.scale && score.scale !== 'major') head += `[Scale ${score.scale}]\n`;
     if (score.meter !== SW.meters.DEFAULT) head += `[Time ${score.meter}]\n`;
     if (score.bpm !== SW.meters.DEFAULT_BPM) head += `[Tempo ${score.bpm}]\n`;
+    if (score.pickup) head += `[Pickup ${score.pickup}]\n`;
     return head + body.trim();
   }
 
@@ -1893,17 +1935,18 @@
       if (M.KEY_SIGNATURES_CHROMATIC_INDEX[keyMatch[1]] !== undefined) key = keyMatch[1];
       songText = songText.substring(keyMatch[0].length);
     }
-    let meter = SW.meters.DEFAULT, bpm = SW.meters.DEFAULT_BPM, scale = 'major';
+    let meter = SW.meters.DEFAULT, bpm = SW.meters.DEFAULT_BPM, scale = 'major', pickup = 0;
     songText = songText.replace(/^\s*\[Scale ([^\]]+)\]\n?/i, (m, t) => { scale = t.trim(); return ''; });
     songText = songText.replace(/^\s*\[Time ([^\]]+)\]\n?/i, (m, t) => { if (SW.meters.isValid(t.trim())) meter = t.trim(); return ''; });
     songText = songText.replace(/^\s*\[Tempo ([^\]]+)\]\n?/i, (m, t) => { bpm = SW.meters.clampBpm(t); return ''; });
+    songText = songText.replace(/^\s*\[Pickup ([^\]]+)\]\n?/i, (m, t) => { pickup = parseInt(t, 10) === 1 ? 1 : 0; return ''; });
     if (songText.trim() && !songText.trim().startsWith('[')) songText = '[New Line]\n' + songText;
 
-    const score = { v: 2, key, scale, meter, bpm, lines: [] };
+    const score = { v: 2, key, scale, meter, bpm, pickup, lines: [] };
     let current = null;
     songText.trim().split('\n').forEach(raw => {
       const lineText = raw.trim();
-      if (lineText.startsWith('[Key of') || /^\[(Time|Tempo|Scale) /i.test(lineText)) return;
+      if (lineText.startsWith('[Key of') || /^\[(Time|Tempo|Scale|Pickup) /i.test(lineText)) return;
       const label = lineText.match(/^\[(.*)\]$/);
       if (label) {
         current = { label: label[1] !== 'New Line' ? label[1] : '', syllables: [] };
@@ -1980,8 +2023,8 @@
         })
       };
     });
-    // the song keeps its time (2.0 dropped meter and tempo here)
-    return normalizeScore({ v: 2, key: score.key, meter: score.meter, bpm: score.bpm, lines });
+    // the song keeps its key, scale, panel and time (2.0 dropped meter and tempo here)
+    return normalizeScore(Object.assign({}, score, { lines }));
   }
 
   /* Your words (the Write button). Two views: the words alone, fitted
@@ -2090,7 +2133,7 @@
     // lines and sections
     appendEmptyLine, moveSection, duplicateSection, requestDeleteSection,
     // the song's time
-    setMeter, setTempo,
+    setMeter, setTempo, setPickup, cutPickupBar,
     // modes
     setEditing, toggleEditMode, setNames, toggleNames, setColours, toggleColorScheme, changeKey, setScale,
     isTyping: () => !!currentlyEditingText,

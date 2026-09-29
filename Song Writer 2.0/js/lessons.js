@@ -153,7 +153,9 @@
     const ids = [];
     (payload.songs || []).forEach((song, i) => {
       const id = stem + i;
-      const fresh = L.normalizeSong({ ...song, id, isCustom: true, createdAt: Date.now() + i }, id);
+      // (the lesson's layout goes in only so a pick-up it switched on before
+      // 2026-09-28 becomes the song's own — normalizeSong; it is dropped below)
+      const fresh = L.normalizeSong({ ...song, layout: song.layout || payload.layout, id, isCustom: true, createdAt: Date.now() + i }, id);
       /* the lesson's layout rules, not a piece's own — buildLessonPayload
          never sends one, and a hand-made link must not either */
       delete fresh.layout;

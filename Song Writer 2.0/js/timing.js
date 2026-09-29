@@ -20,10 +20,11 @@
    song's meter (SW.state.meter). A line's last bar is padded with silence
    to the bar in playback.
 
-   PICK-UP — Layout settings → On the page → 1-beat pick-up. Every line
-   then opens with a one-beat pick-up — unless that line's own was taken
-   away (Join up or Delete on it, score.js; the line carries
-   data-pickup="off", `pickup: false` in the model). A line with one has
+   PICK-UP — the song's own (`score.pickup: 1`, S.pickup; switched in
+   Layout settings → On the page → 1-beat pick-up). Every line then opens
+   with a one-beat pick-up — unless that line's own was taken away (Join
+   up or Delete on it, or its bar line taken out, score.js; the line
+   carries data-pickup="off", `pickup: false` in the model). A line with one has
    bar 0 = that one beat, and its bar lines fall a beat later (bar k
    starts at k × bar − shift, shift = a bar less the pick-up).
    Beats and beams are unmoved (the pick-up is a whole beat).
@@ -66,8 +67,7 @@
 
   const meter = () => SW.meters.byId(S.meter);
   function pickup(mt) {
-    const L = SW.settings && SW.settings.layout;
-    return L && L.show && L.show.pickup && mt.beats > 1 ? mt.beatTicks : 0;
+    return S.pickup && mt.beats > 1 ? mt.beatTicks : 0;
   }
   function linePickup(line, mt) {
     return line && line.dataset.pickup === 'off' ? 0 : pickup(mt);

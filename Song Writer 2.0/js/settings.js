@@ -132,10 +132,12 @@
     return hit || 'custom';
   }
 
-  /* What is actually out: the preference, less whatever a lesson leaves out. */
+  /* What is actually out: the preference, less whatever a lesson leaves
+     out. The chord panel is away while the hat is on: the Edit box takes
+     its column (edit-box.js WHERE IT SITS); the lane stays. */
   function shows(part) {
     const allow = SW.lessons ? SW.lessons.shellAllows : () => true;
-    if (part === 'strip') return view.showStrip && allow('strip');
+    if (part === 'strip') return view.showStrip && allow('strip') && !S.editing;
     if (part === 'lane') return view.showLane && allow('strip');
     if (part === 'dock') return view.showDock && allow('dock');
     return true;
@@ -222,6 +224,9 @@
     syncSoundControls();
     if (!o.quiet) SW.bus.emit('view:changed', { view });
   }
+
+  // the hat on or off: the left column changes hands (panel ↔ Edit box)
+  SW.bus.on('mode:changed', () => applyView());
 
   function setView(patch, opts) {
     Object.assign(view, patch);
@@ -533,8 +538,8 @@
       values: null,       // null = all eight note values
       keys: null,         // null = all thirteen keys
       scaleMorph: true,   // choosing a scale moves the melody's notes into it (score.js morphToScale); off, only the chords and keyboard follow
-      show: { sectionTitles: true, keycaps: true, barNumbers: true,
-              pickup: false },  // every line opens with a one-beat pick-up (timing.js)
+      show: { sectionTitles: true, keycaps: true, barNumbers: true },
+      // (the 1-beat pick-up was `show.pickup` until 2026-09-28; it is the song's own now — score.pickup)
       locked: false       // arrived locked in a link or a lesson
     };
   }
@@ -801,11 +806,16 @@
       ['sectionTitles', 'Section titles', 'The A, B … name at the top of each line'],
       ['keycaps', 'Letter keys on the chord panel', 'The F D S A … and Z X C V B each chord and button is played with'],
       ['barNumbers', 'Bar numbers', 'A small number over the first note of each bar, on written lines'],
-      ['pickup', '1-beat pick-up', 'Every line starts with a one-beat pick-up that finishes the bar before it. In Edit, Join up or Delete on a line’s pick-up takes it off that line']
     ].forEach(([k, name, desc]) => {
       list.appendChild(ui.switchRow(name, desc, layout.show[k], () => { layout.show[k] = !layout.show[k]; layoutChanged(); renderLayoutShow(); }));
     });
+    /* The pick-up is the song's (score.pickup: saved, shared and sent with
+       it), switched here beside the page's other rules. */
+    list.appendChild(ui.switchRow('1-beat pick-up (this song)',
+      'Every line starts with a one-beat pick-up that finishes the bar before it. In Edit, the × on a pick-up’s bar line takes it off that line',
+      !!S.pickup, () => { SW.score.setPickup(!S.pickup); renderLayoutShow(); }));
   }
+  SW.bus.on('score:loaded', () => { if ($('layout-show')) renderLayoutShow(); });
 
   function renderLayoutNotes() {
     const presets = $('layout-range-presets');

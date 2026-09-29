@@ -64,7 +64,7 @@
   const APP_NAME = {
     'rhythm-poetry': 'Rhythm Poetry', 'ostinato-builder': 'Ostinato Builder',
     'song-writer': 'Song Writer', 'rainbow-xylophone': 'Rainbow Xylophone',
-    'key-blocks': 'Key Blocks', 'virtual-drum-kit': 'Drum Kit',
+    'key-blocks': 'Digital Accordion', 'virtual-drum-kit': 'Drum Kit',
     'music-stand': 'Music Stand'
   };
   const things = () => (A && A.words) || 'songs';

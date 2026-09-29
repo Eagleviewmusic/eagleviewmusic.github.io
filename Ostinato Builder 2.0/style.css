@@ -73,6 +73,7 @@
   --track-name-size: 17px;
   --mini-btn: 34px;          /* mute, on the picture's bottom corner */
   --corner-btn: 26px;        /* remove, on its top corner */
+  --text-scale: 1;           /* syllables and words alone: View → Text size */
 
   /* Set from script.js, which needs the same numbers to work out how
      wide a beat has to be before the browser lays it out. */
@@ -502,6 +503,7 @@ html.in-iframe .home-link { display: none; }
    list above along with it */
 .instrument-slot:has(:focus-visible) .remove-badge,
 .instrument-slot:has(:focus-visible) .track-move { opacity: 1; pointer-events: auto; }
+
 
 /* the × on the top corner — the mute badge's counterpart, a size down,
    because it is the one to be sure about */
@@ -1211,7 +1213,10 @@ body.hide-bar-numbers .ruler-measure-number { display: none; }
 body.hide-beat-numbers .ruler-beat,
 body.hide-beat-numbers .ruler-beat.playing { color: transparent; border-bottom-color: transparent; }
 body.hide-bar-numbers.hide-beat-numbers .ruler { display: none; }
-body.show-syllables .track-head { padding-bottom: 28px; }
+/* A line with something spoken under it keeps its picture level with
+   the notation, not with the words: the head is padded by exactly the
+   words row (its 4px margin and its height), which grows with Text size. */
+.track.speaks .track-head { padding-bottom: calc(4px + 24px * var(--text-scale)); }
 
 /* ============================================================
    BEAT REPEAT (SIMILE MARK) QUICK-COPY
@@ -1371,14 +1376,14 @@ body.show-syllables .track-head { padding-bottom: 28px; }
   justify-items: center;
   align-items: flex-start;
   margin-top: 4px;
-  min-height: 24px;
+  min-height: calc(24px * var(--text-scale));
 }
 
 .word-container { display: inline-flex; justify-content: center; min-width: 0; }
 
 .word {
   font-family: var(--font);
-  font-size: 17px;
+  font-size: calc(17px * var(--text-scale));
   font-weight: 600;
   line-height: 1.2;
   color: var(--ink);
@@ -1386,6 +1391,55 @@ body.show-syllables .track-head { padding-bottom: 28px; }
   white-space: nowrap;
 }
 .word.rest { color: var(--ink-3); opacity: .5; font-weight: 400; }
+
+/* --- one box per note ---
+   A word of the line's own spans from its note to the next one in the
+   beat (buildSpeech). Inside, a box one slot wide centres a short word
+   on its notehead; a longer one grows out of it to the right, the way
+   words are set under a song. min-width: 0 on the container keeps a long
+   word from widening the grid's columns and pulling the words off their
+   dots — the beat is widened for it instead. */
+.words .word-container {
+  position: relative;
+  justify-self: stretch;
+  justify-content: flex-start;
+}
+.word-box {
+  flex: none;
+  min-width: calc(100% / var(--span, 1));
+  text-align: center;
+  white-space: nowrap;
+  border-radius: 6px;
+  transition: background .13s;
+}
+
+/* Double-click a syllable to change it (EDITING A SYLLABLE in script.js). */
+.words.editable { user-select: none; -webkit-user-select: none; }
+.words.editable [data-note] { cursor: text; }
+.words.editable [data-note]:hover .word-box { background: var(--accent-soft); }
+body.present-mode .words.editable [data-note] { cursor: default; }
+body.present-mode .words.editable [data-note]:hover .word-box { background: transparent; }
+.word-container.editing .word-box { visibility: hidden; }
+.word-input {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  z-index: 5;
+  min-width: calc(100% / var(--span, 1));
+  box-sizing: border-box;
+  padding: 1px 5px;
+  font-family: var(--font);
+  font-size: calc(17px * var(--text-scale));
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1.5px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  outline: none;
+}
 
 
 /* ============================================================
@@ -1502,6 +1556,18 @@ body.show-syllables .track-head { padding-bottom: 28px; }
 .voice-switch.muted img { filter: grayscale(1); }
 .voice-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .voice-switch .switch { flex: none; }
+
+/* its volume, on a line of its own under the switch, lined up with the name */
+.voice-row { display: flex; flex-direction: column; }
+.voice-level {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 6px 46px;
+}
+.voice-level .slider { height: 4px; }
+.voice-level .slider-readout { min-width: 38px; font-size: 12px; cursor: default; }
+.voice-row.silent .voice-level { opacity: .45; }
 .voice-switch.active .switch { background: var(--accent); }
 .voice-switch.active .switch::after { transform: translateX(16px); }
 

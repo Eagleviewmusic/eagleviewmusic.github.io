@@ -97,8 +97,9 @@ in `js/core.js`).
 | `board` | `{ place: { root, q, mods, label? } }` — place one of `f d s a g r e q w 1 2 3 4 5`; `root` a degree relative to the tonic (`5`, `b6`, `#4`); `q` a quality id from `theory.js` (`maj min dim aug sus2 sus4 pow dom7 maj7 min7 m7b5 dim7 mmaj7 aug7 dom7b5 six min6 add9 madd9 six9 dom9sus4 dom7s9 dom7b9 dom9s5 dom13b9 majb5`); `mods` function ids (`sus2 add9 sus4 b7 maj7 inv6 inv64 inv65 inv43 inv42`); `label` ≤ 12 chars | Optional (2026-09-27). The places on the chord panel the song has re-chorded; a place left out shows the scale's own chord. **Omitted when empty.** |
 | `meter` | `2/4`, `3/4`, `4/4` | **Omitted when `4/4`.** |
 | `bpm` | 30–300 (the family's range; songs saved when it was 40–200 read unchanged) | **Omitted when 100.** |
+| `pickup` | `1` | Optional (2026-09-28). Every line opens with a one-beat pick-up. **Omitted = none.** Until 2026-09-28 this was the Layout setting `show.pickup` (§7); a record, link or lesson whose `layout.show.pickup` is `true` and whose score has no `pickup` is read as `pickup: 1` (`normalizeSong`). |
 | `lines[].label` | string, ≤ 15 chars | Section name (`A`, `Verse`…); may be empty. |
-| `lines[].pickup` | `false` | Optional (2026-09-25). With Layout settings → 1-beat pick-up on, this line has had its pick-up taken away (Join up or Delete on it) and starts on a downbeat. **Omitted = the line follows the layout.** Not kept in the 1.0 text format (§3). |
+| `lines[].pickup` | `false` | Optional (2026-09-25). With the song's `pickup` on, this line has had its pick-up taken away (Join up or Delete on it, or the × on its bar line) and starts on a downbeat. **Omitted = the line follows the song**; dropped when the song has no `pickup`. Not kept in the 1.0 text format (§3). |
 | `syllables[].text` | string | `-` means no word under these notes. Never empty. |
 | `syllables[].chord` | a chord id (`I`, `V7`, `ii`, `bVI`, `#iv°7`, `Imaj7`, `V:inv64`, `I:sus4,add9`) | Optional; one per syllable, drawn in the chord lane. The id is a roman numeral the engine (`js/chords.js`) reads back in any key: ♭/♯ + numeral (lower case = the minor family) + Theory's quality suffix, then `:` and the functions applied, comma-separated. The fourteen ids written before 2026-09-27 (`I ii iii IV V vi V/V V/vi IV/IV bVI iv vii°7/V V/iii V/ii`) still read (`V/V` → `II`, `vii°7/V` → `#iv°7`). An id the engine cannot read is kept and drawn grey. |
 | `syllables[].cols` | ≥ 1 column | One column per note in time; a syllable can hold several (a melisma). |
@@ -126,6 +127,7 @@ editor) and written by `SW.score.toText`:
 [Scale dorian]      (optional; omitted for major — 2026-09-27)
 [Time 3/4]          (optional; omitted for 4/4)
 [Tempo 96]          (optional; omitted for 100)
+[Pickup 1]          (optional; omitted when none — 2026-09-28)
 [A]
 {I}Twin[D1] kle[D1:q] {V7}twin[S1,S1:e] kle[S1+M1:h] rest[D1~]
 ```
@@ -216,16 +218,16 @@ reload does not end it. It never leaves the device.
 ```json
 { "v": 1, "notes": null, "accidentals": true, "rests": true, "harmony": true,
   "connected": true, "chords": null, "values": null, "keys": null, "scaleMorph": true,
-  "show": { "sectionTitles": true, "keycaps": true, "barNumbers": true, "pickup": false },
+  "show": { "sectionTitles": true, "keycaps": true, "barNumbers": true },
   "locked": false }
 ```
 
 `show.barNumbers` (added 2026-09-25): a small number over the first note of
 each bar on written lines. Missing means `true`.
 
-`show.pickup` (added 2026-09-25): every line opens with a one-beat pick-up
-(bar lines a beat later; a line whose `pickup` is `false` has none). Missing
-means `false`.
+`show.pickup` (2026-09-25 to 2026-09-28, no longer written): the 1-beat
+pick-up, now the score's own `pickup` (§2). Still read once, to carry an older
+song's pick-up over.
 
 `null` in a list means "all of them". `values`, when a list, always includes
 `q` (a block counts as a quarter). `locked` is set when the layout arrived in

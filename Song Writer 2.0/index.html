@@ -34,8 +34,8 @@
   There is no edit ribbon. The construction hat beside Play is the
   editing layer's switch; while it is on, every note tool — the value
   circles, ♯ ♭, harmony, the syllable's notes, the word and line tools —
-  sits in ONE FLOATING BOX (#edit-box, js/components/edit-box.js) that
-  can be dragged anywhere, and each line's section head grows its tools
+  sits in ONE BOX (#edit-box, js/components/edit-box.js) that takes the
+  workspace's left column in place of the chord panel, and each line's section head grows its tools
   (js/score.js). Everything that edits is one layer under body.editing,
   hidden in Present and in a saved picture.
 
@@ -121,6 +121,34 @@
      The Song · Keyboard · Chords switch sets which parts are out;
      js/components/keyboard-dock.js does the alignment. -->
 <main class="workspace" id="workspace">
+  <!-- THE EDIT BOX — out while the hat is on (js/components/edit-box.js).
+       It takes the whole left column: the chord panel's place and the
+       corner under it (the chord panel is away while editing, with the
+       chords on or off). Every note tool is in it, so nothing is drawn
+       around the note. The sections a lesson or Layout settings take
+       away are removed; a tool that cannot act on the selection just now
+       is greyed, so no button ever moves under a finger. -->
+  <aside class="edit-box" id="edit-box" aria-label="Edit tools">
+    <div class="eb-head" id="edit-box-head">
+      <svg class="eb-hat" viewBox="0 0 28 20" aria-hidden="true">
+        <path d="M4 12 C4 6, 10 2, 14 2 C18 2, 24 6, 24 12 L24 14 L4 14 Z" fill="currentColor" stroke="none"/>
+        <ellipse cx="14" cy="14" rx="12" ry="3" fill="currentColor" stroke="none"/>
+      </svg>
+      <span class="eb-title">Edit</span>
+    </div>
+    <div class="eb-body" id="edit-box-body">
+      <!-- the value circles (js/components/rhythm-panel.js). One tap writes
+           the selected block as that note and steps on; the circles never move. -->
+      <section class="eb-section eb-values" id="rhythm-panel" role="group" aria-label="Rhythm"></section>
+      <section class="eb-section" id="eb-note" aria-label="Note"></section>
+      <section class="eb-section" id="eb-syllable" aria-label="Syllable"></section>
+      <section class="eb-section" id="eb-words" aria-label="Words and lines"></section>
+      <p class="eb-empty" id="eb-empty">Tap a word to type it.</p>
+      <!-- View → Staff notation, the same setting (edit-box.js) -->
+      <div class="eb-staff" id="eb-staff"></div>
+    </div>
+  </aside>
+
   <!-- LEFT HAND — js/components/chord-strip.js: Digital Accordion's chord
        panel (the scale's fourteen chords, Core…Extreme, Z X C V B) -->
   <aside class="chord-strip" id="chord-strip" aria-label="Chord panel"></aside>
@@ -240,41 +268,7 @@
   </div>
 </footer>
 
-<!-- ============ THE EDIT BOX — out while the hat is on ============
-     js/components/edit-box.js. A vertical box that floats over the
-     stage and can be dragged by its title bar to any part of the
-     screen; it stays out for as long as the hat is on and keeps its
-     place (and whether it is folded) on this browser. Every note tool
-     is in it, so nothing is drawn around the note and the song does not
-     move when the hat goes on. The sections a lesson or Layout settings
-     take away are removed; a tool that cannot act on the selection just
-     now is greyed, so no button ever moves under a finger. -->
-<aside class="edit-box" id="edit-box" aria-label="Edit tools">
-  <div class="eb-head" id="edit-box-head" title="Drag to move the box">
-    <span class="eb-grip" aria-hidden="true">
-      <svg viewBox="0 0 10 16"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>
-    </span>
-    <svg class="eb-hat" viewBox="0 0 28 20" aria-hidden="true">
-      <path d="M4 12 C4 6, 10 2, 14 2 C18 2, 24 6, 24 12 L24 14 L4 14 Z" fill="currentColor" stroke="none"/>
-      <ellipse cx="14" cy="14" rx="12" ry="3" fill="currentColor" stroke="none"/>
-    </svg>
-    <span class="eb-title">Edit</span>
-    <button class="eb-fold" id="edit-box-fold" aria-expanded="true" title="Fold the box up" aria-label="Fold the box up">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
-    </button>
-  </div>
-  <div class="eb-body" id="edit-box-body">
-    <!-- the value circles (js/components/rhythm-panel.js). One tap writes
-         the selected block as that note and steps on; the circles never move. -->
-    <section class="eb-section eb-values" id="rhythm-panel" role="group" aria-label="Rhythm"></section>
-    <section class="eb-section" id="eb-note" aria-label="Note"></section>
-    <section class="eb-section" id="eb-syllable" aria-label="Syllable"></section>
-    <section class="eb-section" id="eb-words" aria-label="Words and lines"></section>
-    <p class="eb-empty" id="eb-empty">Tap a word to type it.</p>
-    <!-- View → Staff notation, the same setting (edit-box.js) -->
-    <div class="eb-staff" id="eb-staff"></div>
-  </div>
-</aside>
+
 </div><!-- /.app -->
 
 <!-- ============ POPOVER: SOUND — what you hear ============ -->
@@ -873,7 +867,7 @@
       <li><span class="help-key edit">A</span><div><b>Letter keys</b> in Edit type pitches: <b>A S D F G H J K</b> = do re mi fa so la ti do′, <b>Q W E R T Y</b> = do′ … la′, <b>Z X C</b> = so, la, ti below, <b>V</b> = do. <span class="help-key">↑</span> <span class="help-key">↓</span> move a step. Double-click a block’s top or bottom half to move it too.</div></li>
       <li><span class="help-key edit">♯</span><div><b>Note</b>, in the Edit box: ♯ ♭ sharpen or flatten the selected note (tap again for natural); <b>Harmony</b> adds a note two steps above it, and − takes the selected one away. <b>Syllable</b> shows a dot for each note on this word — tap one to select it — and − takes the selected one away. Two buttons add a note: <b>+ Note/Syllable</b> gives it a syllable of its own after this one; <b>+ Note Only</b> puts it on this same syllable.</div></li>
       <li><span class="help-key edit">↵</span><div><b>Words &amp; lines</b>, in the Edit box: <b>New line</b> starts a line after this word, and <b>Join up</b> (on the first word of a line) joins the line to the one above. <b>Delete</b> removes the syllable — tap it twice, so one stray tap never loses work. <b>Staff notation</b> at the foot of the box is the same switch as in View: off, the rhythms show under the blocks.</div></li>
-      <li><span class="help-key edit">♪</span><div><b>Pick-ups</b> (Layout settings → 1-beat pick-up): every line starts with a one-beat pick-up. Select a line’s pick-up and <b>Join up</b> moves just that beat to the end of the line above — press it again to join the whole line. <b>Delete</b> on a pick-up takes it away and puts a rest in the bar above. A new line starts with its pick-up again.</div></li>
+      <li><span class="help-key edit">♪</span><div><b>Pick-ups</b> (Layout settings → 1-beat pick-up, saved with the song): every line starts with a one-beat pick-up. With the hat on, point at the bar line after a pick-up and press its <b>×</b>: the bar line goes and the pick-up joins the first bar. Or select a line’s pick-up and <b>Join up</b> moves just that beat to the end of the line above — press it again to join the whole line. <b>Delete</b> on a pick-up takes it away and puts a rest in the bar above. A new line starts with its pick-up again.</div></li>
       <li><span class="help-key edit">A</span><div><b>Section names</b> sit in the top corner of each line; type into them in Edit. ▲ ▼ move the line, ⧉ copies it below, × deletes it. <b>Add a line</b>, at the end of the song, starts a new one.</div></li>
       <li><span class="help-key">I</span><div><b>Chord lane</b> (Chords tab): in Edit, tap the space above a word and choose a chord; while that space glows, the panel, its letter keys and <span class="help-key">1</span>–<span class="help-key">5</span> write into it — with any Z X C V B held, the changed chord (V⁷, I⁶₄). Otherwise they just sound. Stepping onto the word plays its chord.</div></li>
       <li><span class="help-key edit">✎</span><div><b>Change a chord</b>: with the hat on, the pencil on any chord opens its editor — root, quality, a 7th or an inversion stuck to it, its name — and <b>Back to the scale’s chord</b> undoes it. The pencil at the end of the Z X C V B row chooses what each button does (sus2 … maj7, or the inversions 6, 6/4, 6/5, 4/3, 4/2). Re-chorded places are saved with the song. Under the panel, the corner shows the chord in hand and its notes; the keyboard’s Octaves and Focus sit below them.</div></li>

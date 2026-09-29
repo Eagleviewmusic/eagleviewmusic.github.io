@@ -76,6 +76,7 @@
     accidentalMode: 'natural',
     meter: '4/4',            // the song's time signature (stored in the score)
     bpm: 100,                // the song's tempo (stored in the score)
+    pickup: 0,               // beats of pick-up every line opens with (0 or 1; stored in the score — timing.js PICK-UP)
     playing: false,          // SW.player is running the song
     scale: 'major',          // the song's scale (Theory.SCALES id; stored in the score) — drives the chord panel
     board: {},               // the song's re-chorded places on the panel: { d: { root, q, mods, label? } } (js/chords.js)

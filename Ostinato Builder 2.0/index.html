@@ -275,6 +275,22 @@
       <span>Counting system</span>
       <select id="syllable-system" class="tool-select"></select>
     </label>
+    <button class="switch-row active" id="words-toggle" hidden>
+      <span>Each line’s own words</span>
+      <span class="switch" aria-hidden="true"></span>
+    </button>
+    <p class="popover-note" id="words-note">Double-click a syllable under the notes to write your own word there. Space moves on to the next note.</p>
+    <!-- The syllables and words alone, as Rhythm Poetry's Text size. Only
+         there while something is spoken on the page. -->
+    <div class="popover-field" id="text-size-field" hidden>
+      <span>Text size</span>
+      <div class="slider-row">
+        <input type="range" class="slider" id="text-size-slider" min="60" max="250" step="10" value="100"
+               aria-label="Text size" />
+        <span class="slider-readout" id="text-size-readout">100%</span>
+      </div>
+      <p class="popover-note">Only the syllables and words grow — the notes are not enlarged, though a page may shrink a touch to make room for bigger words.</p>
+    </div>
   </div>
 
   <div class="popover-section" id="settings-play">
@@ -731,6 +747,10 @@
           <div><b>Repeat a beat or a bar:</b> point at an empty beat or a bar line and tap the repeat mark to copy the one before it.</div></li>
         <li><span class="help-key">🥁</span>
           <div><b>Change an instrument</b> by tapping its picture. The speaker on the picture mutes that line, and <b>Add</b>, under the last picture, brings in another.</div></li>
+        <li><span class="help-key">💬</span>
+          <div><b>Give a line its own words</b> — “wet dogs sleep all day”: with Syllables on (View), double-click one and type. <span class="help-key">Space</span> moves on to the next note, <span class="help-key">Enter</span> finishes.</div></li>
+        <li><span class="help-key">🔊</span>
+          <div><b>Balance the instruments</b> in <b>Sound</b>: each one has its own volume, saved with the ostinato.</div></li>
         <li><span class="help-key">＋</span>
           <div><b>Set the length</b> with the bar counter on the toolbar, or the + and × where the music ends.</div></li>
         <li><span class="help-key">⛶</span>
