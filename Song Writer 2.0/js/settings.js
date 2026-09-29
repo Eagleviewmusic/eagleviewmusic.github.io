@@ -133,11 +133,11 @@
   }
 
   /* What is actually out: the preference, less whatever a lesson leaves
-     out. The chord panel is away while the hat is on: the Edit box takes
-     its column (edit-box.js WHERE IT SITS); the lane stays. */
+     out. (While the hat is on, the chord panel sits in the foot of the
+     Edit box — edit-box.js WHERE IT SITS.) */
   function shows(part) {
     const allow = SW.lessons ? SW.lessons.shellAllows : () => true;
-    if (part === 'strip') return view.showStrip && allow('strip') && !S.editing;
+    if (part === 'strip') return view.showStrip && allow('strip');
     if (part === 'lane') return view.showLane && allow('strip');
     if (part === 'dock') return view.showDock && allow('dock');
     return true;
@@ -225,7 +225,7 @@
     if (!o.quiet) SW.bus.emit('view:changed', { view });
   }
 
-  // the hat on or off: the left column changes hands (panel ↔ Edit box)
+  // the hat on or off: the left column changes hands (panel ↔ Edit box, the panel in its foot)
   SW.bus.on('mode:changed', () => applyView());
 
   function setView(patch, opts) {

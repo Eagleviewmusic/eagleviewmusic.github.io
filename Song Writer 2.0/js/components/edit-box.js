@@ -42,10 +42,13 @@
    WHERE IT SITS (2026-09-28, the user's call). No longer floating: it
    is the workspace's left column, from the top of the stage to the
    toolbar — the chord panel's place and the corner under it, beside the
-   keyboard when that is out (style.css WORKSPACE). The chord panel is
-   away while the hat is on, whether the chords are on or off
-   (settings.js shows('strip')); the chord lane stays, and a slot's
-   picker still writes chords. Its body scrolls when the window is short.
+   keyboard when that is out (style.css WORKSPACE). With the chords on,
+   the chord panel itself (#chord-strip, the same element and all its
+   wiring) moves into the box's foot (#eb-chords) while the hat is on,
+   pencils and all — in Edit, chords are there to be edited — and goes
+   back beside the stage when it comes off (seatChords). The corner
+   under it is away while editing. The tools above scroll when the
+   window is short; the chords stay put at the foot.
    (Until then it floated and was dragged by its title bar; its old
    place, song_writer_2_edit_box_v1, is no longer read.)
 
@@ -246,8 +249,18 @@
   // the box never takes the focus from a word being typed, or from the page's keys
   box.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
 
+  /* ================= the chord panel in the foot ================= */
+  const chordsSlot = document.getElementById('eb-chords');
+  function seatChords() {
+    const strip = document.getElementById('chord-strip');
+    const stage = document.getElementById('stage');
+    if (!strip || !chordsSlot || !stage) return;
+    if (S.editing) { if (strip.parentNode !== chordsSlot) chordsSlot.appendChild(strip); }
+    else if (strip.parentNode !== stage.parentNode) stage.parentNode.insertBefore(strip, stage);
+  }
+
   /* ================= wiring ================= */
-  SW.bus.on('mode:changed', () => { if (S.editing) render(); });
+  SW.bus.on('mode:changed', () => { seatChords(); if (S.editing) render(); });
   ['selection', 'score:changed', 'score:loaded', 'layout:changed', 'policy:changed', 'key:changed',
    'edit:armed', 'staff:drawn', 'view:changed', 'words:typing'].forEach(evt => SW.bus.on(evt, schedule));
 

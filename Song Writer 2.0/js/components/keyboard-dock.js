@@ -259,7 +259,8 @@
   function seatPanel() {
     if (!panel) return;
     const slot = document.getElementById('corner-panel');
-    const cornerOut = slot && document.body.classList.contains('show-strip') && document.body.classList.contains('show-dock');
+    const b = document.body.classList;
+    const cornerOut = slot && b.contains('show-strip') && b.contains('show-dock') && !b.contains('editing');   // the Edit box has the corner's place
     if (cornerOut) { if (panel.parentNode !== slot) slot.appendChild(panel); }
     else if (panel.parentNode !== dock) dock.insertBefore(panel, stage);
     dock.classList.toggle('panel-away', !!cornerOut);

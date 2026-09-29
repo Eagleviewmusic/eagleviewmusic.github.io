@@ -269,8 +269,9 @@ body.show-dock .preview-bar { bottom: calc(var(--toolbar-real) + var(--dock-h) +
        rows:     [main]  1fr              [dock]  auto
 
    While the hat is on, the Edit box is the left column, both rows
-   tall (the panel's place and the corner under it), whatever the
-   chord panel's setting; settings.js keeps the panel away then.
+   tall (the panel's place and the corner under it); with the chords
+   on, the chord panel sits in its foot (#eb-chords, edit-box.js) and
+   the corner is away.
    ============================================================ */
 .workspace {
   flex: 1 1 auto;
@@ -286,12 +287,14 @@ body.show-dock .preview-bar { bottom: calc(var(--toolbar-real) + var(--dock-h) +
 body.show-strip .workspace { grid-template-columns: var(--strip-w) minmax(0, 1fr); }
 body.show-dock .workspace { grid-template-rows: minmax(0, 1fr) auto; }
 body.editing .workspace { grid-template-columns: var(--eb-w) minmax(0, 1fr); }
+body.editing.show-strip .workspace { grid-template-columns: max(var(--eb-w), var(--strip-w)) minmax(0, 1fr); }
 
 .chord-strip { grid-area: strip; min-width: 0; overflow: hidden; display: none; }
 body.show-strip .chord-strip { display: flex; }
 .stage { grid-area: score; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; position: relative; scroll-behavior: auto; }
 .dock-corner { grid-area: corner; display: none; }
 body.show-strip.show-dock .dock-corner { display: flex; }
+body.editing .dock-corner, body.editing.show-strip.show-dock .dock-corner { display: none; }   /* the Edit box has its place */
 .keyboard-dock { grid-area: dock; min-width: 0; display: none; }
 
 
@@ -655,6 +658,18 @@ body.editing .edit-box { display: flex; animation: eb-in .18s ease-out; }
 .eb-title { flex: 1; font-family: var(--font-round); font-size: 16px; font-weight: 700; line-height: 1; }
 
 .eb-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; padding: 0 11px 11px; }
+/* the chord panel in the foot (edit-box.js seatChords): a fixed share of
+   the column, so the chords never scroll away; the tools above scroll */
+.eb-chords { display: none; }
+body.show-strip .eb-chords {
+  flex: 0 0 auto; height: clamp(230px, 44%, 420px); min-height: 0;
+  display: flex; border-top: 1.5px solid rgba(240,138,0,.32);
+}
+.eb-chords .chord-strip { flex: 1 1 auto; min-width: 0; border-right: none; padding: 9px 10px 10px; }
+/* the blocks are smaller down here: a small pencil in the corner, clear of the name */
+.eb-chords .cb-edit { width: 16px; height: 16px; top: 2px; right: 2px; border-radius: 5px; }
+.eb-chords .cb-edit svg { width: 10px; height: 10px; }
+.eb-chords .cblock { border-radius: 10px; }
 .eb-section { display: flex; flex-direction: column; gap: 7px; padding: 10px 0 2px; border-top: 1px solid var(--hairline); margin-top: 8px; }
 .eb-section.eb-first { border-top: none; margin-top: 0; }
 .eb-kicker { font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3); line-height: 1; }

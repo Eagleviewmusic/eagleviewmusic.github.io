@@ -99,9 +99,12 @@ selected note is in **one box** (`js/components/edit-box.js`, 2026-09-25 — it
 replaced the tools drawn around the note and the value drawer in the toolbar).
 Since 2026-09-28 it no longer floats: it is the workspace's **left column**,
 from the stage's top to the toolbar — the chord panel's place and the corner
-under it, beside the keyboard when that is out. The chord panel is away while
-the hat is on, whether the chords are on or off (`settings.js shows('strip')`);
-the chord lane stays and a slot's picker still writes chords. It stays out for as long as the
+under it, beside the keyboard when that is out. With the chords on, the chord
+panel itself moves into the box's foot (`#eb-chords`, `edit-box.js seatChords`)
+while the hat is on — a fixed share of the column (clamp 230 px, 44%, 420 px),
+with small ✎ pencils so the names stay readable — so chords are edited there;
+the tools above scroll. The corner under the panel is away while editing (the
+keyboard's 1–4 / Focus go back to the dock). It stays out for as long as the
 hat is on; nothing is drawn around the note, so the song does not move when the
 hat goes on.
 
