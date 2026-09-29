@@ -1,0 +1,1423 @@
+{
+  "format": "evm-item",
+  "formatVersion": 1,
+  "app": "song-writer",
+  "kind": "song",
+  "id": "song_1790651857604_4g5o",
+  "title": "Ging Gang Goolie",
+  "createdAt": 1790651857605,
+  "updatedAt": 1790651857605,
+  "book": "More songs",
+  "data": {
+    "score": {
+      "v": 2,
+      "key": "D",
+      "pickup": 1,
+      "lines": [
+        {
+          "label": "",
+          "syllables": [
+            {
+              "text": "Ging",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "gang",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "gu",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-li",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "gu",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-li",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "goo",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-lie",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "la"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "wat",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-cha",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "Ging",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "gang",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "goo,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "ging",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti-low"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "gang",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "goo",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Ging",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "gang",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "gu",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-li",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "gu",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-li",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "gu",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-li",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "la"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "wat",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-cha",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "Ging",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "gang",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "goo,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "ging",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti-low"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "gang",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "goo",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "h"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "label": "",
+          "syllables": [
+            {
+              "text": "Hey",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "la"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "la,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "h"
+                }
+              ]
+            },
+            {
+              "text": "hey",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "la"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "la"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "shay",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "la,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "h"
+                }
+              ]
+            },
+            {
+              "text": "hey",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "shay",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "q."
+                }
+              ]
+            },
+            {
+              "text": "la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "hay",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "q."
+                }
+              ]
+            },
+            {
+              "text": "la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "woah",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "q"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "q"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "h"
+                }
+              ]
+            },
+            {
+              "text": "Hey",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "la"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "la,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "h"
+                }
+              ]
+            },
+            {
+              "text": "hey",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "la"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "la"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "shay",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "la,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "h"
+                }
+              ]
+            },
+            {
+              "text": "hey",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "shay",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "q."
+                }
+              ]
+            },
+            {
+              "text": "la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "hey",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "q."
+                }
+              ]
+            },
+            {
+              "text": "la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "woah",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "w"
+                }
+              ]
+            }
+          ],
+          "pickup": false
+        },
+        {
+          "label": "",
+          "syllables": [
+            {
+              "text": "Shal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "wal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-ly,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "shal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "wal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-ly,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "shal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "wal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-ly,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "shal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "wal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-ly,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "oom",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-pa!",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "oom",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-pa!",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "oom",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-pa!",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "oom",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-pa!",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "Shal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "wal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-ly,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "shal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "wal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-ly,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "shal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "wal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-ly,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "shal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-la",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "wal",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "-ly,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "s"
+                }
+              ]
+            },
+            {
+              "text": "oom",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-pa!",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "oom",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-pa!",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "oom",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-pa!",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            }
+          ],
+          "pickup": false
+        }
+      ]
+    },
+    "layout": {
+      "v": 1,
+      "notes": null,
+      "accidentals": true,
+      "rests": true,
+      "harmony": true,
+      "connected": true,
+      "chords": null,
+      "values": null,
+      "keys": null,
+      "scaleMorph": true,
+      "show": {
+        "sectionTitles": true,
+        "keycaps": true,
+        "barNumbers": true
+      },
+      "locked": false
+    }
+  }
+}
