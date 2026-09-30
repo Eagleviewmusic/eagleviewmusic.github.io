@@ -156,11 +156,11 @@
     const sc = SW.chords ? SW.chords.scale() : null;
     if (sc && typeof Theory !== 'undefined') {
       sc.degrees.forEach(deg => {
-        const sp = Theory.spellDegree(key, deg);
+        const sp = Theory.spellDegree(M.spelledKey(), deg);   // C♯ minor, not D♭ minor
         palette[sp.pc] = { name: sp.name, color: M.LETTER_COLORS[sp.letter] };
       });
     } else {
-      const names = M.letterNamesByKey[key] || M.letterNamesByKey.C;
+      const names = M.letterNamesByKey[M.spelledKey()] || M.letterNamesByKey.C;
       Object.keys(M.SOLFEGE_INTERVALS).forEach(sol => {
         const pc = (tonic + M.SOLFEGE_INTERVALS[sol]) % 12;
         const sp = names[sol];
@@ -187,8 +187,13 @@
 
   function plainName(pc) {
     if (!IS_BLACK[pc]) return WHITE_LETTER[pc];
-    if (S.key === 'C') return NAMES_C[pc];
-    return (FLAT_KEYS.indexOf(S.key) !== -1 ? NAMES_FLAT : NAMES_SHARP)[pc];
+    // sharps or flats as the key signature of this key and scale has them
+    // (D minor's keyboard says B♭, D major's C♯); none: C major's mix
+    const ks = SW.staff && SW.staff.keySignature ? SW.staff.keySignature(S.key, S.scale) : null;
+    if (ks) return ks.kind < 0 ? NAMES_FLAT[pc] : ks.kind > 0 ? NAMES_SHARP[pc] : NAMES_C[pc];
+    const k = M.spelledKey();
+    if (k === 'C') return NAMES_C[pc];
+    return (FLAT_KEYS.indexOf(k) !== -1 ? NAMES_FLAT : NAMES_SHARP)[pc];
   }
 
   /* ---------------- build ---------------- */

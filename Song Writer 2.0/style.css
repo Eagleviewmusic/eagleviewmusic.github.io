@@ -408,7 +408,6 @@ body.light-notes .syllable.sounding .syl-body,
 body.light-notes .syllable.sounding.highlighted .syl-body { background-color: rgba(156,22,142,.10); box-shadow: 0 0 0 1.5px #9C168E, 0 0 12px rgba(156,22,142,.25); transform: none; }
 
 .notes-container { display: flex; flex-direction: row; align-items: flex-end; justify-content: center; margin-bottom: calc(8px * var(--bs)); }
-body:not(.show-staff) .notes-container:has(.value-mark) { margin-bottom: calc(22px * var(--bs)); }
 
 .note {
   width: calc(32px * var(--bs));
@@ -504,18 +503,34 @@ body:not(.show-staff) .notes-container:has(.value-mark) { margin-bottom: calc(22
   padding: 2px 4px; outline: none; box-shadow: 0 0 8px rgba(240,138,0,.3);
 }
 
-/* the mark under a written column — only when the staff is switched off */
+/* the mark inside a written column — only when the staff is switched off.
+   Black, standing on the foot of the bar (so a line's rhythms read along
+   one level just above the words), and never taller than the bar allows:
+   a low block (mi, fa below do) gets a smaller mark rather than one that
+   pokes out of its top. With names showing, the mark leaves the top of the
+   bar to the solfège (down to a floor, where a tiny bar must share). A ♯/♭
+   stands just left of the notehead, as it would on the staff, and the mark
+   steps right to make room. */
 .value-mark {
-  position: absolute; top: calc(100% + 3px); left: 50%; transform: translateX(-50%);
-  display: none; color: var(--c); pointer-events: none; z-index: 5;
+  --vm-h: min(calc(26px * var(--bs)), calc(100% - 8px * var(--bs)));
+  position: absolute; bottom: calc(5px * var(--bs)); left: 50%; transform: translateX(-50%);
+  height: var(--vm-h); line-height: 0;
+  display: none; color: #111; pointer-events: none; z-index: 22;
 }
+.value-mark svg { display: block; height: 100%; width: auto; }
 body:not(.show-staff) .value-mark { display: block; }
-/* a tie, with the staff off: an arc under the marks, from this column's
+.show-names .value-mark { --vm-h: max(calc(12px * var(--bs)), min(calc(26px * var(--bs)), calc(100% - 27px * var(--bs)))); }
+body:not(.show-staff) .harmony-stack.notated:has(.accidental-symbol) .value-mark { left: calc(50% + 4px * var(--bs)); }
+body:not(.show-staff) .harmony-stack.notated .accidental-symbol {
+  bottom: calc(4px * var(--bs)); left: calc(50% - 9px * var(--bs));
+  font-size: calc(15px * var(--bs)); color: #111; text-shadow: none; z-index: 23;
+}
+/* a tie, with the staff off: an arc under the noteheads, from this column's
    to the next one's (a tie's two notes sit side by side in one syllable) */
 body:not(.show-staff) .harmony-stack.notated[data-tie]::before {
-  content: ''; position: absolute; z-index: 5; pointer-events: none;
-  top: calc(100% + 17px); left: calc(50% + 4px); width: calc(100% - 8px); height: 7px;
-  border-bottom: 2px solid #5C4E6B; border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  content: ''; position: absolute; z-index: 22; pointer-events: none;
+  bottom: calc(1px * var(--bs)); left: calc(50% + 3px); width: calc(100% - 6px); height: calc(5px * var(--bs));
+  border-bottom: 2px solid #111; border-radius: 0 0 50% 50% / 0 0 100% 100%;
 }
 
 /* ---- the staff (staff.js) ----

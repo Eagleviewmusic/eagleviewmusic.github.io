@@ -164,12 +164,23 @@
     return isFinite(v) && v > 0 ? v : 1;
   }
 
-  /* The key signature: the alteration each letter carries in this key,
-     read from 1.0's spelling table. A key spelled with a double sharp
-     (D♯ major's F𝄪) has no standard signature; then nothing is written
-     at the clef and every note carries its own accidental. */
-  function keySignature(key) {
-    const names = M.letterNamesByKey[key] || M.letterNamesByKey.C;
+  /* The key signature: the alteration each letter carries in this key
+     and scale. The scale is written with the signature of its seven-note
+     frame (core.js signatureScale): C minor, C minor pentatonic and C
+     blues with three flats, D Dorian with none, D Phrygian with two, C
+     major pentatonic with none; the notes a scale adds beyond that frame
+     (harmonic minor's ti, blues's se) carry their own accidentals. A key
+     spelled with a double sharp (D♯ major's F𝄪) has no standard
+     signature; then nothing is written at the clef and every note
+     carries its own accidental. */
+  function keySignature(key, scaleId) {
+    const tonic = M.spelledKey(key, scaleId);
+    let names = M.letterNamesByKey[tonic] || M.letterNamesByKey.C;
+    const frame = M.signatureScale(scaleId);
+    if (typeof Theory !== 'undefined' && Theory.SCALE_BY_ID[frame]) {
+      names = {};
+      Theory.SCALE_BY_ID[frame].degrees.forEach((d, i) => { names[i] = Theory.spellDegree(tonic, d).ascii; });
+    }
     const sig = {};
     let ok = true, sharps = 0, flats = 0;
     Object.keys(names).forEach(sol => {
@@ -230,7 +241,7 @@
      room kept and the room drawn in can never disagree. */
   function prefix(s, withTime) {
     const k = s / UNITS;
-    const ks = keySignature(S.key);
+    const ks = keySignature(S.key, S.scale);
     let x = s * 0.5;
     const clefX = x;
     x += gw('gClef', k) + s * 0.55;
@@ -509,7 +520,7 @@
   function planLine(line, lineIndex, lastLine, bs) {
     const s = SS_PX * bs, k = s / UNITS;
     const le = SW.timing.lineEvents(line);
-    const ks = keySignature(S.key);
+    const ks = keySignature(S.key, S.scale);
     const cs = getComputedStyle(line);
     const avail = line.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
     const pre = prefix(s, lineIndex === 0);
@@ -1278,7 +1289,7 @@
     timer = setTimeout(render, 16);
   }
 
-  ['score:changed', 'score:loaded', 'selection', 'key:changed', 'names:changed', 'meter:changed',
+  ['score:changed', 'score:loaded', 'selection', 'key:changed', 'scale:changed', 'names:changed', 'meter:changed',
    'view:changed', 'policy:changed', 'mode:changed', 'layout:changed', 'present:changed'].forEach(evt => SW.bus.on(evt, schedule));
   window.addEventListener('resize', schedule);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule);

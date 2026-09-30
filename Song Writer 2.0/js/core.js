@@ -312,12 +312,14 @@
   function midiToFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
 
   /* Written spelling of a block: letter, alteration and octave, for the
-     staff. The letter comes from 1.0's table for the key (so F♯ in D is
-     F♯, not G♭); the block's own ♯/♭ is added on top. */
+     staff. The letter comes from 1.0's table for the key as the scale
+     spells it (spelledKey: F♯ in D is F♯, not G♭; D♭ minor is written
+     C♯ minor); the block's own ♯/♭ is added on top. The pitch is always
+     the chosen key's, so a respelling never moves a note. */
   function spellNote(noteClass, accidental, key) {
     const k = key || SW.state.key;
     const sol = noteToSolfege[noteClass];
-    const base = (letterNamesByKey[k] || letterNamesByKey.C)[sol] || 'C';
+    const base = (letterNamesByKey[spelledKey(k)] || letterNamesByKey.C)[sol] || 'C';
     const letter = base.charAt(0);
     let alter = 0;
     for (const ch of base.slice(1)) alter += ch === '#' ? 1 : -1;
@@ -327,12 +329,133 @@
     return { letter, alter, octave, midi };
   }
 
+  /* ------------------------------------------------------------------
+     THE SCALE — Digital Accordion's scales (lib/theory.js) applied to
+     1.0's blocks. Do is always the scale's tonic (the key), so in D
+     Phrygian D is do and E♭ is ra.
+
+     A block stays what 1.0 made it: a RUNG (the note class — a step of
+     do re mi fa so la ti and its octave, which is the bar's height and
+     the staff's letter) plus a ♯ or ♭ counted from the major scale. A
+     scale is a list of degrees ('1', 'b3', '#4'), and each degree is
+     exactly one rung with one alteration, so every note of every scale
+     is a block 1.0 could already draw: C minor's me is mi with a ♭,
+     blues's se is so with a ♭. Nothing about the stored song changes;
+     what the scale decides is which of those blocks ↑ ↓ and the letter
+     keys land on, and what each block is called.
+     ------------------------------------------------------------------ */
+  const STEP_OF = { Do: 1, Re: 2, Mi: 3, Fa: 4, So: 5, La: 6, Ti: 7 };
+  const accOf = alter => alter > 0 ? 'sharp' : alter < 0 ? 'flat' : 'natural';
+  const alterOf = acc => acc === 'sharp' ? 1 : acc === 'flat' ? -1 : 0;
+  const hasTheory = () => typeof Theory !== 'undefined';
+
+  function scaleOf(id) {
+    if (!hasTheory()) return null;
+    return Theory.SCALE_BY_ID[id || SW.state.scale] || Theory.SCALE_BY_ID.major;
+  }
+  /* the scale as rungs: [{ num 1–7, alter }] */
+  function scaleSteps(id) {
+    const sc = scaleOf(id);
+    if (!sc) return [1, 2, 3, 4, 5, 6, 7].map(num => ({ num, alter: 0 }));
+    return sc.degrees.map(d => Theory.parseDegree(d));
+  }
+  /* The alteration a scale gives each step, the one nearest natural when
+     it has two (blues's so and se: so), or undefined for a step it
+     skips (major pentatonic has no fa and no ti). */
+  function stepAlters(id) {
+    const out = {};
+    scaleSteps(id).forEach(p => {
+      if (out[p.num] === undefined || Math.abs(p.alter) < Math.abs(out[p.num])) out[p.num] = p.alter;
+    });
+    return out;
+  }
+  function inScale(noteClass, accidental, id) {
+    const num = STEP_OF[noteToSolfege[noteClass]];
+    const a = alterOf(accidental);
+    return scaleSteps(id).some(p => p.num === num && p.alter === a);
+  }
+
+  /* The notes of the scale that fit on the given rungs (the Layout
+     settings range), low to high: [{ nc, acc, midi }]. What ↑ ↓ walk. */
+  function scaleLadder(rungs, id) {
+    const steps = scaleSteps(id);
+    const out = [];
+    (rungs || noteOrder).forEach(nc => {
+      const num = STEP_OF[noteToSolfege[nc]];
+      steps.forEach(p => {
+        if (p.num !== num) return;
+        const acc = accOf(p.alter);
+        const midi = noteMidi(nc, acc);
+        if (midi !== null) out.push({ nc, acc, midi });
+      });
+    });
+    return out.sort((a, b) => a.midi - b.midi);
+  }
+
+  /* Solfège with Do on the tonic: a block's name, chromatic syllables
+     included — re♭ is ra, mi♭ me, fa♯ fi, so♭ se, so♯ si, la♭ le, ti♭ te. */
+  function solfegeOf(noteClass, accidental) {
+    const sol = noteToSolfege[noteClass] || 'Do';
+    const a = alterOf(accidental);
+    if (!a || !hasTheory()) return sol;
+    return Theory.solfegeFor((a > 0 ? '#' : 'b') + STEP_OF[sol]);
+  }
+
+  /* The key as the scale spells it. A key the menu offers under two names
+     (D♭ / C♯, G♭ / F♯) is written with whichever needs fewer accidentals
+     in this scale — D♭ major stays D♭, but D♭ minor (with its F♭ and
+     B𝄫) is written C♯ minor. The key chosen is kept (lessons, storage,
+     pitch); only the spelling follows the scale. A tie keeps the choice. */
+  const SIG_MODE = {
+    major: 'major', minor: 'natural-minor', 'natural-minor': 'natural-minor',
+    'harmonic-minor': 'natural-minor', 'melodic-minor': 'natural-minor',
+    dorian: 'dorian', phrygian: 'phrygian', lydian: 'lydian', mixolydian: 'mixolydian', locrian: 'locrian',
+    'major-pentatonic': 'major', 'minor-pentatonic': 'natural-minor', blues: 'natural-minor',
+    'hungarian-minor': 'natural-minor', 'phrygian-dominant': 'phrygian'
+  };
+  /* The seven-note scale whose key signature a scale is written with:
+     itself for the modes, natural minor for every minor and for minor
+     pentatonic and blues, major for major pentatonic, Phrygian for
+     Phrygian dominant, and the tonic's major for the rest. */
+  function signatureScale(id) { return SIG_MODE[id || SW.state.scale] || 'major'; }
+  function spelledKey(key, id) {
+    const k = key || SW.state.key;
+    const idx = KEY_SIGNATURES_CHROMATIC_INDEX[k];
+    if (idx === undefined || !hasTheory()) return k;
+    const flat = Theory.TONIC_FLAT[idx], sharp = Theory.TONIC_SHARP[idx];
+    if (flat === sharp) return k;
+    const other = k === flat ? sharp : flat;
+    const sig = Theory.SCALE_BY_ID[signatureScale(id)];
+    const cost = t => sig.degrees.reduce((n, d) => n + Math.abs(Theory.spellDegree(t, d).alter), 0);
+    return cost(other) < cost(k) ? other : k;
+  }
+
+  /* A block's letter name, spelled (B♭, F♯, E𝄫), and its colour — the
+     colour of its letter, as 1.0's tables have it. */
+  function prettyAlter(alter) {
+    if (!alter) return '';
+    if (alter === 2) return '𝄪';
+    if (alter === -2) return '𝄫';
+    return alter > 0 ? '♯'.repeat(alter) : '♭'.repeat(-alter);
+  }
+  function noteLetter(noteClass, accidental) {
+    const sp = spellNote(noteClass, accidental);
+    return sp.letter + prettyAlter(sp.alter);
+  }
+  function noteColour(noteClass) {
+    const base = (letterNamesByKey[spelledKey()] || letterNamesByKey.C)[noteToSolfege[noteClass]] || 'C';
+    return LETTER_COLORS[base.charAt(0)];
+  }
+
   SW.music = {
     noteColorsByKey, keySignatureColors, LETTER_COLORS, letterNamesByKey, chordColorMapping,
     chordNamesByKey, NOTE_FREQUENCIES, BASE_CHORD_VOICINGS, CHROMATIC_NOTES, KEY_TRANSPOSITION,
     solfegeKeyMap, SOLFEGE_INTERVALS, DEFAULT_SOLFEGE_OCTAVE, KEY_SIGNATURES_CHROMATIC_INDEX, KEYS,
     noteOrder, noteToSolfege, noteToShorthandMap, shorthandToNoteMap, NOTE_HEIGHTS, LINE_COLORS,
-    LETTER_PC, displayKey, noteClassOf, octaveOf, noteMidi, midiFromName, midiToFreq, spellNote
+    LETTER_PC, displayKey, noteClassOf, octaveOf, noteMidi, midiFromName, midiToFreq, spellNote,
+    // the scale (Digital Accordion's, Do on the tonic)
+    STEP_OF, accOf, alterOf, scaleOf, scaleSteps, stepAlters, inScale, scaleLadder, solfegeOf,
+    signatureScale, spelledKey, prettyAlter, noteLetter, noteColour
   };
 
   /* ------------------------------------------------------------------

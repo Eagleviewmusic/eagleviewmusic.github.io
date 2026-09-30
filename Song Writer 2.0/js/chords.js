@@ -123,8 +123,9 @@
   const view = () => (SW.settings && SW.settings.view) || {};
   const keyIndex = () => M.KEY_SIGNATURES_CHROMATIC_INDEX[S.key] || 0;
   /* the key as Theory spells it — Song Writer's own spelling (F♯ stays
-     F♯, G♭ stays G♭), never Theory's fewest-accidentals guess */
-  const tonicName = () => S.key;
+     F♯, G♭ stays G♭), respelled only where the scale needs it (D♭ minor
+     is C♯ minor), exactly as the blocks are (core.js spelledKey) */
+  const tonicName = () => M.spelledKey();
 
   /* ---------------- the scale ---------------- */
   function scaleId() { return T.SCALE_BY_ID[S.scale] ? S.scale : 'major'; }

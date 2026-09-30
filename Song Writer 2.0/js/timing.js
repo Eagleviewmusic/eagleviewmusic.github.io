@@ -82,18 +82,17 @@
     const v = SW.score.isNotated(stack) ? stack.dataset.v : null;
     const value = SW.values.byId(v || SW.values.DEFAULT);
     const rest = notes.length > 0 && notes.every(n => n.classList.contains('rest-note'));
-    const colours = M.noteColorsByKey[S.key] || M.noteColorsByKey.C;
     const pitches = notes.filter(n => !n.classList.contains('rest-note')).map(n => {
       const nc = M.noteClassOf(n) || 'do';
       const acc = SW.score.getAccidentalFromNote(n);
       const sp = M.spellNote(nc, acc);
-      const sol = M.noteToSolfege[nc];
+      const sol = M.solfegeOf(nc, acc);               // ra, me, fi … (Do on the tonic)
       return {
         el: n, nc, acc, sol,
         letter: sp.letter, alter: sp.alter, octave: sp.octave, midi: sp.midi,
         step: LETTERS.indexOf(sp.letter) + 7 * sp.octave,
-        color: colours[sol] || '#888',
-        name: (M.letterNamesByKey[S.key] || M.letterNamesByKey.C)[sol] || sp.letter
+        color: M.noteColour(nc) || '#888',
+        name: sp.letter + M.prettyAlter(sp.alter)          // B♭, not B
       };
     });
     pitches.sort((a, b) => a.step - b.step);

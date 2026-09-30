@@ -109,6 +109,8 @@ in `js/core.js`).
 | `notes[].n` | `mi-low fa-low so-low la-low ti-low do re mi fa so la ti do-high re-high mi-high fa-high so-high la-high` | Solfège in the key, movable do. |
 | `notes[].acc` | `sharp`, `flat` | **Omitted = natural.** |
 | `notes[].rest` | `true` | Optional. A rest keeps a pitch so it can be turned back into a note. |
+| `notes[].step` | a rung, as `n` | Optional (2026-09-29). The melody's rung when the song's scale shows the note on another one — a fa shown as mi because major pentatonic has no fa. Omitted = `n`. |
+| `notes[].alt` | `{ "<scale id>": { "n": "fa", "acc": "sharp" } }` | Optional (2026-09-29). **Each scale's fine-tuning.** `n`/`acc` are the note in the song's `scale`; `alt` holds the pitch it was given with ♯/♭ in *other* scales. A scale not listed plays the note as that scale has its step (minor's me for a mi), so an accidental made for one scale never reaches another. Text format: `F1^major=F#1^step=F1`. |
 
 Rules that keep two identical songs identical (the library matches songs by
 content, so this matters): `SW.score.normalize` (`normalizeScore` in

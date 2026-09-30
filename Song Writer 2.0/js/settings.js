@@ -537,7 +537,7 @@
       chords: null,       // null = all fourteen places on the chord panel (f d s a g r e q w 1 2 3 4 5)
       values: null,       // null = all eight note values
       keys: null,         // null = all thirteen keys
-      scaleMorph: true,   // choosing a scale moves the melody's notes into it (score.js morphToScale); off, only the chords and keyboard follow
+      scaleMorph: true,   // choosing a scale shows each note's version for it (score.js morphToScale, SCALE MEMORY); off, the notes stay and become that scale's version
       show: { sectionTitles: true, keycaps: true, barNumbers: true },
       // (the 1-beat pick-up was `show.pickup` until 2026-09-28; it is the song's own now — score.pickup)
       locked: false       // arrived locked in a link or a lesson
@@ -832,16 +832,20 @@
 
     const box = $('layout-notes');
     box.innerHTML = '';
-    const colors = M.noteColorsByKey[S.key];
+    // each rung named as the song's scale has it (me in minor); a rung the
+    // scale skips (fa in pentatonic) keeps its major name
+    const alters = M.stepAlters();
     M.noteOrder.forEach(n => {
       const on = cur.indexOf(n) !== -1;
+      const a = alters[M.STEP_OF[M.noteToSolfege[n]]];
+      const sol = M.solfegeOf(n, M.accOf(a === undefined ? 0 : Math.max(-1, Math.min(1, a))));
       const b = document.createElement('button');
       b.className = 'range-block' + (on ? ' on' : '');
       b.style.setProperty('--h', M.NOTE_HEIGHTS[n]);
-      b.style.setProperty('--c', colors[M.noteToSolfege[n]]);
-      b.title = M.noteToSolfege[n] + (M.octaveOf(n) < 0 ? ' (low)' : M.octaveOf(n) > 0 ? ' (high)' : '');
+      b.style.setProperty('--c', M.noteColour(n));
+      b.title = sol + (M.octaveOf(n) < 0 ? ' (low)' : M.octaveOf(n) > 0 ? ' (high)' : '');
       b.innerHTML = '<span class="range-bar"></span><span class="range-name"></span>';
-      b.querySelector('.range-name').textContent = M.noteToSolfege[n].toLowerCase() + (M.octaveOf(n) < 0 ? ',' : M.octaveOf(n) > 0 ? '′' : '');
+      b.querySelector('.range-name').textContent = sol.toLowerCase() + (M.octaveOf(n) < 0 ? ',' : M.octaveOf(n) > 0 ? '′' : '');
       b.addEventListener('click', () => {
         let list = allowedNotes().slice();
         const at = list.indexOf(n);
@@ -924,7 +928,7 @@
     if (sc) {
       sc.innerHTML = '';
       sc.appendChild(ui.switchRow('Melody follows the scale',
-        'Choosing a scale moves the notes into it — C major to C minor turns mi into me, la into le, ti into te. Off, the scale only changes the chords and the keyboard; the melody stays as written (the key still transposes it)',
+        'Choosing a scale shows the song in it — C major to C minor turns mi into me, la into le, ti into te; a note the new scale has no place for (fa in pentatonic) moves to its nearest neighbour. A ♯ or ♭ belongs to the scale it was added in: each scale keeps its own, and comes back as it was. Off, the notes stay as they are and become this scale’s version. Either way ↑ ↓ and the letter keys write the scale’s notes',
         layout.scaleMorph !== false, () => { layout.scaleMorph = layout.scaleMorph === false; layoutChanged(); renderLayoutSheet(); }));
     }
   }

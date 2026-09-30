@@ -39,13 +39,22 @@
   function buildKeyGrid() {
     const grid = $('key-grid');
     grid.innerHTML = '';
-    SW.settings.allowedKeys().forEach(k => {
+    // named as this scale spells it (D♭ is offered as C♯ in minor); where
+    // F♯ and G♭ come out as one name, one chip — the chosen key's if it is one
+    const keys = SW.settings.allowedKeys();
+    const byName = {};
+    keys.forEach(k => {
+      const n = M.spelledKey(k);
+      if (!byName[n] || k === S.key) byName[n] = k;
+    });
+    keys.filter(k => byName[M.spelledKey(k)] === k).forEach(k => {
       const b = document.createElement('button');
+      const shown = M.spelledKey(k);
       b.className = 'key-chip' + (k === S.key ? ' active' : '');
       b.dataset.key = k;
-      b.textContent = M.displayKey(k);
-      b.title = 'Key of ' + M.displayKey(k);
-      b.style.setProperty('--kc', M.keySignatureColors[k]);
+      b.textContent = M.displayKey(shown);
+      b.title = 'Key of ' + M.displayKey(shown);
+      b.style.setProperty('--kc', M.keySignatureColors[shown]);
       grid.appendChild(b);
     });
   }

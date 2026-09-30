@@ -68,15 +68,38 @@ and calls the others through `SW` at call time.
   toggle, as in 1.0; while it is on the **Edit box** is out (below);
   the **key + time tile** (tap the letter for the key, tap the top numeral for
   4 → 3 → 2); **the scale menu** beside it (Digital Accordion's nineteen scales,
-  grouped as its menu is — the song's, saved with it; it rebuilds the chord
-  panel, recolours the keyboard and, with Layout settings → Keys → **Melody
-  follows the scale** on (the default), moves the melody into the scale:
-  C major → C minor turns every mi into me, la into le, ti into te, and the
-  whole feel changes — `morphToScale` in score.js, degree by degree: a note on
-  the old scale's step moves to the new scale's step, a deliberate accidental
-  (a fi in major) is kept, a step the new scale lacks (fa in major pentatonic)
-  stays. Off, the scale leaves the melody as written and only the key
-  transposes it. Loading a song never moves anything);
+  grouped as its menu is — the song's, saved with it). **The scale runs the
+  melody** (2026-09-29; core.js THE SCALE, score.js PITCH): Do is always the
+  scale's tonic, so D Phrygian's E♭ is ra; ↑ ↓ walk the scale's notes inside
+  the allowed range; a letter key writes its step as the scale has it (D is
+  me in minor; a step the scale skips is written as major has it, with a
+  toast); the harmony button adds two scale steps up; the keyboard dock
+  writes a pitch in the scale's spelling (fi in Lydian, se in blues, si in
+  whole tone); names are the block's own pitch (letter with its ♯/♭,
+  chromatic solfège ra me fi se le te); the staff takes the key signature of
+  the scale's seven-note frame (`signatureScale`: C minor, minor pentatonic
+  and blues with three flats, D Dorian none, D Phrygian two); a key the menu
+  offers under two names is spelled as the scale needs (`spelledKey`: D♭
+  minor is written and offered as C♯ minor; pitch, lessons and storage keep
+  the chosen key). Blocks are unchanged — a rung plus a ♯/♭ from major — so
+  every scale's notes are 1.0 blocks and nothing stored changes. It also
+  rebuilds the chord panel, recolours the keyboard and, with Layout settings →
+  Keys → **Melody follows the scale** on (the default), moves the melody into
+  the scale — `morphToScale`. **Accidentals are scale-specific** (SCALE
+  MEMORY in score.js): a note is its step (the melody's rung) plus, for each
+  scale where it was fine-tuned with ♯/♭, that scale's own pitch (`data-step`,
+  `data-alt`; saved as `notes[].step` / `notes[].alt`, JSON-FORMAT.md). A
+  scale with no fine-tuning for a note plays that scale's form of its step:
+  each scale gets a frame of seven steps (major pentatonic borrows its gaps
+  from major, minor pentatonic and blues from natural minor), mi → me, and a
+  step the scale skips lands on its nearest note (the lower of two as near):
+  fa → mi and ti → do′ into major pentatonic, re → me and le → so into minor
+  pentatonic. So the Star-Spangled Banner's fi is major's only — plain fa in
+  minor, fi again back in major — and each scale's own tweaks come back when
+  it is chosen again. ♯ ♭ fine-tune the current scale; moving a note (↑ ↓, a
+  letter key, the keyboard) rewrites it in every scale. Off, notes stay as
+  they are and become the new scale's version; ↑ ↓ and the letter keys follow
+  the scale either way. Loading a song never moves anything);
   the **BPM chip** (tap to type 30–300; a mouse resting on it shows
   the slider); **Sound**; **Write** (Edit only); **Names** (1.0's glasses);
   **View** (a mouse resting on it shows the Scale slider); **Present**; and at

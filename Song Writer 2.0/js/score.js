@@ -179,7 +179,99 @@
     });
   }
 
-  /* ================= PITCH ================= */
+  /* ================= PITCH =================
+     Every way of choosing a pitch follows the song's scale (core.js THE
+     SCALE): ↑ ↓ walk the scale's notes, a letter key writes its step the
+     way the scale has it (in C minor D is me), a harmony note is two
+     scale steps up. The ♯ ♭ buttons stay 1.0's, counted from major. */
+
+  /* Put a block on a rung with an accidental, and redraw what shows it. */
+  function setNotePitch(noteElement, noteClass, accidental) {
+    const current = M.noteClassOf(noteElement);
+    if (current && current !== noteClass) noteElement.classList.remove(current);
+    noteElement.classList.add(noteClass);
+    addAccidentalToNote(noteElement, accidental || 'natural');
+    updateNoteDisplay(noteElement, noteClass);
+  }
+  /* the scale's notes on the allowed rungs; the whole eighteen when the
+     range holds none of them (a lesson range built for another scale) */
+  function ladder(id) {
+    const l = M.scaleLadder(allowedNotes(), id);
+    return l.length ? l : M.scaleLadder(noteOrder, id);
+  }
+
+  /* ---- each scale's own version of a note ----
+     A note is its STEP — the rung the melody puts it on (fa, so′) — plus,
+     for any scale where it was fine-tuned with ♯ or ♭, that scale's own
+     pitch. Everywhere else the scale decides (defaultPitch). So the Star-
+     Spangled Banner's raised fa (fi) belongs to major only: in minor that
+     note is minor's fa, and back in major it is fi again.
+       data-step   the step, when the block shows another rung (fa shown
+                   as mi in major pentatonic, which has no fa)
+       data-alt    {"major":"fa|sharp"} — the fine-tuned versions, the
+                   current scale's included
+     Moving a note (↑ ↓, a letter key, the keyboard) rewrites the melody:
+     the new pitch is the note in every scale. ♯ ♭ fine-tune it in the
+     current scale only. Changing scale shows each note's version for the
+     new scale (morphToScale). */
+  function stepOf(note) { return note.dataset.step || M.noteClassOf(note) || 'do'; }
+  function altsOf(note) {
+    try { return note.dataset.alt ? JSON.parse(note.dataset.alt) : {}; } catch (e) { return {}; }
+  }
+  function setAlts(note, alts) {
+    if (Object.keys(alts).length) note.dataset.alt = JSON.stringify(alts);
+    else delete note.dataset.alt;
+  }
+  const packPitch = p => p.nc + '|' + p.acc;
+  function unpackPitch(str) {
+    const [nc, acc] = String(str).split('|');
+    return noteOrder.indexOf(nc) !== -1 ? { nc, acc: acc === 'sharp' || acc === 'flat' ? acc : 'natural' } : null;
+  }
+  /* What a scale does with a step: its own alteration of it; a step it
+     skips lands on its nearest note (the lower of two as near), found from
+     the step as the scale's parent would have it (MORPH below). */
+  function defaultPitch(step, id) {
+    const num = M.STEP_OF[noteToSolfege[step]];
+    const alter = M.stepAlters(id)[num];
+    if (alter !== undefined) return { nc: step, acc: M.accOf(Math.max(-1, Math.min(1, alter))) };
+    const midi = M.noteMidi(step, M.accOf(frameOf(id)[num]));
+    const near = ladder(id).reduce((best, n) => {
+      if (!best) return n;
+      const d = Math.abs(n.midi - midi), bd = Math.abs(best.midi - midi);
+      return d < bd || (d === bd && n.midi < best.midi) ? n : best;
+    }, null);
+    return near ? { nc: near.nc, acc: near.acc } : { nc: step, acc: 'natural' };
+  }
+  /* the note in a scale: its fine-tuned version there, or the scale's own */
+  function pitchIn(note, id) {
+    return unpackPitch(altsOf(note)[id]) || defaultPitch(stepOf(note), id);
+  }
+  /* After ♯ ♭ (or loading): the block's pitch is the current scale's
+     version — kept as a fine-tuning if it is not what the scale would give. */
+  function remember(note) {
+    const nc = M.noteClassOf(note);
+    if (!nc) return;
+    const cur = { nc, acc: getAccidentalFromNote(note) };
+    const def = defaultPitch(stepOf(note), S.scale);
+    const alts = altsOf(note);
+    if (def.nc === cur.nc && def.acc === cur.acc) delete alts[S.scale];
+    else alts[S.scale] = packPitch(cur);
+    setAlts(note, alts);
+    if (note.dataset.step === nc) delete note.dataset.step;
+  }
+  /* After a move: this pitch is the note now, in every scale. */
+  function rewrite(note) {
+    delete note.dataset.step;
+    delete note.dataset.alt;
+    remember(note);
+  }
+  function memoryOf(note) { return { step: stepOf(note), alt: altsOf(note) }; }
+  function playPitch(noteElement, noteClass, accidental) {
+    if (noteElement.classList.contains('rest-note')) return;
+    const frequency = A.getModifiedFrequency(noteClass, accidental || 'natural', S.key);
+    if (frequency !== null) A.playNote(frequency);
+  }
+
   function handleSolfegeKeyInput(key) {
     if (!S.editing || currentNoteIndex < 0) return false;
     const noteClass = M.solfegeKeyMap[String(key).toLowerCase()];
@@ -191,16 +283,19 @@
     }
     const activeNote = getActiveNote();
     if (!activeNote) return false;
-    const currentNoteClass = M.noteClassOf(activeNote);
-    if (currentNoteClass) activeNote.classList.remove(currentNoteClass);
-    activeNote.classList.add(noteClass);
-    removeAccidentalFromNote(activeNote);
-    resetAccidentalToggleVisuals();
-    updateNoteDisplay(activeNote, noteClass);
-    if (!activeNote.classList.contains('rest-note')) {
-      const frequency = A.getFrequencyForNote(noteClass);
-      if (frequency !== null) A.playNote(frequency);
+    // the step as the scale has it (the one nearest natural if it has two);
+    // a step the scale skips is written as major has it, outside the scale
+    const num = M.STEP_OF[noteToSolfege[noteClass]];
+    const alter = M.stepAlters()[num];
+    const acc = alter === undefined ? 'natural' : M.accOf(Math.max(-1, Math.min(1, alter)));
+    if (alter === undefined) {
+      const sc = M.scaleOf();
+      SW.ui.toast(noteToSolfege[noteClass] + ' is not in ' + (sc ? sc.name : 'this scale') + ' — written as an outside note');
     }
+    setNotePitch(activeNote, noteClass, acc);
+    rewrite(activeNote);
+    syncAccidentalToggle(activeNote);
+    playPitch(activeNote, noteClass, acc);
     const harmonyStack = activeNote.closest('.harmony-stack');
     if (harmonyStack) updateHarmonyStackVisuals(harmonyStack);
     const idx = Array.from(getAllNotes()).indexOf(activeNote);
@@ -211,72 +306,68 @@
     return true;
   }
 
-  /* 1.0: changeNote. Up and down walk the allowed notes and wrap, as 1.0
-     wrapped over all eighteen. */
+  /* 1.0: changeNote. Up and down walk the scale's notes inside the allowed
+     range and wrap round, as 1.0 wrapped over all eighteen. A note outside
+     the scale steps to the nearest scale note that way. */
   function changeNote(noteElement, direction, playSound) {
     if (!can('pitch')) return;
     const currentNoteClass = M.noteClassOf(noteElement);
     if (!currentNoteClass) return;
-    const allowed = allowedNotes();
     const up = direction !== 'down';
-    const cur = noteOrder.indexOf(currentNoteClass);
-    let nextNote;
-    if (allowed.length === noteOrder.length) {
-      const i = up ? (cur + 1) % noteOrder.length : (cur - 1 + noteOrder.length) % noteOrder.length;
-      nextNote = noteOrder[i];
-    } else {
-      const idxs = allowed.map(n => noteOrder.indexOf(n));
-      const next = up ? idxs.find(i => i > cur) : idxs.slice().reverse().find(i => i < cur);
-      nextNote = noteOrder[next !== undefined ? next : (up ? idxs[0] : idxs[idxs.length - 1])];
-    }
-    noteElement.classList.remove(currentNoteClass);
-    noteElement.classList.add(nextNote);
-    removeAccidentalFromNote(noteElement);
-    resetAccidentalToggleVisuals();
-    updateNoteDisplay(noteElement, nextNote);
+    const steps = ladder();
+    if (!steps.length) return;
+    const cur = M.noteMidi(currentNoteClass, getAccidentalFromNote(noteElement));
+    const next = up
+      ? (steps.find(n => n.midi > cur) || steps[0])
+      : (steps.slice().reverse().find(n => n.midi < cur) || steps[steps.length - 1]);
+    setNotePitch(noteElement, next.nc, next.acc);
+    rewrite(noteElement);
+    syncAccidentalToggle(noteElement);
     const harmonyStack = noteElement.closest('.harmony-stack');
     if (harmonyStack) updateHarmonyStackVisuals(harmonyStack);
     const idx = Array.from(getAllNotes()).indexOf(noteElement);
     if (idx >= 0) currentNoteIndex = idx;
-    if (playSound !== false && !noteElement.classList.contains('rest-note')) {
-      const frequency = A.getFrequencyForNote(nextNote);
-      if (frequency !== null) A.playNote(frequency);
-    }
+    if (playSound !== false) playPitch(noteElement, next.nc, next.acc);
     updateLineHeight(noteElement.closest('.notation-line'));
     emitSelection(false);
     changed('pitch');
   }
 
   /* Set a block to a pitch given as MIDI — the keyboard dock uses this.
-     Finds the note class (and ♯/♭, within 1.0's accidental rules) that
-     sounds that pitch in the current key. Returns false if none does. */
+     Finds the rung (and ♯/♭, within 1.0's accidental rules) that sounds
+     that pitch in the current key, spelled as the scale spells it (fi in
+     Lydian, se in Locrian and blues, si in whole tone); a pitch outside
+     the scale takes the usual chromatic name (ra me le te, fi). Returns
+     false if no allowed rung can sound it. */
   function setActiveNoteMidi(midi) {
     if (!S.editing || !can('pitch')) return false;
     const note = getActiveNote();
     if (!note) return false;
     const allowed = allowedNotes();
-    // the usual chromatic spellings: ra me le te are flats, fi is a sharp
     const tonic = M.KEY_SIGNATURES_CHROMATIC_INDEX[S.key] || 0;
     const rel = ((midi - tonic) % 12 + 12) % 12;
-    const accs = !can('accidentals') ? ['natural'] : rel === 6 ? ['natural', 'sharp', 'flat'] : ['natural', 'flat', 'sharp'];
+    const sc = M.scaleOf();
+    const wanted = (typeof Theory !== 'undefined') ? Theory.parseDegree(Theory.semisToDegree(rel, sc ? sc.degrees : [])) : null;
+    const tries = [];
+    if (wanted && (can('accidentals') || wanted.alter === 0)) tries.push({ num: wanted.num, acc: M.accOf(wanted.alter) });
+    (!can('accidentals') ? ['natural'] : rel === 6 ? ['natural', 'sharp', 'flat'] : ['natural', 'flat', 'sharp'])
+      .forEach(acc => tries.push({ num: null, acc }));
     let found = null;
-    for (const acc of accs) {
+    for (const t of tries) {
       for (const nc of allowed) {
-        if (M.noteMidi(nc, acc) !== midi) continue;
         const sol = noteToSolfege[nc];
-        if (acc === 'flat' && (sol === 'Do' || sol === 'Fa')) continue;
-        if (acc === 'sharp' && (sol === 'Mi' || sol === 'Ti')) continue;
-        found = { nc, acc };
+        if (t.num !== null && M.STEP_OF[sol] !== t.num) continue;
+        if (M.noteMidi(nc, t.acc) !== midi) continue;
+        if (t.acc === 'flat' && (sol === 'Do' || sol === 'Fa')) continue;
+        if (t.acc === 'sharp' && (sol === 'Mi' || sol === 'Ti')) continue;
+        found = { nc, acc: t.acc };
         break;
       }
       if (found) break;
     }
     if (!found) return false;
-    const current = M.noteClassOf(note);
-    if (current) note.classList.remove(current);
-    note.classList.add(found.nc);
-    addAccidentalToNote(note, found.acc);
-    updateNoteDisplay(note, found.nc);
+    setNotePitch(note, found.nc, found.acc);
+    rewrite(note);
     syncAccidentalToggle(note);
     const stack = note.closest('.harmony-stack');
     if (stack) updateHarmonyStackVisuals(stack);
@@ -287,17 +378,17 @@
 
   /* ================= ACCIDENTALS ================= */
   function addAccidentalToNote(noteElement, accidentalType) {
-    removeAccidentalFromNote(noteElement);
-    if (accidentalType === 'natural') return;
-    const span = document.createElement('span');
-    span.className = 'accidental-symbol';
-    span.textContent = accidentalType === 'sharp' ? '♯' : '♭';
-    noteElement.appendChild(span);
-  }
-  function removeAccidentalFromNote(noteElement) {
     const existing = noteElement.querySelector('.accidental-symbol');
     if (existing) existing.remove();
+    if (accidentalType === 'sharp' || accidentalType === 'flat') {
+      const span = document.createElement('span');
+      span.className = 'accidental-symbol';
+      span.textContent = accidentalType === 'sharp' ? '♯' : '♭';
+      noteElement.appendChild(span);
+    }
+    paintNoteNames(noteElement);
   }
+  function removeAccidentalFromNote(noteElement) { addAccidentalToNote(noteElement, 'natural'); }
   function getAccidentalFromNote(noteElement) {
     const sym = noteElement.querySelector('.accidental-symbol');
     if (!sym) return 'natural';
@@ -308,6 +399,7 @@
     const activeNote = getActiveNote();
     if (!activeNote) return;
     addAccidentalToNote(activeNote, S.accidentalMode);
+    remember(activeNote);                      // this scale's version only
     const noteClass = M.noteClassOf(activeNote);
     if (noteClass && !activeNote.classList.contains('rest-note')) {
       const frequency = A.getModifiedFrequency(noteClass, S.accidentalMode, S.key);
@@ -332,37 +424,31 @@
     applyActiveAccidentalToCurrentNote();
   }
 
-  /* ================= COLOUR & NAMES ================= */
-  function applyNoteColors() {
-    const colors = M.noteColorsByKey[S.key];
-    const letters = M.letterNamesByKey[S.key];
-    notationContainer.querySelectorAll('.note').forEach(noteElement => {
-      const noteClass = Array.from(noteElement.classList).find(c => noteToSolfege[c]);
-      if (!noteClass) return;
-      const sol = noteToSolfege[noteClass];
-      const color = colors[sol];
-      const letterName = letters[sol];
-      if (!noteElement.classList.contains('rest-note') && color) noteElement.style.backgroundColor = color;
-      const letterEl = noteElement.querySelector('.letter-name');
-      if (letterEl && letterName) {
-        letterEl.textContent = letterName;
-        if (!noteElement.classList.contains('rest-note')) letterEl.style.color = color;
-      }
-    });
-  }
-
-  function updateNoteDisplay(noteElement, noteClass) {
-    const sol = noteToSolfege[noteClass];
-    const color = M.noteColorsByKey[S.key][sol];
-    const letterName = M.letterNamesByKey[S.key][sol];
-    if (!noteElement.classList.contains('rest-note') && color) noteElement.style.backgroundColor = color;
+  /* ================= COLOUR & NAMES =================
+     A block's colour is its letter's (1.0's palette); its names are its
+     own pitch: the letter spelled with its ♯/♭ (B♭, not B) and solfège
+     with Do on the tonic (ra me fi se le te — core.js solfegeOf). */
+  function paintNoteNames(noteElement) {
+    const noteClass = M.noteClassOf(noteElement);
+    if (!noteClass) return;
+    const acc = getAccidentalFromNote(noteElement);
     const letterEl = noteElement.querySelector('.letter-name');
-    if (letterEl && letterName) {
-      letterEl.textContent = letterName;
-      if (!noteElement.classList.contains('rest-note')) letterEl.style.color = color;
-    }
+    if (letterEl) letterEl.textContent = M.noteLetter(noteClass, acc);
     const solEl = noteElement.querySelector('.solfege-name');
-    if (solEl) solEl.textContent = sol ? sol.toLowerCase() : '';
+    if (solEl) solEl.textContent = M.solfegeOf(noteClass, acc).toLowerCase();
+  }
+  function updateNoteDisplay(noteElement, noteClass) {
+    noteClass = noteClass || M.noteClassOf(noteElement);
+    if (!noteClass) return;
+    const color = M.noteColour(noteClass);
+    const isRest = noteElement.classList.contains('rest-note');
+    if (!isRest && color) noteElement.style.backgroundColor = color;
+    const letterEl = noteElement.querySelector('.letter-name');
+    if (letterEl && !isRest) letterEl.style.color = color;
+    paintNoteNames(noteElement);
+  }
+  function applyNoteColors() {
+    notationContainer.querySelectorAll('.note').forEach(n => updateNoteDisplay(n));
   }
 
   /* ================= SECTIONS =================
@@ -712,25 +798,29 @@
     return line;
   }
 
-  function createNoteElement(noteClass, accidental, isRest) {
+  function createNoteElement(noteClass, accidental, isRest, memory) {
     noteClass = noteClass || 'do';
-    const sol = noteToSolfege[noteClass] || 'Do';
-    const color = M.noteColorsByKey[S.key][sol];
-    const letterName = M.letterNamesByKey[S.key][sol];
+    const color = M.noteColour(noteClass);
     const noteDiv = document.createElement('div');
     noteDiv.className = 'note ' + noteClass;
     if (isRest) noteDiv.classList.add('rest-note');
     else if (color) noteDiv.style.backgroundColor = color;
     const letterDiv = document.createElement('div');
     letterDiv.className = 'letter-name';
-    letterDiv.textContent = letterName || 'C';
     if (!isRest && color) letterDiv.style.color = color;
     const solDiv = document.createElement('div');
     solDiv.className = 'solfege-name';
-    solDiv.textContent = sol.toLowerCase();
     noteDiv.appendChild(letterDiv);
     noteDiv.appendChild(solDiv);
-    if (accidental && accidental !== 'natural') addAccidentalToNote(noteDiv, accidental);
+    addAccidentalToNote(noteDiv, accidental || 'natural');     // and names it
+    // each scale's version (SCALE MEMORY above): from the song, or copied
+    if (memory) {
+      if (memory.step && noteOrder.indexOf(memory.step) !== -1) noteDiv.dataset.step = memory.step;
+      const alts = {};
+      Object.keys(memory.alt || {}).forEach(id => { if (unpackPitch(memory.alt[id])) alts[id] = memory.alt[id]; });
+      setAlts(noteDiv, alts);
+    }
+    remember(noteDiv);
     return noteDiv;
   }
 
@@ -774,7 +864,7 @@
   }
   /* Write a column (v = a value id, 'q' included) or unwrite it (v = null).
      The .notated class is what the CSS and the staff read; the value mark
-     under the block is only shown when the staff is switched off. */
+     inside the block is only shown when the staff is switched off. */
   function applyStackValue(stack, v) {
     if (!stack) return;
     let mark = stack.querySelector('.value-mark');
@@ -794,17 +884,26 @@
       stack.appendChild(mark);
     }
     const allRest = Array.from(stack.querySelectorAll('.note')).every(n => n.classList.contains('rest-note'));
-    mark.style.setProperty('--c', SW.values.colour(v));
     mark.innerHTML = SW.engrave.value(v, { height: 18, rest: allRest });
     mark.title = SW.values.byId(v).name;
   }
 
   /* 1.0's createNewSyllable, with the columns also accepting the 2.0 column
      shape { v, notes }. Kept tolerant of every shape 1.0 accepted. */
+  /* a note spec's other-scale versions → createNoteElement's memory */
+  function memoryFromSpec(n) {
+    if (!n || (!n.step && !n.alt)) return null;
+    const alt = {};
+    Object.keys(n.alt || {}).forEach(id => {
+      const a = n.alt[id];
+      if (a && a.n) alt[id] = packPitch({ nc: a.n, acc: a.acc === 'sharp' || a.acc === 'flat' ? a.acc : 'natural' });
+    });
+    return { step: n.step, alt };
+  }
   function normalizeColumns(columns) {
     const spec = n => (typeof n === 'string')
       ? { n, acc: 'natural', rest: false }
-      : { n: n.n || n.noteClass || 'do', acc: n.acc || n.accidental || 'natural', rest: !!(n.rest || n.isRest) };
+      : { n: n.n || n.noteClass || 'do', acc: n.acc || n.accidental || 'natural', rest: !!(n.rest || n.isRest), mem: memoryFromSpec(n) };
     if (typeof columns === 'string') return [{ notes: [spec(columns)] }];
     if (!Array.isArray(columns) || columns.length === 0) return [{ notes: [spec('do')] }];
     return columns.map(col => {
@@ -894,7 +993,7 @@
     cols.forEach(col => {
       const stack = document.createElement('div');
       stack.className = 'harmony-stack';
-      col.notes.forEach(n => stack.appendChild(createNoteElement(n.n, n.acc, n.rest)));
+      col.notes.forEach(n => stack.appendChild(createNoteElement(n.n, n.acc, n.rest, n.mem)));
       updateHarmonyStackVisuals(stack);
       applyStackValue(stack, col.v);
       if (col.tie && col.v) stack.dataset.tie = '1';
@@ -930,7 +1029,7 @@
     const currentStack = activeNote.closest('.harmony-stack');
     const newStack = document.createElement('div');
     newStack.className = 'harmony-stack';
-    const newNote = createNoteElement(M.noteClassOf(activeNote) || 'do', getAccidentalFromNote(activeNote), activeNote.classList.contains('rest-note'));
+    const newNote = createNoteElement(M.noteClassOf(activeNote) || 'do', getAccidentalFromNote(activeNote), activeNote.classList.contains('rest-note'), memoryOf(activeNote));
     newStack.appendChild(newNote);
     applyStackValue(newStack, currentStack ? currentStack.dataset.v : null);
     if (currentStack && currentStack.parentNode === notesContainer) currentStack.insertAdjacentElement('afterend', newStack);
@@ -1004,7 +1103,7 @@
     const held = document.createElement('div');
     held.className = 'harmony-stack';
     const notes = Array.from(stack.querySelectorAll('.note'));
-    notes.forEach(n => held.appendChild(createNoteElement(M.noteClassOf(n) || 'do', getAccidentalFromNote(n), n.classList.contains('rest-note'))));
+    notes.forEach(n => held.appendChild(createNoteElement(M.noteClassOf(n) || 'do', getAccidentalFromNote(n), n.classList.contains('rest-note'), memoryOf(n))));
     updateHarmonyStackVisuals(held);
     stack.insertAdjacentElement('afterend', held);
     // an eighth, or the nearest length Layout settings offer
@@ -1036,19 +1135,17 @@
       SW.ui.toast('Six notes is the most one harmony can hold');
       return;
     }
-    // 1.0: two steps above, wrapping round the eighteen. Inside a
-    // narrowed range: the first allowed note two or more steps up.
-    const cur = noteOrder.indexOf(M.noteClassOf(activeNote) || 'do');
-    const allowed = allowedNotes();
-    let newNoteClass;
-    if (allowed.length === noteOrder.length) {
-      newNoteClass = noteOrder[(cur + 2) % noteOrder.length];
-    } else {
-      const idxs = allowed.map(n => noteOrder.indexOf(n));
-      const up = idxs.find(i => i >= cur + 2);
-      newNoteClass = noteOrder[up !== undefined ? up : idxs[0]];
-    }
-    const newNote = createNoteElement(newNoteClass, 'natural', false);
+    // 1.0: two steps above, wrapping round — two steps of the scale now
+    // (a third in the seven-note scales: me over do in minor), inside the
+    // allowed range. A note outside the scale counts from the scale note
+    // just below it.
+    const steps = ladder();
+    const cur = M.noteMidi(M.noteClassOf(activeNote) || 'do', getAccidentalFromNote(activeNote));
+    let at = steps.findIndex(n => n.midi >= cur);
+    if (at === -1) at = steps.length;
+    else if (steps[at].midi > cur) at -= 1;          // outside the scale: count from just below
+    const target = steps[at + 2] || steps[0];
+    const newNote = createNoteElement(target.nc, target.acc, false);   // a scale note: nothing to remember
     harmonyStack.appendChild(newNote);
     updateHarmonyStackVisuals(harmonyStack);
     updateLineHeight(harmonyStack.closest('.notation-line'));
@@ -1383,7 +1480,7 @@
   function paintKeyLetter() {
     const el = $('keySignatureDisplay');
     if (!el) return;
-    const k = S.key;
+    const k = M.spelledKey();                  // D♭ minor reads C♯ (core.js spelledKey)
     const letter = k.charAt(0);
     const acc = k.slice(1).replace('b', '♭').replace('#', '♯');
     el.innerHTML = '';
@@ -1411,83 +1508,89 @@
     SW.bus.emit('key:changed', { key: newKey });
   }
 
-  /* The song's scale (major, natural minor, Dorian …): what the chord
-     panel offers and what the keyboard colours as "in the key" — and,
-     with Layout settings → Keys → "Melody follows the scale" on (the
-     default), what the melody is written in: choosing a scale MOVES the
-     notes into it (morphToScale), so C major → C minor turns every mi
-     into me and the whole feel changes. Off, the blocks stay 1.0's
-     major-key blocks whatever the scale says. Loading a song (quiet)
-     never moves anything. */
+  /* The song's scale (major, natural minor, Dorian, blues …): what ↑ ↓,
+     the letter keys and the harmony button write (PITCH above), what
+     each block is called, the chord panel, the keyboard's colours and
+     the staff's key signature — and, with Layout settings → Keys →
+     "Melody follows the scale" on (the default), the melody itself:
+     choosing a scale MOVES the notes into it (morphToScale), so C major
+     → C minor turns every mi into me. Off, the notes already written stay
+     as they are. Loading a song (quiet) never moves anything. */
   function setScale(id, quiet) {
     const valid = typeof Theory !== 'undefined' && Theory.SCALE_BY_ID[id] ? id : 'major';
     const was = S.scale;
     S.scale = valid;
+    // the key's spelling can change with the scale (D♭ major, C♯ minor)
+    paintKeyLetter();
     if (was === valid && quiet) return;
     let moved = null;
-    if (!quiet && was !== valid && SW.settings.layout.scaleMorph !== false) moved = morphToScale(was, valid);
+    if (!quiet && was !== valid) {
+      if (SW.settings.layout.scaleMorph !== false) moved = morphToScale(was, valid);
+      else getAllNotes().forEach(remember);       // the notes stay: they are this scale's version now
+    }
+    applyNoteColors();
     SW.bus.emit('scale:changed', { scale: valid, moved: moved ? moved.count : 0 });
     if (!quiet) changed('scale');
     if (moved && moved.count) {
       const sc = Theory.SCALE_BY_ID[valid];
-      SW.ui.toast(moved.count + (moved.count === 1 ? ' note' : ' notes') + ' moved into ' + sc.name + ': ' + moved.steps.join(', '));
+      const steps = moved.steps.length > 6 ? moved.steps.slice(0, 6).concat('…') : moved.steps;
+      SW.ui.toast(moved.count + (moved.count === 1 ? ' note' : ' notes') + ' moved into ' + sc.name + ': ' + steps.join(', '));
     }
   }
 
-  /* MORPH — the melody re-written from one scale into another, degree by
-     degree. A scale is a list of degrees relative to major ('b3', '#4'),
-     so each solfège step has a "main" alteration in each scale (the one
-     nearest natural, when a scale has two forms of a step, as blues has
-     of the 5th). The rule:
-       • a note on the old scale's step (mi in major, me in minor) moves
-         to the new scale's step of that degree (mi → me → mi);
-       • a note that was a deliberate accidental in the old scale (a fi in
-         major, a mi in minor) is kept as it is;
-       • a step the new scale does not have (fa in major pentatonic)
-         keeps the note as it is;
-       • a step the old scale did not have counts as natural, so re, la
-         in minor pentatonic become re, le on the way to natural minor.
-     Every alteration a scale asks for is a single ♯ or ♭, so 1.0's
-     one-accidental blocks can always write it. Returns what moved. */
-  const DEGREE_OF = { Do: 1, Re: 2, Mi: 3, Fa: 4, So: 5, La: 6, Ti: 7 };
-  function scaleMainAlters(id) {
+  /* MORPH — the melody shown in another scale. Each note becomes its
+     version for the new scale (pitchIn, SCALE MEMORY above): the version
+     fine-tuned there with ♯ or ♭ if there is one; otherwise the scale's
+     own form of the note's step —
+       • each scale gives each step of do re mi fa so la ti an alteration
+         (mi in major, me in minor), so mi → me → mi;
+       • a ♯ or ♭ put in for another scale is not carried over (the Star-
+         Spangled Banner's fi in major is plain fa in minor, and fi again
+         back in major);
+       • a scale that skips steps borrows them from its parent — major
+         pentatonic from major, minor pentatonic and blues from natural
+         minor — and a note on a skipped step moves to the nearest note
+         the scale has, the lower of two as near: fa → mi and ti → do′
+         into major pentatonic, re → me and le → so into minor pentatonic.
+     Nothing is lost on the way: every note keeps its step and every
+     scale's fine-tuning, so any scale can be shown again as it was.
+     Returns what moved (count, and "mi → me" steps). */
+  const MORPH_PARENT = { 'major-pentatonic': 'major', 'minor-pentatonic': 'natural-minor', blues: 'natural-minor' };
+  function frameOf(id) {
+    const own = M.stepAlters(id);
+    const parent = MORPH_PARENT[id] ? M.stepAlters(MORPH_PARENT[id]) : {};
     const out = {};
-    const sc = Theory.SCALE_BY_ID[id];
-    if (!sc) return out;
-    sc.degrees.forEach(d => {
-      const p = Theory.parseDegree(d);
-      if (out[p.num] === undefined || Math.abs(p.alter) < Math.abs(out[p.num])) out[p.num] = p.alter;
-    });
+    for (let num = 1; num <= 7; num++) {
+      const a = own[num] !== undefined ? own[num] : parent[num] !== undefined ? parent[num] : 0;
+      out[num] = Math.max(-1, Math.min(1, a));
+    }
     return out;
   }
-  const accOf = alter => alter > 0 ? 'sharp' : alter < 0 ? 'flat' : 'natural';
-  const alterOf = acc => acc === 'sharp' ? 1 : acc === 'flat' ? -1 : 0;
   function morphToScale(fromId, toId) {
     if (typeof Theory === 'undefined') return null;
-    const from = scaleMainAlters(fromId), to = scaleMainAlters(toId);
     const steps = {};
-    let count = 0;
+    let count = 0, any = false;
     getAllNotes().forEach(n => {
-      const nc = M.noteClassOf(n);
-      if (!nc) return;
-      const num = DEGREE_OF[noteToSolfege[nc]];
-      const a = alterOf(getAccidentalFromNote(n));
-      const oldAlt = from[num] === undefined ? 0 : from[num];
-      if (a !== oldAlt) return;                        // a deliberate accidental: kept
-      if (to[num] === undefined) return;               // no such step in the new scale: kept
-      const newAlt = Math.max(-1, Math.min(1, to[num]));
-      if (newAlt === a) return;
-      addAccidentalToNote(n, accOf(newAlt));
+      const was = { nc: M.noteClassOf(n), acc: getAccidentalFromNote(n) };
+      if (!was.nc) return;
+      const now = pitchIn(n, toId);
+      if (was.nc === now.nc && was.acc === now.acc) return;
+      n.dataset.step = stepOf(n);                    // the melody's rung stays, whatever is shown
+      setNotePitch(n, now.nc, now.acc);
+      if (n.dataset.step === now.nc) delete n.dataset.step;
+      any = true;
+      if (n.classList.contains('rest-note')) return;          // a rest moves silently
       count++;
-      const acc = x => x > 0 ? '#' : x < 0 ? 'b' : '';
-      steps[num] = Theory.solfegeFor(acc(a) + num).toLowerCase() + ' → ' + Theory.solfegeFor(acc(newAlt) + num).toLowerCase();
+      const label = M.solfegeOf(was.nc, was.acc).toLowerCase() + ' → ' + M.solfegeOf(now.nc, now.acc).toLowerCase();
+      steps[label] = (M.noteMidi(was.nc, was.acc) % 12 + 12) % 12;
     });
-    if (count) {
+    if (any) {
       notationContainer.querySelectorAll('.harmony-stack').forEach(updateHarmonyStackVisuals);
+      updateAllLineHeights();
       const active = getActiveNote();
       if (active) syncAccidentalToggle(active); else resetAccidentalToggleVisuals();
     }
-    return { count, steps: Object.keys(steps).sort().map(k => steps[k]) };
+    return { count, steps: Object.keys(steps).sort((x, y) => steps[x] - steps[y]) };
   }
 
   /* ================= SELECTION & NAVIGATION ================= */
@@ -1775,6 +1878,16 @@
                   const acc = getAccidentalFromNote(n);
                   if (acc !== 'natural') spec.acc = acc;
                   if (n.classList.contains('rest-note')) spec.rest = true;
+                  // the other scales' versions (SCALE MEMORY): the step when
+                  // another rung is shown, and each fine-tuned scale's pitch
+                  if (stepOf(n) !== spec.n) spec.step = stepOf(n);
+                  const alts = altsOf(n), alt = {};
+                  Object.keys(alts).forEach(id => {
+                    if (id === S.scale) return;
+                    const p = unpackPitch(alts[id]);
+                    if (p) alt[id] = p.acc === 'natural' ? { n: p.nc } : { n: p.nc, acc: p.acc };
+                  });
+                  if (Object.keys(alt).length) spec.alt = alt;
                   return spec;
                 })
               };
@@ -1862,6 +1975,17 @@
             const spec = { n: n.n };
             if (n.acc === 'sharp' || n.acc === 'flat') spec.acc = n.acc;
             if (n.rest) spec.rest = true;
+            if (typeof n.step === 'string' && noteOrder.indexOf(n.step) !== -1 && n.step !== n.n) spec.step = n.step;
+            if (n.alt && typeof n.alt === 'object') {
+              const alt = {};
+              Object.keys(n.alt).forEach(id => {
+                const a = n.alt[id];
+                if (id === out.scale || typeof Theory === 'undefined' || !Theory.SCALE_BY_ID[id]) return;
+                if (!a || noteOrder.indexOf(a.n) === -1) return;
+                alt[id] = (a.acc === 'sharp' || a.acc === 'flat') ? { n: a.n, acc: a.acc } : { n: a.n };
+              });
+              if (Object.keys(alt).length) spec.alt = alt;
+            }
             return spec;
           });
           if (!notes.length) notes.push({ n: 'do' });
@@ -1879,11 +2003,20 @@
   }
 
   /* ---- 1.0's text format ---- */
+  function pitchToken(n, acc) {
+    let sh = noteToShorthandMap[n] || 'D1';
+    if (acc === 'sharp') sh = sh.replace(/([A-Z])/, '$1#');
+    else if (acc === 'flat') sh = sh.replace(/([A-Z])/, '$1b');
+    return sh;
+  }
+  /* A note's other-scale versions ride after it (SCALE MEMORY):
+     `F1^step=F1` the step when another rung is shown, `^major=F#1` a
+     scale's fine-tuned pitch — so R1^major=R#1 is re here, ri in major. */
   function noteToken(spec) {
-    let sh = noteToShorthandMap[spec.n] || 'D1';
-    if (spec.acc === 'sharp') sh = sh.replace(/([A-Z])/, '$1#');
-    else if (spec.acc === 'flat') sh = sh.replace(/([A-Z])/, '$1b');
+    let sh = pitchToken(spec.n, spec.acc);
     if (spec.rest) sh += '~';
+    if (spec.step) sh += '^step=' + pitchToken(spec.step);
+    Object.keys(spec.alt || {}).forEach(id => { sh += '^' + id + '=' + pitchToken(spec.alt[id].n, spec.alt[id].acc); });
     return sh;
   }
   function scoreToText(model) {
@@ -1909,6 +2042,20 @@
   function parseNoteShorthand(shorthand) {
     let noteClass = 'do', accidentalType = 'natural', isRest = false, value = null;
     let clean = String(shorthand).trim();
+    // the other scales' versions (noteToken): ^step=F1 ^major=F#1
+    let step = null;
+    const alt = {};
+    clean = clean.replace(/\^[^:~*]+/g, m => {
+      m.slice(1).split('^').forEach(pair => {
+        const eq = pair.indexOf('=');
+        if (eq < 1) return;
+        const k = pair.slice(0, eq).trim().toLowerCase();
+        const p = parseNoteShorthand(pair.slice(eq + 1));
+        if (k === 'step') step = p.noteClass;
+        else alt[k] = p.accidentalType === 'natural' ? { n: p.noteClass } : { n: p.noteClass, acc: p.accidentalType };
+      });
+      return '';
+    });
     const restMark = s => (s.endsWith('~') || s.endsWith('*'));
     if (restMark(clean)) { isRest = true; clean = clean.slice(0, -1); }
     const vm = clean.match(/:(w|h\.|h|q\.|q|e\.|e|s)$/i);
@@ -1924,7 +2071,7 @@
         else if (acc.toLowerCase() === 'b') accidentalType = 'flat';
       }
     }
-    return { noteClass, accidentalType, isRest, value };
+    return { noteClass, accidentalType, isRest, value, step, alt };
   }
 
   function textToScore(text) {
@@ -1974,6 +2121,8 @@
                 const spec = { n: p.noteClass };
                 if (p.accidentalType !== 'natural') spec.acc = p.accidentalType;
                 if (p.isRest) spec.rest = true;
+                if (p.step) spec.step = p.step;
+                if (Object.keys(p.alt).length) spec.alt = p.alt;
                 col.notes.push(spec);
                 if (p.value) col.v = p.value;
               });
