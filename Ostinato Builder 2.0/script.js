@@ -1241,6 +1241,9 @@
     },
     "Fruit Rhythms": {
       six: { main: ["Ap", "Cher", "Lem"], filler: ["ple", "ry", "on"] },
+      /* Notes held over whole beats, by how many beats they hold — read
+         by speechForLongNote, since no one beat's pattern can show them. */
+      long: { "2": "Orange" },
       "2": { "B/G": ["Pie", "-"], "B/B": ["Ap", "ple"], "G/B": ["-", "Sweet"], "G/G": ["-", "-"] },
       "3": { "B/G/G": ["Pie", "-", "-"], "B/B/B": ["Pine", "ap", "ple"], "B/B/G": ["Yo", "gurt", "-"], "B/G/B": ["Le", "-", "mon"], "G/B/G": ["-", "Peas", "-"], "G/B/B": ["-", "Spi", "cy"], "G/G/B": ["-", "-", "Sweet"], "G/G/G": ["-", "-", "-"] },
       "4": { "B/G/G/G": ["Pie", "-", "-", "-"], "B/G/B/G": ["Ap", "-", "ple", "-"], "B/B/B/B": ["Wa", "ter", "me", "lon"], "G/B/B/B": ["-", "To", "ma", "to"], "B/B/B/G": ["Co", "co", "nut", "-"], "B/B/G/B": ["Ba", "na", "-", "na"], "B/G/B/B": ["Blue", "-", "ber", "ry"], "B/B/G/G": ["Ki", "wi", "-", "-"], "G/B/B/G": ["-", "Fi", "let", "-"], "G/G/B/B": ["-", "-", "Ber", "ry"], "G/B/G/B": ["-", "Sal", "-", "sa"], "B/G/G/B": ["Cher", "-", "-", "ry"], "G/B/G/G": ["-", "Peas", "-", "-"], "G/G/B/G": ["-", "-", "Sweet", "-"], "G/G/G/B": ["-", "-", "-", "&"], "G/G/G/G": ["-", "-", "-", "-"] }
@@ -1248,6 +1251,30 @@
   };
 
   const SYLLABLE_SYSTEMS = Object.keys(rhythmSystems);
+
+  /* A system may name a note by how long it rings rather than by its beat
+     — Fruit Rhythms says Orange for a half note. Only a note that starts
+     on the beat and holds a whole number of beats in simple time counts;
+     anything else is read beat by beat as usual. `at` is the note's slot
+     inside its group's colours. */
+  function speechForLongNote(track, group, colours, at, system) {
+    const data = rhythmSystems[system];
+    if (!data || !data.long || isCompound()) return null;
+    let beats = 0, slot = 0, started = false;
+    for (let b = group.start; b <= group.end; b++) {
+      const slots = track.beats[b].slots;
+      for (let i = 0; i < slots; i++, slot++) {
+        if (slot === at) {
+          if (i !== 0) return null;
+          started = true;
+        } else if (started && colours[slot] !== 'sustain') {
+          return (i === 0 && data.long[beats]) || null;
+        }
+      }
+      if (started) beats++;
+    }
+    return data.long[beats] || null;
+  }
 
   /* What is spoken on each slot of one beat. */
   function getChantText(activeStates, system, slots) {
@@ -3063,7 +3090,7 @@
     el.appendChild(notes);
 
     /* ---- what it is called, or what it says ---- */
-    if (membership.speech) el.appendChild(buildSpeech(track, beat, mine, noteOf));
+    if (membership.speech) el.appendChild(buildSpeech(track, beat, mine, noteOf, membership));
 
     return el;
   }
@@ -3290,12 +3317,20 @@
      short word is centred on it, a long one reads on to the right, the
      way words are set under a song. The beat only widens when a word will
      not fit the room it has (layoutAndEngrave reads data-span). */
-  function buildSpeech(track, beat, colours, notes) {
+  function buildSpeech(track, beat, colours, notes, membership) {
     const row = document.createElement('div');
     row.className = 'words';
     const count = !!view.showSyllables;
     const own = view.showWords !== false;
     const spoken = count ? getChantText(beat.cells, view.syllableSystem, beat.slots) : [];
+    if (count && membership && membership.group.span > 1) {
+      colours.forEach((c, i) => {
+        if (c !== 'active') return;
+        const long = speechForLongNote(track, membership.group, membership.colours,
+          membership.offset + i, view.syllableSystem);
+        if (long) spoken[i] = long;
+      });
+    }
 
     let i = 0;
     while (i < colours.length) {
