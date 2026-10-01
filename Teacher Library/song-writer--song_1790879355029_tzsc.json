@@ -1,0 +1,1133 @@
+{
+  "format": "evm-item",
+  "formatVersion": 1,
+  "app": "song-writer",
+  "kind": "song",
+  "id": "song_1790879355029_tzsc",
+  "title": "The Morning Song by Mr. Reed",
+  "createdAt": 1790879355030,
+  "updatedAt": 1790880128603,
+  "book": "More songs",
+  "data": {
+    "score": {
+      "v": 2,
+      "key": "C",
+      "lines": [
+        {
+          "label": "A",
+          "syllables": [
+            {
+              "text": "Good",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so-low"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "morn",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "-ing,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "(Good",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so-low"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "morn",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "-ing,)",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "How",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so-low"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "are",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "you?",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "(How",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so-low"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "are",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "you?)",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "label": "",
+          "syllables": [
+            {
+              "text": "I'm",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so-low"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "so",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "glad",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "(I'm",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so-low"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "so",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "glad)",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "to",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "see",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "you!",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "(to",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "see",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "you!)",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "label": "",
+          "syllables": [
+            {
+              "text": "We're",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "sing",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "-ing",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "(We're",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "sing",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "-ing)",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "to",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "-geth",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "la"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "-er.",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "(to",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "-geth",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "la"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "-er.)",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "label": "",
+          "syllables": [
+            {
+              "text": "Good",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "morn",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "-ing,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "good",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "morn",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "-ing",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "to",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti-low"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "you!",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "label": "A",
+          "syllables": [
+            {
+              "text": "So",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so-low"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Mi",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Do",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "(So",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so-low"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Mi",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Do)",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "So",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so-low"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Fa",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Re",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "(So",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so-low"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Fa",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Re)",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "label": "",
+          "syllables": [
+            {
+              "text": "So",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so-low"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Fa",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Re",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "(So",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so-low"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Fa",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Re)",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Do",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "So",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Mi",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "(Do",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "So",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Mi)",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "label": "",
+          "syllables": [
+            {
+              "text": "Do",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "So",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Mi",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "(Do",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "So",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Mi)",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Do",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "La",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "la"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Fa",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "(Do",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "La",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "la"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Fa)",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "label": "",
+          "syllables": [
+            {
+              "text": "Do",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "So",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Mi",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Do",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Fa",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Re",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Ti",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti-low"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Do",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "layout": {
+      "v": 1,
+      "notes": null,
+      "accidentals": true,
+      "rests": true,
+      "harmony": true,
+      "connected": true,
+      "chords": null,
+      "values": null,
+      "keys": null,
+      "scaleMorph": true,
+      "show": {
+        "sectionTitles": true,
+        "keycaps": true,
+        "barNumbers": true
+      },
+      "locked": false
+    }
+  }
+}
