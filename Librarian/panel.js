@@ -14,6 +14,14 @@
    books.json (in the Teacher Library) is the list of books, so a new book
    exists before anything is in it. Students only ever see books that have
    songs (the apps read index.json).
+
+   HIDE / SHOW (2026-10-01): a hidden song stays in the Teacher Library
+   (its file keeps `hidden: true`; index.json lists it under `hidden`) but
+   is off the students' shelf; a student who already has it keeps that
+   copy, and gets the new version when it is shown again. Staged like a
+   move. DOWNLOAD (no connection needed) saves a song's file as the
+   teacher's own copy, to open in the app on another computer and carry on
+   there (script.js downloadPublished).
    ========================================================================== */
 (function () {
   'use strict';
@@ -25,7 +33,7 @@
   let remote = null;         // { items: [index entry], books: [name] }
   let loadError = '';
   let loading = false;
-  let staged = [];           // { type: move|remove|keep|newBook|renameBook|deleteBook, … }
+  let staged = [];           // { type: move|remove|keep|hide|show|newBook|renameBook|deleteBook, … }
   let appFilter = 'all';
   let query = '';
   const picked = new Set();  // app|id ticked in this tab
@@ -55,7 +63,9 @@
           if (r.ok) books = await r.json();
         } catch (e) {}
       }
-      remote = { items: (index && index.items) || [], books: namesFrom(books) };
+      const shown = ((index && index.items) || []).map(e => Object.assign({}, e, { hidden: false }));
+      const hidden = ((index && index.hidden) || []).map(e => Object.assign({}, e, { hidden: true }));
+      remote = { items: shown.concat(hidden), books: namesFrom(books) };
       loadError = '';
     } catch (e) {
       loadError = e.message || 'The Teacher Library can’t be read right now.';
@@ -67,13 +77,14 @@
   /* ---------------- the library as it will be after Save ---------------- */
   function current() {
     const items = (remote ? remote.items : []).map(e =>
-      Object.assign({}, e, { was: bookName(e), book: bookName(e), removed: false }));
+      Object.assign({}, e, { was: bookName(e), book: bookName(e), removed: false, wasHidden: !!e.hidden, hidden: !!e.hidden }));
     const find = k => items.find(i => keyOf(i) === k);
     const books = new Set((remote ? remote.books : []).concat(items.map(i => i.book)));
     staged.forEach(op => {
       if (op.type === 'move') { const it = find(op.key); if (it) { it.book = op.to; books.add(op.to); } }
       else if (op.type === 'remove') { const it = find(op.key); if (it) it.removed = true; }
       else if (op.type === 'keep') { const it = find(op.key); if (it) it.removed = false; }
+      else if (op.type === 'hide' || op.type === 'show') { const it = find(op.key); if (it) it.hidden = op.type === 'hide'; }
       else if (op.type === 'newBook') books.add(op.name);
       else if (op.type === 'renameBook') {
         items.forEach(i => { if (i.book === op.from) i.book = op.to; });
@@ -89,7 +100,7 @@
 
   function pendingCount() {
     const cur = current();
-    let n = cur.items.filter(i => i.removed || i.book !== i.was).length;
+    let n = cur.items.filter(i => i.removed || i.book !== i.was || i.hidden !== i.wasHidden).length;
     const before = new Set(remote ? remote.books.concat(remote.items.map(bookName)) : []);
     const after = new Set(cur.books);
     before.forEach(b => { if (!after.has(b) && !cur.items.some(i => i.was === b && i.book !== b)) n++; });
@@ -146,17 +157,34 @@
     render();
   }
 
+  function setHidden(keys, hide) {
+    keys.forEach(k => staged.push({ type: hide ? 'hide' : 'show', key: k }));
+    picked.clear();
+    render();
+  }
+
+  /* Each file, a beat apart (browsers drop downloads fired together). */
+  async function downloadSongs(list) {
+    for (const i of list) {
+      await L.downloadPublished(i);
+      if (list.length > 1) await new Promise(r => setTimeout(r, 350));
+    }
+    L.toast(list.length === 1 ? 'Downloaded as your copy — open it in the app with Library → Restore from a backup'
+                              : list.length + ' files downloaded as your copies');
+  }
+
   /* ---------------- saving ---------------- */
   function entryOf(i) {
     const e = { app: i.app, kind: i.kind, id: i.id, title: i.title, updatedAt: i.updatedAt, path: i.path };
     if (i.book) e.book = i.book;
+    if (i.hidden) e.hidden = true;
     return e;
   }
 
   async function save() {
     if (!GH.connected() || !remote) return;
     const cur = current();
-    const moved = cur.items.filter(i => !i.removed && i.book !== i.was);
+    const moved = cur.items.filter(i => !i.removed && (i.book !== i.was || i.hidden !== i.wasHidden));
     const removed = cur.items.filter(i => i.removed);
     const btn = $('lib-save');
     btn.disabled = true;
@@ -167,6 +195,7 @@
         const env = await GH.readJSON(it.path);
         if (!env) continue;
         env.book = it.book;
+        if (it.hidden) env.hidden = true; else delete env.hidden;
         files[it.path] = JSON.stringify(env, null, 2) + '\n';
       }
       removed.forEach(i => { files[i.path] = null; });
@@ -178,13 +207,18 @@
       }, null, 2) + '\n';
 
       const bits = [];
-      if (moved.length) bits.push('moved ' + moved.length);
+      const nMoved = moved.filter(i => i.book !== i.was).length;
+      const nHid = moved.filter(i => i.hidden && !i.wasHidden).length;
+      const nShown = moved.filter(i => !i.hidden && i.wasHidden).length;
+      if (nMoved) bits.push('moved ' + nMoved);
+      if (nHid) bits.push('hid ' + nHid);
+      if (nShown) bits.push('showed ' + nShown);
       if (removed.length) bits.push('took down ' + removed.length);
       const message = 'Librarian: ' + (bits.join(', ') || 'organised the books') +
         ' (' + cur.books.length + ' book' + (cur.books.length === 1 ? '' : 's') + ')';
       await GH.commit(files, message);
 
-      moved.forEach(i => L.setBookNote(i.app, i.id, i.book));
+      moved.filter(i => i.book !== i.was).forEach(i => L.setBookNote(i.app, i.id, i.book));
       remote = { items: kept, books: cur.books };
       staged = [];
       L.setPublished(kept);
@@ -193,6 +227,7 @@
       alert('Nothing was changed on GitHub.\n\n' + (e.message || e));
     }
     btn.disabled = false;
+    btn.textContent = 'Save to Teacher Library';
     render();
   }
 
@@ -290,8 +325,10 @@
       (!q || i.title.toLowerCase().indexOf(q) !== -1);
 
     const total = cur.items.filter(i => !i.removed).length;
+    const nHidden = cur.items.filter(i => !i.removed && i.hidden).length;
     $('lib-summary').textContent = total
-      ? `${total} song${total === 1 ? '' : 's'} in ${cur.books.length} book${cur.books.length === 1 ? '' : 's'}`
+      ? `${total} song${total === 1 ? '' : 's'} in ${cur.books.length} book${cur.books.length === 1 ? '' : 's'}` +
+        (nHidden ? ` · ${nHidden} hidden from students` : '')
       : 'The Teacher Library is empty so far.';
 
     cur.books.forEach(book => {
@@ -305,7 +342,8 @@
       head.appendChild(el('span', 'lib-book-spine'));
       head.appendChild(el('h3', 'lib-book-name', book));
       const live = all.filter(i => !i.removed);
-      head.appendChild(el('span', 'lib-book-count', live.length ? countLine(live) : 'Empty'));
+      const hid = live.filter(i => i.hidden).length;
+      head.appendChild(el('span', 'lib-book-count', live.length ? countLine(live) + (hid ? ' · ' + hid + ' hidden' : '') : 'Empty'));
       if (can) {
         const acts = el('span', 'lib-book-acts');
         const rn = el('button', 'text-btn', 'Rename');
@@ -338,7 +376,7 @@
 
   function songRow(i, books, can) {
     const k = keyOf(i);
-    const row = el('div', 'lib-song app-' + i.app + (i.removed ? ' is-removed' : '') + (picked.has(k) ? ' is-ticked' : ''));
+    const row = el('div', 'lib-song app-' + i.app + (i.removed ? ' is-removed' : '') + (i.hidden ? ' is-hidden' : '') + (picked.has(k) ? ' is-ticked' : ''));
     if (can) {
       const box = document.createElement('input');
       box.type = 'checkbox';
@@ -366,8 +404,24 @@
       tags.appendChild(t);
     }
     if (i.removed) tags.appendChild(el('span', 'tag tag-changed', 'Will be taken down'));
-    else if (i.book !== i.was) tags.appendChild(el('span', 'tag tag-moved', 'from ' + i.was));
+    else {
+      if (i.book !== i.was) tags.appendChild(el('span', 'tag tag-moved', 'from ' + i.was));
+      if (i.hidden !== i.wasHidden) tags.appendChild(el('span', 'tag tag-moved', i.hidden ? 'Will be hidden' : 'Will be shown'));
+      else if (i.hidden) {
+        const t = el('span', 'tag tag-hidden', 'Hidden from students');
+        t.title = 'In the Teacher Library, but not on the shelf. A student who had it before keeps that copy, and gets the new version when you show it.';
+        tags.appendChild(t);
+      }
+    }
     row.appendChild(tags);
+
+    // its file, as your own copy to carry on with elsewhere (no connection needed)
+    const dl = el('button', 'text-btn lib-dl', 'Download');
+    dl.title = 'Download its file as your own copy — open it in ' + (L.APP_NAMES[i.app] || 'the app') +
+      ' on another computer (Library → Restore from a backup) to keep working on it, then publish from there';
+    dl.setAttribute('aria-label', 'Download ' + i.title);
+    dl.addEventListener('click', () => downloadSongs([i]));
+    row.appendChild(dl);
 
     if (can) {
       if (i.removed) {
@@ -375,6 +429,11 @@
         keep.addEventListener('click', () => stage({ type: 'keep', key: k }));
         row.appendChild(keep);
       } else {
+        const hs = el('button', 'text-btn lib-hide', i.hidden ? 'Show' : 'Hide');
+        hs.title = i.hidden ? 'Put it back on the students’ shelf (when you save)'
+          : 'Keep it in the Teacher Library but off the students’ shelf while you work on it (when you save)';
+        hs.addEventListener('click', () => setHidden([k], !i.hidden));
+        row.appendChild(hs);
         row.appendChild(bookSelect(books, i.book, to => moveTo([k], to), 'Move ' + i.title + ' to'));
         const rm = el('button', 'lib-x', '×');
         rm.title = 'Take this song down';
@@ -448,6 +507,12 @@
     $('lib-save').addEventListener('click', save);
     $('lib-discard').addEventListener('click', discard);
     $('lib-bulk-remove').addEventListener('click', () => removeSongs([...picked]));
+    $('lib-bulk-hide').addEventListener('click', () => setHidden([...picked], true));
+    $('lib-bulk-show').addEventListener('click', () => setHidden([...picked], false));
+    $('lib-bulk-download').addEventListener('click', () => {
+      const cur = current();
+      downloadSongs(cur.items.filter(i => picked.has(keyOf(i))));
+    });
     $('lib-bulk-clear').addEventListener('click', () => { picked.clear(); render(); });
     window.addEventListener('beforeunload', e => {
       if (staged.length && pendingCount()) { e.preventDefault(); e.returnValue = ''; }

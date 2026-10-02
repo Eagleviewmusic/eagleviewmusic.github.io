@@ -15,6 +15,19 @@
 
    What is never offered: built-ins, sandboxes, lesson exercises, and blank
    songs (the apps would refuse a blank one anyway).
+
+   HIDDEN and WORKING ON TWO COMPUTERS (2026-10-01, the teacher's call). A
+   published song can be hidden: kept in the Teacher Library, off the
+   students' shelf (index.json lists it under `hidden`; a student who has
+   it already keeps that copy until it is shown again, then gets the new
+   one). "Hidden from students" in the dock publishes that way; a hidden
+   song published again stays hidden; Hide / Show are in the Teacher
+   Library tab. That tab also downloads a song's file as YOUR copy
+   (`received: false`, so an app files it as yours to edit, not a shared
+   one): open it in the app on another computer, keep working, publish
+   from there. Back on the first computer the song then reads "Newer in
+   the Teacher Library" — download that before editing here, so an older
+   version is never published over the newer one.
    ========================================================================== */
 (function () {
   'use strict';
@@ -298,6 +311,7 @@
       }
       const map = {};
       (index.items || []).forEach(e => { map[e.app + '|' + e.id] = e; });
+      (index.hidden || []).forEach(e => { map[e.app + '|' + e.id] = Object.assign({}, e, { hidden: true }); });
       published = map;
     } catch (e) {
       published = false;
@@ -309,6 +323,8 @@
     if (!published) return 'unknown';
     const e = published[item.app + '|' + item.id];
     if (!e) return 'new';
+    // published from another computer since this copy was last changed
+    if ((Number(e.updatedAt) || 0) > item.updatedAt) return 'behind';
     if ((bookOf(item) || DEFAULT_BOOK) !== (tidyBook(e.book) || DEFAULT_BOOK)) return 'moved';
     return item.updatedAt > (Number(e.updatedAt) || 0) ? 'changed' : 'published';
   }
@@ -319,6 +335,7 @@
     new: 'Not published',
     changed: 'Changed since you published',
     moved: 'Moved to another book',
+    behind: 'Newer in the Teacher Library',
     published: 'Published'
   };
   const TO_PUBLISH = s => s === 'new' || s === 'changed' || s === 'moved';
@@ -333,7 +350,7 @@
   function shown(item) {
     const s = stateOf(item);
     if (filter === 'todo') return TO_PUBLISH(s) || s === 'unknown';
-    if (filter === 'published') return s === 'published' || s === 'changed' || s === 'moved';
+    if (filter === 'published') return s === 'published' || s === 'changed' || s === 'moved' || s === 'behind';
     return true;
   }
 
@@ -470,11 +487,29 @@
       t.title = 'This song came to this browser in a link. You can still publish it.';
       tags.appendChild(t);
     }
+    const pub = published && published[k];
+    if (pub && pub.hidden && s !== 'new') {
+      const t = document.createElement('span');
+      t.className = 'tag tag-hidden';
+      t.textContent = 'Hidden from students';
+      t.title = 'In the Teacher Library but not on the shelf. Show it from the Teacher Library tab. Publishing it again keeps it hidden.';
+      tags.appendChild(t);
+    }
     if (STATE_LABEL[s]) {
       const t = document.createElement('span');
       t.className = 'tag tag-' + s;
       t.textContent = STATE_LABEL[s];
+      if (s === 'behind') t.title = 'Someone published a newer version — you, from another computer? Download it and open it in the app before you change this one, or publishing from here would put the older version back.';
       tags.appendChild(t);
+    }
+    if (s === 'behind' && pub) {
+      const b = document.createElement('button');
+      b.className = 'text-btn';
+      b.type = 'button';
+      b.textContent = 'Download the newer one';
+      b.title = 'Its file, as your own copy: open it in ' + (APP_NAMES[item.app] || 'the app') + ' (Library → Restore from a backup) to carry on from there.';
+      b.addEventListener('click', () => downloadPublished(pub));
+      tags.appendChild(b);
     }
     side.appendChild(tags);
 
@@ -514,8 +549,9 @@
       return;
     }
     const n = Object.keys(published).length;
+    const h = Object.keys(published).filter(k => published[k].hidden).length;
     el.textContent = n
-      ? `The Teacher Library holds ${n} song${n === 1 ? '' : 's'}.`
+      ? `The Teacher Library holds ${n} song${n === 1 ? '' : 's'}` + (h ? ` (${h} hidden from students).` : '.')
       : 'The Teacher Library is empty so far.';
     el.className = 'status';
   }
@@ -525,13 +561,22 @@
     return item.app + '--' + String(item.id).replace(/[^A-Za-z0-9_.-]/g, '-') + '.json';
   }
 
+  /* `hidden`: kept in the Teacher Library, off the shelf (index.json's
+     `hidden` list). Published again, a hidden song stays hidden; the dock's
+     "Hidden from students" hides the rest too. */
+  function hiddenOnPublish(item) {
+    const e = published && published[item.app + '|' + item.id];
+    return !!(e && e.hidden) || !!($('publish-hidden') && $('publish-hidden').checked);
+  }
   function envelopeOf(item) {
-    return EVM.toEnvelope(item.record, {
+    const env = EVM.toEnvelope(item.record, {
       app: item.app,
       kind: item.kind,
       book: bookOf(item) || DEFAULT_BOOK,
       dataOf: item.dataOf || undefined
     });
+    if (env && hiddenOnPublish(item)) env.hidden = true;
+    return env;
   }
 
   function download(name, text) {
@@ -558,12 +603,44 @@
       path: path
     };
     if (env.book && String(env.book).trim()) e.book = String(env.book).trim();
+    if (env.hidden === true) e.hidden = true;
     return e;
   }
+  /* Entries with `hidden: true` go in their own list, as the Action writes
+     them; `hidden` only when there is one. */
   function indexText(entries) {
-    const items = entries.slice().sort((a, b) => (a.book || '').localeCompare(b.book || '') ||
+    const all = entries.slice().sort((a, b) => (a.book || '').localeCompare(b.book || '') ||
       a.app.localeCompare(b.app) || a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
-    return JSON.stringify({ format: 'evm-index', formatVersion: 1, generatedAt: new Date().toISOString(), items }, null, 2) + '\n';
+    const out = { format: 'evm-index', formatVersion: 1, generatedAt: new Date().toISOString(),
+      items: all.filter(e => !e.hidden) };
+    const hidden = all.filter(e => e.hidden);
+    if (hidden.length) out.hidden = hidden;
+    return JSON.stringify(out, null, 2) + '\n';
+  }
+
+  /* A published song's file, downloaded as the teacher's OWN copy
+     (`received: false`): an app files it as yours to keep working on —
+     same id, so publishing it again from there replaces the published one.
+     Read from GitHub when connected (it is newest there), else from the
+     site. Its name says it is a copy, so it is never mistaken for an
+     upload. */
+  async function downloadPublished(entry) {
+    try {
+      let env = null;
+      if (GH && GH.connected()) env = await GH.readJSON(entry.path);
+      else {
+        const res = await fetch('../' + encodeURIComponent(FOLDER) + '/' + encodeURIComponent(entry.path), { cache: 'no-store' });
+        if (res.ok) env = await res.json();
+      }
+      if (!env || env.format !== 'evm-item') throw new Error('The file could not be read.');
+      env.received = false;
+      delete env.hidden;
+      download(String(entry.path).replace(/\.json$/i, '') + '--my-copy.json', JSON.stringify(env, null, 2) + '\n');
+      return true;
+    } catch (e) {
+      alert('Couldn’t download “' + (entry.title || 'that song') + '”.\n\n' + (e.message || e));
+      return false;
+    }
   }
 
   /* Connected: the ticked songs go straight into the Teacher Library, one
@@ -571,6 +648,10 @@
   async function publishTicked() {
     const chosen = items.filter(i => ticked.has(i.app + '|' + i.id) && !i.blank);
     if (!chosen.length) return;
+    const behind = chosen.filter(i => stateOf(i) === 'behind');
+    if (behind.length && !confirm('The Teacher Library has a newer version of ' +
+        behind.map(i => '“' + i.title + '”').join(', ') + ' than this computer.\n\n' +
+        'Publishing puts this older version back. Publish anyway?')) return;
     const btn = $('download-btn');
     btn.disabled = true;
     btn.textContent = 'Publishing…';
@@ -580,6 +661,7 @@
       const files = {};
       const byKey = {};
       (index.items || []).forEach(e => { byKey[e.app + '|' + e.id] = e; });
+      (index.hidden || []).forEach(e => { byKey[e.app + '|' + e.id] = Object.assign({}, e, { hidden: true }); });
       chosen.forEach(item => {
         const env = envelopeOf(item);
         const path = fileName(item);
@@ -597,12 +679,15 @@
         files['books.json'] = JSON.stringify({ format: 'evm-books', formatVersion: 1,
           books: [...names].sort((a, b) => a.localeCompare(b)).map(name => ({ name })) }, null, 2) + '\n';
       }
+      const nHidden = chosen.filter(i => byKey[i.app + '|' + i.id].hidden).length;
       await GH.commit(files, 'Librarian: published ' + chosen.length + ' song' + (chosen.length === 1 ? '' : 's') +
+        (nHidden ? ' (' + nHidden + ' hidden)' : '') +
         ' (' + chosen.map(i => i.title).slice(0, 3).join(', ') + (chosen.length > 3 ? ', …' : '') + ')');
       setPublished(entries);
       ticked.clear();
       render();
-      toast(`Published — students see ${chosen.length === 1 ? 'it' : 'them'} in about a minute`);
+      toast(nHidden === chosen.length ? 'Published, hidden from students'
+        : `Published — students see ${chosen.length === 1 ? 'it' : 'them'} in about a minute`);
       if (window.LibrarianPanel) window.LibrarianPanel.reload();
     } catch (e) {
       alert('Nothing was published.\n\n' + (e.message || e));
@@ -621,6 +706,10 @@
   async function downloadTicked() {
     const chosen = items.filter(i => ticked.has(i.app + '|' + i.id) && !i.blank);
     if (!chosen.length) return;
+    const behind = chosen.filter(i => stateOf(i) === 'behind');
+    if (behind.length && !confirm('The Teacher Library has a newer version of ' +
+        behind.map(i => '“' + i.title + '”').join(', ') + ' than this computer.\n\n' +
+        'Uploading these files would put the older version back. Download anyway?')) return;
     /* One at a time, a beat apart: browsers drop downloads fired in the
        same instant (Chrome asks once to allow several). */
     for (const item of chosen) {
@@ -679,7 +768,7 @@
 
   window.Librarian = {
     APP_NAMES, KIND_NAMES, DEFAULT_BOOK, INDEX_URL, BOOKS_URL,
-    indexText, toast, setPublished,
+    indexText, toast, setPublished, downloadPublished,
     setBookNote: (app, id, name) => { bookNotes[app + '|' + id] = tidyBook(name); saveBookNotes(); render(); },
     hasLocal: (app, id) => items.some(i => i.app === app && i.id === id),
     connectionChanged: () => { updateDock(); readPublished().then(() => { setStatus(); render(); }); }

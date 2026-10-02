@@ -648,122 +648,145 @@
   }
 
   /* ================= PICK-UPS =================
-     With the song's pick-up on (`score.pickup`, switched in Layout
-     settings → 1-beat pick-up), every line opens with a one-beat pick-up
-     (timing.js PICK-UP) — until it is taken away, on that line only
-     (data-pickup="off"; `pickup: false` in the model):
-       • the × on its bar line (staff.js draws it; Edit only) takes that
-         bar line out: the pick-up beat joins the bar after it, in the
-         same line. Nothing else is touched — the bar above it used to
-         finish is simply left open (silence in playback), so taking the
-         bar lines out line by line, in any order, leaves no stray rests.
-       • Join up on the pick-up takes just that beat up to the end of the
-         line above; the rest of the line stays where it is and starts on
-         a downbeat. Join up again (its first word is selected for it)
-         joins the whole line, as ever.
-       • Delete on the pick-up deletes that beat, and a rest in the line
-         above fills the bar the pick-up used to finish.
-     A new line (↵ New line) opens with a pick-up again. Only a pick-up
-     that is a beat of its own counts (timing.pickupSyllables): one whose
-     note runs on past the beat, or that is the whole line, is an ordinary
-     word to these buttons. */
+     A pick-up is a line's own (2026-10-01, the user's design; timing.js
+     PICK-UP): the line's `data-pickup` is the value it is worth ('e',
+     'q.', …), `lines[].pickup` in the model.
+       • Pick-up in the Edit box (Words & lines), on a selected note: like
+         New line, a new line starts at that note's word — and opens with
+         a pick-up. On a line's first word the line itself takes one.
+         It is worth that word's own length when that is a value (one
+         eighth note: an eighth), else a beat; the rhythm chips under the
+         button choose another — or make one straight away at that value.
+         The notes are not touched: the bar line falls after that much.
+       • With the selection in a pick-up (a word that starts inside it)
+         the button is lit, the chips show its value and change it, and
+         the button takes it away: the line joins back onto the line
+         above, as Join up does (the first line just starts on the
+         downbeat). The × on its bar line (staff.js, Edit) does the same.
+       • Layout settings → Pick-up switches the FIRST line's.
+     (Until 2026-10-01 the song had one switch, a beat on every line, and
+     Join up / Delete on a pick-up moved or deleted just that beat.) */
   function previousLine(line) {
     const prev = line && line.previousElementSibling;
     return prev && prev.classList.contains('notation-line') ? prev : null;
-  }
-  /* The selected syllable's line pick-up, when the selection is in it. */
-  function pickupAt(syl) {
-    const line = syl && syl.closest('.notation-line');
-    const pk = line ? SW.timing.pickupSyllables(line) : null;
-    return pk && !pk.whole && pk.syllables.indexOf(syl) !== -1 ? Object.assign({ line }, pk) : null;
   }
   function selectedSyllable() {
     const note = (S.editing && currentNoteIndex >= 0) ? getActiveNote() : null;
     return note ? note.closest('.syllable') : null;
   }
-  function pickupSelected() { return !!pickupAt(selectedSyllable()); }
+  const barTicks = () => SW.meters.byId(S.meter).barTicks;
+  /* The values a pick-up can be worth in this time: shorter than a bar,
+     shortest first. */
+  function pickupValues() {
+    return SW.values.LIST.filter(v => v.ticks < barTicks()).map(v => v.id).reverse();
+  }
+  /* The line whose pick-up the syllable starts in, or null. */
+  function pickupAt(syl) {
+    const line = syl && syl.closest('.notation-line');
+    if (!line || !SW.timing.linePickup(line)) return null;
+    const le = SW.timing.lineEvents(line);
+    const ev = le.events.find(e => e.syllable === syl);
+    return ev && ev.start < le.pickup ? line : null;
+  }
+  /* What a new pick-up on this word is worth: the word's own length when
+     that is a value shorter than a bar, else a beat. */
+  function pickupValueFor(syl) {
+    let t = 0;
+    if (syl) syl.querySelectorAll('.harmony-stack').forEach(st => { t += SW.timing.column(st).ticks; });
+    const v = SW.values.LIST.find(x => x.ticks === t && x.ticks < barTicks());
+    return v ? v.id : SW.values.DEFAULT;
+  }
+  /* For the Edit box: can the selection take a pick-up, is it in one
+     (`on`, `value`), and is that the first line's. */
+  function pickupState() {
+    const syl = selectedSyllable();
+    const line = pickupAt(syl);
+    return {
+      can: !!syl && can('structure'),
+      on: !!line,
+      value: line ? line.dataset.pickup : null,
+      first: !!line && !previousLine(line),
+      values: pickupValues()
+    };
+  }
+  /* Pick-up on the selection: a new line from its word, opening with a
+     pick-up worth `id` (or the word's own length). In a pick-up already,
+     `id` re-values it. */
+  function makePickup(id) {
+    const syl = selectedSyllable();
+    if (!syl || !can('structure')) return false;
+    if (id && pickupValues().indexOf(id) === -1) return false;
+    const inPk = pickupAt(syl);
+    if (inPk) return id ? setPickupValue(id) : false;
+    const active = getActiveNote();
+    let line = syl.closest('.notation-line');
+    if (line.querySelector(':scope > .syllable') !== syl) line = splitLineAt(syl);
+    if (!line) return false;
+    line.dataset.pickup = id || pickupValueFor(syl);
+    line.querySelectorAll(':scope > .row-break').forEach(b => b.remove());
+    updateLineHeight(line);
+    if (active && document.contains(active)) setNoteAsActive(active, false);
+    SW.ui.toast('Pick-up: ' + SW.values.byId(line.dataset.pickup).name.toLowerCase() + ' — the chips change it');
+    changed('line');
+    return true;
+  }
+  /* The selected pick-up's value. */
+  function setPickupValue(id) {
+    const line = pickupAt(selectedSyllable());
+    if (!line || !can('structure') || pickupValues().indexOf(id) === -1) return false;
+    if (line.dataset.pickup === id) return true;
+    line.dataset.pickup = id;
+    line.querySelectorAll(':scope > .row-break').forEach(b => b.remove());
+    updateLineHeight(line);
+    changed('line');
+    return true;
+  }
+  /* Take a line's pick-up away (the selection's when no line is given):
+     it joins back onto the line above, or, the first line, starts on the
+     downbeat. */
+  function removePickup(line) {
+    line = line || pickupAt(selectedSyllable());
+    if (!line || !S.editing || !can('structure') || !line.dataset.pickup) return false;
+    delete line.dataset.pickup;
+    if (previousLine(line)) {
+      joinLineWithPrevious(line);
+      SW.ui.toast('Pick-up taken away — the line joined the one above');
+    } else {
+      line.querySelectorAll(':scope > .row-break').forEach(b => b.remove());
+      updateLineHeight(line);
+      SW.ui.toast('Pick-up taken away — the song starts on the downbeat');
+      changed('line');
+    }
+    return true;
+  }
+  function togglePickup() { return pickupState().on ? removePickup() : makePickup(); }
+  /* The × on a pick-up's bar line (staff.js syncCut). */
+  function cutPickupBar(line) { return removePickup(line); }
 
-  /* What Join up would do for the selection: the pick-up alone, the whole
-     line (its first word), or nothing (the first line, or mid-line). */
+  /* Layout settings → Pick-up: the first line's. */
+  function firstPickup() {
+    const first = notationContainer.querySelector('.notation-line');
+    return first && SW.timing.linePickup(first) ? first.dataset.pickup : null;
+  }
+  function setFirstPickup(on) {
+    const first = notationContainer.querySelector('.notation-line');
+    if (!first || !!firstPickup() === !!on) return;
+    if (on) first.dataset.pickup = pickupValueFor(first.querySelector(':scope > .syllable'));
+    else delete first.dataset.pickup;
+    first.querySelectorAll(':scope > .row-break').forEach(b => b.remove());
+    updateLineHeight(first);
+    changed('line');
+  }
+
+  /* Join up: the selected line's first word joins it to the line above. */
   function joinState() {
     const syl = selectedSyllable();
     const line = syl && syl.closest('.notation-line');
-    if (!line || !previousLine(line) || !can('structure')) return { can: false, pickup: false };
-    if (pickupAt(syl)) return { can: true, pickup: true };
-    return { can: line.querySelector(':scope > .syllable') === syl, pickup: false };
+    return { can: !!line && !!previousLine(line) && can('structure') && line.querySelector(':scope > .syllable') === syl };
   }
   function joinUp() {
-    const st = joinState();
-    if (!st.can) return false;
-    const syl = selectedSyllable();
-    const line = syl.closest('.notation-line');
-    if (!st.pickup) return joinLineWithPrevious(line);
-    const pk = pickupAt(syl);
-    const prev = previousLine(line);
-    pk.syllables.forEach(s => prev.appendChild(s));
-    line.dataset.pickup = 'off';
-    [prev, line].forEach(l => { l.querySelectorAll(':scope > .row-break').forEach(b => b.remove()); updateLineHeight(l); });
-    updateSectionActionButtonsState();
-    // the line's first word is selected, so Join up again joins the whole line
-    const first = line.querySelector('.note');
-    if (first) setNoteAsActive(first, false);
-    SW.ui.toast('The pick-up joined the line above — Join up again joins the whole line');
-    changed('line');
-    return true;
-  }
-
-  /* The rests that fill what a line's pick-up left open of the bar in
-     the line above, once the pick-up is gone (in that line's own values:
-     a rest block when it ends in a block and a beat is all there is to
-     fill). None when the values offered cannot fill it: the silence does. */
-  function restsForOpenBar(prev) {
-    let rests = [];
-    if (prev && can('rest')) {
-      const pe = SW.timing.lineEvents(prev);
-      const B = pe.meter.barTicks;
-      let open = (B - (pe.total + pe.shift) % B) % B;
-      const last = pe.events[pe.events.length - 1];
-      const n = last && last.pitches.length ? last.pitches[0].nc : (last && last.notes[0] ? M.noteClassOf(last.notes[0]) : 'do') || 'do';
-      if (open && last && !last.notated && open === pe.meter.beatTicks) {
-        rests = [{ notes: [{ n, rest: true }] }];
-      } else if (open) {
-        const vals = SW.settings.allowedValues().map(id => SW.values.byId(id)).sort((a, b) => b.ticks - a.ticks);
-        vals.forEach(v => { while (open >= v.ticks) { rests.push({ v: v.id, notes: [{ n, rest: true }] }); open -= v.ticks; } });
-        if (open) rests = [];                 // the values offered cannot fill it: the silence does
-      }
-    }
-    return rests;
-  }
-
-  /* Delete on a pick-up: the beat goes, and rests fill what it left open
-     of the bar above. */
-  function deletePickup(pk) {
-    const line = pk.line, prev = previousLine(line);
-    const rests = restsForOpenBar(prev);
-    clearTimeout(deleteTimer);
-    deleteConfirmationState = false;
-    rests.forEach(col => prev.appendChild(createNewSyllable('-', [col])));
-    pk.syllables.forEach(s => s.remove());
-    line.dataset.pickup = 'off';
-    [prev, line].forEach(l => { if (l) { l.querySelectorAll(':scope > .row-break').forEach(b => b.remove()); updateLineHeight(l); } });
-    updateSectionActionButtonsState();
-    const first = line.querySelector('.note');
-    if (first) setNoteAsActive(first, false);
-    SW.bus.emit('edit:armed', { armed: false });
-    SW.ui.toast(rests.length ? 'Pick-up deleted — a rest fills the bar above' : 'Pick-up deleted');
-    changed('syllable');
-  }
-
-  /* The × on a pick-up's bar line: the bar line goes and the pick-up beat
-     joins the bar after it. Nothing moves and nothing is added. */
-  function cutPickupBar(line) {
-    if (!line || !S.editing || !can('structure') || !SW.timing.linePickup(line)) return false;
-    const prev = previousLine(line);
-    line.dataset.pickup = 'off';
-    [prev, line].forEach(l => { if (l) { l.querySelectorAll(':scope > .row-break').forEach(b => b.remove()); updateLineHeight(l); } });
-    SW.ui.toast('Bar line taken out — the pick-up is part of the first bar now');
-    changed('line');
-    return true;
+    if (!joinState().can) return false;
+    return joinLineWithPrevious(selectedSyllable().closest('.notation-line'));
   }
 
   /* Write every block of one line as `v`, or unwrite every note of it —
@@ -952,17 +975,6 @@
     if (!SW.meters.isValid(id) || S.meter === id) return;
     S.meter = id;
     SW.bus.emit('meter:changed', { meter: S.meter, bpm: S.bpm, what: 'meter' });
-    if (!quiet) changed('meter');
-  }
-  /* The song's pick-up (timing.js PICK-UP): 0 or 1 beat, every line.
-     Switching it (Layout settings → 1-beat pick-up) starts every line
-     afresh — each gets its pick-up back, or none has one. */
-  function setPickup(n, quiet) {
-    const v = n ? 1 : 0;
-    if (!quiet) notationContainer.querySelectorAll('.notation-line[data-pickup]').forEach(l => { delete l.dataset.pickup; });
-    if (S.pickup === v) { if (!quiet) changed('meter'); return; }
-    S.pickup = v;
-    SW.bus.emit('meter:changed', { meter: S.meter, bpm: S.bpm, what: 'pickup' });
     if (!quiet) changed('meter');
   }
   /* 30–300 BPM (the family's), narrowed by a lesson's tempo rule. A
@@ -1260,8 +1272,6 @@
     const syllables = getAllSyllables();
     if (currentSyllableIndex >= syllables.length) return;
     const doomed = syllables[currentSyllableIndex];
-    const pk = pickupAt(doomed);
-    if (pk) { deletePickup(pk); return; }            // a pick-up goes as one beat (PICK-UPS)
     const parentLine = doomed.closest('.notation-line');
     clearTimeout(deleteTimer);
     deleteConfirmationState = false;
@@ -1777,30 +1787,41 @@
   }
   function isDeleteArmed() { return deleteConfirmationState; }
 
-  /* New line in the Edit box: a new line starts after this word — one press
-     (DECISIONS D12), because Join up on the new line's first word joins it straight
-     back. On a line's last word the new line holds one "-" on do, so
-     no line is ever left empty. */
-  function newLineAfterCurrent() {
-    if (!S.editing || currentSyllableIndex < 0 || !can('structure')) return;
-    const syllables = getAllSyllables();
-    const currentSyllable = syllables[currentSyllableIndex];
-    if (!currentSyllable) return;
-    const currentLine = currentSyllable.closest('.notation-line');
-    const own = Array.from(currentLine.querySelectorAll(':scope > .syllable'));
-    const at = own.indexOf(currentSyllable);
-    if (at < 0) return;
+  /* New line in the Edit box: the selected word starts a new line (the
+     user's fix, 2026-10-01 — it used to be the word after it), so Join up
+     on it joins it straight back (DECISIONS D12). A line's first word
+     already starts one: greyed there (newLineState). */
+  function splitLineAt(syl) {
+    const line = syl && syl.closest('.notation-line');
+    if (!line) return null;
+    const own = Array.from(line.querySelectorAll(':scope > .syllable'));
+    const at = own.indexOf(syl);
+    if (at <= 0) return null;
     const newLine = createNewLineElement(true);
-    const moved = own.slice(at + 1);
-    if (moved.length) moved.forEach(s => newLine.appendChild(s));
-    else newLine.appendChild(createNewSyllable());
-    currentLine.querySelectorAll(':scope > .row-break').forEach(b => b.remove());
-    currentLine.after(newLine);
+    own.slice(at).forEach(s => newLine.appendChild(s));
+    line.querySelectorAll(':scope > .row-break').forEach(b => b.remove());
+    line.after(newLine);
     updateLineBackgrounds();
-    updateLineHeight(currentLine);
+    updateLineHeight(line);
     updateLineHeight(newLine);
     updateSectionActionButtonsState();
-    setSyllableAsActive(newLine.querySelector('.syllable'));
+    return newLine;
+  }
+  function currentSyllable() {
+    return currentSyllableIndex >= 0 ? getAllSyllables()[currentSyllableIndex] || null : null;
+  }
+  function newLineState() {
+    const syl = currentSyllable();
+    const line = syl && syl.closest('.notation-line');
+    return { can: S.editing && can('structure') && !!line && line.querySelector(':scope > .syllable') !== syl };
+  }
+  function newLineAfterCurrent() {
+    if (!newLineState().can) return;
+    const syl = currentSyllable();
+    const active = getActiveNote();
+    if (!splitLineAt(syl)) return;
+    if (active && document.contains(active) && syl.contains(active)) setNoteAsActive(active, false);
+    else setSyllableAsActive(syl);
     changed('line');
   }
   function handleEnterKeyClick() { newLineAfterCurrent(); }
@@ -1860,7 +1881,6 @@
     if (S.scale && S.scale !== 'major') out.scale = S.scale;                  // the chord panel's scale (chords.js)
     if (S.meter !== SW.meters.DEFAULT) out.meter = S.meter;
     if (S.bpm !== SW.meters.DEFAULT_BPM) out.bpm = S.bpm;
-    if (S.pickup) out.pickup = S.pickup;                                      // every line opens with a pick-up (timing.js)
     const board = SW.chords ? SW.chords.boardModel() : {};
     if (Object.keys(board).length) out.board = board;                        // re-chorded places on the panel
     out.lines = Array.from(notationContainer.querySelectorAll('.notation-line')).map(line => {
@@ -1898,7 +1918,7 @@
             return sy;
           })
         };
-        if (S.pickup && line.dataset.pickup === 'off') lineOut.pickup = false;   // its pick-up was taken away (PICK-UPS)
+        if (line.dataset.pickup && SW.values.isValid(line.dataset.pickup)) lineOut.pickup = line.dataset.pickup;   // it opens with a pick-up (PICK-UPS)
         return lineOut;
       });
     return out;
@@ -1914,7 +1934,6 @@
     S.board = JSON.parse(JSON.stringify(score.board || {}));
     setMeter(score.meter, true);
     setTempo(score.bpm, true);
-    setPickup(score.pickup, true);
     finishTextEdit();
     notationContainer.innerHTML = '';
     currentNoteIndex = -1;
@@ -1926,7 +1945,7 @@
       const label = line.querySelector('.line-label');
       label.value = l.label || '';
       sizeLabel(label);
-      if (l.pickup === false) line.dataset.pickup = 'off';
+      if (l.pickup) line.dataset.pickup = l.pickup;
       l.syllables.forEach(s => line.appendChild(createNewSyllable(s.text, s.cols, s.chord)));
       notationContainer.appendChild(line);
     });
@@ -1960,12 +1979,16 @@
     }
     if (SW.meters.isValid(raw.meter)) out.meter = raw.meter;
     if (raw.bpm !== undefined && raw.bpm !== null) out.bpm = SW.meters.clampBpm(raw.bpm);
-    // omitted when there is none, so songs from before it keep their keys (library matching)
-    if (raw.pickup === 1 || raw.pickup === true) out.pickup = 1;
+    // a line's pick-up (PICK-UPS): a value shorter than a bar. Until
+    // 2026-10-01 `pickup: 1` gave every line a beat — each line that had not
+    // had its own taken away (`pickup: false`) keeps it, as a quarter.
+    const legacyPickup = raw.pickup === 1 || raw.pickup === true;
+    const pickupOk = id => typeof id === 'string' && SW.values.isValid(id) && SW.values.byId(id).ticks < SW.meters.byId(out.meter).barTicks;
     (Array.isArray(raw.lines) ? raw.lines : []).forEach(l => {
       if (!l || typeof l !== 'object') return;
       const line = { label: typeof l.label === 'string' ? l.label.slice(0, 15) : '', syllables: [] };
-      if (l.pickup === false && out.pickup) line.pickup = false;
+      if (pickupOk(l.pickup)) line.pickup = l.pickup;
+      else if (legacyPickup && l.pickup !== false) line.pickup = SW.values.DEFAULT;
       (Array.isArray(l.syllables) ? l.syllables : []).forEach(s => {
         if (!s || typeof s !== 'object') return;
         const syl = { text: typeof s.text === 'string' && s.text.length ? s.text : '-', cols: [] };
@@ -2024,6 +2047,7 @@
     let body = '';
     score.lines.forEach(line => {
       body += `[${line.label || 'New Line'}]\n`;
+      if (line.pickup) body += `[Pickup ${line.pickup}]\n`;
       body += line.syllables.map(s => {
         const cols = s.cols.map(c => c.notes.map(noteToken).join('+') + (c.v ? ':' + c.v : '') + (c.tie ? '_' : '')).join(',');
         return (s.chord ? `{${s.chord}}` : '') + `${s.text}[${cols}]`;
@@ -2033,7 +2057,6 @@
     if (score.scale && score.scale !== 'major') head += `[Scale ${score.scale}]\n`;
     if (score.meter !== SW.meters.DEFAULT) head += `[Time ${score.meter}]\n`;
     if (score.bpm !== SW.meters.DEFAULT_BPM) head += `[Tempo ${score.bpm}]\n`;
-    if (score.pickup) head += `[Pickup ${score.pickup}]\n`;
     return head + body.trim();
   }
 
@@ -2093,7 +2116,10 @@
     let current = null;
     songText.trim().split('\n').forEach(raw => {
       const lineText = raw.trim();
-      if (lineText.startsWith('[Key of') || /^\[(Time|Tempo|Scale|Pickup) /i.test(lineText)) return;
+      // a line's pick-up: [Pickup e] under its name (a song-wide [Pickup 1] is read off the head above)
+      const pk = lineText.match(/^\[Pickup ([^\]]+)\]$/i);
+      if (pk) { if (current && SW.values.isValid(pk[1].trim())) current.pickup = pk[1].trim(); return; }
+      if (lineText.startsWith('[Key of') || /^\[(Time|Tempo|Scale) /i.test(lineText)) return;
       const label = lineText.match(/^\[(.*)\]$/);
       if (label) {
         current = { label: label[1] !== 'New Line' ? label[1] : '', syllables: [] };
@@ -2278,11 +2304,13 @@
     handleAccidentalClick, duplicateCurrentNote, removeCurrentConnectedNote,
     addHarmonyNote, removeHarmonyNote, connectedState, harmonyState,
     addSyllableAfterCurrent, newLineAfterCurrent, handleEnterKeyClick, joinLineWithPrevious,
-    joinUp, joinState, pickupSelected, toggleTie, tieState, soundNote,
+    joinUp, joinState, newLineState, toggleTie, tieState, soundNote,
+    // pick-ups (PICK-UPS)
+    pickupState, makePickup, setPickupValue, removePickup, togglePickup, firstPickup, setFirstPickup, cutPickupBar,
     // lines and sections
     appendEmptyLine, moveSection, duplicateSection, requestDeleteSection,
     // the song's time
-    setMeter, setTempo, setPickup, cutPickupBar,
+    setMeter, setTempo,
     // modes
     setEditing, toggleEditMode, setNames, toggleNames, setColours, toggleColorScheme, changeKey, setScale,
     isTyping: () => !!currentlyEditingText,

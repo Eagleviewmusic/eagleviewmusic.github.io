@@ -403,9 +403,18 @@ body.sections-locked .head-tool { display: none !important; }
 .syllable.highlighted:hover .syl-body { background-color: rgba(255,215,0,.4); }
 body.editing .syllable.highlighted .text { box-shadow: inset 0 -2px 0 #F08A00; }
 .syllable.editing .syl-body { background-color: rgba(0,123,255,.1); transform: scale(1.02); }
-/* View → While it plays → Light up the notes: the family's light box */
-body.light-notes .syllable.sounding .syl-body,
-body.light-notes .syllable.sounding.highlighted .syl-body { background-color: rgba(156,22,142,.10); box-shadow: 0 0 0 1.5px #9C168E, 0 0 12px rgba(156,22,142,.25); transform: none; }
+/* On a written line the selected word's box is drawn by staff.js BEHIND
+   the staff and the heads (a box here would tint the notes over it). */
+.notation-line.has-staff .syllable.highlighted .syl-body { background-color: transparent; box-shadow: none; transform: none; }
+/* View → While it plays → Light up (2026-10-01): Note · Box · Both · Off.
+   While it plays the selection's own look stands down — no yellow, no
+   brightened block — and only the chosen light shows, always behind or
+   around the note so its colour stays true. On a written line staff.js
+   draws both lights under the staff; here, the lines of blocks. */
+body.playing .syllable.highlighted .syl-body { background-color: transparent; box-shadow: none; transform: none; }
+body.playing .note.selected-note { box-shadow: none !important; filter: none; }
+body.playing.play-box .notation-line:not(.has-staff) .syllable.sounding .syl-body { background-color: rgba(156,22,142,.10); box-shadow: 0 0 0 1.5px var(--sound), 0 0 12px rgba(156,22,142,.25); }
+body.playing.play-note .harmony-stack.sounding .note { box-shadow: 0 0 0 2px #fff, 0 0 0 4.5px var(--sound), 0 0 16px 3px rgba(156,22,142,.5) !important; z-index: 20; }
 
 .notes-container { display: flex; flex-direction: row; align-items: flex-end; justify-content: center; margin-bottom: calc(8px * var(--bs)); }
 
@@ -711,6 +720,20 @@ body.show-strip .eb-chords {
 .eb-btn.armed, .eb-btn.armed:hover:not(:disabled) { background: var(--danger); color: #fff; animation: armPulse 1s infinite; }
 .eb-square { flex: 0 0 var(--eb-btn-h); padding: 0; font-size: 20px; font-weight: 900; }
 .eb-wide { grid-column: 1 / -1; }
+/* the pick-up's values (edit-box.js PICK-UP): a row of small chips under
+   Pick-up, the lit one what the selected pick-up is worth */
+.eb-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: -2px; }
+.eb-chips[hidden] { display: none; }   /* only out with the selection in a pick-up */
+.eb-chip {
+  min-width: 0; height: 32px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px; background: var(--paper-2); color: var(--ink-2);
+  transition: background .12s, color .12s, opacity .12s;
+}
+.eb-chip .engraving { height: 20px; width: auto; max-width: 100%; }
+.eb-chip:hover:not(:disabled) { background: var(--edit-soft); color: var(--edit); }
+.eb-chip.on, .eb-chip.on:hover:not(:disabled) { background: var(--edit); color: #fff; }
+.eb-chip:disabled { opacity: .35; }
 /* + Note/Syllable and + Note Only: one action, two ways — the same
    first line, what differs underneath */
 .eb-btn.eb-add { flex-direction: column; gap: 2px; height: auto; min-height: calc(var(--eb-btn-h) + 8px); padding: 5px 4px; }
@@ -1973,6 +1996,7 @@ body.capturing:not(.capture-colour) .line-label { background: #f2f2f2; }
   .play-btn:hover:not(:active) { transform: none; box-shadow: 0 3px 0 rgba(0,0,0,.13); }
   .ts-num:hover:not(:active), .sig-key:hover:not(:active) { transform: none; }
   .eb-btn:hover:not(:active):not(.on):not(.armed):not(:disabled) { background: var(--paper-2); color: var(--ink-2); }
+  .eb-chip:hover:not(:active):not(.on):not(:disabled) { background: var(--paper-2); color: var(--ink-2); }
   .eb-pm:hover:not(:active) { color: var(--ink-2); }
   .value-choice:hover:not(:active) { transform: none; }
   .syllable:hover:not(.highlighted) .syl-body { background-color: transparent; }

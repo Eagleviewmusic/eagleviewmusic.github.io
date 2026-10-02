@@ -20,14 +20,17 @@
    song's meter (SW.state.meter). A line's last bar is padded with silence
    to the bar in playback.
 
-   PICK-UP — the song's own (`score.pickup: 1`, S.pickup; switched in
-   Layout settings → On the page → 1-beat pick-up). Every line then opens
-   with a one-beat pick-up — unless that line's own was taken away (Join
-   up or Delete on it, or its bar line taken out, score.js; the line
-   carries data-pickup="off", `pickup: false` in the model). A line with one has
-   bar 0 = that one beat, and its bar lines fall a beat later (bar k
-   starts at k × bar − shift, shift = a bar less the pick-up).
-   Beats and beams are unmoved (the pick-up is a whole beat).
+   PICK-UP — a line's own (2026-10-01): `data-pickup` on the line holds a
+   value id ('e', 'q.', …; `lines[].pickup` in the model), made with
+   Pick-up in the Edit box (score.js PICK-UPS) or, for the first line,
+   Layout settings → Pick-up. The line opens with a pick-up that long:
+   bar 0 is the pick-up, and its bar lines fall that much later (bar k
+   starts at k × bar − shift, shift = a bar less the pick-up). A pick-up
+   a bar long or more (after a change of time) counts as none. Beats are
+   counted from the bar lines, so beams follow the pick-up.
+   (Until 2026-10-01 it was one beat on every line, switched for the
+   whole song — `score.pickup: 1`; normalizeScore reads that as a
+   quarter on each line that kept its pick-up.)
 
    PADDING — a line runs on (in silence) until the next line's pick-up
    lands on its bar line: the least length L ≥ its notes with
@@ -53,9 +56,7 @@
      SW.timing.lineEvents(lineEl)     { meter, events, total, padded, pickup,
                                         shift, barStart(bar), endsOnBar, opensNext }
      SW.timing.song()                 every line, with absolute starts
-     SW.timing.pickup()               the song's pick-up in ticks (0 when off)
-     SW.timing.linePickup(lineEl)     this line's (0 when off, or taken away)
-     SW.timing.pickupSyllables(lineEl) the syllables that are its pick-up
+     SW.timing.linePickup(lineEl)     this line's pick-up in ticks (0: none)
      SW.timing.tickMs()               milliseconds per tick at the tempo
    ========================================================================== */
 (function () {
@@ -66,11 +67,11 @@
   const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 
   const meter = () => SW.meters.byId(S.meter);
-  function pickup(mt) {
-    return S.pickup && mt.beats > 1 ? mt.beatTicks : 0;
-  }
   function linePickup(line, mt) {
-    return line && line.dataset.pickup === 'off' ? 0 : pickup(mt);
+    const id = line && line.dataset.pickup;
+    if (!id || !SW.values.isValid(id)) return 0;
+    const t = SW.values.byId(id).ticks;
+    return t < mt.barTicks ? t : 0;
   }
   const allLines = () => Array.from(document.querySelectorAll('#score .notation-line'));
   const mod = (a, b) => ((a % b) + b) % b;
@@ -119,7 +120,7 @@
       ev.start = t;
       ev.end = t + ev.ticks;
       ev.bar = Math.floor((t + shift) / mt.barTicks);
-      ev.beat = Math.floor(t / mt.beatTicks);       // beat number from the line's start
+      ev.beat = Math.floor((t + shift) / mt.beatTicks);   // beat number, counted from the bar lines
       ev.beam = null;
       t = ev.end;
       return ev;
@@ -134,7 +135,7 @@
     };
     events.forEach(ev => {
       const beamable = ev.notated && !ev.rest && ev.ticks < mt.beatTicks;
-      const endBeat = Math.floor((ev.end - 1) / mt.beatTicks);
+      const endBeat = Math.floor((ev.end - 1 + shift) / mt.beatTicks);
       if (!beamable || endBeat !== ev.beat) { close(); return; }
       if (groupBeat !== ev.beat) { close(); group++; groupBeat = ev.beat; }
       ev.beam = group;
@@ -178,24 +179,6 @@
     };
   }
 
-  /* A line's pick-up, as syllables: those whose notes lie inside its one
-     beat. Null when it has none, or when a note or a syllable runs on
-     past it (a first note longer than a beat) — then there is no beat of
-     its own to join up or delete. `whole`: the pick-up is all the line. */
-  function pickupSyllables(line) {
-    const le = lineEvents(line);
-    if (!le.pickup || !le.events.length) return null;
-    const syls = [];
-    for (const ev of le.events) {
-      if (ev.start < le.pickup) {
-        if (ev.end > le.pickup) return null;
-        if (syls.indexOf(ev.syllable) === -1) syls.push(ev.syllable);
-      } else if (syls.indexOf(ev.syllable) !== -1) return null;
-    }
-    const all = line.querySelectorAll(':scope > .syllable').length;
-    return syls.length ? { syllables: syls, whole: syls.length >= all } : null;
-  }
-
   /* The whole song: lines in order, each starting on the bar after the
      previous one ends. Events carry `at` (absolute ticks). */
   function song() {
@@ -212,14 +195,13 @@
     });
     const mt = meter();
     const p0 = out.length ? out[0].pickup : 0;          // the song's grid is the first line's
-    return { lines: out, total: at, meter: mt, pickup: pickup(mt), shift: p0 ? mt.barTicks - p0 : 0 };
+    return { lines: out, total: at, meter: mt, pickup: p0, shift: p0 ? mt.barTicks - p0 : 0 };
   }
 
   function tickMs() { return 60000 / (S.bpm || 100) / SW.values.TICKS_PER_QUARTER; }
 
   SW.timing = {
-    column, lineEvents, song, tickMs, pickupSyllables, LETTERS,
-    pickup: () => pickup(meter()),
+    column, lineEvents, song, tickMs, LETTERS,
     linePickup: line => linePickup(line, meter())
   };
 })();

@@ -69,11 +69,21 @@
     chordVolume: 100,
     room: 35,               // Sound → Room: the reverb, % (Key Blocks' default)
     laneChordsPlay: true,   // Sound → Chords: the lane's chords sound where they change
-    lightNotes: true,       // While it plays → Light up the notes
+    playLight: 'note',      // While it plays → Light up: 'note' | 'box' | 'both' | 'off' (was lightNotes, a switch; 'note' the default — the user's call)
     followScroll: true,     // While it plays → Follow along
     colourPictures: true    // Library → Keep the section colours in saved pictures
   };
   const view = Object.assign({}, VIEW_DEFAULTS);
+  /* View → While it plays → Light up (2026-10-01): what shows the note
+     that is sounding. Every light sits behind the note (staff.js draws the
+     box and the glow under the staff), so a note keeps its colour. */
+  const PLAY_LIGHTS = ['note', 'box', 'both', 'off'];
+  const PLAY_LIGHT_NOTES = {
+    note: 'The sounding note glows',
+    box: 'A box behind the word that is sounding',
+    both: 'The note glows, with a box behind its word',
+    off: 'Nothing lights up while it plays'
+  };
 
   /* The three workspaces — what is on the stage — the Song · Keyboard ·
      Chords switch in the top bar. (2.0 called them Classic · Melody ·
@@ -92,6 +102,8 @@
         Object.keys(VIEW_DEFAULTS).forEach(k => { if (raw[k] !== undefined) view[k] = raw[k]; });
         // an earlier build stored this switch as showValues
         if (raw.showStaff === undefined && raw.showValues !== undefined) view.showStaff = !!raw.showValues;
+        // Light up the notes was a switch until 2026-10-01: on → the box, off → off
+        if (raw.playLight === undefined && raw.lightNotes === false) view.playLight = 'off';
       }
     } catch (e) {}
     if (OLD_WORKSPACE[view.workspace]) view.workspace = OLD_WORKSPACE[view.workspace];
@@ -117,8 +129,9 @@
     }
     if (typeof view.dockHeight === 'number') view.dockHeight = ui.clamp(Math.round(view.dockHeight) || 100, 52, 600);
     else if (!DOCK_HEIGHTS.includes(view.dockHeight)) view.dockHeight = 'md';
-    ['showStrip', 'showLane', 'showDock', 'showStaff', 'colours', 'kbFocus', 'laneChordsPlay', 'lightNotes', 'followScroll', 'colourPictures']
+    ['showStrip', 'showLane', 'showDock', 'showStaff', 'colours', 'kbFocus', 'laneChordsPlay', 'followScroll', 'colourPictures']
       .forEach(k => { view[k] = !!view[k]; });
+    if (PLAY_LIGHTS.indexOf(view.playLight) === -1) view.playLight = VIEW_DEFAULTS.playLight;
   }
   function saveView() {
     try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (e) {}
@@ -214,7 +227,8 @@
     b.classList.toggle('show-lane', shows('lane'));
     b.classList.toggle('show-dock', shows('dock'));
     b.classList.toggle('show-staff', !!view.showStaff);
-    b.classList.toggle('light-notes', !!view.lightNotes);
+    b.classList.toggle('play-note', view.playLight === 'note' || view.playLight === 'both');
+    b.classList.toggle('play-box', view.playLight === 'box' || view.playLight === 'both');
     b.classList.toggle('hide-section-titles', !layout.show.sectionTitles);
     b.classList.toggle('hide-keycaps', !layout.show.keycaps);
     if (SW.score && SW.score.setColours && S.colorScheme !== !!view.colours) SW.score.setColours(!!view.colours);
@@ -275,7 +289,6 @@
     { key: 'colours', name: 'Section colours', desc: 'A pastel band behind each line' }
   ];
   const PLAY_SWITCHES = [
-    { key: 'lightNotes', name: 'Light up the notes', desc: 'A box around the note that is sounding' },
     { key: 'followScroll', name: 'Follow along', desc: 'Scroll to keep the sounding note in view' }
   ];
   function fillSwitches(listId, rows) {
@@ -310,6 +323,12 @@
     document.querySelectorAll('#lyric-font-row .font-chip').forEach(c => c.classList.toggle('active', c.dataset.font === view.lyricFont));
     $('lyric-font-note').textContent = LYRIC_FONTS[view.lyricFont].note;
     document.querySelectorAll('#strip-size-seg .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.ss === view.stripSize));
+    document.querySelectorAll('#play-light-seg .seg-btn').forEach(b => {
+      const on = b.dataset.pl === view.playLight;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-checked', String(on));
+    });
+    if ($('play-light-note')) $('play-light-note').textContent = PLAY_LIGHT_NOTES[view.playLight];
     // the keyboard and strip sizes go with the parts a lesson leaves in
     showHide($('kb-colors-row'), allow('dock'));
     syncKeyColours();
@@ -492,6 +511,7 @@
     });
     wireKeyColours();
     $('strip-size-seg').addEventListener('click', e => { const b = e.target.closest('.seg-btn'); if (b) setView({ stripSize: b.dataset.ss }); });
+    $('play-light-seg').addEventListener('click', e => { const b = e.target.closest('.seg-btn'); if (b) setView({ playLight: b.dataset.pl }); });
     wireMixer();
     $('voicing-seg').addEventListener('click', e => { const b = e.target.closest('.seg-btn'); if (b) setView({ voicing: b.dataset.voicing }, { quiet: true }); });
     $('at-end-seg').addEventListener('click', e => {
@@ -809,13 +829,16 @@
     ].forEach(([k, name, desc]) => {
       list.appendChild(ui.switchRow(name, desc, layout.show[k], () => { layout.show[k] = !layout.show[k]; layoutChanged(); renderLayoutShow(); }));
     });
-    /* The pick-up is the song's (score.pickup: saved, shared and sent with
-       it), switched here beside the page's other rules. */
-    list.appendChild(ui.switchRow('1-beat pick-up (this song)',
-      'Every line starts with a one-beat pick-up that finishes the bar before it. In Edit, the × on a pick-up’s bar line takes it off that line',
-      !!S.pickup, () => { SW.score.setPickup(!S.pickup); renderLayoutShow(); }));
+    /* The first line's pick-up (the song's own — lines[0].pickup, saved,
+       shared and sent with it; score.js PICK-UPS). Any other line takes
+       one from Pick-up in the Edit box. */
+    list.appendChild(ui.switchRow('Pick-up (first line)',
+      'The song starts with a pick-up into its first bar. In Edit, select a note in it to choose its rhythm or take it away; Pick-up in the Edit box gives any line one',
+      !!SW.score.firstPickup(), () => { SW.score.setFirstPickup(!SW.score.firstPickup()); renderLayoutShow(); }));
   }
   SW.bus.on('score:loaded', () => { if ($('layout-show')) renderLayoutShow(); });
+  // the first line's pick-up can change in Edit (or its line move up)
+  SW.bus.on('score:changed', e => { if (e && (e.reason === 'line' || e.reason === 'section') && $('layout-show')) renderLayoutShow(); });
 
   function renderLayoutNotes() {
     const presets = $('layout-range-presets');

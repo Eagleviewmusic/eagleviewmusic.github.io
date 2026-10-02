@@ -97,9 +97,9 @@ in `js/core.js`).
 | `board` | `{ place: { root, q, mods, label? } }` — place one of `f d s a g r e q w 1 2 3 4 5`; `root` a degree relative to the tonic (`5`, `b6`, `#4`); `q` a quality id from `theory.js` (`maj min dim aug sus2 sus4 pow dom7 maj7 min7 m7b5 dim7 mmaj7 aug7 dom7b5 six min6 add9 madd9 six9 dom9sus4 dom7s9 dom7b9 dom9s5 dom13b9 majb5`); `mods` function ids (`sus2 add9 sus4 b7 maj7 inv6 inv64 inv65 inv43 inv42`); `label` ≤ 12 chars | Optional (2026-09-27). The places on the chord panel the song has re-chorded; a place left out shows the scale's own chord. **Omitted when empty.** |
 | `meter` | `2/4`, `3/4`, `4/4` | **Omitted when `4/4`.** |
 | `bpm` | 30–300 (the family's range; songs saved when it was 40–200 read unchanged) | **Omitted when 100.** |
-| `pickup` | `1` | Optional (2026-09-28). Every line opens with a one-beat pick-up. **Omitted = none.** Until 2026-09-28 this was the Layout setting `show.pickup` (§7); a record, link or lesson whose `layout.show.pickup` is `true` and whose score has no `pickup` is read as `pickup: 1` (`normalizeSong`). |
+| `pickup` | `1` | **No longer written** (2026-09-28 to 2026-10-01: every line opened with a one-beat pick-up). Still read: each line without `pickup: false` gets `pickup: "q"`. Before 2026-09-28 it was the Layout setting `show.pickup` (§7); a record, link or lesson whose `layout.show.pickup` is `true` and whose score has no `pickup` is read as `pickup: 1` (`normalizeSong`). |
 | `lines[].label` | string, ≤ 15 chars | Section name (`A`, `Verse`…); may be empty. |
-| `lines[].pickup` | `false` | Optional (2026-09-25). With the song's `pickup` on, this line has had its pick-up taken away (Join up or Delete on it, or the × on its bar line) and starts on a downbeat. **Omitted = the line follows the song**; dropped when the song has no `pickup`. Not kept in the 1.0 text format (§3). |
+| `lines[].pickup` | a value id shorter than a bar: `s`, `e`, `e.`, `q`, `q.`, `h`, `h.` | Optional (2026-10-01). The line opens with a pick-up worth that value; its first bar line falls that far in. **Omitted = none.** A value a bar long or more is dropped on reading. (`false` — the older "this line's pick-up was taken away" — is still read, with the song's old `pickup: 1`.) |
 | `syllables[].text` | string | `-` means no word under these notes. Never empty. |
 | `syllables[].chord` | a chord id (`I`, `V7`, `ii`, `bVI`, `#iv°7`, `Imaj7`, `V:inv64`, `I:sus4,add9`) | Optional; one per syllable, drawn in the chord lane. The id is a roman numeral the engine (`js/chords.js`) reads back in any key: ♭/♯ + numeral (lower case = the minor family) + Theory's quality suffix, then `:` and the functions applied, comma-separated. The fourteen ids written before 2026-09-27 (`I ii iii IV V vi V/V V/vi IV/IV bVI iv vii°7/V V/iii V/ii`) still read (`V/V` → `II`, `vii°7/V` → `#iv°7`). An id the engine cannot read is kept and drawn grey. |
 | `syllables[].cols` | ≥ 1 column | One column per note in time; a syllable can hold several (a melisma). |
@@ -129,12 +129,13 @@ editor) and written by `SW.score.toText`:
 [Scale dorian]      (optional; omitted for major — 2026-09-27)
 [Time 3/4]          (optional; omitted for 4/4)
 [Tempo 96]          (optional; omitted for 100)
-[Pickup 1]          (optional; omitted when none — 2026-09-28)
 [A]
+[Pickup e]          (optional, under a line's name: its pick-up — 2026-10-01)
 {I}Twin[D1] kle[D1:q] {V7}twin[S1,S1:e] kle[S1+M1:h] rest[D1~]
 ```
 
-The `board` does not travel in the text (the JSON carries it).
+The `board` does not travel in the text (the JSON carries it). A `[Pickup 1]`
+in the head (2026-09-28 to 2026-10-01) is still read: a quarter on every line.
 
 `[X1]` note shorthand, `,` next column, `+` harmony, `:q` a value, `~` a rest,
 `_` at a column's end a tie to the next (`D1:q_,D1:e`),
@@ -266,7 +267,7 @@ must still read:
 | --- | --- | --- |
 | `workspace` | `song` · `keyboard` · `chords` · `custom` | 2.0 stored `classic` / `melody`; they are read as `song` / `keyboard`. |
 | `colours` | boolean, default `true` | Section colours (was an unremembered toolbar button). |
-| `lightNotes` | boolean, default `true` | While it plays → Light up the notes. |
+| `playLight` | `note` · `box` · `both` · `off`, default `note` | While it plays → Light up (2026-10-01): the sounding note glows, a box behind its word, both, or nothing. Every light is behind the note. Replaces `lightNotes` (boolean): a stored `false` reads as `off`. |
 | `colourPictures` | boolean, default `true` | Library → Keep the section colours in saved pictures. |
 | `voicing`, `laneChordsPlay` | as before | Now shown in the Sound popover. |
 

@@ -148,7 +148,10 @@ hat goes on.
 │ + Note     + Note   │   the two ways to add a note, side by side: with a
 │  /Syllable   Only   │   syllable of its own after this one, or connected
 │ WORDS & LINES       │
-│ ↰ Join up ↵ New line│   Join up on a line's first word only
+│ ↰ Join up ↵ New line│   Join up on a line's first word only; New line
+│                     │   starts the line AT the selected word (2026-10-01)
+│ ♪| Pick-up          │   a new line here with a pick-up; lit in one:
+│ 𝅘𝅥𝅯 ♪  ♩  𝅗𝅥 /  ♪. ♩. 𝅗𝅥.│   Remove pick-up. Chips: what it is worth
 │ ×      Delete       │   delete takes two taps
 │ Staff notation  ◯━  │   View → Staff notation, the same setting
 └─────────────────────┘
@@ -280,38 +283,35 @@ until they are written too.
   sixteenth; dots in spaces, clear of an up flag; whole rest centred in its bar.
 - **Time:** a block counts as one beat until it is written; each line starts a
   new bar; bar lines and beams only inside runs of written notes.
-- **1-beat pick-up** (switched in Layout settings → On the page, 2026-09-25;
-  since 2026-09-28 the SONG's own — `score.pickup: 1`, `S.pickup`,
-  `SW.score.setPickup`, `[Pickup 1]` in the text format — so share links,
-  backups and the text carry it whatever the layout; a song saved or sent
-  with the old `layout.show.pickup` on takes it as its own in
-  `normalizeSong`): every line opens with a one-beat
-  pick-up, so its bar lines fall a beat later (`timing.js` PICK-UP). Lines are
-  still padded to whole bars, so each line's pick-up finishes the bar the line
-  before left open: that line ends without a closing bar line, the song's last
-  bar is a beat short with the final bar line, and bar numbers count from the
-  first whole bar. The steady beat's accent moves with the bars, and a
-  count-in into a pick-up leaves it the last beat (1 2 3 · pick-up on 4).
-  **Per line** (score.js PICK-UPS): Join up on a line's pick-up moves just
-  that beat to the end of the line above and the line keeps the rest, now
-  starting on a downbeat (its first word is selected, so Join up again joins
-  the whole line); Delete on a pick-up removes the beat and rests fill the
-  bar above (a rest block when that line ends in a block and one beat is
-  open). The line then carries `data-pickup="off"` / `pickup: false`; a new
-  line opens with a pick-up again. A line pads on until the next line's
-  pick-up lands on its bar line, so every downbeat stays on one grid and
-  bar numbers are counted on it. A first note longer than the beat is not a
-  pick-up of its own, and the buttons treat it as an ordinary word.
-  **The × on the bar line** (2026-09-28, Edit only; staff.js `syncCut`,
-  score.js `cutPickupBar`): a mouse over the bar line that closes a line's
-  pick-up lights it red with a × over the staff (always faintly shown on
-  touch screens); the × takes that bar line out — the line's pick-up is off
-  and its beat is part of the first bar. Nothing else changes: the bar above
-  is left open (silence), so no stray rests whatever order lines are cut in.
-  Switching the pick-up off or on gives every line a fresh start.
+- **Pick-ups are a line's own** (2026-10-01, the user's design; score.js
+  PICK-UPS, timing.js PICK-UP). A line's `data-pickup` / `lines[].pickup` is
+  the value it is worth (`s e e. q q. h h.`, shorter than a bar); its bar
+  lines fall that much in (bar 0 is the pick-up), beats and beams are
+  counted from them. Made two ways: **Layout settings → On the page →
+  Pick-up (first line)** switches the first line's; **Pick-up in the Edit
+  box** (Words & lines), on a selected note, starts a new line AT that word
+  (as New line does) opening with a pick-up worth the word's own length (a
+  beat for a block) — or, on a line's first word, gives that line one. With
+  the selection in a pick-up (a word starting inside it) value chips appear
+  under the button (plain values over dotted; hidden otherwise, 2026-10-01,
+  less clutter) and re-value it; the button then reads **Remove pick-up**, which joins the line back
+  onto the line above (the first line just starts on the downbeat). The ×
+  over a pick-up's bar line (Edit; staff.js `syncCut`) does the same. Notes
+  are never rewritten: the bar line falls after that much music, even
+  through a note. A line pads on (silence) until the next line's pick-up
+  lands on its bar line, so every downbeat sits on one grid, a line before
+  a pick-up ends without a closing bar line, and bar numbers count from the
+  first whole bar. The steady beat's accent follows the grid; a count-in
+  into a pick-up stops where it comes in (1 2 3 · a beat's pick-up on 4; 1 2
+  3 4 · an eighth's on the "and"). Join up and Delete are ordinary on a
+  pick-up now. History: 2026-09-25 a 1-beat pick-up on every line (Layout
+  switch; Join up / Delete / × took one line's away), 2026-09-28 the song's
+  own (`score.pickup: 1`, `[Pickup 1]`); both still read — every line that
+  kept its pick-up gets a quarter (`normalizeScore`, `normalizeSong` for the
+  older `layout.show.pickup`).
 - View → **Staff notation** off shows every column as a block again.
 
-Not yet: pick-ups longer than a beat (or on the first line only), 6/8, cross-staff (kneed) beams for very wide leaps.
+Not yet: 6/8, cross-staff (kneed) beams for very wide leaps.
 
 ## Touch screens and smart boards (tested 2026-09-27)
 
@@ -488,7 +488,7 @@ Each file's header comment is the full contract.
   (staff notation, section colours) · Scale (Justify width / Fixed) · Text size ·
   Lyric font · Keyboard & strip (**Key colours** — Rainbow /
   Colours when played / One colour + 10 swatches and a colour picker; `kbColors`,
-  `kbColor` — Chord panel S/M/L) · While it plays (Light up the notes,
+  `kbColor` — Chord panel S/M/L) · While it plays (Light up: Note · Box · Both · Off — behind the note, staff.js draws it under the staff on written lines;
   Follow along) · Layout settings… · How this works. Also remembered, set from
   the panel itself: `chordSet`, `modSlots`, `chordNames` and `chordTones`.
 - **Sound**: see Playing.

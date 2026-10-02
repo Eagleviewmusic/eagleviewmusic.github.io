@@ -6906,16 +6906,31 @@
 
     group.appendChild(notesBox);
 
-    // Fruit Rhythms names a held note that spans a whole linked run of
-    // beats - a half, dotted half or whole note - with one word of its
-    // own, instead of the per-beat fruit word a plain quarter would use.
-    const FRUIT_SPAN_WORDS = { 2: 'Orange', 3: 'Oreo', 4: 'Baha honey' };
-    const fruitSpanWord =
-      rhythmState.currentRhythmSystem === 'Fruit Rhythms' &&
-      isJoinStart && linkGroup.length > 1 && fullRunRoles &&
-      fullRunRoles[0] === 'note' && fullRunRoles.slice(1).every(r => r === 'hold')
-        ? FRUIT_SPAN_WORDS[linkGroup.length]
-        : null;
+    // Fruit Rhythms names a note held over whole beats of a linked run -
+    // a half, dotted half or whole note - with one word of its own,
+    // instead of the per-beat fruit word a plain quarter would use. The
+    // note need not fill the run: a half note and two quarters joined
+    // across a bar still reads Orange.
+    const FRUIT_SPAN_WORDS = { 2: 'Orange', 3: 'O-re-o', 4: 'Ba-ha hon-ey' };
+    let fruitSpanWord = null;
+    if (rhythmState.currentRhythmSystem === 'Fruit Rhythms' && beatIsJoined && !tupletRun) {
+      const run = getLinkGroup(beatIndex);
+      const roles = fullRunRoles && isJoinStart
+        ? fullRunRoles : rolesFromFlags(getLinkGroupFlags(run, displayWords));
+      let at = 0;
+      for (let b = run.start; b < beatIndex; b++) at += getBeatSubdivision(b);
+      if (roles[at] === 'note') {
+        let beats = 0, slot = at, b = beatIndex;
+        while (b <= run.end) {
+          const n = getBeatSubdivision(b);
+          const rest = roles.slice(slot + (b === beatIndex ? 1 : 0), slot + n);
+          if (b !== beatIndex && roles[slot] !== 'hold') break;   // the next note starts this beat
+          if (rest.some(r => r !== 'hold')) { beats = 0; break; } // ends mid-beat: not a long note
+          beats++; slot += n; b++;
+        }
+        fruitSpanWord = beats > 1 ? (FRUIT_SPAN_WORDS[beats] || null) : null;
+      }
+    }
 
     if (isRhythm) {
         const chantSyllables = getChantText(activeStates, rhythmState.currentRhythmSystem, circlesInThisBeat);

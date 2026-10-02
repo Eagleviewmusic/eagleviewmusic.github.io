@@ -21,13 +21,24 @@
         │  /Syllable   Only   │   away. The two ways to add a note, side
         │ WORDS & LINES       │   by side: with a syllable of its own
         │ ↰ Join up ↵ New line│   after this one, or on this same
-        │ ×      Delete       │   syllable (connected). Delete: two taps
+        │ ♪| Pick-up          │   syllable (connected). New line and
+        │ 𝅘𝅥𝅯 ♪  ♩  𝅗𝅥 /  ♪. ♩. 𝅗𝅥.│   Pick-up start a line AT the selected
+        │ ×      Delete       │   word (see below). Delete: two taps
         │ Staff notation  ◯━  │   the View switch, the same setting
         └─────────────────────┘
 
    It stays out for as long as the hat is on, and nothing is drawn around
    the note, so the song does not move when the hat goes on. Every button
    calls score.js — the same functions the keys call.
+
+   PICK-UP (2026-10-01, the user's design; score.js PICK-UPS). On a word
+   that is not in a pick-up, Pick-up starts a new line there (as New
+   line does) opening with a pick-up worth the word's own length. In a
+   pick-up the button is lit and reads Remove pick-up (the line joins
+   back onto the one above), and the value chips appear under it, the lit
+   one its value — tap another to change it. Out of a pick-up the chips
+   are away (the user's call: less clutter), the one exception to the
+   box's "still targets" rule.
 
    STAFF NOTATION. The switch at the foot is View → Staff notation itself
    (settings.js view.showStaff, through setView): turn it off in either
@@ -79,6 +90,7 @@
 
   const ICON = {
     harmony: '<svg viewBox="0 0 18 20" aria-hidden="true"><rect x="5.5" y="1" width="10" height="18" rx="2" fill="currentColor" stroke="none" opacity=".55"/><rect x="1.5" y="7" width="10" height="12" rx="2" fill="currentColor" stroke="none"/></svg>',
+    pickup: '<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="7.5" cy="17" rx="3.4" ry="2.5" transform="rotate(-20 7.5 17)" fill="currentColor" stroke="none"/><path d="M10.6 16.2V4.5l3.6 3"/><path d="M19.5 3.5v17"/></svg>',
     newline: '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 10 4 15 9 20"/><path d="M20 5v10H4"/></svg>',
     join: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a4 4 0 0 1 0 8h-1"/></svg>',
     add: '<svg viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:2.6"><path d="M12 5v14"/><path d="M5 12h14"/></svg>',
@@ -142,9 +154,23 @@
   kicker('Words & lines', secWords);
   const grid = div('eb-grid', secWords);
   const join = button('eb-btn', ICON.join + '<span>Join up</span>', 'Join this line to the one above', 'join', () => SW.score.joinUp());
-  const newline = button('eb-btn', ICON.newline + '<span>New line</span>', 'Start a new line after this word', 'newline', () => SW.score.newLineAfterCurrent());
+  const newline = button('eb-btn', ICON.newline + '<span>New line</span>', 'Start a new line at this word', 'newline', () => SW.score.newLineAfterCurrent());
+  const pick = button('eb-btn eb-wide', ICON.pickup + '<span class="eb-pick-label">Pick-up</span>', 'Pick-up', 'pickup', () => SW.score.togglePickup());
+  const pickLabel = pick.querySelector('.eb-pick-label');
+  const chips = div('eb-chips eb-wide');
+  chips.setAttribute('role', 'group');
+  chips.setAttribute('aria-label', 'What the pick-up is worth');
   const del = button('eb-btn danger eb-wide', ICON.del + '<span>Delete</span>', 'Delete this syllable (tap twice)', 'delete', () => SW.score.handleDeleteClick());
-  grid.append(join, newline, del);
+  grid.append(join, newline, pick, chips, del);
+
+  /* the pick-up's values: the plain ones over their dotted ones (a value
+     a bar long or more in this time is greyed, never taken away) */
+  ['s', 'e', 'q', 'h', null, 'e.', 'q.', 'h.'].forEach(id => {
+    if (!id) { div('eb-chip-gap', chips); return; }
+    const c = button('eb-chip', SW.engrave.value(id, { height: 20 }), SW.values.byId(id).name, null, () => SW.score.makePickup(id));
+    c.dataset.v = id;
+    chips.appendChild(c);
+  });
 
   /* ---- Staff notation: View's switch, the same setting ---- */
   const staffSwitch = SW.ui.switchRow('Staff notation', '', false, e => {
@@ -220,18 +246,31 @@
 
     // Words & lines (not while a word is being typed: Space and ⌫ do that)
     secWords.hidden = !structOn;
-    // on a line's pick-up (Layout settings → 1-beat pick-up), Join up and
-    // Delete act on that one beat (score.js PICK-UPS)
-    const js = SW.score.joinState();
-    join.disabled = typing || !js.can;
-    setTitle(join, js.pickup ? 'Join the pick-up to the line above (the rest of this line stays)' : 'Join this line to the one above');
-    newline.disabled = del.disabled = !syl || typing;
+    join.disabled = typing || !SW.score.joinState().can;
+    const nl = SW.score.newLineState();
+    newline.disabled = typing || !nl.can;
+    setTitle(newline, syl && !nl.can ? 'This word already starts a line' : 'Start a new line at this word');
+    // the pick-up (score.js PICK-UPS)
+    const pk = SW.score.pickupState();
+    pick.disabled = typing || !pk.can;
+    pick.classList.toggle('on', pk.on);
+    pickLabel.textContent = pk.on ? 'Remove pick-up' : 'Pick-up';
+    setTitle(pick, pk.on
+      ? (pk.first ? 'Take the pick-up away — the song starts on the downbeat' : 'Take the pick-up away — this line joins back onto the line above')
+      : 'Pick-up — a new line starts at this word, with a pick-up into its first bar');
+    chips.hidden = !pk.on;
+    chips.querySelectorAll('.eb-chip').forEach(c => {
+      const id = c.dataset.v, name = SW.values.byId(id).name.toLowerCase();
+      const fits = pk.values.indexOf(id) !== -1;
+      c.disabled = typing || !pk.can || !fits;
+      c.classList.toggle('on', pk.value === id);
+      setTitle(c, !fits ? 'A ' + name + ' is a bar or more in this time'
+        : pk.value === id ? 'The pick-up is worth a ' + name : 'Make the pick-up worth a ' + name);
+    });
+    del.disabled = !syl || typing;
     const armed = SW.score.isDeleteArmed();
-    const onPickup = SW.score.pickupSelected();
     del.classList.toggle('armed', armed && !del.disabled);
-    setTitle(del, onPickup
-      ? (armed ? 'Tap again to delete the pick-up' : 'Delete the pick-up (tap twice) — a rest fills the bar above')
-      : (armed ? 'Tap again to delete this syllable' : 'Delete this syllable (tap twice)'));
+    setTitle(del, armed ? 'Tap again to delete this syllable' : 'Delete this syllable (tap twice)');
 
     // the first section shown draws no rule above it; with none, a hint
     const shown = [secValues, secNote, secSyl, secWords].filter(s => !s.hidden && !s.classList.contains('policy-off'));
@@ -261,7 +300,7 @@
 
   /* ================= wiring ================= */
   SW.bus.on('mode:changed', () => { seatChords(); if (S.editing) render(); });
-  ['selection', 'score:changed', 'score:loaded', 'layout:changed', 'policy:changed', 'key:changed',
+  ['selection', 'score:changed', 'score:loaded', 'layout:changed', 'policy:changed', 'key:changed', 'meter:changed',
    'edit:armed', 'staff:drawn', 'view:changed', 'words:typing'].forEach(evt => SW.bus.on(evt, schedule));
 
   SW.editBox = { render, schedule };

@@ -100,6 +100,7 @@
     <div>
       <h2 class="lib-title">What students can find on the shelf</h2>
       <p class="fine" id="lib-summary"></p>
+      <p class="fine lib-howto"><strong>Working on a song in two places?</strong> <em>Hide</em> keeps it here but off the students’ shelf (anyone who already has it keeps that copy, and gets your new version when you <em>Show</em> it). <em>Download</em> saves its file as your own copy — open it in the app on your other computer (Library → Restore from a backup), keep working, and publish from there.</p>
     </div>
     <div class="lib-top-acts">
       <button class="btn small lib-edit-only" id="lib-new-book">＋ New book</button>
@@ -121,6 +122,9 @@
   <div class="lib-bulk" id="lib-bulk" hidden>
     <span id="lib-bulk-count"></span>
     <span id="lib-bulk-move"></span>
+    <button class="text-btn" id="lib-bulk-hide" title="Keep them in the Teacher Library, off the students’ shelf">Hide</button>
+    <button class="text-btn" id="lib-bulk-show" title="Put them back on the students’ shelf">Show</button>
+    <button class="text-btn" id="lib-bulk-download" title="Download their files as your own copies">Download</button>
     <button class="text-btn danger" id="lib-bulk-remove">Take down</button>
     <button class="text-btn" id="lib-bulk-clear">Clear ticks</button>
   </div>
@@ -130,6 +134,9 @@
 
 <footer class="dock" id="dock">
   <span class="dock-count" id="dock-count">Nothing ticked</span>
+  <label class="dock-hide" title="Publish into the Teacher Library but keep them off the students’ shelf until you Show them (Teacher Library tab). A hidden song stays hidden when you publish it again.">
+    <input type="checkbox" id="publish-hidden"> Hidden from students
+  </label>
   <span class="dock-acts">
     <button class="btn small" id="download-files-btn" hidden title="Download the files instead, to upload on GitHub yourself">Download files</button>
     <button class="btn primary" id="download-btn" disabled>Download</button>

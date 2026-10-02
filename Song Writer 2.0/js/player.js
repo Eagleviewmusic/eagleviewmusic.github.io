@@ -7,7 +7,7 @@
                last bar. The selection follows along (silently, so the
                scheduled sound is the only sound), which also scrolls the
                stage, slides the keyboard dock and lights the sounding
-               syllable (View → Light up the notes).
+               word and column (View → While it plays → Light up).
 
    Everything is placed on the audio clock — a setTimeout would drift. A
    pass is scheduled up front (songs are short), and a timer loop moves
@@ -26,10 +26,10 @@
      Chords    the lane's chords where they change (View pref
                laneChordsPlay; heard with the chord lane out, as in 2.0)
      beat      a soft tick on every beat
-     countIn   one bar first (two when the bar has two beats); with a
-               1-beat pick-up (Layout settings) and Play starting on a
-               bar's last beat, one beat fewer, so the pick-up falls on
-               the count's missing beat (1 2 3 · pick-up on 4)
+     countIn   one bar first (two when the bar has two beats); when Play
+               starts in a line's pick-up, the count stops where the
+               pick-up comes in (a beat's pick-up: 1 2 3 · pick-up on 4;
+               an eighth's: 1 2 3 4 · pick-up on the "and")
      atEnd     'stop'  — stop at the end (2.0's behaviour)
                'round' — go round from where Play began, re-anchored at
                          the end of the last pass so nothing drifts
@@ -68,6 +68,7 @@
   let playToken = 0;          // a start still getting ready is dropped if this moves
   let run = null;             // the run in progress (see play)
   let soundingSyl = null;
+  let soundingStack = null;   // the column itself (View → Light up → Note)
 
   const ctx = () => SW.audio.context();
   const latency = () => { const ac = ctx(); return ac.outputLatency || ac.baseLatency || 0; };
@@ -78,7 +79,14 @@
     SW.bus.emit('play:changed', { playing: on });
   }
 
-  function markSounding(syl) {
+  /* .sounding on the word and on the column that is sounding: style.css
+     and staff.js light them as View → While it plays → Light up says. */
+  function markSounding(syl, stack) {
+    if (soundingStack !== (stack || null)) {
+      if (soundingStack) soundingStack.classList.remove('sounding');
+      soundingStack = stack || null;
+      if (soundingStack) soundingStack.classList.add('sounding');
+    }
     if (soundingSyl === syl) return;
     if (soundingSyl) soundingSyl.classList.remove('sounding');
     soundingSyl = syl || null;
@@ -181,7 +189,7 @@
     if (S.sound.beat) {
       const bt = mt.beatTicks;
       const shift = plan.song.shift || 0;
-      for (let t = Math.ceil(fromTick / bt) * bt; t < toTick; t += bt) {
+      for (let t = Math.ceil((fromTick + shift) / bt) * bt - shift; t < toTick; t += bt) {
         const o = SW.audio.click(anchor + secs(t), (t + shift) % mt.barTicks === 0, true);
         if (o) voices.push({ o, start: anchor + secs(t), end: anchor + secs(t) + 0.1 });
       }
@@ -212,7 +220,17 @@
   }
 
   /* ---------------- the count-in ---------------- */
-  function scheduleCountIn(from, beatSec, n, perBar) {
+  /* Where in its bar a start inside a line's pick-up falls (ticks from
+     the bar line before it), or 0 when it is not in one. */
+  function intoPickup(plan, start) {
+    const le = plan.song.lines.find(l => start >= l.at && start < l.at + Math.max(l.padded, l.total));
+    if (!le || !le.pickup || start - le.at >= le.pickup) return 0;
+    const B = plan.song.meter.barTicks;
+    return ((start + plan.song.shift) % B + B) % B;
+  }
+  /* `endAt`: when the music comes in, if not on the beat after the last
+     click (a pick-up that starts off the beat). */
+  function scheduleCountIn(from, beatSec, n, perBar, endAt) {
     const ac = ctx();
     const times = [];
     for (let i = 0; i < n; i++) {
@@ -221,7 +239,7 @@
       if (o) voices.push({ o, start: time, end: time + 0.1 });
       times.push(EVMCountIn.heardAt(ac, time));
     }
-    const end = from + n * beatSec;
+    const end = endAt || from + n * beatSec;
     EVMCountIn.run(times, EVMCountIn.heardAt(ac, end));
     return end;
   }
@@ -240,9 +258,11 @@
     setPlaying(true);
     const mt = plan.song.meter;
     let count = S.sound.countIn && window.EVMCountIn ? EVMCountIn.beats(mt.beats) : 0;
-    // into a pick-up (the last beat of a bar), the count leaves that beat for it
+    // into a pick-up, the count's last bar stops where the pick-up comes in:
+    // the clicks at or after it are left out, and the music starts there
     const start = plan.first[0];
-    if (count > 1 && plan.song.pickup && (start + plan.song.shift) % mt.barTicks === mt.barTicks - mt.beatTicks) count--;
+    const into = intoPickup(plan, start);
+    if (count && into) count -= mt.beats - Math.ceil(into / mt.beatTicks);
     if (count) EVMCountIn.open(count, mt.beats);
 
     const ac = ctx();
@@ -256,7 +276,8 @@
 
     const tickSec = SW.timing.tickMs() / 1000;
     let t = ac.currentTime + START_GAP;
-    if (count) t = scheduleCountIn(t, mt.beatTicks * tickSec, count, mt.beats);
+    if (count) t = scheduleCountIn(t, mt.beatTicks * tickSec, count, mt.beats,
+      into ? t + (count - Math.ceil(into / mt.beatTicks) + into / mt.beatTicks) * mt.beatTicks * tickSec : 0);
     run = { plan, tickSec, anchor: t, passFrom: plan.first[0], passTo: plan.first[1], passEnd: 0 };
     cues = [];
     cueIndex = 0;
@@ -275,7 +296,7 @@
       if (!document.contains(ev.stack)) { stop(); return; }
       const first = ev.stack.querySelector('.note');
       if (first) SW.score.setNoteAsActive(first, false);
-      markSounding(ev.syllable);
+      markSounding(ev.syllable, ev.stack);
       if (cue.chord) SW.chords.announce(cue.chord.id, cue.chord.list, 'lane');
     }
     if (!run.plan.loop && cueIndex >= cues.length && now >= run.passEnd + 0.05) {

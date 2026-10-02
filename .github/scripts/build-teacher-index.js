@@ -12,8 +12,14 @@
    folder), as downloaded from the Librarian. Anything else is reported
    and left out; it never stops the index being built.
 
-   Writes the file only when the list of items actually changed, so the
-   Action does not commit a new index on every run.
+   An envelope with `hidden: true` (the Librarian's Hide, 2026-10-01) is
+   listed under `hidden` instead of `items`: kept in the Teacher Library,
+   off the students' shelf (evm-shelf.js leaves a copy a student already
+   has alone until it is shown again). `hidden` is written only when there
+   is something in it. The Librarian writes index.json the same way.
+
+   Writes the file only when the lists actually changed, so the Action
+   does not commit a new index on every run.
 
    Usage: node .github/scripts/build-teacher-index.js [folder]
    ========================================================================== */
@@ -59,6 +65,8 @@ fs.readdirSync(folder)
     };
     // The book it stands in on the students' shelf (none: the apps' "More songs").
     if (env.book && String(env.book).trim()) entry.book = String(env.book).trim();
+    // Kept off the shelf for now (the Librarian's Hide).
+    if (env.hidden === true) entry.hidden = true;
     const key = entry.app + '|' + entry.id;
     if (seen.has(key)) {
       // The same song twice under two file names: the newer one is published.
@@ -73,10 +81,13 @@ fs.readdirSync(folder)
 
 items.sort((a, b) => (a.book || '').localeCompare(b.book || '') || a.app.localeCompare(b.app) ||
   a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
+const shown = items.filter(e => !e.hidden);
+const hidden = items.filter(e => e.hidden);
 
 let previous = null;
 try { previous = JSON.parse(fs.readFileSync(indexPath, 'utf8')); } catch (e) {}
-const same = previous && JSON.stringify(previous.items) === JSON.stringify(items);
+const same = previous && JSON.stringify(previous.items) === JSON.stringify(shown) &&
+  JSON.stringify(previous.hidden || []) === JSON.stringify(hidden);
 
 problems.forEach(p => console.log('warning: ' + p));
 if (same) {
@@ -84,10 +95,12 @@ if (same) {
   process.exit(0);
 }
 
-fs.writeFileSync(indexPath, JSON.stringify({
+const out = {
   format: 'evm-index',
   formatVersion: 1,
   generatedAt: new Date().toISOString(),
-  items
-}, null, 2) + '\n');
-console.log(`index.json written: ${items.length} item(s).`);
+  items: shown
+};
+if (hidden.length) out.hidden = hidden;
+fs.writeFileSync(indexPath, JSON.stringify(out, null, 2) + '\n');
+console.log(`index.json written: ${shown.length} item(s)` + (hidden.length ? `, ${hidden.length} hidden` : '') + '.');

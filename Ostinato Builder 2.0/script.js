@@ -1243,7 +1243,7 @@
       six: { main: ["Ap", "Cher", "Lem"], filler: ["ple", "ry", "on"] },
       /* Notes held over whole beats, by how many beats they hold — read
          by speechForLongNote, since no one beat's pattern can show them. */
-      long: { "2": "Orange" },
+      long: { "2": "Orange", "3": "O-re-o", "4": "Ba-ha hon-ey" },
       "2": { "B/G": ["Pie", "-"], "B/B": ["Ap", "ple"], "G/B": ["-", "Sweet"], "G/G": ["-", "-"] },
       "3": { "B/G/G": ["Pie", "-", "-"], "B/B/B": ["Pine", "ap", "ple"], "B/B/G": ["Yo", "gurt", "-"], "B/G/B": ["Le", "-", "mon"], "G/B/G": ["-", "Peas", "-"], "G/B/B": ["-", "Spi", "cy"], "G/G/B": ["-", "-", "Sweet"], "G/G/G": ["-", "-", "-"] },
       "4": { "B/G/G/G": ["Pie", "-", "-", "-"], "B/G/B/G": ["Ap", "-", "ple", "-"], "B/B/B/B": ["Wa", "ter", "me", "lon"], "G/B/B/B": ["-", "To", "ma", "to"], "B/B/B/G": ["Co", "co", "nut", "-"], "B/B/G/B": ["Ba", "na", "-", "na"], "B/G/B/B": ["Blue", "-", "ber", "ry"], "B/B/G/G": ["Ki", "wi", "-", "-"], "G/B/B/G": ["-", "Fi", "let", "-"], "G/G/B/B": ["-", "-", "Ber", "ry"], "G/B/G/B": ["-", "Sal", "-", "sa"], "B/G/G/B": ["Cher", "-", "-", "ry"], "G/B/G/G": ["-", "Peas", "-", "-"], "G/G/B/G": ["-", "-", "Sweet", "-"], "G/G/G/B": ["-", "-", "-", "&"], "G/G/G/G": ["-", "-", "-", "-"] }
@@ -1253,7 +1253,8 @@
   const SYLLABLE_SYSTEMS = Object.keys(rhythmSystems);
 
   /* A system may name a note by how long it rings rather than by its beat
-     — Fruit Rhythms says Orange for a half note. Only a note that starts
+     — Fruit Rhythms says Orange for a half note, O-re-o for a dotted
+     half and Ba-ha hon-ey for a whole note. Only a note that starts
      on the beat and holds a whole number of beats in simple time counts;
      anything else is read beat by beat as usual. `at` is the note's slot
      inside its group's colours. */

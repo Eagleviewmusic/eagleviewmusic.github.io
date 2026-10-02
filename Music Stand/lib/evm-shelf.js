@@ -23,6 +23,14 @@
    Nothing is ever removed unless a fresh index.json was read: offline, or
    with the site unreachable, the library is left exactly as it is.
 
+   HIDDEN songs (2026-10-01): the teacher can keep a published song in the
+   Teacher Library but off the shelf while still working on it (Librarian →
+   Teacher Library → Hide). index.json lists those under `hidden`, apart
+   from `items`. A hidden song is never offered and never filed; a student
+   who already has it (from before it was hidden) KEEPS that copy — it is
+   neither updated nor removed while hidden — and gets the new version as
+   soon as the teacher shows it again (it is back in `items`, newer).
+
    window.EVMShelf
      init(adapter)     once, at start-up — see ADAPTER below
      sync()            -> Promise<{ added, updated, removed, offline }>
@@ -141,6 +149,11 @@
       index.items.forEach(e => {
         if (e.app === A.app && out.indexOf(bookOf(e)) !== -1) want.set(String(e.id), e);
       });
+      // hidden by the teacher for now: a copy already here stays as it is
+      const resting = new Set();
+      (Array.isArray(index.hidden) ? index.hidden : []).forEach(e => {
+        if (e && e.app === A.app && out.indexOf(bookOf(e)) !== -1) resting.add(String(e.id));
+      });
 
       const lib = A.load();
       let dirty = false;
@@ -149,7 +162,7 @@
       Object.keys(lib).forEach(id => {
         const rec = lib[id];
         if (!rec || !rec.received || !rec.book) return;
-        if (!want.has(id)) { delete lib[id]; summary.removed.push(id); dirty = true; }
+        if (!want.has(id) && !resting.has(id)) { delete lib[id]; summary.removed.push(id); dirty = true; }
       });
 
       // Arrive: new songs, and newer versions of ones already here.

@@ -130,6 +130,7 @@
 
   const INK = '#2B1D38';
   const GOLD = '#FFD700';
+  const SOUND = '#9C168E';     // the sounding note (style.css --sound)
   const ACC_GLYPH = { '-2': 'accidentalDoubleFlat', '-1': 'accidentalFlat', '0': 'accidentalNatural', '1': 'accidentalSharp', '2': 'accidentalDoubleSharp' };
 
   const n2 = v => Number(Number(v).toFixed(2));
@@ -849,24 +850,53 @@
     rows.sort((a, b) => a.base - b.base);
 
     const active = SW.score.getActiveNote();
-    // a saved picture shows the music, not the selection
-    const activeStack = active && !document.body.classList.contains('capturing') ? active.closest('.harmony-stack') : null;
+    // a saved picture shows the music, not the selection; while it plays,
+    // the play light (View → While it plays → Light up) stands in for it
+    const capturing = document.body.classList.contains('capturing');
+    const playing = !!S.playing && !capturing;
+    const activeStack = active && !capturing && !playing ? active.closest('.harmony-stack') : null;
+    const light = playing && SW.settings ? SW.settings.view.playLight : 'off';
+    const soundStack = playing ? line.querySelector('.harmony-stack.sounding') : null;
+    const noteLight = light === 'note' || light === 'both';
+    const boxLight = light === 'box' || light === 'both';
     const barNumbers = !SW.settings || !SW.settings.layout || !SW.settings.layout.show || SW.settings.layout.show.barNumbers !== false;
     const parts = [];
     const cuts = [];
     rows.forEach((row, ri) => {
       parts.push(renderRow(row, {
         bs, left, withTime: withTime && ri === 0, lastRow: ri === rows.length - 1,
-        lastLine, le, activeStack, showNames: S.showNames, barNumbers, clock: clock || { at: 0, p0: 0 }, W, cuts
+        lastLine, le, activeStack, showNames: S.showNames, barNumbers, clock: clock || { at: 0, p0: 0 }, W, cuts,
+        soundStack: noteLight ? soundStack : null
       }));
     });
-    svg.innerHTML = parts.join('');
+    // BEHIND THE NOTES: the selected word's box (yellow) and, while it
+    // plays, the sounding word's (purple) are drawn here, under the staff
+    // and the heads, so neither tints a note's colour (the user's call,
+    // 2026-10-01). On a written line the word's own box (style.css) stays
+    // clear; a line of blocks keeps it, behind its blocks already.
+    const under = [];
+    if (activeStack) under.push(wordBox(activeStack, line, 'rgba(255,215,0,.30)', 'rgba(255,215,0,.5)', 2));
+    if (soundStack && boxLight) under.push(wordBox(soundStack, line, 'rgba(156,22,142,.10)', SOUND, 0));
+    svg.innerHTML = under.join('') + parts.join('');
     syncCut(line, cuts[0] || null);
   }
 
+  /* The box behind a word (its .syl-body), in line coordinates: a soft
+     edge, then the fill; `grow` px all round (the selection's 1.05). */
+  function wordBox(stack, line, fill, edge, grow) {
+    const body = stack.closest('.syl-body');
+    if (!body) return '';
+    const o = offsetIn(body, line);
+    const x = o.x - grow, y = o.y - grow, w = body.offsetWidth + 2 * grow, h = body.offsetHeight + 2 * grow;
+    const r = ' x="' + n2(x) + '" y="' + n2(y) + '" width="' + n2(w) + '" height="' + n2(h) + '" rx="8"';
+    return '<rect' + r + ' fill="none" stroke="' + edge + '" stroke-width="' + (grow ? 6 : 5) + '" opacity="' + (grow ? '.6' : '.22') + '"/>'
+      + '<rect' + r + ' fill="' + fill + '"' + (grow ? '' : ' stroke="' + edge + '" stroke-width="1.5"') + '/>';
+  }
+
   /* ================= the pick-up's bar line: the × =================
-     In Edit, the bar line that closes a line's pick-up can be taken out
-     (score.js cutPickupBar): a mouse over it shows it lit, with a × above
+     In Edit, the bar line that closes a line's pick-up takes the pick-up
+     away (score.js cutPickupBar = removePickup: the line joins back onto
+     the one above): a mouse over it shows it lit, with a × above
      the staff; on a touch screen the × is always there, faintly. An HTML
      button over the SVG (which takes no pointer), a child of the line. */
   function syncCut(line, cut) {
@@ -876,7 +906,7 @@
     if (!el) {
       el = document.createElement('div');
       el.className = 'pickup-cut';
-      el.innerHTML = '<button type="button" class="pickup-cut-btn" title="Take out this bar line — the pick-up joins the bar after it" aria-label="Take out the pick-up’s bar line">'
+      el.innerHTML = '<button type="button" class="pickup-cut-btn" title="Take the pick-up away — this line joins back onto the line above" aria-label="Take the pick-up away">'
         + '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg></button>'
         + '<span class="pickup-cut-bar" aria-hidden="true"></span>';
       // never take the selection or a word being typed away (Edit box rule)
@@ -910,6 +940,18 @@
     let staffEnd = o.W - 4;
     if (last && last.info && last.info.endDx !== undefined) staffEnd = last.x + last.info.endDx;
     else if (last) staffEnd = last.x + last.stack.offsetWidth / 2 + s * 0.5;
+
+    // the sounding note lit (View → Light up → Note): a glow BEHIND its
+    // heads (or its rest), under the staff lines, the head's colour untouched
+    if (o.soundStack) evs.forEach(ev => {
+      if (ev.stack !== o.soundStack || !ev.notated || !ev.info) return;
+      const spots = ev.rest ? [{ x: ev.x, y: yOf(B4) }]
+        : ev.info.heads.map(h => ({ x: ev.x + h.dx, y: yOf(h.pt.step) }));
+      spots.forEach(pt => {
+        p.push('<circle cx="' + n2(pt.x) + '" cy="' + n2(pt.y) + '" r="' + n2(s * 1.7) + '" fill="' + SOUND + '" opacity=".16"/>');
+        p.push('<circle cx="' + n2(pt.x) + '" cy="' + n2(pt.y) + '" r="' + n2(s * 1.15) + '" fill="' + SOUND + '" opacity=".38"/>');
+      });
+    });
 
     // staff lines
     for (let i = 0; i < 5; i++) {
@@ -1290,7 +1332,7 @@
   }
 
   ['score:changed', 'score:loaded', 'selection', 'key:changed', 'scale:changed', 'names:changed', 'meter:changed',
-   'view:changed', 'policy:changed', 'mode:changed', 'layout:changed', 'present:changed'].forEach(evt => SW.bus.on(evt, schedule));
+   'view:changed', 'policy:changed', 'mode:changed', 'layout:changed', 'present:changed', 'play:changed'].forEach(evt => SW.bus.on(evt, schedule));
   window.addEventListener('resize', schedule);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule);
   /* A bar's height eases (.2s, style.css .note) when its pitch or the
