@@ -148,6 +148,10 @@ kbd { font-family: var(--font-ui); }
   .scale-select { flex: 0 1 auto; min-width: 90px; }
 }
 
+/* the way back to the Eagle View Music hub: a keycap before the logo (hidden inside a frame) */
+.home-btn { flex: 0 0 auto; text-decoration: none; }
+.in-iframe .home-btn { display: none; }
+
 .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .brand-home {
   display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
@@ -975,6 +979,8 @@ input[type="range"]:focus-visible { outline: 2px solid var(--amber); outline-off
   .scale-select { width: 100%; max-width: none; }
   .key-name { flex: 0 0 auto; }
   .brand-home { width: 34px; height: 34px; }
+  /* the way home takes the logo's place, so the first row keeps its width */
+  html:not(.in-iframe) .brand { display: none; }
   .seg-btn { padding: 0 8px; letter-spacing: 0.05em; font-size: 10px; gap: 5px; }
   .seg-btn::before { width: 5px; height: 5px; }
   .tb-btn span { display: none; }

@@ -75,6 +75,10 @@ kbd {
   -webkit-user-select: none;
 }
 .brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* the way back to the Eagle View Music hub, before the logo (hidden inside a frame) */
+.home-btn { flex: none; text-decoration: none; padding: 0 12px 0 8px; gap: 4px; }
+.home-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.in-iframe .home-btn { display: none; }
 .brand-home {
   display: inline-flex; align-items: center; justify-content: center; flex: none;
   width: 34px; height: 34px; border-radius: 10px;
@@ -614,7 +618,9 @@ body.keys-view .keyboard { display: none; }
 @media (max-width: 480px) {
   .brand-name { font-size: 16px; }
   .tb-btn span { display: none; }
-  #library-btn { width: 36px; padding: 0; justify-content: center; }
+  #library-btn, .home-btn { width: 36px; padding: 0; justify-content: center; }
+  /* the way home takes the logo's place, so the name still fits */
+  html:not(.in-iframe) .brand-home { display: none; }
   .scale-select { max-width: 160px; }
   .key-grid { grid-template-columns: repeat(4, 1fr); }
   .quick-label { display: none; }
