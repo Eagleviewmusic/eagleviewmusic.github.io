@@ -525,6 +525,11 @@ body.modal-open {
   color: #16a34a;
 }
 
+/* A group with more than three apps: its category card runs down beside both rows */
+.group-category-tall {
+  grid-row: span 2;
+}
+
 /* App Cards (4 on a row - compact sizing) */
 .app-card {
   background: var(--surface);
@@ -937,6 +942,10 @@ body.modal-open {
 
   .group-category-card {
     grid-column: 1 / -1;
+  }
+
+  .group-category-tall {
+    grid-row: auto;
   }
 }
 

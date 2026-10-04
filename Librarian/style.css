@@ -24,6 +24,7 @@
   --ob: #4F5BD5;
   --sw: #9C168E;
   --ms: linear-gradient(135deg, #E0642F, #5B4BD6);   /* the Music Stand: both sides */
+  --rr: linear-gradient(90deg, #ef4444, #facc15, #22c55e, #3b82f6, #a855f7);   /* Melody Reader */
 
   --r-sm: 10px;
   --r-md: 14px;
@@ -164,6 +165,7 @@ html.in-iframe .home-link { visibility: hidden; }
 .group-ostinato-builder .group-head::before { background: var(--ob); }
 .group-song-writer .group-head::before { background: var(--sw); }
 .group-music-stand .group-head::before { background: var(--ms); }
+.group-rainbow-reader .group-head::before { background: var(--rr); }
 
 .item {
   display: flex; align-items: center; gap: 12px;
@@ -378,6 +380,7 @@ body:not(.lib-can-edit) .lib-edit-only { display: none; }
 .lib-song.app-ostinato-builder::before { background: var(--ob); }
 .lib-song.app-song-writer::before { background: var(--sw); }
 .lib-song.app-music-stand::before { background: var(--ms); }
+.lib-song.app-rainbow-reader::before { background: var(--rr); }
 .lib-song-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .lib-song-title { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lib-song-meta { font-size: 12px; font-weight: 700; color: var(--ink-3); }

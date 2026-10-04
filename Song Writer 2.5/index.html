@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Song Writer 2.5</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Nunito:wght@400;600;700;800;900&family=Fredoka:wght@500;600&family=Noto+Serif:wght@700;900&family=Andika:wght@400;700&family=Atkinson+Hyperlegible:wght@400;700&family=Literata:opsz,wght@7..72,600;7..72,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lib/evm-shelf.css">
+  <link rel="stylesheet" href="lib/evm-count-in.css">
+  <script>
+    try {
+      if (window.self !== window.top) document.documentElement.classList.add('in-iframe');
+    } catch (e) {
+      document.documentElement.classList.add('in-iframe');
+    }
+  </script>
+</head>
+<!--
+  Song Writer — page shell (the family layout: Rhythm Poetry 2.0,
+  Ostinato Builder 2.0 and the Music Stand).
+
+  Four horizontal bands, top to bottom:
+
+    .topbar        home · name (About) · Song | Keyboard | Chords · Clear · Auto-save · Library chip
+    .task-strip    only inside a lesson
+    .workspace     a CSS grid: chord strip | score, and under them
+                   dock corner | keyboard dock (see "WORKSPACE" below)
+    .toolbar       Play · the hat · key + time · BPM · Sound ·
+                   Write · Names · View · Present … the step pad
+
+  There is no edit ribbon. The construction hat beside Play is the
+  editing layer's switch; while it is on, every note tool — the value
+  circles, ♯ ♭, harmony, the syllable's notes, the word and line tools —
+  sits in ONE BOX (#edit-box, js/components/edit-box.js) that takes the
+  workspace's left column in place of the chord panel, and each line's section head grows its tools
+  (js/score.js). Everything that edits is one layer under body.editing,
+  hidden in Present and in a saved picture.
+
+  Everything a lesson or Layout settings can take away is a single element
+  with an id, so the policy pass in js/settings.js can remove it outright.
+-->
+<body data-workspace="song">
+<div class="app" id="app">
+
+<!-- ============ TOP BAR — one row ============ -->
+<header class="topbar">
+  <div class="topbar-start">
+    <a href="../index.html" class="home-link" title="Back to Eagle View Music">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      <span>Eagle View</span>
+    </a>
+    <!-- The name is the way to About (1.0's rule), at every width. -->
+    <button class="app-mark" id="appTitleLink" title="About Song Writer" aria-label="About Song Writer">
+      <svg class="mark-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="13" width="5" height="8" rx="1.4" fill="#FF3B30" stroke="none"/>
+        <rect x="9.5" y="9" width="5" height="12" rx="1.4" fill="#FFCC00" stroke="none"/>
+        <rect x="16" y="5" width="5" height="16" rx="1.4" fill="#48C4C8" stroke="none"/>
+      </svg>
+      <span class="mark-name">Song Writer 2.5</span>
+    </button>
+  </div>
+
+  <!-- What is on the stage (Rhythm Poetry's sides, the Stand's Poem ·
+       Both · Ostinato). Each tab is a workspace preset; View → On the
+       stage sets the parts one by one. -->
+  <div class="side-switch" id="workspace-switch" role="tablist" aria-label="What is on the stage">
+    <button class="side-tab" data-ws-tab="song" role="tab" aria-selected="true" title="The song on its own">
+      <svg class="side-tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V12"/><path d="M10 20V7"/><path d="M15 20V10"/><path d="M20 20V4"/></svg>
+      <span>Song</span>
+    </button>
+    <button class="side-tab" data-ws-tab="keyboard" role="tab" aria-selected="false" title="The song, with a keyboard that follows the melody">
+      <svg class="side-tab-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M8.5 5v8M12 5v8M15.5 5v8" stroke-width="3"/></svg>
+      <span>Keyboard</span>
+    </button>
+    <button class="side-tab" data-ws-tab="chords" role="tab" aria-selected="false" title="The song, with the chord panel, the chord track and the keyboard">
+      <svg class="side-tab-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      <span>Chords</span>
+    </button>
+  </div>
+
+  <div class="chip-cluster">
+    <!-- Only in the sandbox. -->
+    <button class="sandbox-clear" id="sandbox-clear-btn" title="Clear the sandbox and start over" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      <span class="sandbox-clear-label">Clear</span>
+    </button>
+    <!-- Only beside a library song (never the sandbox or a lesson). -->
+    <button class="autosave-toggle" id="autosave-toggle" aria-pressed="true" hidden>
+      <svg class="autosave-icon" viewBox="0 0 24 24" aria-hidden="true"></svg>
+      <span class="autosave-label" id="autosave-label">Auto-save</span>
+    </button>
+    <button class="song-chip" id="song-chip" title="Library">
+      <span class="song-chip-text">
+        <span class="song-chip-kicker" id="song-chip-kicker">Library</span>
+        <span class="song-chip-label" id="song-chip-label">Twinkle Twinkle</span>
+      </span>
+      <svg class="song-chip-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- ============ LESSON TASK STRIP ============ -->
+<div class="task-strip" id="task-strip" hidden>
+  <span class="task-strip-title" id="task-strip-title"></span>
+  <span class="task-strip-note" id="task-strip-note"></span>
+</div>
+
+<!-- ============ WORKSPACE ============
+     One grid, two columns, two rows:
+
+         ┌ strip ┬──────── score ────────┐
+         │       │ lines · chords · blocks│
+         ├ corner┼──────── dock ─────────┤
+         └───────┴────────────────────────┘
+
+     The keyboard dock always sits in the score's column, so a block and
+     its key share one horizontal coordinate frame whatever the layout.
+     The Song · Keyboard · Chords switch sets which parts are out;
+     js/components/keyboard-dock.js does the alignment. -->
+<main class="workspace" id="workspace">
+  <!-- THE EDIT BOX — out while the hat is on (js/components/edit-box.js).
+       It takes the whole left column: the chord panel's place and the
+       corner under it. With the chords on, the chord panel itself moves
+       to the end of its scroll (#eb-chords), pencils and all, so chords
+       can still be edited there. Every note tool is in it, so nothing is drawn
+       around the note. The sections a lesson or Layout settings take
+       away are removed; a tool that cannot act on the selection just now
+       is greyed, so no button ever moves under a finger. -->
+  <aside class="edit-box" id="edit-box" aria-label="Edit tools">
+    <div class="eb-head" id="edit-box-head">
+      <svg class="eb-hat" viewBox="0 0 28 20" aria-hidden="true">
+        <path d="M4 12 C4 6, 10 2, 14 2 C18 2, 24 6, 24 12 L24 14 L4 14 Z" fill="currentColor" stroke="none"/>
+        <ellipse cx="14" cy="14" rx="12" ry="3" fill="currentColor" stroke="none"/>
+      </svg>
+      <span class="eb-title" id="eb-title">Edit</span>
+      <!-- 2.5: with the chords out, Edit ↔ Chords — the box shows the edit
+           tools, or the chord panel to play (no pencils; the letter keys
+           play chords). edit-box.js setPane. -->
+      <div class="eb-pane seg" id="eb-pane" role="group" aria-label="What the box shows" hidden>
+        <button type="button" class="seg-btn active" data-pane="edit">Edit</button>
+        <button type="button" class="seg-btn" data-pane="chords">Chords</button>
+      </div>
+      <!-- Undo / Redo (js/history.js; buttons wired in edit-box.js) -->
+      <span class="eb-undo-pair">
+        <button type="button" class="eb-undo" id="eb-undo" title="Undo (⌘Z)" aria-label="Undo" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+        </button>
+        <button type="button" class="eb-undo" id="eb-redo" title="Redo (⇧⌘Z)" aria-label="Redo" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+        </button>
+      </span>
+    </div>
+    <div class="eb-body" id="edit-box-body">
+      <!-- the value circles (js/components/rhythm-panel.js). One tap writes
+           the selected block as that note and steps on; the circles never move. -->
+      <section class="eb-section eb-values" id="rhythm-panel" role="group" aria-label="Rhythm"></section>
+      <section class="eb-section" id="eb-note" aria-label="Note"></section>
+      <section class="eb-section" id="eb-syllable" aria-label="Syllable"></section>
+      <section class="eb-section" id="eb-words" aria-label="Words and lines"></section>
+      <p class="eb-empty" id="eb-empty">Tap a word to type it.</p>
+      <!-- View → Staff notation, the same setting (edit-box.js) -->
+      <div class="eb-staff" id="eb-staff"></div>
+      <!-- the chord panel, while the hat is on and the chords are out: last
+           in the scroll — there when wanted, out of the way otherwise -->
+      <div class="eb-chords" id="eb-chords"></div>
+    </div>
+  </aside>
+
+  <!-- LEFT HAND — js/components/chord-strip.js: Digital Accordion's chord
+       panel (the scale's fourteen chords, Core…Extreme, Z X C V B) -->
+  <aside class="chord-strip" id="chord-strip" aria-label="Chord panel"></aside>
+
+  <div class="stage" id="stage">
+    <div class="notation-container" id="score"></div>
+    <!-- the chords after the melody: a chord chart (js/components/chord-track.js) -->
+    <section class="chord-tail" id="chord-tail" aria-label="The chords after the melody" hidden></section>
+    <!-- Ostinato Builder's Add row: Edit only, never in a picture -->
+    <div class="add-line-row" id="add-line-row">
+      <button class="add-line-btn" id="add-line-btn" title="Add a new line at the end of the song">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        <span>Add a line</span>
+      </button>
+    </div>
+    <!-- 2.5 THE BEAT STRIP (js/components/beat-strip.js): the selected bar's
+         beats as Rhythm Poetry's pills — Edit only, with Beats on; it stays
+         at the foot of the stage while the song scrolls -->
+    <div class="beat-bar" id="beat-bar" hidden aria-label="Beats"></div>
+  </div>
+
+  <!-- under the panel, beside the keyboard (chord-strip.js): the chord in
+       hand and its notes on top; the keyboard's Octaves and Focus rows
+       below (keyboard-dock.js seats them here while the corner is out) -->
+  <div class="dock-corner" id="dock-corner">
+    <div class="corner-inner">
+      <div class="corner-now" id="corner-now" aria-live="polite"></div>
+      <div class="corner-panel" id="corner-panel"></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM KEYBOARD — js/components/keyboard-dock.js -->
+  <section class="keyboard-dock" id="keyboard-dock" aria-label="Keyboard"></section>
+</main>
+
+<!-- ============ BOTTOM TOOLBAR — one row on a computer ============
+     Three columns like the top bar: an empty left column that gives way
+     first, the family's centred cluster, and Song Writer's step pad
+     pinned at the right (the right hand, opposite the chord strip). -->
+<footer class="toolbar" id="toolbar">
+  <div class="toolbar-inner">
+    <div class="tb-side tb-left" aria-hidden="true"></div>
+
+    <div class="tb-center">
+      <button class="play-btn" id="playBtn" title="Play from the selected note (Space)" aria-label="Play" aria-pressed="false">
+        <svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor" stroke="none"/></svg>
+        <svg class="stop-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="5.5" width="13" height="13" rx="2.5" fill="currentColor" stroke="none"/></svg>
+      </button>
+
+      <!-- The construction hat, in the place and shape of the family's
+           beat-dot button: the editing layer's switch, a toggle as in 1.0. -->
+      <button class="hat-toggle" id="editToggle" aria-pressed="false" title="Edit — put on the construction hat" aria-label="Edit">
+        <svg class="construction-hat-icon" viewBox="0 0 28 20" aria-hidden="true">
+          <path d="M4 12 C4 6, 10 2, 14 2 C18 2, 24 6, 24 12 L24 14 L4 14 Z" fill="currentColor" stroke="none"/>
+          <ellipse cx="14" cy="14" rx="12" ry="3" fill="currentColor" stroke="none"/>
+          <path d="M14 2 L14 12" stroke="#fff" stroke-width="1.5" opacity="0.8"/>
+          <circle cx="8" cy="8" r="1" fill="#fff" stroke="none" opacity="0.6"/>
+          <circle cx="20" cy="8" r="1" fill="#fff" stroke="none" opacity="0.6"/>
+        </svg>
+      </button>
+
+      <div class="tool-group tg-time" id="tg-time">
+        <!-- key + time: the start of a staff, one tile, three targets -->
+        <div class="signature" id="signature">
+          <button class="sig-key" id="keySignatureDisplay" title="Key — tap to choose" aria-label="Key">C</button>
+          <span class="sig-rule" aria-hidden="true"></span>
+          <div class="time-sig" id="time-sig" title="Tap the top number to change the meter">
+            <button class="ts-num" id="ts-top" aria-label="Beats in a bar">4</button>
+            <button class="ts-num" id="ts-bottom" title="Tap for 6/8 time — a beat of three eighths" aria-label="The beat is a quarter note">4</button>
+          </div>
+        </div>
+        <!-- the scale (Digital Accordion's list): the chords the panel offers, the notes the keyboard colours -->
+        <select class="scale-select" id="scale-select" aria-label="Scale" title="Scale — the chords on the panel, and the notes the keyboard colours"></select>
+        <button class="tool-btn bpm-btn" id="bpm-button" title="Tap to type a tempo" aria-label="Tempo">
+          <span class="bpm-value" id="bpm-value">100</span><span class="bpm-unit">BPM</span>
+        </button>
+        <button class="tool-btn sound-btn" id="sound-btn" title="Sound — melody, chords, steady beat, count-in, loop" data-popover-anchor>
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>
+          <span class="tool-label">Sound</span>
+        </button>
+      </div>
+
+      <div class="tool-group tg-look" id="tg-look">
+        <button class="tool-btn write-btn" id="textEditorBtn" title="Write or paste the words">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          <span class="tool-label">Write</span>
+        </button>
+        <!-- 1.0's glasses: the note names -->
+        <button class="names-toggle" id="nameToggle" aria-pressed="false" title="Show the note names" aria-label="Note names">
+          <svg class="glasses-icon" viewBox="0 0 28 18" aria-hidden="true">
+            <ellipse cx="6" cy="10" rx="5.2" ry="6"/>
+            <ellipse cx="22" cy="10" rx="5.2" ry="6"/>
+            <path d="M11.2 9.5h5.6" stroke-width="2.4"/>
+          </svg>
+        </button>
+        <button class="tool-btn" id="view-btn" title="View options">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span class="tool-label">View</span>
+        </button>
+      </div>
+
+      <div class="tool-group tg-present" id="tg-present">
+        <button class="tool-btn present-btn" id="present-btn" title="Present mode — big and clean for the class">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+          <span class="tool-label">Present</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- THE RIGHT HAND: 1.0's arrows. Chevrons, so they never read as a
+         second Play. Never gated. -->
+    <div class="tb-side tb-right">
+      <span class="step-kicker" aria-hidden="true">Step<br>← →</span>
+      <div class="step-pad" id="step-pad">
+        <button class="step-btn" id="leftArrow" title="Previous note (←)" aria-label="Previous note">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <button class="step-btn" id="rightArrow" title="Next note (→)" aria-label="Next note">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</footer>
+
+
+</div><!-- /.app -->
+
+<!-- ============ POPOVER: SOUND — what you hear ============ -->
+<div class="popover" id="sound-popover" role="dialog" aria-label="Sound">
+  <div class="popover-title">What you hear</div>
+  <div class="switch-list" id="sound-switches"></div>
+
+  <!-- the Virtual Keyboard's sounds (Key Blocks' engine, lib/audio.js):
+       a sound and a volume for each side, and the Room they play in -->
+  <div class="popover-title">How it sounds</div>
+  <div class="mixer" id="sound-mixer">
+    <div class="mix-card" id="melody-mix">
+      <div class="mix-head">
+        <label class="mix-name" for="melody-sound">Melody</label>
+        <select class="sound-select" id="melody-sound" aria-label="Melody sound"></select>
+      </div>
+      <div class="mix-level">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+        <input type="range" class="zoom-slider" id="melody-volume" min="0" max="100" step="1" aria-label="Melody volume">
+        <output id="melody-volume-value" for="melody-volume">100%</output>
+      </div>
+    </div>
+    <div class="mix-card" id="chord-mix">
+      <div class="mix-head">
+        <label class="mix-name" for="chord-sound">Chords</label>
+        <select class="sound-select" id="chord-sound" aria-label="Chords sound"></select>
+      </div>
+      <div class="mix-level">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+        <input type="range" class="zoom-slider" id="chord-volume" min="0" max="100" step="1" aria-label="Chords volume">
+        <output id="chord-volume-value" for="chord-volume">100%</output>
+      </div>
+    </div>
+    <div class="mix-card" id="room-mix">
+      <div class="mix-head">
+        <span class="mix-name">Room</span>
+      </div>
+      <div class="mix-level">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M9.5 15.5a3.5 3.5 0 0 1 5 0M7.5 13a6.5 6.5 0 0 1 9 0"/></svg>
+        <input type="range" class="zoom-slider" id="room-range" min="0" max="100" step="1" aria-label="Room">
+        <output id="room-value" for="room-range">35%</output>
+      </div>
+      <p class="mix-note">How much the room echoes: 0% is dry, like playing outside; higher sounds like a bigger hall.</p>
+    </div>
+  </div>
+  <p class="popover-note">Let go of a slider, or pick a sound, to hear it.</p>
+  <div class="popover-title">At the end</div>
+  <div class="seg seg-wide" id="at-end-seg" role="group" aria-label="At the end">
+    <button class="seg-btn" data-end="stop" title="Stop at the end of the song">Stop</button>
+    <button class="seg-btn" data-end="round" title="Start again from where Play began">Go round</button>
+    <button class="seg-btn" data-end="line" title="Play the selected line over and over">This line</button>
+  </div>
+  <p class="popover-note" id="at-end-note"></p>
+  <div class="popover-title">Chord voicing</div>
+  <div class="seg seg-wide" id="voicing-seg" role="group" aria-label="Chord voicing">
+    <button class="seg-btn" data-voicing="classic" title="Song Writer 1.0’s voicings">Song Writer 1.0</button>
+    <button class="seg-btn" data-voicing="keyblocks" title="Digital Accordion’s open and close voicings">Digital Accordion</button>
+  </div>
+</div>
+
+<!-- ============ POPOVER: VIEW ============
+     How the page looks and which parts of the stage are out — the room,
+     rather than the song. Remembered in song_writer_25_view_prefs_v1. -->
+<div class="popover popover-wide" id="view-popover" role="dialog" aria-label="View options">
+  <div class="popover-scroll">
+    <div class="popover-title">On the stage</div>
+    <div class="switch-list" id="stage-switches"></div>
+    <p class="popover-note" id="stage-note">The Song · Keyboard · Chords switch at the top sets these three at once.</p>
+
+    <div class="popover-title">On the page</div>
+    <div class="switch-list" id="page-switches"></div>
+
+    <div class="popover-title">Scale</div>
+    <div class="seg seg-wide" role="group" aria-label="How big the music is">
+      <button class="seg-btn" id="block-auto-btn">Justify&nbsp;width</button>
+      <button class="seg-btn" id="block-fixed-btn">Fixed</button>
+    </div>
+    <div class="zoom-row">
+      <button class="zoom-btn" id="block-smaller-btn" title="Smaller" aria-label="Smaller">−</button>
+      <input type="range" class="zoom-slider" id="block-size-slider" min="50" max="160" step="5" value="100" aria-label="Scale">
+      <button class="zoom-btn" id="block-bigger-btn" title="Bigger" aria-label="Bigger">+</button>
+    </div>
+    <div class="zoom-readout"><span id="block-size-value">100%</span><button class="text-tool" id="block-size-reset-btn">Reset</button></div>
+
+    <div class="popover-title">Text size</div>
+    <div class="zoom-row">
+      <button class="zoom-btn" id="text-smaller-btn" title="Smaller words" aria-label="Smaller words">−</button>
+      <input type="range" class="zoom-slider" id="text-size-slider" min="60" max="250" step="5" value="100" aria-label="Text size">
+      <button class="zoom-btn" id="text-bigger-btn" title="Bigger words" aria-label="Bigger words">+</button>
+    </div>
+    <div class="zoom-readout"><span id="text-size-value">100%</span><button class="text-tool" id="text-size-reset-btn">Reset</button></div>
+
+    <div class="popover-title">Lyric font</div>
+    <div class="chip-row" id="lyric-font-row" role="group" aria-label="Lyric font">
+      <button class="chip font-chip" data-font="rounded">Rounded</button>
+      <button class="chip font-chip" data-font="reader">Early reader</button>
+      <button class="chip font-chip" data-font="clear">Big &amp; clear</button>
+      <button class="chip font-chip" data-font="story">Storybook</button>
+    </div>
+    <p class="popover-note" id="lyric-font-note"></p>
+
+    <div class="popover-title" id="kbd-strip-title">Keyboard &amp; strip</div>
+    <!-- Key colours: the three ways the keyboard wears colour (settings.js) -->
+    <div class="kbc-block" id="kb-colors-row">
+      <span class="size-row-name">Key colours</span>
+      <div class="kbc-choices" role="radiogroup" aria-label="Key colours">
+        <button class="kbc-choice" type="button" role="radio" data-kc="rainbow"><span class="kbc-pic"></span><span class="kbc-label">Rainbow</span></button>
+        <button class="kbc-choice" type="button" role="radio" data-kc="played"><span class="kbc-pic"></span><span class="kbc-label">Colours when played</span></button>
+        <button class="kbc-choice" type="button" role="radio" data-kc="single"><span class="kbc-pic"></span><span class="kbc-label">One colour</span></button>
+      </div>
+      <div class="kbc-swatches" id="kb-color-swatches" role="radiogroup" aria-label="The one colour">
+        <label class="kbc-custom" title="Any colour"><input type="color" id="kb-color-custom" aria-label="Any colour"></label>
+      </div>
+      <p class="popover-note" id="kb-colors-note"></p>
+    </div>
+    <div class="size-row" id="strip-size-row">
+      <span class="size-row-name">Chord panel</span>
+      <div class="seg" role="group" id="strip-size-seg">
+        <button class="seg-btn" data-ss="sm">S</button>
+        <button class="seg-btn" data-ss="md">M</button>
+        <button class="seg-btn" data-ss="lg">L</button>
+      </div>
+    </div>
+
+    <div class="popover-title">While it plays</div>
+    <div class="size-row" id="play-light-row">
+      <span class="size-row-name">Light up</span>
+      <div class="seg" role="radiogroup" aria-label="Light up while it plays" id="play-light-seg">
+        <button class="seg-btn" type="button" role="radio" data-pl="note">Note</button>
+        <button class="seg-btn" type="button" role="radio" data-pl="box">Box</button>
+        <button class="seg-btn" type="button" role="radio" data-pl="both">Both</button>
+        <button class="seg-btn" type="button" role="radio" data-pl="off">Off</button>
+      </div>
+    </div>
+    <p class="popover-note" id="play-light-note"></p>
+    <div class="switch-list" id="play-switches"></div>
+
+    <div class="popover-divider" id="layout-settings-divider"></div>
+    <button class="popover-link popover-link-strong" id="layout-settings-btn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/></svg>
+      Layout settings…
+    </button>
+    <p class="popover-note" id="layout-settings-note">What is on the page, and which notes, values and chords can be written.</p>
+    <div class="popover-divider"></div>
+    <button class="popover-link" id="help-btn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+      How this works
+    </button>
+  </div>
+</div>
+
+<!-- ============ POPOVER: KEY (from the tile's letter) ============ -->
+<div class="popover" id="key-popover" role="dialog" aria-label="Key">
+  <div class="popover-title">Key</div>
+  <div class="key-grid" id="key-grid"></div>
+  <p class="popover-note">The song moves to the new key: every block keeps its solfège, and its colour follows the new do.</p>
+</div>
+
+<!-- ============ POPOVER: EVERY NOTE AT ONCE (the Edit box's ⋯ All notes) ============ -->
+<div class="popover" id="every-popover" role="dialog" aria-label="Every note at once">
+  <div class="popover-title">This line</div>
+  <button class="popover-link" id="line-write-all">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    Write every block as a one-beat note
+  </button>
+  <button class="popover-link" id="line-clear-all">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="3"/></svg>
+    Turn every note back into a block
+  </button>
+  <div class="popover-title">The whole song</div>
+  <button class="popover-link" id="song-write-all">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    Write every block as a one-beat note
+  </button>
+  <button class="popover-link" id="song-clear-all">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="3"/></svg>
+    Turn every note back into a block
+  </button>
+  <p class="popover-note">Each line of the song starts a new bar. A block counts as one beat until it is written.</p>
+</div>
+
+<!-- ============ HOVER GAUGES (a mouse resting on BPM or View) ============ -->
+<div class="hover-gauge" id="bpm-gauge-wrap">
+  <span class="hover-gauge-label" id="bpm-gauge-label">100 BPM</span>
+  <input type="range" class="zoom-slider" id="bpm-gauge" min="30" max="300" step="1" value="100" aria-label="Tempo">
+</div>
+<div class="hover-gauge" id="size-gauge-wrap">
+  <span class="hover-gauge-label" id="size-gauge-label">100%</span>
+  <input type="range" class="zoom-slider" id="size-gauge" min="50" max="160" step="5" value="100" aria-label="Scale">
+</div>
+
+<!-- ============ SHEET: LIBRARY ============ -->
+<div class="sheet-backdrop" id="library-sheet">
+  <div class="sheet sheet-lg">
+    <div class="sheet-head">
+      <h2 id="library-sheet-title">Library</h2>
+      <button class="sheet-close" data-close="library-sheet" title="Close" aria-label="Close">&times;</button>
+    </div>
+
+    <div class="now-editing">
+      <span class="now-editing-label">Now open</span>
+      <span class="now-editing-title" id="now-editing-title">Sandbox</span>
+      <span class="key-badge" id="now-editing-badge">C</span>
+      <span class="now-editing-note" id="now-editing-note" hidden></span>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn btn-primary" id="newSongBtn">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        New song
+      </button>
+      <button class="btn" id="shelfBtn" title="Books your teacher has put on the shelf">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v14"/><path d="M9 19V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v11"/><path d="m14.5 8.6 2.9-.8a1 1 0 0 1 1.2.7l2.7 10.1"/><path d="M3 19h18"/></svg>
+        <span>Teacher Library</span>
+      </button>
+      <button class="btn" id="saveAsBtn">Save as…</button>
+      <button class="btn" id="importExportBtn">Share &amp; backup</button>
+      <button class="btn" id="lessonSetupBtn">Set up for students</button>
+      <button class="btn" id="copyVisualBtn" title="Save a picture of the song to your downloads (and copy it, where the browser allows)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <span class="btn-label" id="copyVisualLabel">Save picture</span>
+      </button>
+    </div>
+    <label class="inline-check" for="picture-colours" id="picture-colours-row">
+      <input type="checkbox" id="picture-colours" checked />
+      <span>Keep the section colours in saved pictures <em>(off = plain white, ready to print)</em></span>
+    </label>
+
+    <div class="library-groups" id="librarySongList"></div>
+  </div>
+</div>
+
+<!-- ============ THE NAME WINDOW: NEW · SAVE AS · RENAME ============ -->
+<div class="sheet-backdrop" id="newSongModal">
+  <div class="sheet sheet-sm">
+    <div class="sheet-head">
+      <h2 id="newSongModalHeading">Create a new song</h2>
+      <button class="sheet-close" data-close="newSongModal" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <p class="sheet-sub" id="newSongModalSubtext">Give it a name so you can find it later, or leave it blank for a fresh page in your sandbox.</p>
+    <input type="text" id="newSongTitleInput" class="text-field" placeholder="e.g. My New Song" maxlength="60" autocomplete="off" />
+    <div class="sheet-foot">
+      <button class="btn" data-close="newSongModal" id="cancelNewSongBtn">Cancel</button>
+      <button class="btn btn-primary" id="confirmNewSongBtn">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHEET: YOUR WORDS (the Write button) ============ -->
+<div class="sheet-backdrop" id="textEditorPopup">
+  <div class="sheet sheet-md">
+    <div class="sheet-head">
+      <h2>Your words</h2>
+      <button class="sheet-close" data-close="textEditorPopup" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <p class="sheet-sub" id="text-editor-sub"></p>
+    <div class="seg words-view-seg" id="words-view-seg" role="group" aria-label="What to show">
+      <button class="seg-btn" data-words-view="words">Words</button>
+      <button class="seg-btn" data-words-view="notes">Words and notes</button>
+    </div>
+    <textarea id="textEditorText" class="text-area" rows="12" spellcheck="false"
+              placeholder="Type or paste the words of your song…"></textarea>
+    <div class="sheet-foot sheet-foot-split">
+      <button class="btn" id="copyLyricsBtn" title="Copy to the clipboard">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16H2V4h12V2"/></svg>
+        <span id="copyLyricsBtnText">Copy</span>
+      </button>
+      <div class="sheet-foot-right">
+        <button class="btn" id="cancelTextEditor">Cancel</button>
+        <button class="btn btn-primary" id="submitTextEditor">Set to the notes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHEET: SHARE & BACKUP ============ -->
+<div class="sheet-backdrop" id="importExportModal">
+  <div class="sheet sheet-lg">
+    <div class="sheet-head">
+      <h2>Share &amp; backup</h2>
+      <button class="sheet-close" data-close="importExportModal" title="Close" aria-label="Close">&times;</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        Send this song by link
+      </div>
+      <p class="card-desc">Anyone who opens the link gets a copy in their own library. A link made from the sandbox lands in their sandbox.</p>
+      <label class="inline-check" for="lock-layout-on-share">
+        <input type="checkbox" id="lock-layout-on-share" />
+        <span>Lock my layout settings into the link <em>(they get the same notes, chords and note values, and cannot widen them)</em></span>
+      </label>
+      <button class="btn btn-primary" id="generateShareLinkBtn">Create a link</button>
+      <div class="share-row" id="shareLinkContainer" hidden>
+        <input type="text" id="shareLinkInput" class="text-field" readonly />
+        <button class="btn" id="copyShareLinkBtn"><span id="copyShareLinkBtnText">Copy</span></button>
+        <span class="status-msg" id="shareLinkFeedback"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download a backup
+      </div>
+      <div class="card-head-row">
+        <p class="card-desc">Choose what to include:</p>
+        <div class="text-tools">
+          <button class="text-tool" id="selectAllExportBtn">All</button>
+          <button class="text-tool" id="deselectAllExportBtn">None</button>
+        </div>
+      </div>
+      <div class="export-list" id="exportSongList"></div>
+      <div class="filename-row">
+        <input type="text" id="exportFilenameInput" class="text-field" placeholder="my-song-library" maxlength="50" autocomplete="off" />
+        <span class="filename-ext">.json</span>
+      </div>
+      <button class="btn btn-primary" id="confirmExportBtn">Download</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Restore from a backup
+      </div>
+      <p class="card-desc">Songs in the file are added to your library. A song you already have is not added twice, and a newer version replaces an older one. Song Writer 1.0 backups work too.</p>
+      <input type="file" id="jsonFileInput" accept=".json,application/json" hidden />
+      <button class="btn" id="uploadJsonBtn">Choose a file…</button>
+      <span class="status-msg" id="uploadStatusMsg"></span>
+    </div>
+
+    <div class="card card-danger">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Start over
+      </div>
+      <p class="card-desc">Deletes every song you have made, restores the examples, clears the sandbox, and puts layout settings back to everything-on. Song Writer 1.0’s own library is not touched. This cannot be undone.</p>
+      <button class="btn btn-danger" id="resetAllDataBtn">Delete everything</button>
+      <span class="status-msg" id="resetStatusMsg"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ WINDOW: DELETE SECTION (1.0's, family style) ============ -->
+<div class="sheet-backdrop" id="deleteSectionModal">
+  <div class="sheet sheet-sm">
+    <div class="sheet-head">
+      <h2 id="deleteSectionPromptText">Delete this section?</h2>
+      <button class="sheet-close" data-close="deleteSectionModal" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <p class="sheet-sub">The line and everything on it goes.</p>
+    <label class="inline-check" for="dontAskDeleteSectionCheckbox">
+      <input type="checkbox" id="dontAskDeleteSectionCheckbox" />
+      <span>Don’t show this message again</span>
+    </label>
+    <div class="sheet-foot">
+      <button class="btn" id="cancelDeleteSectionBtn">Cancel</button>
+      <button class="btn btn-danger-solid" id="confirmDeleteSectionBtn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHEET: LAYOUT SETTINGS ============
+     What is on the page, and what can be written on it — as against the
+     View popover, which is how it looks. Applies to whoever is using the
+     app, and a student link carries a copy. -->
+<div class="sheet-backdrop" id="layout-sheet">
+  <div class="sheet sheet-lg">
+    <div class="sheet-head">
+      <h2>Layout settings</h2>
+      <button class="sheet-close" data-close="layout-sheet" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <p class="sheet-sub">
+      What is on the page, and what can be written on it. These are your working
+      settings &mdash; anything you send to students carries a copy of them. A song
+      that already uses something switched off here still opens exactly as written.
+    </p>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        On the page
+      </div>
+      <div class="switch-list" id="layout-show"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10"/><path d="M9 20V6"/><path d="M14 20V12"/><path d="M19 20V4"/></svg>
+        Notes that can be written
+      </div>
+      <p class="card-desc">Tap the blocks to choose the range. The up and down arrows, the letter keys and harmony all stay inside it.</p>
+      <div class="range-presets chip-row" id="layout-range-presets"></div>
+      <div class="note-range" id="layout-notes"></div>
+      <div class="switch-list" id="layout-build"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Chords on the panel
+      </div>
+      <p class="card-desc">The chord panel, the Chord Progression window and the keys only offer these places (each shows the scale’s chord on it right now).</p>
+      <div class="chip-row" id="layout-chords"></div>
+      <!-- Chords bend the keyboard (settings.js; chords.js bend) -->
+      <div class="switch-list layout-bend" id="layout-bend"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        Note values
+      </div>
+      <p class="card-desc">Which values the value circles offer. A block counts as a quarter note until it is written, so the quarter always stays.</p>
+      <div class="chip-row value-chip-row" id="layout-values"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        Keys
+      </div>
+      <p class="card-desc">The keys the key letter offers, and what the scale menu beside it does to the melody.</p>
+      <div class="chip-row" id="layout-keys"></div>
+      <!-- Melody follows the scale (settings.js; score.js morphToScale) -->
+      <div class="switch-list layout-scale" id="layout-scale"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHEET: CHORD PROGRESSION — build progressions (js/components/progression-window.js) ============
+     Before the chord editor, so More chords… opens on top of it. -->
+<div class="sheet-backdrop" id="prog-sheet">
+  <div class="sheet prog-sheet" role="dialog" aria-label="Chord Progression">
+    <div class="pw-head">
+      <h2>Chord Progression</h2>
+      <span class="pw-song" id="pw-song"></span>
+      <div class="seg pw-tabs" id="pw-tabs" role="tablist" aria-label="Build or In the song">
+        <button type="button" class="seg-btn active" data-tab="build" role="tab">Build</button>
+        <button type="button" class="seg-btn" data-tab="song" role="tab">In the song</button>
+      </div>
+      <span class="pw-undo">
+        <button type="button" class="pw-hbtn" id="pw-undo" title="Undo (⌘Z)" aria-label="Undo" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+        </button>
+        <button type="button" class="pw-hbtn" id="pw-redo" title="Redo (⇧⌘Z)" aria-label="Redo" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+        </button>
+      </span>
+      <button class="sheet-close" data-close="prog-sheet" title="Close (Esc)" aria-label="Close">&times;</button>
+    </div>
+    <div class="pw-body" id="pw-body"></div>
+    <div class="pw-foot" id="pw-foot"></div>
+  </div>
+</div>
+
+<!-- ============ SHEET: JUST HERE — one chord of the song (progression-window.js) ============ -->
+<div class="sheet-backdrop" id="here-sheet">
+  <div class="sheet here-sheet" role="dialog" aria-label="Just here">
+    <div class="pw-head">
+      <h2 id="here-title">Just here</h2>
+      <span class="pw-gap"></span>
+      <button class="sheet-close" data-close="here-sheet" title="Close (Esc)" aria-label="Close">&times;</button>
+    </div>
+    <div class="here-body" id="here-body"></div>
+    <div class="pw-foot" id="here-foot"></div>
+  </div>
+</div>
+
+<!-- ============ SHEET: THE CHORD EDITOR (chord-strip.js) ============
+     Digital Accordion's block editor for one place on the chord panel:
+     hear it, its root and quality, the functions stuck to it (7ths,
+     inversions), its name — saved with the song (score.board). -->
+<div class="sheet-backdrop" id="chord-sheet">
+  <div class="sheet sheet-md chord-editor">
+    <div class="sheet-head">
+      <h2 id="chord-sheet-title">Chord</h2>
+      <button class="sheet-close" data-close="chord-sheet" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <div class="editor-body" id="chord-sheet-body"></div>
+    <div class="sheet-foot sheet-foot-split" id="chord-sheet-foot"></div>
+  </div>
+</div>
+
+<!-- ============ SHEET: CHORD BUTTONS — what Z X C V B do ============ -->
+<div class="sheet-backdrop" id="mods-sheet">
+  <div class="sheet sheet-md">
+    <div class="sheet-head">
+      <h2>Chord buttons</h2>
+      <button class="sheet-close" data-close="mods-sheet" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <div class="editor-body" id="mods-body"></div>
+  </div>
+</div>
+
+<!-- ============ SHEET: SET UP FOR STUDENTS ============ -->
+<div class="sheet-backdrop" id="lesson-setup-sheet">
+  <div class="sheet sheet-lg">
+    <div class="sheet-head">
+      <h2>Set up for students</h2>
+      <button class="sheet-close" data-close="lesson-setup-sheet" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <p class="sheet-sub">
+      Build the room you want them to work in, then send the link. What you leave
+      out simply isn’t there for them &mdash; no locks, no greyed-out buttons,
+      just a smaller app.
+    </p>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        The task
+      </div>
+      <div class="task-grid" id="lesson-task-grid"></div>
+      <div class="lesson-sub">What the strip at the top says</div>
+      <input type="text" id="lesson-task-note" class="text-field" maxlength="160" autocomplete="off" />
+      <p class="card-desc lesson-hint">This sentence sits above their work the whole time.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        Notes, chords and values
+      </div>
+      <div class="layout-summary" id="lesson-layout-summary"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        Key &amp; tempo
+      </div>
+      <div class="switch-list" id="lesson-structure"></div>
+      <div class="lesson-sub">Tempo</div>
+      <div class="seg" id="lesson-tempo-seg" role="group" aria-label="Tempo">
+        <button class="seg-btn" data-tempo="any">Any</button>
+        <button class="seg-btn" data-tempo="range">Between</button>
+        <button class="seg-btn" data-tempo="locked">Locked</button>
+      </div>
+      <div class="tempo-range-row" id="lesson-tempo-range">
+        <span>From</span>
+        <input type="number" class="text-field num-field" id="lesson-tempo-min" min="30" max="300" inputmode="numeric" aria-label="Slowest tempo" />
+        <span>to</span>
+        <input type="number" class="text-field num-field" id="lesson-tempo-max" min="30" max="300" inputmode="numeric" aria-label="Fastest tempo" />
+        <span>BPM</span>
+      </div>
+      <p class="card-desc lesson-hint" id="lesson-tempo-note"></p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        The exercises
+      </div>
+      <div class="card-head-row">
+        <p class="card-desc">Tick what goes in this lesson. Students open them in this order.</p>
+        <div class="text-tools">
+          <button class="text-tool" id="lesson-songs-all">All</button>
+          <button class="text-tool" id="lesson-songs-none">None</button>
+        </div>
+      </div>
+      <div class="export-list" id="lesson-song-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        What else comes with it
+      </div>
+      <div class="switch-list" id="lesson-shell"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        The link
+      </div>
+      <input type="text" id="lesson-title-input" class="text-field" maxlength="60" autocomplete="off" placeholder="Name this lesson &mdash; e.g. Do Re Mi, Monday" />
+      <p class="card-desc">
+        The link is one-way: it opens the lesson and stays there. Keep working in your
+        own copy here &mdash; nothing you send changes it.
+      </p>
+      <div class="lesson-foot">
+        <button class="btn" id="lesson-preview-btn">Preview as a student</button>
+        <button class="btn btn-primary" id="lesson-link-btn">Create the link</button>
+      </div>
+      <div class="share-row" id="lesson-link-row" hidden>
+        <input type="text" id="lesson-link-input" class="text-field" readonly />
+        <button class="btn" id="lesson-link-copy"><span id="lesson-link-copy-text">Copy</span></button>
+        <span class="status-msg" id="lesson-link-feedback"></span>
+      </div>
+    </div>
+
+    <div class="card" id="lesson-saved-card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/></svg>
+        Lessons you have made
+      </div>
+      <div class="lesson-saved-list" id="lesson-saved-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PREVIEW BAR (teacher only) ============ -->
+<div class="preview-bar" id="preview-bar" hidden>
+  <span>Previewing as a student</span>
+  <button class="btn" id="preview-exit-btn">Leave preview</button>
+</div>
+
+<!-- ============ SHEET: HOW THIS WORKS ============ -->
+<div class="sheet-backdrop" id="help-sheet">
+  <div class="sheet sheet-md">
+    <div class="sheet-head">
+      <h2>How this works</h2>
+      <button class="sheet-close" data-close="help-sheet" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <div class="help-hands">
+      <div class="help-hand">
+        <div class="help-hand-title">Left hand · chords</div>
+        <p>With the chord panel out (the <b>Chords</b> tab at the top), <span class="help-key">F</span> <span class="help-key">D</span> <span class="help-key">S</span> <span class="help-key">A</span>
+          <span class="help-key">G</span> <span class="help-key">R</span> <span class="help-key">E</span> <span class="help-key">Q</span> <span class="help-key">W</span>
+          and <span class="help-key">1</span>–<span class="help-key">5</span> play it the way Digital Accordion lays it out,
+          and holding <span class="help-key">Z</span> <span class="help-key">X</span> <span class="help-key">C</span> <span class="help-key">V</span> <span class="help-key">B</span> changes any chord — sus2, add9, sus4, ♭7, maj7 to start.
+          A chord rings while you hold it; tap a function key while holding it and it plays again, changed — hold I and tap <span class="help-key">C</span> over and over to trill a suspension.
+          The button by the title cycles <b>Core · Full · Extended · Extreme</b>: how many chords are out. The scale menu beside the key changes the whole panel.</p>
+      </div>
+      <div class="help-hand">
+        <div class="help-hand-title">Right hand · melody</div>
+        <p>With the chord panel out, the right hand plays the melody, as in Digital Accordion: <span class="help-key">J</span> is do,
+          <span class="help-key">K</span> <span class="help-key">L</span> <span class="help-key">;</span> <span class="help-key">U</span> <span class="help-key">I</span> <span class="help-key">O</span> <span class="help-key">P</span> climb the scale
+          and <span class="help-key">7</span> <span class="help-key">8</span> <span class="help-key">9</span> <span class="help-key">0</span> <span class="help-key">-</span> carry on; <span class="help-key">N</span> <span class="help-key">M</span> <span class="help-key">,</span> <span class="help-key">.</span> <span class="help-key">/</span> are the notes below do.
+          With only the keyboard out, the keys are the Virtual Keyboard’s <b>Flex</b>: each row — <span class="help-key">Z</span>, <span class="help-key">A</span>, <span class="help-key">Q</span>, <span class="help-key">1</span> — climbs the scale from do, an octave apart.
+          Either way the notes follow the key and the scale (in F, <span class="help-key">J</span> <span class="help-key">K</span> <span class="help-key">L</span> <span class="help-key">;</span> play F G A B♭), light up on the keyboard, and in Edit write the selected note, as tapping the keyboard does.
+          <span class="help-key">⇧</span> or Caps Lock moves them by an octave.
+          A chord with a note outside the scale bends them while it is in hand, as Digital Accordion does: after V/V in C, the key for fa plays F♯ — the F♯ keys take F’s colour and a white ring until the chord changes or is cleared.</p>
+        <p><span class="help-key">←</span> <span class="help-key">→</span> (or the arrows at the right of the toolbar) step through the song, each note sounding.
+          <span class="help-key">⇧</span>+<span class="help-key">↑</span><span class="help-key">↓</span> pick a note inside a harmony.</p>
+      </div>
+    </div>
+    <ul class="help-list">
+      <li><span class="help-key edit">⛑</span><div><b>The hat</b> beside Play puts you in Edit, and takes you out again. Every tool comes out in the <b>Edit box</b> — drag it by its title bar to any part of the screen, or fold it up with ⌃; it stays out until you take the hat off. Tap a word to type it — <span class="help-key">Space</span> moves to the next word, <span class="help-key">⌫</span> at the start goes back.</div></li>
+      <li><span class="help-key edit">♩</span><div><b>Value circles</b> write the selected block on the staff and step to the next one — so a phrase is one tap per note. Tap the lit circle again for a rest; the block circle turns a note back into a block. <b>Dotted</b> works before or after: on a block it lights and waits for the value you tap next. <b>Tie</b> holds the note over into a new eighth note on the same syllable (tap a circle to change its length) — over the bar line when the note ends a bar; Tie again unties it. <span class="help-key">[</span> <span class="help-key">]</span> step the value, and <b>⋯</b> writes (or unwrites) a whole line or song at once.</div></li>
+      <li><span class="help-key edit">A</span><div><b>Letter keys</b> in Edit, with neither the chord panel nor the keyboard out (the <b>Song</b> tab), type pitches: <b>A S D F G H J K</b> = do re mi fa so la ti do′, <b>Q W E R T Y</b> = do′ … la′, <b>Z X C</b> = so, la, ti below, <b>V</b> = do. <span class="help-key">↑</span> <span class="help-key">↓</span> move a step. Double-click a block’s top or bottom half to move it too.</div></li>
+      <li><span class="help-key edit">♯</span><div><b>Note</b>, in the Edit box: ♯ ♭ sharpen or flatten the selected note (tap again for natural); <b>Harmony</b> adds a note two steps above it, and − takes the selected one away. <b>Syllable</b> shows a dot for each note on this word — tap one to select it — and − takes the selected one away. Two buttons add a note: <b>+ Note/Syllable</b> gives it a syllable of its own after this one; <b>+ Note Only</b> puts it on this same syllable.</div></li>
+      <li><span class="help-key edit">↵</span><div><b>Words &amp; lines</b>, in the Edit box: <b>New line</b> starts a line after this word, and <b>Join up</b> (on the first word of a line) joins the line to the one above. <b>Delete</b> removes the syllable — tap it twice, so one stray tap never loses work. <b>Staff notation</b> at the foot of the box is the same switch as in View: off, the rhythms show under the blocks.</div></li>
+      <li><span class="help-key edit">♪</span><div><b>Pick-ups</b> (Layout settings → 1-beat pick-up, saved with the song): every line starts with a one-beat pick-up. With the hat on, point at the bar line after a pick-up and press its <b>×</b>: the bar line goes and the pick-up joins the first bar. Or select a line’s pick-up and <b>Join up</b> moves just that beat to the end of the line above — press it again to join the whole line. <b>Delete</b> on a pick-up takes it away and puts a rest in the bar above. A new line starts with its pick-up again.</div></li>
+      <li><span class="help-key edit">A</span><div><b>Section names</b> sit in the top corner of each line; type into them in Edit. ▲ ▼ move the line, ⧉ copies it below, × deletes it. <b>Add a line</b>, at the end of the song, starts a new one.</div></li>
+      <li><span class="help-key">I</span><div><b>Chord progressions</b> (Chords tab): <b>Chord Progression</b>, under the panel, opens their window. <b>Build</b> makes a progression — tap the panel’s chords (or press their keys) to add them, set how long each lasts, and a rhythm every bar plays (a chord can have its own); <b>Hear it</b> plays it round and round. Make as many as you like. <b>In the song</b> is a map of the bars: drag a progression onto it, drag its ends to start or stop it, and it plays on past the melody, to help write the next part.</div></li>
+      <li><span class="help-key">I</span><div><b>The chord track</b> draws the chords over the words, and the bars after the melody as a chord chart. Tap a chord to hear it; in Edit, select it and press a chord key to change it, <span class="help-key">⌫</span> to silence it, <span class="help-key">←</span> <span class="help-key">→</span> to walk the chords. <b>Double-click</b> a chord for <b>Just here</b>: change that one bar — one chord or two, any rhythm — and the progression stays as it is. Play starts from a selected chord.</div></li>
+      <li><span class="help-key edit">✎</span><div><b>Change a chord</b>: with the hat on, the pencil on any chord opens its editor — root, quality, a 7th or an inversion stuck to it, its name — and <b>Back to the scale’s chord</b> undoes it. The pencil at the end of the Z X C V B row chooses what each button does (sus2 … maj7, or the inversions 6, 6/4, 6/5, 4/3, 4/2). Re-chorded places are saved with the song. Under the panel, the corner shows the chord in hand and its notes; the keyboard’s Octaves and Focus sit below them.</div></li>
+      <li><span class="help-key">⛶</span><div><b>Present</b> hides every control and fills the screen. Play and the step arrows stay. Press <span class="help-key">Esc</span> to come back.</div></li>
+      <li><span class="help-key">␣</span><div><b>Spacebar</b> plays from the selected note, and stops — and the next Play carries on from where it stopped. Sound sets a count-in, a steady beat, and what happens at the end.</div></li>
+    </ul>
+    <div class="sheet-foot">
+      <button class="btn" id="about-link">About Song Writer</button>
+      <button class="btn btn-primary" data-close="help-sheet">Back to music</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHEET: ABOUT ============ -->
+<div class="sheet-backdrop" id="aboutModal">
+  <div class="sheet sheet-md">
+    <div class="sheet-head">
+      <h2>About Song Writer</h2>
+      <button class="sheet-close" data-close="aboutModal" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <div class="about-hero-card">
+      Created by <strong>Nathan Walby</strong>, <strong>Song Writer</strong> helps students compose and
+      perform music using accessible graphic notation. Instead of getting bogged down by complex
+      traditional scoring, students can focus purely on melody, rhythm, and musical exploration.
+    </div>
+    <div class="about-grid">
+      <div class="about-item"><span>▶</span><div><b>Interactive playback.</b> Step through in real time with the on-screen arrows or your keyboard’s left and right arrows — tap in rhythm to bring the melody to life — or press Play.</div></div>
+      <div class="about-item"><span>🎨</span><div><b>Full creative control.</b> Compose original tunes, edit existing songs, and transpose to any key.</div></div>
+      <div class="about-item"><span>🔗</span><div><b>Easy sharing &amp; printing.</b> Share by link, send a lesson, or save a picture ready for printing.</div></div>
+      <div class="about-item"><span>📁</span><div><b>Offline song library.</b> Organise and back up your songs right on your computer — no accounts, nothing leaves your browser.</div></div>
+    </div>
+    <div class="about-new">
+      <div class="lesson-sub">New in this version</div>
+      <ul>
+        <li>The same frame, toolbar and windows as Rhythm Poetry, Ostinato Builder and the Music Stand.</li>
+        <li>The construction hat sits beside Play again, as a switch. With it on, every tool — the value circles, ♯ ♭, harmony, and the word and line tools — is in one Edit box you can drag anywhere on the screen.</li>
+        <li>Song · Keyboard · Chords at the top: the song on its own, with a keyboard that follows the melody, or with the chord panel and the chord track.</li>
+        <li>Present mode, a count-in, a steady beat, and Go round or This line at the end — for practising a line over and over.</li>
+        <li>Staff notation one note at a time, bar numbers, a tempo from 30 to 300, Save picture, and lesson tempo rules.</li>
+        <li>Digital Accordion’s chord panel: the scale’s fourteen chords on the same keys in every scale (F D S A G R E Q W, 1–5), Z X C V B to change them, Core · Full · Extended · Extreme, a chord editor for 7ths and inversions, and a scale menu beside the key.</li>
+      </ul>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn" id="about-help-link">How this works</button>
+      <button class="btn btn-primary" data-close="aboutModal">Back to music</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PRESENT MODE: Play · ‹ › · Exit ============ -->
+<div class="present-bar" id="present-bar">
+  <button class="present-play" id="present-play-btn" title="Play / stop (Space)" aria-label="Play">
+    <svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor" stroke="none"/></svg>
+    <svg class="stop-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="5.5" width="13" height="13" rx="2.5" fill="currentColor" stroke="none"/></svg>
+  </button>
+  <span class="present-sep" aria-hidden="true"></span>
+  <button class="present-step" id="present-left" title="Previous note (←)" aria-label="Previous note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+  <button class="present-step" id="present-right" title="Next note (→)" aria-label="Next note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+  <span class="present-sep" aria-hidden="true"></span>
+  <button class="present-exit" id="present-exit-btn" title="Leave present mode (Esc)">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9L4 4m0 0v5m0-5h5"/><path d="M15 9l5-5m0 0v5m0-5h-5"/><path d="M9 15l-5 5m0 0v-5m0 5h5"/><path d="M15 15l5 5m0 0v-5m0 5h-5"/></svg>
+    <span>Exit</span>
+  </button>
+</div>
+
+<!-- ============ TOAST ============ -->
+<!-- 2.5 TAP IT IN (js/flow.js tap): out while a take is counted in, tapped
+     and kept. The pad is for touch screens; on a keyboard → Space or Enter. -->
+<div class="tap-panel" id="tap-panel" hidden data-state="ready" role="dialog" aria-label="Tap the rhythm">
+  <div class="tap-top">
+    <span class="tap-dot" aria-hidden="true"></span>
+    <span class="tap-text" aria-live="polite">Get ready…</span>
+  </div>
+  <button type="button" class="tap-pad">Tap <small>or press → / Space</small></button>
+  <div class="tap-snap seg" role="group" aria-label="Snap the taps to">
+    <span class="tap-snap-label">Snap to</span>
+    <button type="button" class="seg-btn" data-snap="e">Eighths</button>
+    <button type="button" class="seg-btn" data-snap="s">Sixteenths</button>
+  </div>
+  <div class="tap-actions">
+    <button type="button" class="tap-btn tap-stop">Done</button>
+    <button type="button" class="tap-btn tap-cancel">Cancel</button>
+    <button type="button" class="tap-btn tap-again">Again</button>
+    <button type="button" class="tap-btn tap-keep primary">Keep</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<!-- lib/keyblocks-layers.js and lib/theory.js are copies of Digital Accordion's (the chord engine) — change them there, then copy -->
+<script src="lib/keyblocks-layers.js"></script>
+<script src="lib/theory.js"></script>
+<!-- lib/audio.js is a copy of Digital Accordion/audio.js (the sounds of Digital Accordion and the Virtual Keyboard) — change it there, then copy -->
+<script src="lib/audio.js"></script>
+<script src="lib/notation/glyphs-leland.js"></script>
+<script src="songs.js"></script>
+<script src="lib/evm-library.js"></script>
+<script src="lib/evm-shelf.js"></script>
+<script src="lib/evm-count-in.js"></script>
+<script src="js/core.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/chords.js"></script>
+<script src="js/engrave.js"></script>
+<script src="js/score.js"></script>
+<script src="js/timing.js"></script>
+<script src="js/track.js"></script>
+<script src="js/staff.js"></script>
+<script src="js/player.js"></script>
+<script src="js/library.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/lessons.js"></script>
+<script src="js/history.js"></script>
+<script src="js/flow.js"></script>
+<script src="js/components/chord-strip.js"></script>
+<script src="js/components/chord-lane.js"></script>
+<script src="js/components/keyboard-dock.js"></script>
+<script src="js/components/rhythm-panel.js"></script>
+<script src="js/components/beat-strip.js"></script>
+<script src="js/components/progression-window.js"></script>
+<script src="js/components/chord-track.js"></script>
+<script src="js/components/edit-box.js"></script>
+<script src="js/keymap.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

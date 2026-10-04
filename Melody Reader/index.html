@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Melody Reader — read the notes, ring the bars. A treble-clef reading game on the Rainbow Xylophone.">
+  <title>Melody Reader</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg stroke-width='2.4' stroke-linecap='round'%3E%3Cline x1='2' x2='38' y1='29.8' y2='29.8' stroke='%23facc15'/%3E%3Cline x1='2' x2='38' y1='24.6' y2='24.6' stroke='%232dd4bf'/%3E%3Cline x1='2' x2='38' y1='19.4' y2='19.4' stroke='%23a855f7'/%3E%3Cline x1='2' x2='38' y1='14.2' y2='14.2' stroke='%23f97316'/%3E%3Cline x1='2' x2='38' y1='9' y2='9' stroke='%2322c55e'/%3E%3C/g%3E%3Cpath transform='translate(13.34 24.6) scale(0.01444)' fill='%232b1d16' stroke='%23fff' stroke-width='150' stroke-linejoin='round' paint-order='stroke' d='M 809 30 C 809 132 768 238 665 279 C 635 107 596 -122 586 -186 C 716 -186 809 -98 809 30 Z M 605 297 C 576 302 549 305 521 305 C 315 305 140 161 140 -56 C 140 -232 264 -389 390 -498 C 415 -520 438 -540 459 -562 C 472 -484 482 -416 492 -357 C 361 -318 272 -180 272 -45 C 272 56 351 194 467 194 C 478 194 491 189 491 176 C 491 163 477 156 459 144 C 403 109 372 72 372 1 C 372 -86 436 -157 521 -177 Z M 478 -1184 C 491 -1241 557 -1392 632 -1392 C 654 -1392 688 -1322 688 -1223 C 688 -1073 577 -960 478 -863 C 469 -920 462 -976 462 -1037 C 462 -1090 467 -1139 478 -1184 Z M 176 739 C 176 834 249 959 444 959 C 511 959 570 942 622 910 C 700 855 720 760 720 670 C 720 613 711 549 697 467 C 693 438 684 395 675 338 C 816 292 922 145 922 -3 C 922 -220 768 -367 557 -367 C 543 -454 528 -539 516 -619 C 668 -779 773 -959 773 -1188 C 773 -1319 733 -1426 710 -1477 C 675 -1551 634 -1601 608 -1601 C 598 -1601 553 -1584 505 -1528 C 413 -1418 387 -1234 387 -1113 C 387 -1035 395 -965 419 -804 C 418 -802 343 -726 312 -701 C 181 -579 0 -405 0 -117 C 0 153 235 364 503 364 C 544 364 583 360 616 354 C 644 492 660 593 660 670 C 660 819 583 899 438 899 C 403 899 373 891 370 891 C 369 890 366 888 366 887 C 366 884 369 883 373 881 C 441 871 508 814 508 721 C 508 644 449 562 341 562 C 240 562 176 644 176 739 Z'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Fredoka is Rainbow Xylophone's font; Baloo 2 and Nunito are the family count-in card's -->
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Baloo+2:wght@700&family=Nunito:wght@800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="lib/evm-count-in.css">
+  <link rel="stylesheet" href="lib/evm-shelf.css">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    // inside the Eagle View Music site or a Google Site: no back-to-hub link
+    try { if (window.self !== window.top) document.documentElement.classList.add('in-iframe'); }
+    catch (e) { document.documentElement.classList.add('in-iframe'); }
+  </script>
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="topbar">
+      <a href="../index.html" class="home-link" title="Back to Eagle View Music">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        <span>Eagle View</span>
+      </a>
+      <div class="brand">
+        <!-- a treble clef on five lines coloured as the xylophone's E G B D F (bottom to top) -->
+        <svg class="brand-logo" viewBox="0 0 40 40" aria-hidden="true"><g stroke-width="2.4" stroke-linecap="round"><line x1="2" x2="38" y1="29.8" y2="29.8" stroke="#facc15"/><line x1="2" x2="38" y1="24.6" y2="24.6" stroke="#2dd4bf"/><line x1="2" x2="38" y1="19.4" y2="19.4" stroke="#a855f7"/><line x1="2" x2="38" y1="14.2" y2="14.2" stroke="#f97316"/><line x1="2" x2="38" y1="9" y2="9" stroke="#22c55e"/></g><path transform="translate(13.34 24.6) scale(0.01444)" fill="#2b1d16" stroke="#fff" stroke-width="150" stroke-linejoin="round" paint-order="stroke" d="M 809 30 C 809 132 768 238 665 279 C 635 107 596 -122 586 -186 C 716 -186 809 -98 809 30 Z M 605 297 C 576 302 549 305 521 305 C 315 305 140 161 140 -56 C 140 -232 264 -389 390 -498 C 415 -520 438 -540 459 -562 C 472 -484 482 -416 492 -357 C 361 -318 272 -180 272 -45 C 272 56 351 194 467 194 C 478 194 491 189 491 176 C 491 163 477 156 459 144 C 403 109 372 72 372 1 C 372 -86 436 -157 521 -177 Z M 478 -1184 C 491 -1241 557 -1392 632 -1392 C 654 -1392 688 -1322 688 -1223 C 688 -1073 577 -960 478 -863 C 469 -920 462 -976 462 -1037 C 462 -1090 467 -1139 478 -1184 Z M 176 739 C 176 834 249 959 444 959 C 511 959 570 942 622 910 C 700 855 720 760 720 670 C 720 613 711 549 697 467 C 693 438 684 395 675 338 C 816 292 922 145 922 -3 C 922 -220 768 -367 557 -367 C 543 -454 528 -539 516 -619 C 668 -779 773 -959 773 -1188 C 773 -1319 733 -1426 710 -1477 C 675 -1551 634 -1601 608 -1601 C 598 -1601 553 -1584 505 -1528 C 413 -1418 387 -1234 387 -1113 C 387 -1035 395 -965 419 -804 C 418 -802 343 -726 312 -701 C 181 -579 0 -405 0 -117 C 0 153 235 364 503 364 C 544 364 583 360 616 354 C 644 492 660 593 660 670 C 660 819 583 899 438 899 C 403 899 373 891 370 891 C 369 890 366 888 366 887 C 366 884 369 883 373 881 C 441 871 508 814 508 721 C 508 644 449 562 341 562 C 240 562 176 644 176 739 Z"/></svg>
+        <h1 class="brand-name">Melody Reader</h1>
+      </div>
+      <button class="chip level-chip" id="level-chip" type="button" aria-label="Choose a level">
+        <span class="band-dot"></span><span class="level-text">Level 1 · Mi Re Do</span>
+        <svg class="caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="topbar-right">
+        <button class="chip score-chip" id="score-chip" type="button" aria-label="Score board">
+          <span class="sc-player" id="sc-player" hidden></span>
+          <span class="sc-stars"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.3L12 17.1l-5.7 3.1 1.2-6.3L2.8 9.5l6.4-.8z"/></svg><b id="sc-stars">0</b></span>
+          <span class="sc-points"><b id="sc-points">0</b><small>pts</small></span>
+          <span class="sc-streak"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.6 2c.4 3.2 3.9 5 4.9 8.6 1.2 4.3-1.6 9.4-5.6 9.4-3.7 0-6.4-3-5.9-6.8.3-2.3 1.7-3.6 2.6-4.9.2 1.5.9 2.7 2 3.2-.6-3.6.4-6.9 2-9.5z"/></svg><b id="sc-streak">0</b></span>
+        </button>
+        <button class="icon-btn" id="mel-btn" type="button" aria-label="My melodies" title="My melodies">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17.5V6.2l10-2.2v11.3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><ellipse cx="6.6" cy="17.6" rx="2.9" ry="2.2"/><ellipse cx="16.6" cy="15.4" rx="2.9" ry="2.2"/></svg>
+        </button>
+        <button class="icon-btn" id="gear" type="button" aria-label="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4zM13 15.2a3.2 3.2 0 1 1 0-6.4 3.2 3.2 0 0 1 0 6.4z" transform="translate(-1 0)"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="stage">
+      <section class="stand" id="stand" aria-label="The music">
+        <div class="maker-part maker-top">
+          <span class="mk-set" id="mk-set"></span>
+          <input type="text" id="mk-title" maxlength="60" placeholder="A name for this melody (if you like)" aria-label="The melody’s name">
+          <div class="seg" id="mk-time" role="group" aria-label="Time"><button type="button" data-v="2">2/4</button><button type="button" data-v="3">3/4</button><button type="button" data-v="4">4/4</button></div>
+          <div class="seg" id="mk-bars" role="group" aria-label="Length"><button type="button" data-v="1">1 bar</button><button type="button" data-v="2">2 bars</button></div>
+          <span class="mk-status" id="mk-status" aria-live="polite"></span>
+        </div>
+        <div class="stand-row">
+          <div class="side side-left">
+            <!-- by stage (game.js drawSides): Practice ▶ Hear it · Count me in; the game Count me in (▶ again once the try is done) -->
+            <button class="round-btn small play-btn" id="btn-play" type="button" aria-label="Hear it">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.9l10.6-6.8a1 1 0 0 0 0-1.7L9.5 4.3A1 1 0 0 0 8 5.2z"/></svg>
+            </button>
+            <span class="side-label play-label" id="play-label">Hear it</span>
+            <button class="round-btn count-btn" id="btn-count" type="button" aria-label="Count me in">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="9" rx="8" ry="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 9v6.5c0 1.8 3.6 3.2 8 3.2s8-1.4 8-3.2V9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 2.5L11 8.6M20.5 3.8l-6 5.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+            <span class="side-label count-label" id="count-label">Count me in</span>
+            <button class="pace-pill" id="pace" type="button"><b>Slow</b></button>
+          </div>
+          <div class="music" id="music" role="img" aria-label="The music"></div>
+          <div class="side side-right">
+            <button class="round-btn ready-btn" id="btn-ready" type="button" aria-label="I’m ready — play it for points">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h13M12 5.5l6.5 6.5-6.5 6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <span class="side-label ready-label">I’m ready</span>
+            <button class="round-btn small again-btn" id="btn-again" type="button" aria-label="Again">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M4 3.5v5h5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <span class="side-label again-label">Again</span>
+            <button class="round-btn small" id="btn-next" type="button" aria-label="Next melody">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5.5v13l9.5-6.5z"/><rect x="16.5" y="5.5" width="2.8" height="13" rx="1"/></svg>
+            </button>
+            <span class="side-label">Next</span>
+          </div>
+        </div>
+        <div class="maker-part maker-bottom">
+          <div class="mk-values" id="mk-values" role="group" aria-label="The note value"></div>
+          <button type="button" class="pill-btn" id="mk-rest">Rest</button>
+          <button type="button" class="pill-btn" id="mk-undo" aria-label="Take the last one back">⌫</button>
+          <button type="button" class="pill-btn" id="mk-hear" aria-label="Hear it">▶</button>
+          <span class="mk-gap"></span>
+          <button type="button" class="pill-btn" id="mk-cancel">Cancel</button>
+          <button type="button" class="pill-btn primary" id="mk-save">Save</button>
+        </div>
+        <div class="stand-foot">
+          <span class="stage-tag practice" id="stage-tag">Practice</span>
+          <span class="tune-name" id="tune-name"></span>
+          <div class="dots" id="dots"></div>
+        </div>
+        <div class="clock" id="clock" hidden><i></i></div>
+        <div class="praise" id="praise"></div>
+      </section>
+      <!-- over the music card, but outside it: the music card clips, and a short window made it cut off the card's top -->
+      <div class="rounddone" id="rounddone" hidden></div>
+
+      <section class="xylo-wrap" aria-label="The xylophone">
+        <div class="xylo" id="xylo" role="group" aria-label="Xylophone: number keys 1 to 0 play the bars; or Tab here, then the arrow keys and Enter"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal" id="settings" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <header class="sheet-head">
+        <h2 id="settings-title">Settings</h2>
+        <span class="custom-tag" id="custom-tag"></span>
+        <button class="icon-btn close" data-close type="button" aria-label="Close">×</button>
+      </header>
+      <div class="sheet-body">
+        <nav class="tabs" id="tabs" role="tablist"></nav>
+        <div class="tab-body" id="tab-body"></div>
+      </div>
+      <footer class="sheet-foot">
+        <button class="pill-btn primary" data-close type="button">Play</button>
+      </footer>
+    </div>
+  </div>
+
+  <div class="modal" id="board" hidden>
+    <div class="sheet board-sheet" role="dialog" aria-modal="true" aria-labelledby="board-title">
+      <header class="sheet-head">
+        <h2 id="board-title">Score board</h2>
+        <span class="custom-tag" id="board-level"></span>
+        <button class="icon-btn close" data-close type="button" aria-label="Close">×</button>
+      </header>
+      <div class="board-body" id="board-body"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="melodies" hidden>
+    <div class="sheet mel-sheet" role="dialog" aria-modal="true" aria-labelledby="mel-title">
+      <header class="sheet-head">
+        <button class="icon-btn back" id="mel-back" type="button" aria-label="Back to all the sets" hidden>‹</button>
+        <h2 id="mel-title">My melodies</h2>
+        <span class="custom-tag" id="mel-tag"></span>
+        <button class="icon-btn close" data-close type="button" aria-label="Close">×</button>
+      </header>
+      <div class="mel-body" id="mel-body"></div>
+      <input type="file" id="mel-file" accept=".json,application/json" hidden>
+    </div>
+  </div>
+
+  <div class="fx" id="fx" aria-hidden="true"></div>
+  <div class="sr-only" id="announce" aria-live="polite"></div>
+
+  <script src="lib/notation/glyphs-leland.js"></script>
+  <script src="lib/evm-count-in.js"></script>
+  <script src="lib/evm-library.js"></script>
+  <script src="lib/evm-shelf.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/points.js"></script>
+  <script src="js/xylophone.js"></script>
+  <script src="js/engrave.js"></script>
+  <script src="js/songbook.js"></script>
+  <script src="js/melody.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/sets.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/players.js"></script>
+  <script src="js/beat.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/board.js"></script>
+  <script src="js/lesson.js"></script>
+  <script src="js/melodies.js"></script>
+  <script src="js/maker.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

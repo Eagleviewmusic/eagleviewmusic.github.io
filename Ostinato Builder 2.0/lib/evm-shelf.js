@@ -67,13 +67,14 @@
     poem: ['poem', 'poems'], rhythm: ['rhythm', 'rhythms'],
     ostinato: ['ostinato', 'ostinatos'], song: ['song', 'songs'],
     scale: ['scale', 'scales'], layout: ['layout', 'layouts'],
-    pairing: ['arrangement', 'arrangements']   // the Music Stand's; the kind keeps its first name
+    pairing: ['arrangement', 'arrangements'],  // the Music Stand's; the kind keeps its first name
+    set: ['melody set', 'melody sets']         // Melody Reader's (2026-10-03)
   };
   const APP_NAME = {
     'rhythm-poetry': 'Rhythm Poetry', 'ostinato-builder': 'Ostinato Builder',
     'song-writer': 'Song Writer', 'rainbow-xylophone': 'Rainbow Xylophone',
     'key-blocks': 'Digital Accordion', 'virtual-drum-kit': 'Drum Kit',
-    'music-stand': 'Music Stand'
+    'music-stand': 'Music Stand', 'rainbow-reader': 'Melody Reader'
   };
   const things = () => (A && A.words) || 'songs';
 

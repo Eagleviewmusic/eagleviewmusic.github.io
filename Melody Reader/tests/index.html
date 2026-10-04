@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Melody Reader — tests</title>
+  <style>
+    body { font: 15px/1.45 system-ui, sans-serif; margin: 24px; color: #2b1d16; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .sum { font-weight: 700; margin: 10px 0 16px; font-size: 18px; }
+    .pass { color: #15803d; } .fail { color: #b91c1c; }
+    li { margin: 2px 0; }
+    small { color: #6b5446; }
+  </style>
+</head>
+<body>
+  <!-- The engine's own checks (IMPLEMENTATION.md, phases 2 and 5): the
+       generator, the Songbook, the levels, the engraver, practices, lesson
+       links, melody sets under the family library rules, and the points
+       (1–20 a melody, POINTS-AND-COUNT-IN.md).
+       Open through the server: http://localhost:8816/tests/  -->
+  <h1>Melody Reader — tests</h1>
+  <div class="sum" id="sum">Running…</div>
+  <ol id="out"></ol>
+
+  <script src="../lib/notation/glyphs-leland.js"></script>
+  <script src="../js/core.js"></script>
+  <script src="../js/engrave.js"></script>
+  <script src="../js/songbook.js"></script>
+  <script src="../js/melody.js"></script>
+  <script src="../js/levels.js"></script>
+  <script src="../js/points.js"></script>
+  <script src="../lib/evm-library.js"></script>
+  <script src="../js/sets.js"></script>
+  <script src="../js/lesson.js"></script>
+  <script>
+  (function () {
+    const out = document.getElementById('out');
+    let pass = 0, fail = 0;
+    function check(name, ok, detail) {
+      const li = document.createElement('li');
+      li.className = ok ? 'pass' : 'fail';
+      li.innerHTML = (ok ? 'PASS ' : 'FAIL ') + name + (detail ? ' <small>' + detail + '</small>' : '');
+      out.appendChild(li);
+      ok ? pass++ : fail++;
+    }
+    const RUNS = 300;
+
+    // 1. the generator, every level
+    RR.LEVELS.forEach(l => {
+      const s = RR.practiceOfLevel(l.n), recent = [];
+      const barTicks = s.time[0] * 4;
+      const problems = [];
+      let minNotes = 99, maxNotes = 0;
+      const melodies = new Set();
+      for (let i = 0; i < RUNS; i++) {
+        const m = RR.Melody.make(s, { recent });
+        if (!m) { problems.push('no melody'); continue; }
+        const sum = m.notes.reduce((a, n) => a + n.t, 0);
+        if (sum !== s.bars * barTicks) problems.push('ticks ' + sum);
+        if (m.notes.some(n => n.p && !s.notes.includes(n.p))) problems.push('a note outside the practice');
+        if (!m.notes[0].p) problems.push('starts on a rest');
+        if (!m.notes[m.notes.length - 1].p) problems.push('ends on a rest');
+        for (let j = 1; j < m.notes.length; j++) if (!m.notes[j].p && !m.notes[j - 1].p) problems.push('two rests running');
+        // nothing crosses a bar line
+        let t = 0; m.notes.forEach(n => { if (Math.floor(t / barTicks) !== Math.floor((t + n.t - 1) / barTicks)) problems.push('crosses a bar line'); t += n.t; });
+        if (s.endDo && (s.notes.includes('C4') || s.notes.includes('C5'))) { const last = m.notes[m.notes.length - 1].p; if (last && last[0] !== 'C') problems.push('ends on ' + last + ', not Do'); }
+        const c = m.notes.filter(n => n.p).length;
+        minNotes = Math.min(minNotes, c); maxNotes = Math.max(maxNotes, c);
+        melodies.add(m.notes.map(n => (n.p || 'r') + n.t).join(' '));
+        try { const g = RR.Eng.render(m, { ss: 20, maxW: 900, colour: s.colour, labels: 'syllables', judgeRow: true }); if (!(g.W > 0 && g.H > 0)) problems.push('drew nothing'); }
+        catch (e) { problems.push('engraver: ' + e.message); }
+      }
+      const need = s.bars === 1 ? 3 : 4;
+      if (minNotes < need) problems.push('only ' + minNotes + ' notes');
+      check('Level ' + l.n + ' · ' + l.name + ': ' + RUNS + ' made-up melodies', !problems.length,
+        problems.length ? Array.from(new Set(problems)).slice(0, 4).join('; ') : minNotes + '–' + maxNotes + ' notes, ' + melodies.size + ' different');
+    });
+
+    // 2. the Songbook
+    Object.keys(RR.SONGS).forEach(id => {
+      const bad = [];
+      RR.Melody.songCards(id).forEach(c => {
+        const sum = c.notes.reduce((a, n) => a + n.t, 0);
+        if (sum % (c.time[0] * 4)) bad.push('card ' + c.part + ' has ' + sum + ' ticks');
+        if (c.notes.some(n => n.p && !RR.BAR[n.p])) bad.push('card ' + c.part + ' has an unknown note');
+        if (c.notes.some(n => n.p && RR.BAR[n.p].i >= 10)) bad.push('card ' + c.part + ' goes above E5');
+        try { RR.Eng.render(c, { ss: 20, maxW: 900, colour: 'always' }); } catch (e) { bad.push('engraver: ' + e.message); }
+      });
+      check('Song: ' + RR.SONGS[id].title, !bad.length, bad.join('; '));
+    });
+
+    // 3. levels whose bars are greyed out have every song note live
+    RR.LEVELS.filter(l => l.grey).forEach(l => {
+      const missing = [];
+      l.songs.forEach(id => RR.Melody.songNotes(id).forEach(n => { if (!l.notes.includes(n)) missing.push(n); }));
+      check('Level ' + l.n + ': its songs only use its live bars', !missing.length, missing.join(' '));
+    });
+    check('Every level names real songs', RR.LEVELS.every(l => l.songs.every(id => RR.SONGS[id])));
+
+    // 4. practices are made safe
+    const junk = RR.sanitize({ notes: ['X9', 'C4'], rhythms: ['qr'], tempos: [999, 10, 'x'], tempo: 90, judge: 'beat', time: [7, 8], colour: 'blue', flash: 5, bars: 3, endDo: 'yes', practice: 'no' });
+    check('sanitize: junk is cleaned (and the old judge / tempo are dropped)', junk.notes.join() === 'C4' && junk.rhythms.join() === RR.DEFAULTS.rhythms.join() &&
+      junk.tempos.join() === '60,80,100' && !('judge' in junk) && !('tempo' in junk) && junk.practice === true &&
+      junk.time[0] === 4 && junk.colour === 'always' && junk.flash === 0 && junk.bars === 1 && junk.endDo === true, JSON.stringify(junk).slice(0, 120));
+    check('sanitize: three tempos are kept in range and in order', RR.sanitize({ tempos: [200, 30, 90] }).tempos.join() === '40,90,160');
+    check('Practice on every level but the two sight-reading ones', RR.LEVELS.every(l => l.practice === !(l.n === 14 || l.n === 15)));
+    check('sanitize: nothing gives the defaults', JSON.stringify(RR.sanitize(null)) === JSON.stringify(RR.DEFAULTS));
+    check('trimPractice of the defaults is empty', Object.keys(RR.trimPractice(RR.clone(RR.DEFAULTS))).length === 0);
+    RR.LEVELS.forEach(l => {
+      const p = RR.practiceOfLevel(l.n);
+      if (JSON.stringify(RR.sanitize(p)) !== JSON.stringify(p)) check('Level ' + l.n + ' survives sanitize unchanged', false);
+    });
+    check('Every level survives sanitize unchanged', RR.LEVELS.every(l => { const p = RR.practiceOfLevel(l.n); return JSON.stringify(RR.sanitize(p)) === JSON.stringify(p); }));
+
+    // 5. lesson links round-trip
+    RR.LEVELS.forEach(l => {
+      const p = RR.practiceOfLevel(l.n);
+      const link = RR.Lesson.link('Week 3 — Café', p);
+      const back = RR.Lesson.parse(link);
+      if (!back || back.name !== 'Week 3 — Café' || JSON.stringify(back.practice) !== JSON.stringify(p)) check('Lesson link for level ' + l.n, false, link);
+    });
+    check('Lesson links round-trip for every level (with a non-ASCII name)', true, 'e.g. ' + RR.Lesson.link('Week 3', RR.practiceOfLevel(9)).length + ' characters for Level 9');
+    const broken = RR.Lesson.parse(location.href.split('?')[0] + '?lesson=X&p=%%%');
+    check('A broken lesson link still opens, with the usual settings', broken && broken.bad && JSON.stringify(broken.practice) === JSON.stringify(RR.DEFAULTS));
+
+    // 6. engraving of the hard cases
+    const hard = { time: [4, 4], notes: [{ p: 'C4', t: 1 }, { p: 'D4', t: 1 }, { p: 'E4', t: 2 }, { p: 'G5', t: 6 }, { p: 'F5', t: 2 }, { p: null, t: 4 }, { p: 'B4', t: 16 }] };
+    let ok = true; try { RR.Eng.render(hard, { ss: 22, maxW: 300, colour: 'black', labels: 'letters', judgeRow: true, ghosts: [{ id: 'A5', col: 0 }], playTick: 3 }); } catch (e) { ok = false; }
+    check('Engraver: sixteenths, a dot, a rest, a whole note, a ghost, the playhead, squeezed', ok);
+    check('Glyphs are loaded', RR.Eng.available);
+
+    // 7. My melodies: melody sets by the family library rules (phase 5)
+    (function () {
+      const S = RR.Sets, EVM = window.EVMLibrary;
+      const ok1 = S.normalizeMelody({ time: [4, 4], notes: [{ p: 'E4', t: 4 }, { p: 'D4', t: 4 }, { p: 'C4', t: 8 }] });
+      const cross = S.normalizeMelody({ time: [4, 4], notes: [{ p: 'E4', t: 12 }, { p: 'D4', t: 8 }, { p: 'C4', t: 12 }] });
+      const short = S.normalizeMelody({ time: [4, 4], notes: [{ p: 'E4', t: 4 }] });
+      const three = S.normalizeMelody({ time: [4, 4], notes: Array.from({ length: 12 }, () => ({ p: 'C4', t: 4 })) });
+      const silent = S.normalizeMelody({ time: [3, 4], notes: [{ p: null, t: 4 }, { p: null, t: 8 }] });
+      const junk = S.normalizeMelody({ time: [7, 8], notes: [{ p: 'Z9', t: 4 }, { p: 'G4', t: 4 }, { p: 'G4', t: 5 }, { p: 'G4', t: 8 }] });
+      check('Sets: a melody fills one or two whole bars, never crosses a bar line, has a note',
+        !!ok1 && !cross && !short && !three && !silent && !!junk && junk.time[0] === 4 && junk.notes.length === 3 && junk.notes[0].p === null,
+        JSON.stringify(junk));
+      const rec = S.normalize({ title: '  Week 3  ', melodies: [ok1, { junk: 1 }], received: true, book: 'B', derivedFrom: 'x' }, 'set_1');
+      check('Sets: normalize keeps the library header (received, book, derivedFrom) and drops bad melodies',
+        rec.title === 'Week 3' && rec.melodies.length === 1 && rec.received === true && rec.book === 'B' && rec.derivedFrom === 'x');
+      check('Sets: a set with no melodies is blank (never filed)', S.key({ melodies: [] }) === null && S.key(rec) !== null);
+      const k1 = S.key(rec), k2 = S.key(S.normalize(JSON.parse(JSON.stringify(rec)), 'other'));
+      check('Sets: the content key ignores the id, the title and the dates', k1 === k2);
+
+      // the filing rule, as a link arrives: added → same → updated → kept, and matched for id-less links
+      const lib = {}, opts = { key: S.key, newId: () => EVM.newId('set'), received: true };
+      const base = { id: 'set_100_aaaa', title: 'Week 3', createdAt: 100, updatedAt: 100, melodies: [ok1] };
+      const a = EVM.file(lib, S.normalize(base, base.id), opts);
+      const b = EVM.file(lib, S.normalize(base, base.id), opts);
+      const newer = Object.assign({}, base, { updatedAt: 200, melodies: [ok1, ok1] });
+      const c = EVM.file(lib, S.normalize(newer, newer.id), opts);
+      const older = Object.assign({}, base, { updatedAt: 150, melodies: [ok1, ok1, ok1] });
+      const d = EVM.file(lib, S.normalize(older, older.id), opts);
+      const noId = S.normalize({ title: 'From an old link', melodies: [ok1, ok1] }, 'x'); delete noId.id; delete noId.createdAt; delete noId.updatedAt;
+      const e = EVM.file(lib, noId, opts);
+      check('Sets: a link filed twice is one set; newer replaces, older is kept; an id-less link matches by content',
+        a.action === 'added' && b.action === 'same' && c.action === 'updated' && d.action === 'kept' && e.action === 'matched' &&
+        Object.keys(lib).length === 1 && lib.set_100_aaaa.melodies.length === 2 && lib.set_100_aaaa.received === true,
+        [a.action, b.action, c.action, d.action, e.action].join(' → '));
+
+      // a lesson link carries the melodies, never the id
+      const link = RR.Lesson.link('Week 4', Object.assign(RR.clone(RR.DEFAULTS), { set: 'set_100_aaaa' }), lib.set_100_aaaa);
+      const back = RR.Lesson.parse(link);
+      check('Lessons: a set travels as its melodies, not its library id',
+        !link.includes('set_100_aaaa') && back.set && back.set.id === 'lesson' && back.set.melodies.length === 2 && back.practice.set === 'lesson');
+
+      // envelopes: what the Librarian publishes, and back
+      const env = EVM.toEnvelope(lib.set_100_aaaa, { app: 'rainbow-reader', kind: 'set', dataOf: r => ({ melodies: r.melodies }) });
+      const round = S.normalize(EVM.fromEnvelope(env), env.id);
+      check('Sets: a Librarian envelope comes back as the same set, shared', S.key(round) === S.key(lib.set_100_aaaa) && round.received === true && env.kind === 'set');
+    })();
+
+    // 8. the points: 1–20 a melody (points.js)
+    (function () {
+      const P = RR.Points;
+      check('Points, tier 1: first try 1, second ½ → ⌊8 × credit ÷ notes⌋, never below 1',
+        P.reading([0, 0, 0, 0]) === 8 && P.reading([0, 1, 0, 0]) === 7 && P.reading([1, 1, 1, 1]) === 4 && P.reading([2, 3, 2]) === 1 && P.reading([0, 0, 0, 1, 0, 0, 0, 0]) === 7,
+        [P.reading([0, 0, 0, 0]), P.reading([0, 1, 0, 0]), P.reading([1, 1, 1, 1]), P.reading([2, 3, 2]), P.reading([0, 0, 0, 1, 0, 0, 0, 0])].join(' '));
+      const starts = [0, 4, 8, 16, 20, 24];                    // q q h q q (+ a note on beat 7): a rhythm with a long note in it
+      const at = (bpm, off) => starts.map((s, i) => s * 15 / bpm + (off ? off[i] : 0) * 60 / bpm);
+      const exact = P.rhythm(starts, at(80)), slowE = P.rhythm(starts, at(50));
+      const wobble = k => P.rhythm(starts, at(80, [0, k, -k, k, -k, 0]));
+      const even = P.rhythm([0, 4, 8, 16], [0, 1, 2, 3].map(x => x * 0.75));
+      const crawl = P.rhythm(starts, at(24));
+      check('Points, tier 2: the right spacing at any steady tempo is 12', exact.grade === 12 && slowE.grade === 12 && Math.abs(exact.bpm - 80) < 0.01, exact.err.toFixed(3) + ' at ' + exact.bpm.toFixed(0));
+      const g = [0.03, 0.1, 0.16, 0.24, 0.4].map(k => wobble(k));
+      check('Points, tier 2: the further from the spacing, the fewer points (12 → 8)', g.every((x, i) => !i || x.grade <= g[i - 1].grade) && g[0].grade === 12 && g[4].grade === 8,
+        g.map(x => x.grade + ' (' + x.err.toFixed(2) + ')').join(' · '));
+      check('Points, tier 2: q q h q played evenly (no long note) is 8', even.grade === 8, 'off by ' + even.err.toFixed(2) + ' of a beat');
+      check('Points, tier 2: slower than 30 BPM is finding, not a beat → 8', crawl.grade === 8);
+      check('Points, tier 2: fewer than three notes have no rhythm to judge → 12', P.rhythm([0, 8], [0, 3]).grade === 12);
+      const fr = P.free({ tries: [0, 0, 0, 0, 0, 0], starts, times: at(80) }), fs1 = P.free({ tries: [0, 1, 0, 0, 0, 0], starts, times: at(80) });
+      check('Points: on your own, every note first time in rhythm → 12; one slip → tier 1', fr.pts === 12 && fr.tier === 2 && fs1.pts === 7 && fs1.tier === 1);
+      const J = (p, g2) => Array(p).fill('Perfect').concat(Array(g2).fill('Good'));
+      const ci = (judge, pace, wrong, times) => P.countIn({ judge, pace, wrong: wrong || 0, starts: starts.slice(0, judge.length), times: times || at(80).slice(0, judge.length) });
+      check('Points, tier 3: all Perfect — Slow 15 · Moderate 18 · Fast 20', ci(J(4, 0), 'slow').pts === 15 && ci(J(4, 0), 'moderate').pts === 18 && ci(J(4, 0), 'fast').pts === 20);
+      check('Points, tier 3: fewer Perfect, still all in time — Slow 14 / 13 · Moderate 16 · Fast 19',
+        ci(J(2, 2), 'slow').pts === 14 && ci(J(1, 3), 'slow').pts === 13 && ci(J(1, 3), 'moderate').pts === 16 && ci(J(2, 2), 'fast').pts === 19 && ci(J(3, 1), 'fast').pts === 20);
+      const late = ci(['Perfect', 'Late', 'Perfect', 'Perfect'], 'fast');
+      check('Points: a count-in with every bar right but one late drops to 9–12', late.tier === 2 && late.pts >= 9 && late.pts <= 12, late.pts + '');
+      const miss = ci(['Perfect', 'Missed', 'Perfect', 'Perfect'], 'fast'), wrong = ci(J(4, 0), 'fast', 1), lots = ci(['Missed', 'Late', 'Missed', 'Missed'], 'fast', 5);
+      check('Points: a missed note or a wrong bar drops a count-in to 1–8 (−½ a wrong bar, never below 1)', miss.pts === 6 && wrong.pts === 7 && lots.pts === 1 && miss.tier === 1 && wrong.tier === 1,
+        [miss.pts, wrong.pts, lots.pts].join(' '));
+      check('Stars follow the tiers: ★ 1–7 · ★★ 8–12 · ★★★ 13–20',
+        [0, 1, 7, 8, 12, 13, 20].map(P.starsFor).join('') === '0112233');
+      check('Slow · Moderate · Fast are 60 · 80 · 100 by default', ['slow', 'moderate', 'fast'].map(id => RR.paceTempo(RR.DEFAULTS, id)).join() === '60,80,100');
+    })();
+
+    document.getElementById('sum').innerHTML = '<span class="' + (fail ? 'fail' : 'pass') + '">' + pass + ' passed, ' + fail + ' failed</span>';
+    document.title = (fail ? 'FAIL ' : 'PASS ') + document.title;
+  })();
+  </script>
+</body>
+</html>

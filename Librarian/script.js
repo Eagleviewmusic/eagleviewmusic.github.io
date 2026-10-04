@@ -44,9 +44,10 @@
 
   /* ------------------------------------------------------------------
      THE APPS — where each keeps its library, and what counts as blank.
-     Song Writer 1.0 and 2.0 publish under one slug: a 1.0 song goes as
-     { content } (1.0's text, which 2.0 also reads), a 2.0 song as
-     { score }. When both have the same id, the newer one goes.
+     Song Writer 1.0, 2.0 and 2.5 publish under one slug: a 1.0 song goes
+     as { content } (1.0's text, which 2.0 also reads), a 2.0 or 2.5 song
+     as { score }. When two have the same id, the newer one goes — 2.5
+     copied 2.0's library on its first run, so most songs sit in both.
      ------------------------------------------------------------------ */
   const SOURCES = [
     {
@@ -72,6 +73,25 @@
       reserved: id => id === 'sandbox',
       kind: () => 'ostinato',
       blank: rec => !(rec.tracks || []).some(t => (t.beats || []).some(b => (b.cells || []).some(Boolean)))
+    },
+    {
+      /* Song Writer 2.5 (the hub's Song Writer since 2026-10-04): 2.0's
+         record shape under its own key. */
+      app: 'song-writer', name: 'Song Writer', from: '2.5', key: 'song_writer_25_library_v1',
+      builtIns: ['twinkle', 'mary', 'starspangledbanner'],
+      reserved: id => id === 'sandbox',
+      kind: () => 'song',
+      blank: rec => {
+        const lines = (rec.score && rec.score.lines) || [];
+        const words = [];
+        lines.forEach(l => (l.syllables || []).forEach(s => {
+          const t = String((s && s.text) || '').trim();
+          if (t && t !== '-') words.push(t.toLowerCase());
+        }));
+        return !words.length || words.join(' ') === 'start here';
+      },
+      data: rec => (rec.layout ? { score: rec.score, layout: rec.layout } : { score: rec.score }),
+      settings: true
     },
     {
       app: 'song-writer', name: 'Song Writer', from: '2.0', key: 'song_writer_2_library_v1',
@@ -136,12 +156,23 @@
         const s = rec.songs && rec.songs[side];
         return s && s.src === 'library' && s.id && !/^sandbox/.test(s.id) ? PAIR_APPS[side].app + '|' + s.id : null;
       }).filter(Boolean)
+    },
+    /* Melody Reader (was Rainbow Reader) melody sets (2026-10-03): a set of one- and two-bar
+       melodies a teacher wrote in My melodies, read on the xylophone.
+       The envelope's data is { melodies } — Melody Reader/js/sets.js. */
+    {
+      app: 'rainbow-reader', name: 'Melody Reader', key: 'rainbow_reader_sets_v1',
+      reserved: id => id === 'lesson',
+      kind: () => 'set',
+      blank: rec => !(rec.melodies || []).some(m => m && (m.notes || []).some(n => n && n.p)),
+      data: rec => ({ melodies: rec.melodies || [] }),
+      detail: rec => { const n = (rec.melodies || []).length; return n + (n === 1 ? ' melody' : ' melodies'); }
     }
   ];
 
-  const APP_ORDER = ['rhythm-poetry', 'ostinato-builder', 'song-writer', 'music-stand'];
-  const APP_NAMES = { 'rhythm-poetry': 'Rhythm Poetry', 'ostinato-builder': 'Ostinato Builder', 'song-writer': 'Song Writer', 'music-stand': 'Music Stand' };
-  const KIND_NAMES = { poem: 'Poem', rhythm: 'Rhythm', ostinato: 'Ostinato', song: 'Song', pairing: 'Arrangement' };
+  const APP_ORDER = ['rhythm-poetry', 'ostinato-builder', 'song-writer', 'music-stand', 'rainbow-reader'];
+  const APP_NAMES = { 'rhythm-poetry': 'Rhythm Poetry', 'ostinato-builder': 'Ostinato Builder', 'song-writer': 'Song Writer', 'music-stand': 'Music Stand', 'rainbow-reader': 'Melody Reader' };
+  const KIND_NAMES = { poem: 'Poem', rhythm: 'Rhythm', ostinato: 'Ostinato', song: 'Song', pairing: 'Arrangement', set: 'Melody set' };
 
   /* ------------------------------------------------------------------
      PAIRINGS' SONGS. Each side of a pairing is either a link to a song in

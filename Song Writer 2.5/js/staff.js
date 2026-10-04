@@ -256,10 +256,13 @@
     let time = null;
     if (withTime) {
       const mt = SW.meters.byId(S.meter);
-      const top = 'timeSig' + mt.top, bot = 'timeSig' + mt.bottom;
-      const tw = Math.max(gw(top, k), gw(bot, k));
+      // a numeral is one glyph per digit (12/8's 12 is two)
+      const digits = n => String(n).split('').map(d => 'timeSig' + d);
+      const top = digits(mt.top), bot = digits(mt.bottom);
+      const widthOf = list => list.reduce((a, g) => a + gw(g, k), 0);
+      const tw = Math.max(widthOf(top), widthOf(bot));
       x += s * 0.25;
-      time = { x, top, bot, w: tw };
+      time = { x, top, bot, w: tw, widthOf };
       x += tw + s * 0.25;
     }
     return { clefX, sig, time, width: x + s * 0.5 };
@@ -540,6 +543,38 @@
     Object.keys(groups).forEach(id => { const d = groupDir(groups[id]); groups[id].forEach(ev => { ev.groupDir = d; }); });
     readAccidentals(le.events, ks);
 
+    /* BARS ALWAYS RIGHT ON PAPER (2.5, P1). Nothing stored changes:
+       • a written column that crosses a bar line is drawn as tied PIECES
+         (a half on beat 4 of 4/4: a quarter, the bar line, a quarter);
+         the column keeps its first piece's look, the others are virtual
+         columns that follow it — they take room in the plan but have no
+         element of their own, and are drawn with their owner;
+       • a line whose notes stop inside a bar is finished with drawn rests
+         (FILLERS, after its last column), so every bar on the page adds
+         up. They are faint while editing. */
+    const mkPiece = (owner, part, filler) => {
+      const v = SW.values.byId(part.id);
+      return {
+        piece: true, filler: !!filler, owner, stack: null, notated: true,
+        rest: filler ? true : owner.rest, value: v, ticks: v.ticks,
+        pitches: owner.pitches, start: part.start, end: part.start + v.ticks,
+        bar: Math.floor((part.start + le.shift) / le.meter.barTicks),
+        beam: null, groupDir: null, accSet: new Set(), bw: 0, syllable: owner.syllable
+      };
+    };
+    le.events.forEach(ev => {
+      ev.pieces = [];
+      const parts = SW.timing.barPieces(ev, le);
+      if (!parts) return;
+      ev.value = SW.values.byId(parts[0].id);
+      ev.ticks = ev.value.ticks;
+      ev.beam = null;
+      ev.split = true;
+      parts.slice(1).forEach(part => ev.pieces.push(mkPiece(ev, part, false)));
+    });
+    const lastReal = le.events[le.events.length - 1];
+    if (lastReal && lastReal.notated) SW.timing.fillPieces(le).forEach(part => lastReal.pieces.push(mkPiece(lastReal, part, true)));
+
     // the syllables, and each column's ink and space
     const syls = Array.from(line.querySelectorAll(':scope > .syllable'));
     const bySyl = new Map(syls.map(syl => [syl, []]));
@@ -547,19 +582,20 @@
     const cols = [];
     const sylInfo = [];
     syls.forEach((syl, si) => {
-      const evs = bySyl.get(syl);
-      if (!evs.length) return;
+      const reals = bySyl.get(syl);
+      if (!reals.length) return;
+      const evs = reals.reduce((a, ev) => a.concat([ev], ev.pieces), []);
       const tEl = syl.querySelector('.text-input') || syl.querySelector('.text');
       const chordEl = syl.querySelector('.chord-slot .chord-sym');
-      const allBlocks = evs.every(ev => !ev.notated);
+      const allBlocks = reals.every(ev => !ev.notated);
       let span = 0;
-      for (let j = 1; j < evs.length; j++) span += (evs[j - 1].bw + evs[j].bw) / 2;
+      for (let j = 1; j < reals.length; j++) span += (reals[j - 1].bw + reals[j].bw) / 2;
       const info = { syl, si, evs, allBlocks, textW: tEl ? tEl.offsetWidth : 0, chordW: chordEl ? chordEl.offsetWidth : 0 };
       sylInfo.push(info);
       evs.forEach((ev, j) => {
         Object.assign(ev, columnInk(ev, s, k));
         ev.sylStart = j === 0;
-        ev.sylEnd = j === evs.length - 1;
+        ev.sylEnd = ev === reals[reals.length - 1];
         ev.syl = info;
         ev.ideal = ev.notated ? idealSpace(ev.ticks, s)
           : (ev.sylEnd ? idealSpace(SW.values.TICKS_PER_QUARTER, s) : 0);
@@ -655,19 +691,35 @@
       const rc = colsOf(infos);
       const { f, p } = fitRow(rc, ctx, ri === rows.length - 1 && !lastFull ? SP.fLast : SP.fInner);
       if (ri > 0) breaks.push(infos[0].syl);
-      // each column: bar lines and the row's end, as offsets from its head
+      // each column: bar lines and the row's end, as offsets from its head;
+      // a column's pieces ride on it (offsets from its head too)
       rc.forEach((ev, i) => {
+        if (ev.piece) {
+          const oi = info.get(ev.owner.stack);
+          oi.pieces.push({
+            dx: p.x[i] - oi.x, value: ev.value, rest: ev.rest, filler: ev.filler, start: ev.start, bar: ev.bar,
+            dir: ev.dir, heads: ev.heads, accs: [], hw: ev.hw, stemW: ev.stemW, dotX: ev.dotX, dots: ev.dots,
+            restW: ev.restW, L: ev.L, R: ev.R
+          });
+          return;
+        }
         info.set(ev.stack, {
           dir: ev.dir, heads: ev.heads, accs: ev.accs, hw: ev.hw, stemW: ev.stemW, dotX: ev.dotX, dots: ev.dots,
-          restW: ev.restW, f, x: p.x[i], L: ev.L, R: ev.R
+          restW: ev.restW, f, x: p.x[i], L: ev.L, R: ev.R,
+          firstValue: ev.split ? ev.value : null, pieces: [], barsAfter: []
         });
       });
+      const ownerOf = ev => ev.piece ? ev.owner : ev;
       p.bars.forEach(b => {
-        info.get(rc[b.after].stack).barDx = b.x - p.x[b.after];
-        info.get(rc[b.after + 1].stack).barBeforeDx = b.x - p.x[b.after + 1];
+        const oi = info.get(ownerOf(rc[b.after]).stack);
+        const dx = b.x - oi.x;
+        oi.barsAfter.push(dx);
+        if (oi.barDx === undefined) oi.barDx = dx;
+        const nx = rc[b.after + 1];
+        if (!nx.piece) info.get(nx.stack).barBeforeDx = b.x - p.x[b.after + 1];
       });
-      const lastI = info.get(rc[rc.length - 1].stack);
-      lastI.endDx = p.end - p.x[rc.length - 1];
+      const lastI = info.get(ownerOf(rc[rc.length - 1]).stack);
+      lastI.endDx = p.end - lastI.x;
       lastI.endBar = p.endBar;
       lastI.final = p.endBar && rc[rc.length - 1].final;
 
@@ -702,7 +754,7 @@
       // the bars still share a base.
       let top = 0, blockTop = 0;
       rc.forEach(ev => {
-        blockTop = Math.max(blockTop, ev.stack.offsetHeight);
+        if (ev.stack) blockTop = Math.max(blockTop, ev.stack.offsetHeight);
         if (!ev.notated) return;
         top = Math.min(top, inkTop(ev, gRel, s));
       });
@@ -761,9 +813,13 @@
         else vars.push([el, '--sx-ca', null]);
         vars.push([el, '--sx-rise', rise ? n2(rise) + 'px' : null]);
         vars.push([el, '--sx-drop', drop ? n2(drop) + 'px' : null]);
-        e.si.evs.forEach((ev, j) => {
-          const nx = e.si.evs[j + 1];
-          const mr = nx ? (e.xs[j + 1] - nx.bw / 2) - (e.xs[j] + ev.bw / 2) : 0;
+        const evs = e.si.evs;
+        evs.forEach((ev, j) => {
+          if (ev.piece) return;
+          let n = j + 1;
+          while (n < evs.length && evs[n].piece) n++;       // the next real column (pieces have no element)
+          const nx = evs[n];
+          const mr = nx ? (e.xs[n] - nx.bw / 2) - (e.xs[j] + ev.bw / 2) : 0;
           vars.push([ev.stack, '--sx-mr', mr ? n2(mr) + 'px' : null]);
         });
       });
@@ -800,6 +856,29 @@
     plans.set(line, plan);
   }
   const plans = new WeakMap();
+  const hitMaps = new WeakMap();
+  /* The drawn thing nearest a tap on a written line (2.5): { kind: 'col'
+     | 'piece' | 'filler', stack, index (of the piece), noteIdx (the head
+     nearest the tap, in a harmony) } — or null when the tap is not near
+     any (then the page's own elements decide, as before). */
+  function hitAt(line, clientX, clientY) {
+    const rows = hitMaps.get(line);
+    if (!rows || !rows.length) return null;
+    const r = line.getBoundingClientRect();
+    const x = clientX - r.left - line.clientLeft, y = clientY - r.top - line.clientTop;
+    const inRows = rows.filter(row => y >= row.top && y <= row.bottom);
+    if (!inRows.length) return null;
+    const row = inRows.sort((a, b) => Math.abs(y - a.mid) - Math.abs(y - b.mid))[0];
+    let best = null, bestD = Infinity;
+    row.targets.forEach(t => { const d = Math.abs(x - t.x); if (d < bestD) { bestD = d; best = t; } });
+    if (!best || bestD > row.s * 2.2) return null;
+    let noteIdx = 0;
+    if (best.heads.length) {
+      let hd = Infinity;
+      best.heads.forEach(h => { const d = Math.abs(y - h.y); if (d < hd && h.noteIdx >= 0) { hd = d; noteIdx = h.noteIdx; } });
+    }
+    return { kind: best.kind, stack: best.stack, index: best.index, noteIdx };
+  }
 
   /* ================= drawing one line =================
      clock: { at, p0 } — where this line starts in the song, in ticks, and
@@ -862,32 +941,53 @@
     const barNumbers = !SW.settings || !SW.settings.layout || !SW.settings.layout.show || SW.settings.layout.show.barNumbers !== false;
     const parts = [];
     const cuts = [];
+    const hits = [];
     rows.forEach((row, ri) => {
       parts.push(renderRow(row, {
         bs, left, withTime: withTime && ri === 0, lastRow: ri === rows.length - 1,
-        lastLine, le, activeStack, showNames: S.showNames, barNumbers, clock: clock || { at: 0, p0: 0 }, W, cuts,
+        lastLine, le, activeStack, showNames: S.showNames, barNumbers, clock: clock || { at: 0, p0: 0 }, W, cuts, hits,
         soundStack: noteLight ? soundStack : null
       }));
     });
+    hitMaps.set(line, hits);
     // BEHIND THE NOTES: the selected word's box (yellow) and, while it
     // plays, the sounding word's (purple) are drawn here, under the staff
     // and the heads, so neither tints a note's colour (the user's call,
     // 2026-10-01). On a written line the word's own box (style.css) stays
     // clear; a line of blocks keeps it, behind its blocks already.
     const under = [];
-    if (activeStack && line.contains(activeStack)) under.push(wordBox(activeStack, line, 'rgba(255,215,0,.30)', 'rgba(255,215,0,.5)', 2));
-    if (soundStack && boxLight) under.push(wordBox(soundStack, line, 'rgba(156,22,142,.10)', SOUND, 0));
+    if (activeStack && line.contains(activeStack)) under.push(markBox(activeStack, line, plan, bs, 'rgba(255,215,0,.30)', 'rgba(255,215,0,.5)', 2));
+    if (soundStack && boxLight) under.push(markBox(soundStack, line, plan, bs, 'rgba(156,22,142,.10)', SOUND, 0));
     svg.innerHTML = under.join('') + parts.join('');
     syncCut(line, cuts[0] || null);
   }
 
   /* The box behind a word (its .syl-body), in line coordinates: a soft
      edge, then the fill; `grow` px all round (the selection's 1.05). */
-  function wordBox(stack, line, fill, edge, grow) {
+  /* 2.5: on a written line each mark stands alone — the box is the
+     selected column's own (its ink, and its word only when the word is
+     its own: the syllable's first column), never the whole syllable with
+     the notes and rests connected to it. Height as the word's box. */
+  function markBox(stack, line, plan, bs, fill, edge, grow) {
     const body = stack.closest('.syl-body');
     if (!body) return '';
+    const I = plan && plan.info.get(stack);
+    const s = SS_PX * bs;
+    const so = offsetIn(stack, line);
+    const cx = so.x + stack.offsetWidth / 2;
+    const half = Math.max(s * 0.95, stack.offsetWidth / 2);
+    let l = cx - Math.max(I && I.L ? I.L : 0, half) - s * 0.35;
+    let rx = cx + Math.max(I && I.R ? I.R : 0, half) + s * 0.35;
+    const syl = stack.closest('.syllable');
+    const own = syl && syl.querySelector('.notes-container > .harmony-stack') === stack;
+    const text = own && (syl.querySelector('.text-input') || syl.querySelector('.text'));
+    if (text && text.offsetWidth) {
+      const t = offsetIn(text, line);
+      l = Math.min(l, t.x - 4);
+      rx = Math.max(rx, t.x + text.offsetWidth + 4);
+    }
     const o = offsetIn(body, line);
-    const x = o.x - grow, y = o.y - grow, w = body.offsetWidth + 2 * grow, h = body.offsetHeight + 2 * grow;
+    const x = l - grow, y = o.y - grow, w = rx - l + 2 * grow, h = body.offsetHeight + 2 * grow;
     const r = ' x="' + n2(x) + '" y="' + n2(y) + '" width="' + n2(w) + '" height="' + n2(h) + '" rx="8"';
     return '<rect' + r + ' fill="none" stroke="' + edge + '" stroke-width="' + (grow ? 6 : 5) + '" opacity="' + (grow ? '.6' : '.22') + '"/>'
       + '<rect' + r + ' fill="' + fill + '"' + (grow ? '' : ' stroke="' + edge + '" stroke-width="1.5"') + '/>';
@@ -965,8 +1065,12 @@
     pre.sig.forEach(a => p.push(at(a.name, o.left + a.x, yOf(a.st), k)));
     if (pre.time) {
       const t = pre.time, tx = o.left + t.x;
-      p.push(boxAt(t.top, tx + (t.w - gw(t.top, k)) / 2, yOf(B4) - gh(t.top, k), k));
-      p.push(boxAt(t.bot, tx + (t.w - gw(t.bot, k)) / 2, yOf(B4), k));
+      const numeral = (list, y, above) => {
+        let x = tx + (t.w - t.widthOf(list)) / 2;
+        list.forEach(g => { p.push(boxAt(g, x, above ? y - gh(g, k) : y, k)); x += gw(g, k); });
+      };
+      numeral(t.top, yOf(B4), true);
+      numeral(t.bot, yOf(B4), false);
     }
 
     // beam groups of this row (a group cut by a row break is no group)
@@ -977,12 +1081,28 @@
     });
 
     const barLine = bx => rect(bx - s * E.thinBar / 2, yOf(F5) - lineW / 2, s * E.thinBar, yOf(E4) - yOf(F5) + lineW, INK);
+    /* a column's PIECES (2.5, planLine): stand-ins at their own x, drawn
+       as their owner is — tied to it when they carry its notes, plain
+       rests when it is a rest, faint while editing when they are the
+       rests that finish the line's last bar */
+    const pieceEv = (ev, pc) => ({
+      x: ev.x + pc.dx, value: pc.value, rest: pc.rest, filler: pc.filler, notated: true, beam: null, stack: null, ghost: ev.ghost,
+      pitches: ev.pitches, info: pc, tiePitches: ev.pitches
+    });
+    const noNames = Object.assign({}, o, { showNames: false, activeStack: {} });   // (no selection ring on a piece)
+    const fillerOpacity = S.editing ? 0.38 : 1;
     evs.forEach((ev, i) => {
       if (!ev.notated || !ev.info) return;
+      if (ev.info.firstValue) { ev.value = ev.info.firstValue; ev.ticks = ev.value.ticks; }
       if (ev.rest) p.push(drawRest(ev, g, o));
       else p.push(drawNote(ev, g, o));
+      (ev.info.pieces || []).forEach(pc => {
+        const pe = pieceEv(ev, pc);
+        const ink = pe.rest ? drawRest(pe, g, noNames) : drawNote(pe, g, noNames);
+        p.push(pc.filler && fillerOpacity < 1 ? '<g class="filler-rest" opacity="' + fillerOpacity + '">' + ink + '</g>' : ink);
+      });
+      (ev.info.barsAfter || []).forEach(dx => p.push(barLine(ev.x + dx)));
       if (ev.info.barDx !== undefined && evs[i + 1]) {
-        p.push(barLine(ev.x + ev.info.barDx));
         // the bar line that closes the line's pick-up (see syncCut)
         if (o.cuts && o.le.pickup && ev.bar === 0 && evs[i + 1].bar > 0) {
           o.cuts.push({ x: ev.x + ev.info.barDx, top: yOf(F5) - lineW / 2, bottom: yOf(E4) + lineW / 2, s });
@@ -991,10 +1111,25 @@
     });
     Object.keys(beamGroups).forEach(id => p.push(drawBeam(beamGroups[id], g)));
     // ties, to the next note in this row (a tie is inside one syllable, so
-    // a row never breaks inside one)
-    evs.forEach((ev, i) => { if (ev.tieNext && ev.info && evs[i + 1] && evs[i + 1].info) p.push(drawTies(ev, evs[i + 1], g)); });
+    // a row never breaks inside one); a column drawn in pieces ties each
+    // piece to the next, and a tie of its own leaves from its last piece
+    evs.forEach((ev, i) => {
+      if (!ev.info) return;
+      const tiedPieces = ev.rest ? [] : (ev.info.pieces || []).filter(pc => !pc.filler).map(pc => pieceEv(ev, pc));
+      let from = ev;
+      if (tiedPieces.length) {
+        const head = { x: ev.x, value: ev.value, info: ev.info, tiePitches: ev.pitches };
+        [head].concat(tiedPieces).forEach((a, j, all) => { if (all[j + 1]) p.push(drawTies(a, all[j + 1], g)); });
+        from = Object.assign({}, tiedPieces[tiedPieces.length - 1], { tiePitches: ev.tiePitches });
+      }
+      if (ev.tieNext && evs[i + 1] && evs[i + 1].info) p.push(drawTies(from, evs[i + 1], g));
+    });
     // heads go over stems and beams' ends
-    evs.forEach(ev => { if (ev.notated && !ev.rest && ev.info) p.push(drawHeads(ev, g, o)); });
+    evs.forEach(ev => {
+      if (!ev.notated || ev.rest || !ev.info) return;
+      p.push(drawHeads(ev, g, o));
+      (ev.info.pieces || []).forEach(pc => { if (!pc.rest) p.push(drawHeads(pieceEv(ev, pc), g, noNames)); });
+    });
 
     // bar numbers (Layout settings → Bar numbers): over the bar line, clear
     // of the first note's ink; the song's first bar goes unnumbered, as in print
@@ -1018,6 +1153,41 @@
         p.push(text(nx, top, Math.max(9, s * 0.62), String(n),
           'class="bar-num" fill="#9487A2" font-weight="800"' + (centred ? ' text-anchor="middle"' : '')));
       });
+      // a bar that opens with a piece of a tied note (2.5): numbered over its bar line too
+      evs.forEach(ev => {
+        if (!ev.info || !ev.info.pieces) return;
+        ev.info.pieces.forEach(pc => {
+          if (pc.filler || pc.start !== o.le.barStart(pc.bar)) return;
+          if (o.le.pickup && pc.bar === 0) return;
+          const n = Math.round((o.clock.at + pc.start - o.clock.p0) / o.le.meter.barTicks) + 1;
+          if (n === 1) return;
+          const before = (ev.info.barsAfter || []).filter(dx => dx < pc.dx);
+          if (!before.length) return;
+          const nx = ev.x + Math.max(...before);
+          p.push(text(nx, yOf(F5) - s * 0.9, Math.max(9, s * 0.62), String(n), 'class="bar-num" fill="#9487A2" font-weight="800" text-anchor="middle"'));
+        });
+      });
+    }
+
+    // WHAT CAN BE TAPPED (2.5): every head, rest and piece drawn in this
+    // row, by where it was drawn — the notes' own blocks are clear and
+    // short on a written line, so a tap on a head, stem or rest is found
+    // here (hitAt) rather than by the element under the finger
+    if (o.hits) {
+      const targets = [];
+      const headsOf = (ev, stack) => {
+        const own = Array.from(stack.querySelectorAll('.note'));
+        return ev.pitches.map(pt => ({ noteIdx: own.indexOf(pt.el), y: yOf(pt.step) }));
+      };
+      evs.forEach(ev => {
+        if (ev.notated && !ev.info) return;
+        targets.push({ x: ev.x, kind: 'col', stack: ev.stack, heads: ev.notated && !ev.rest ? headsOf(ev, ev.stack) : [] });
+        if (ev.info && ev.info.pieces) ev.info.pieces.forEach((pc, i) => targets.push({
+          x: ev.x + pc.dx, kind: pc.filler ? 'filler' : 'piece', stack: ev.stack, index: i,
+          heads: pc.rest ? [] : headsOf(ev, ev.stack)
+        }));
+      });
+      o.hits.push({ top: yOf(F5) - s * 5, bottom: row.base + 6, mid: yOf(B4), s, targets });
     }
 
     // the row's closing bar line; the song's last is a final bar line
@@ -1147,9 +1317,13 @@
     const hx0 = gx0(head, k);
     const ring = n2(Math.max(1, s * E.outline) / k);
     const p = [];
+    const ghost = ev.ghost || (ev.stack && ev.stack.dataset.ghost);
     I.heads.forEach(h => {
       const x = ev.x - I.hw / 2 - hx0 + h.dx, y = yOf(h.pt.step);
-      p.push(at(head, x, y, k, 'fill="' + h.pt.color + '" stroke="' + INK + '" stroke-width="' + ring + '" stroke-linejoin="round"'));
+      // a ghost (2.5 flow.js: the rhythm ran past the melody) is hollow, its outline dashed in the pitch's colour
+      p.push(at(head, x, y, k, ghost
+        ? 'fill="#FFFFFF" fill-opacity=".85" stroke="' + h.pt.color + '" stroke-width="' + n2(ring * 2.2) + '" stroke-dasharray="' + n2(ring * 4) + ' ' + n2(ring * 3) + '" stroke-linejoin="round"'
+        : 'fill="' + h.pt.color + '" stroke="' + INK + '" stroke-width="' + ring + '" stroke-linejoin="round"'));
     });
     if (o.activeStack === ev.stack) {
       const sel = ev.pitches.find(pt => pt.el.classList.contains('selected-note')) || ev.pitches[0];
@@ -1343,5 +1517,5 @@
     if (e.propertyName === 'height' && e.target.classList && e.target.classList.contains('note')) schedule();
   });
 
-  SW.staff = { render, schedule, geometry, keySignature, plan: line => plans.get(line), available: !!G };
+  SW.staff = { render, schedule, geometry, keySignature, plan: line => plans.get(line), hitAt, available: !!G };
 })();
