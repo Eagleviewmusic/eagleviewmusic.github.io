@@ -44,7 +44,9 @@
   const VIEW_DEFAULTS = {
     workspace: 'song',      // 'song' | 'keyboard' | 'chords' | 'custom' — the top-centre switch
     showStrip: false,       // the left-hand chord strip
-    showLane: false,        // the chord track above the words (chord-track.js; the key keeps the old lane's name)
+    showLane: true,         // View → Chord track: the song's chords above the words (chord-track.js; the key keeps the old lane's name).
+                            //   2026-10-05: its own switch — no workspace sets it; with it on, chords that are there show
+    trackOwn: false,        //   (set once the switch was freed from the workspaces: the old stored value was the workspace's, not a choice)
     showDock: false,        // the keyboard under the score
     showStaff: true,        // notes with a rhythm are written on a treble staff
     colours: true,          // section colours: a pastel band behind each line
@@ -92,11 +94,14 @@
 
   /* The three workspaces — what is on the stage — the Song · Keyboard ·
      Chords switch in the top bar. (2.0 called them Classic · Melody ·
-     Chords; stored preferences are read under the old names too.) */
+     Chords; stored preferences are read under the old names too.) The
+     chord track is not theirs (2026-10-05, user): View → Chord track
+     alone decides whether the song's chords show, Sound → Chords alone
+     whether they are heard — in every workspace, Edit or not. */
   const WORKSPACES = {
-    song:     { showStrip: false, showLane: false, showDock: false },
-    keyboard: { showStrip: false, showLane: false, showDock: true },
-    chords:   { showStrip: true,  showLane: true,  showDock: true }
+    song:     { showStrip: false, showDock: false },
+    keyboard: { showStrip: false, showDock: true },
+    chords:   { showStrip: true,  showDock: true }
   };
   const OLD_WORKSPACE = { classic: 'song', melody: 'keyboard' };
 
@@ -112,6 +117,7 @@
       }
     } catch (e) {}
     if (OLD_WORKSPACE[view.workspace]) view.workspace = OLD_WORKSPACE[view.workspace];
+    if (!view.trackOwn) { view.showLane = true; view.trackOwn = true; }   // once: the stored value was the workspace's
     if (!WORKSPACES[view.workspace]) view.workspace = workspaceFor(view);
     view.blockPct = ui.clamp(Math.round(Number(view.blockPct)) || 100, 50, 160);
     view.textPct = ui.clamp(Math.round(Number(view.textPct)) || 100, 60, 250);
@@ -146,7 +152,7 @@
   function workspaceFor(v) {
     const hit = Object.keys(WORKSPACES).find(id => {
       const w = WORKSPACES[id];
-      return w.showStrip === !!v.showStrip && w.showLane === !!v.showLane && w.showDock === !!v.showDock;
+      return w.showStrip === !!v.showStrip && w.showDock === !!v.showDock;
     });
     return hit || 'custom';
   }
@@ -271,8 +277,7 @@
      kept for anything that still flips the strip on its own. */
   function toggleStrip() {
     if (SW.lessons && !SW.lessons.shellAllows('strip')) return;
-    const on = !view.showStrip;
-    setView({ showStrip: on, showLane: on ? view.showLane : false });
+    setView({ showStrip: !view.showStrip });
   }
 
   /* ---------------- the top-centre switch ---------------- */
@@ -412,9 +417,7 @@
     list.innerHTML = '';
     list.appendChild(ui.switchRow('Melody', 'The notes of the song', snd.melody, () => setSound('melody', !snd.melody)));
     if (!SW.lessons || SW.lessons.shellAllows('strip')) {
-      const laneOut = shows('lane');
-      list.appendChild(ui.switchRow('Chords',
-        laneOut ? 'The chord track, in its rhythm' : 'The chord track, in its rhythm — with the chord track out (Chords)',
+      list.appendChild(ui.switchRow('Chords', 'The song’s chords, in their rhythm — whatever is on the stage',
         !!view.laneChordsPlay, () => { setView({ laneChordsPlay: !view.laneChordsPlay }, { quiet: true }); SW.bus.emit('sound:changed', { sound: snd }); }));
     }
     list.appendChild(ui.switchRow('Steady beat', 'A soft tick on every beat', snd.beat, () => setSound('beat', !snd.beat)));

@@ -626,8 +626,8 @@ body.show-staff .harmony-stack.notated .letter-name, body.show-staff .harmony-st
   position: relative;
   border-radius: 7px;
 }
-body.show-lane .chord-slot { display: flex; }
-body.show-lane .notation-line { padding-top: 34px; }
+body.show-ctrack .chord-slot { display: flex; }               /* chord-track.js: View → Chord track on, and chords to show */
+body.show-ctrack .notation-line { padding-top: 34px; }
 body.editing:not(.chords-locked) .chord-slot { cursor: pointer; }
 
 /* ============================================================
@@ -1996,7 +1996,7 @@ body.capturing:not(.capture-colour) .line-label { background: #f2f2f2; }
   .value-choice::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; }
   body.editing .notation-line:hover .head-tool { display: none; }
   body.editing .notation-line.has-selection .head-tool { display: inline-grid; }
-  .notation-line, body.show-lane .notation-line { padding-top: calc(var(--hb) + 14px); }
+  .notation-line, body.show-ctrack .notation-line { padding-top: calc(var(--hb) + 14px); }
   .line-label { height: var(--hb); }
 
   .play-btn:hover:not(:active) { transform: none; box-shadow: 0 3px 0 rgba(0,0,0,.13); }
@@ -2344,6 +2344,7 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .pw-pplay { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
 .pw-pplay svg { width: 13px; height: 13px; }
 .pw-pplay:hover { background: var(--accent); color: #fff; }
+.pw-pplay.on { background: var(--accent); color: #fff; box-shadow: 0 0 0 3px var(--accent-soft); }   /* playing: a second tap stops it */
 .pw-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .pw-chip { padding: 1px 7px; border-radius: 6px; background: var(--c); color: var(--cink); font-family: var(--font-block); font-size: 12px; font-weight: 600; }
 .pw-none { font-size: 12px; color: var(--ink-3); font-style: italic; }
@@ -2359,7 +2360,7 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .pw-list > .fold-note, .pw-list > .note-i { margin-top: 4px; font-size: 12px; }
 
 /* the main column */
-.pw-main { overflow-y: auto; padding: 16px 20px 24px; display: flex; flex-direction: column; gap: 20px; background: var(--paper); }
+.pw-main { overflow-y: auto; padding: 16px 20px 24px; display: flex; flex-direction: column; gap: 20px; background: var(--paper); container: pwmain / inline-size; }
 .pw-top { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; }
 .pw-name.text-field { width: 230px; height: 42px; font-family: var(--font-round); font-size: 20px; font-weight: 700; }
 .pw-hear { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px 0 12px; border-radius: 999px; background: var(--accent); color: #fff; font-weight: 900; font-size: 14px; }
@@ -2369,7 +2370,7 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .pw-hear:disabled { opacity: .45; }
 .pw-beat, .pw-twobars { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--ink-2); cursor: pointer; text-transform: none; letter-spacing: 0; }
 .pw-beat input, .pw-twobars input { width: 16px; height: 16px; accent-color: var(--accent); }
-.pw-each { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: var(--ink-2); }
+.pw-each { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: var(--ink-2); }
 .pw-each small { min-width: 40px; font-size: 11.5px; color: var(--ink-3); }
 .pw-stepper { display: inline-flex; align-items: center; border: 1.5px solid var(--hairline-2); border-radius: 10px; overflow: hidden; background: var(--surface); }
 .pw-stepper button { width: 30px; height: 32px; background: var(--paper-2); font-size: 16px; font-weight: 900; color: var(--ink-2); }
@@ -2413,34 +2414,145 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .pw-card.plus small { font-size: 11px; font-weight: 800; color: var(--ink-3); }
 .pw-card.plus.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
-/* pick a chord: the panel's blocks, smaller */
-.pw-pick { display: grid; grid-template-columns: minmax(250px, 340px) minmax(0, 1fr); gap: 18px; align-items: start; }
+/* pick a chord (left) and the rhythm (right), side by side — one above
+   the other when the column is narrow (a tablet held upright, a phone) */
+.pw-duo { display: grid; grid-template-columns: minmax(250px, 320px) minmax(0, 1fr); gap: 22px; align-items: start; }
+@container pwmain (max-width: 600px) {
+  .pw-duo { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+}
+
+/* pick a chord: its title with More chords… beside it, the panel's blocks (smaller), the note under them */
+.pw-pick { min-width: 0; }
+.pw-pick-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; min-height: 32px; margin-bottom: 8px; }
+.pw-pick-head .pw-kicker { margin: 0; }
+.pw-small-btn { height: 32px; padding: 0 12px; border-radius: 10px; font-size: 13px; }
 .pw-board { display: flex; flex-direction: column; gap: 6px; container-type: inline-size; }
 .pw-board .strip-tower { height: 172px; flex: none; margin-top: 0; }
 .pw-board .crow { max-height: 52px; }
 .pw-board .cblock { border-radius: 10px; min-height: 26px; }
-.pw-pick-side .fold-note { display: block; }
-.pw-more { margin-top: 10px; }
+.pw-pick-note { margin-top: 10px; }
+.pw-pick-note .fold-note { display: block; }
 
-/* the rhythm: the beat strip's pills */
-.pw-rhythm { padding: 12px 14px 14px; border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--hairline); }
-.pw-rhead { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 8px; }
+/* the rhythm: its title, two tabs (Build your own · Pre-built), the box under them */
+.pw-rhythm { min-width: 0; container: pwrhythm / inline-size; }
+.pw-rhead { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 32px; margin-bottom: 8px; }
 .pw-rhead .pw-kicker { margin: 0; }
 .pw-rhead .seg-btn { padding: 6px 11px; font-size: 12.5px; }
+.pw-rtabs { display: flex; gap: 4px; padding-left: 10px; position: relative; z-index: 1; }
+.pw-rtab {
+  padding: 8px 14px 7px; border-radius: 12px 12px 0 0; margin-bottom: -1px;
+  border: 1px solid var(--hairline); border-bottom-color: transparent; background: var(--paper-2);
+  font-size: 13.5px; font-weight: 800; color: var(--ink-3); white-space: nowrap;
+}
+.pw-rtab:hover:not(.on) { color: var(--ink-2); background: var(--surface); }
+.pw-rtab.on { background: var(--surface); color: var(--accent); box-shadow: inset 0 3px 0 var(--accent); }
+.pw-rtabs .pw-bars { margin: 0 0 5px auto; align-self: center; }   /* 1 bar · 2 bars, on the tabs' row */
+.pw-bars .seg-btn { padding: 5px 10px; font-size: 12.5px; }
+.pw-rbox { padding: 12px 12px 14px; border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--hairline); }
 .pw-strip { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 4px; }
 .pw-beatcol { gap: 4px; }
 .pw-notes { height: 26px; display: flex; align-items: flex-end; justify-content: center; gap: 2px; color: var(--ink); }
 .pw-notes .engraving { height: 22px; width: auto; }
 .pw-say { min-height: 20px; font-family: var(--font-round); font-size: 16px; font-weight: 700; color: var(--ink-2); }
-.pw-barline { align-self: stretch; width: 2px; margin: 26px 6px 40px; border-radius: 1px; background: var(--ink-3); opacity: .5; }
 .pw-strip .bb-chain { margin-top: 33px; }
-.pw-presets { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
-.pw-preset { padding: 5px 12px; border-radius: 999px; border: 1.5px solid var(--hairline-2); background: var(--surface); font-family: var(--font-round); font-size: 14px; font-weight: 700; color: var(--ink-2); }
-.pw-preset:hover { border-color: var(--accent); color: var(--accent); }
-.pw-preset.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+/* two bars (or a chord's rhythm longer than a bar): a line a bar, beat under beat — each bar's ⛓ to the bar before leads its line */
+.pw-strip.bars { flex-direction: column; flex-wrap: nowrap; gap: 10px; }
+.pw-barrow { align-self: stretch; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 4px; }
+.pw-barrow + .pw-barrow { padding-top: 10px; border-top: 1px dashed var(--hairline-2); }
+.pw-chain-gap { flex: none; width: 26px; }
+/* beside the board the box is narrower than the beat strip's: its smaller pills, so a bar of 4/4 stays on one row */
+@container pwrhythm (max-width: 540px) {
+  .pw-strip, .pw-barrow { column-gap: 3px; }
+  .pw-strip .bb-pill { min-width: 56px; height: 34px; padding: 0 4px; gap: 2px; }
+  .pw-strip .bb-pill.d3 { min-width: 76px; }
+  .pw-strip .bb-pill.d4 { min-width: 84px; }
+  .pw-strip .bb-pill.d6 { min-width: 118px; }
+  .pw-strip .bb-dot { width: 16px; height: 16px; border-width: 2px; }
+  .pw-strip .bb-dot.hold::before { left: -6px; right: -6px; }
+  .pw-strip .bb-chain { width: 16px; margin-top: 30px; }
+  .pw-chain-gap { width: 16px; }
+}
+/* Pre-built: the meter's rhythms as lines of notes, one under another */
+.pw-lines { display: flex; flex-direction: column; gap: 6px; }
+.pw-line {
+  display: flex; align-items: center; min-height: 52px; padding: 2px 12px; border-radius: 12px;
+  border: 1.5px solid var(--hairline); background: var(--surface); color: var(--ink); text-align: left;
+  transition: border-color .13s, background .13s, box-shadow .13s;
+}
+.pw-line svg.rhythm-line { display: block; max-width: 100%; height: auto; }
+.pw-line .rl-line, .pw-line .rl-bar { opacity: .55; }
+.pw-line:hover { border-color: var(--accent); }
+.pw-line.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-soft); color: var(--accent-deep); }
+.pw-line-more { margin-left: auto; padding-left: 10px; font-size: 15px; color: var(--accent); }   /* closed to the one chosen: tap for every line */
 .pw-rnote { margin: 10px 0 0; }
 .pw-ownline { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; font-size: 14px; font-weight: 800; color: var(--ink-2); }
 .pw-ownline .seg-btn { padding: 6px 11px; font-size: 12.5px; }
+
+/* 2026-10-05 the Edit Chords page, top to bottom: Choose your chords and their
+   rhythm · Build your chord progression · Name it and hear it (the first time);
+   made and come back to, its name and chords head the page instead */
+.pw-sec { display: flex; flex-direction: column; gap: 10px; }
+.pw-sec + .pw-sec { padding-top: 18px; border-top: 1px solid var(--hairline); }
+.pw-h { margin: 0; font-family: var(--font-round); font-size: 19px; font-weight: 700; color: var(--ink); }
+.pw-headsec { gap: 12px; }
+.pw-namerow { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; }
+.pw-sec.pw-finish { padding: 14px 16px 16px; border: 1.5px solid #E7C4E1; border-radius: var(--r-lg); background: var(--accent-soft); }
+.pw-sec + .pw-sec.pw-finish { margin-top: 4px; }
+.pw-finish .pw-name.text-field { background: var(--surface); }
+.pw-empty { margin: 0; font-weight: 700; color: var(--ink-3); }
+.pw-headsec > .pw-none { margin: 0; }
+.pw-duo.rhythm-first { grid-template-columns: minmax(0, 1fr) minmax(250px, 330px); }
+@container pwmain (max-width: 600px) {
+  .pw-duo.rhythm-first { grid-template-columns: minmax(0, 1fr); }
+}
+/* Build your chord progression: right under the chords — its title and Each chord as one block, Add a chord beside it, the chords after */
+.pw-sec + .pw-sec.pw-build { padding-top: 2px; border-top: 0; }
+.pw-build-row { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 12px 16px; align-items: start; }
+.pw-build-head { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding-top: 2px; }
+.pw-build-head .pw-h { line-height: 1.2; }
+.pw-build-head .pw-each { flex-direction: column; align-items: flex-start; gap: 5px; }
+.pw-each-row { display: inline-flex; align-items: center; gap: 8px; }
+.pw-build-head .pw-each small { min-width: 0; }
+/* the chords four to a row, Add a chord in the next place */
+.pw-cards.pw-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 124px)); gap: 10px; }
+.pw-grid .pw-card { width: auto; min-width: 0; }
+.pw-grid .pw-mini { width: calc(100% - 16px); max-width: 96px; }
+@container pwmain (max-width: 600px) {
+  .pw-build-row { grid-template-columns: minmax(0, 1fr); }
+  .pw-cards.pw-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .pw-grid .pw-card-top { font-size: 20px; }
+  .pw-grid .pw-card-len { gap: 2px; font-size: 11px; }
+}
+/* the box a new chord goes into, listening */
+.pw-card.plus small { padding: 0 8px; text-align: center; line-height: 1.3; }
+.pw-card.plus.listening { border-color: var(--accent); background: var(--accent-soft); animation: pw-listen 1.8s ease-in-out infinite; }
+.pw-card.plus.listening small { font-size: 12px; color: var(--accent-deep); }
+.pw-listen { font-size: 26px; line-height: 1; color: var(--accent); }
+@keyframes pw-listen { 0%, 100% { box-shadow: 0 0 0 3px var(--accent-soft); } 50% { box-shadow: 0 0 0 7px rgba(156,22,142,.14); } }
+@media (prefers-reduced-motion: reduce) { .pw-card.plus.listening { animation: none; box-shadow: 0 0 0 3px var(--accent-soft); } }
+/* the changes under the board: sideways, each a switch (on until tapped again) */
+.pw-mods { display: flex; align-items: stretch; gap: 4px; }
+.pw-modrow { flex: 1; min-width: 0; display: flex; gap: 4px; overflow-x: auto; scroll-snap-type: x proximity; overscroll-behavior-x: contain; scrollbar-width: none; }
+.pw-modrow::-webkit-scrollbar { display: none; }
+.pw-mod { flex: 0 0 auto; min-width: 52px; padding: 4px 6px 3px; scroll-snap-align: start; touch-action: pan-x; }
+.pw-modnav { flex: none; width: 22px; border-radius: 8px; background: var(--paper-2); color: var(--ink-2); font-size: 18px; font-weight: 900; line-height: 1; }
+.pw-modnav:hover:not(:disabled) { background: var(--hairline); color: var(--ink); }
+.pw-mods.fits .pw-modnav, .pw-mods.fits .pw-mod.copy { display: none; }   /* the whole list fits: once, no arrows */
+.pw-mod .cmod-name .figs { font-size: .9em; vertical-align: -.15em; }        /* 6/4, 4/2: readable figures */
+
+/* a progression's chord: More chords… and a double-click (#pchord-sheet) */
+.sheet.pchord-sheet { max-width: 860px; max-height: 92vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; overflow: clip; }
+.pchord-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 14px; background: var(--paper); }
+.pchord-body > * { flex: none; }
+.ce-row { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 10px; align-items: center; }
+.ce-row .editor-label { padding-top: 0; }
+.ce-qrow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.ce-quality.sound-select { flex: none; width: 150px; height: 40px; }
+.ce-mods { display: flex; flex-wrap: wrap; gap: 5px; }
+.ce-mods .mod-chip { height: 40px; min-width: 44px; padding: 0 8px; }
+.ce-mods .mod-chip .figs { font-size: .82em; }
+.ce-rhythm { padding-top: 14px; border-top: 1px solid var(--hairline); }
+.ce-rhythm .pw-rhead { gap: 8px 14px; }
 
 /* phones: one column, the list a row of cards across the top */
 @media (max-width: 720px) {
@@ -2455,16 +2567,17 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
   .pw-starters { flex-direction: row; }
   .pw-starter { flex: none; width: 140px; }
   .pw-main { padding: 12px 12px 18px; gap: 16px; }
-  .pw-each { margin-left: 0; }
   .pw-name.text-field { width: 100%; }
   .pw-card { width: 104px; }
   .pw-mini { width: 84px; }
-  .pw-pick { grid-template-columns: minmax(0, 1fr); }
   .pw-foot { padding: 10px 12px; gap: 6px; flex-wrap: nowrap; }
   .pw-foot .btn { padding: 0 11px; height: 40px; font-size: 13px; }
   .pw-foot .pw-long { display: none; }
   .pw-foot .pw-short { display: inline; }
   .pw-foot .pw-confirm { font-size: 13px; }
+  .sheet.pchord-sheet { height: 100%; max-height: 100%; border-radius: var(--r-xl) var(--r-xl) 0 0; }
+  .pchord-body { padding: 12px 12px 16px; }
+  .ce-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }
 
 /* ============================================================
@@ -2653,7 +2766,7 @@ body.present-mode .ct-add { display: none; }
    JUST HERE — one chord of the song (progression-window.js)
    ============================================================ */
 .sheet.here-sheet { max-width: 780px; max-height: 92vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; overflow: clip; }
-.here-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 16px; background: var(--paper); }
+.here-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 16px; background: var(--paper); container: pwmain / inline-size; }
 .here-body > * { flex: none; }
 .hw-split { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 16px; }
 .hw-cards { display: flex; flex-wrap: wrap; gap: 8px; flex: 1 1 auto; }
@@ -2684,7 +2797,6 @@ body.present-mode .ct-add { display: none; }
 #prog-sheet.readonly .pw-stepper button,
 #prog-sheet.readonly .pw-pick,
 #prog-sheet.readonly .pw-twobars,
-#prog-sheet.readonly .pw-presets,
 #prog-sheet.readonly .pw-rnote,
 #prog-sheet.readonly .fold-note:has([data-note="pw.list"]),
 #prog-sheet.readonly .fold-note:has([data-note="pw.cards"]),
@@ -2700,6 +2812,7 @@ body.present-mode .ct-add { display: none; }
 #prog-sheet.readonly [data-song="clear-sel"],
 #prog-sheet.readonly .pw-strip .bb-pm { display: none !important; }
 #prog-sheet.readonly .pw-strip .bb-chain:not(.on) { visibility: hidden; }
+#prog-sheet.readonly .pw-duo { grid-template-columns: minmax(0, 1fr); }      /* no board: the rhythm has the row */
 #prog-sheet.readonly .pw-name { border-color: transparent; background: transparent; box-shadow: none; pointer-events: none; }
 #prog-sheet.readonly .pw-strip, #prog-sheet.readonly .pw-strip * { cursor: default; }
 #prog-sheet.readonly .mp-band { cursor: pointer; }

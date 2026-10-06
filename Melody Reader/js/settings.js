@@ -89,17 +89,17 @@
     },
     play() {
       const s = G.setup;
-      return '<div class="sec"><h3>Count me in</h3>' +
-        RR.note('ci', 'A 1 2 3 4 count-in, then a metronome through the melody — nothing shows but the notes lighting as they are played. The player picks Slow, Moderate or Fast under Count me in; these are the three tempos.') +
+      return '<div class="sec"><h3>The metronome</h3>' +
+        RR.note('ci', 'With the metronome on, a Test starts with a 1 2 3 4 count-in, then the metronome through the melody — nothing shows but the notes lighting as they are played — and rolls on to the next melody, counting in again. The player taps the metronome under the music for Slow, Moderate or Fast; these are the three tempos (Listen plays at them too).') +
         RR.Points.PACES.map((p, i) => '<div class="row"><span class="lbl">' + p.name + ' <small class="pts-range">' + p.lo + '–' + p.hi + ' points</small></span>' +
           '<input type="range" min="40" max="160" step="2" value="' + s.tempos[i] + '" data-range="tempo' + i + '" aria-label="' + p.name + ' tempo"><b id="tempo' + i + '-v">' + s.tempos[i] + ' BPM</b></div>').join('') +
         row('Flash (the notes fade after the count-in)', seg('flash', [['0', 'Off'], ['2', '2 s'], ['3', '3 s'], ['4', '4 s'], ['6', '6 s']], s.flash)) +
-        swRow('One go (no Again)', 'oneGo', s.oneGo) + '</div>' +
+        swRow('One go (no starting a Test over)', 'oneGo', s.oneGo) + '</div>' +
         '<div class="sec"><h3>Game</h3>' + seg('game', [['round5', 'Round of 5'], ['round10', 'Round of 10'], ['song', 'Song'], ['clock', 'Beat the clock'], ['endless', 'Endless']], s.game) +
         (s.game === 'song' ? '<div class="picks">' + Object.keys(RR.SONGS).map(id => '<button type="button" data-song="' + id + '" class="' + ((s.song || s.songs[0] || 'hot-cross-buns') === id ? 'on' : '') + '">' + RR.esc(RR.SONGS[id].title) + '</button>').join('') + '</div>' +
           RR.note('sg', 'The song, card by card — and at the end, Hear your song.') : '') +
         (s.game === 'clock' ? '<div class="row">' + seg('clockSecs', [['30', '30 s'], ['60', '60 s'], ['120', '2 min']], s.clockSecs) + '</div>' +
-          RR.note('ck', 'As many melodies as you can — no Practice, no count-in. The clock starts with your first note; each melody scores 1–12.') : '') + '</div>' +
+          RR.note('ck', 'As many melodies as you can — no Practice, no metronome. The clock starts with your first note; each melody scores 1–12.') : '') + '</div>' +
         '<div class="sec"><h3>Melodies from</h3>' + fromHtml(s) +
         row('Next melody', seg('auto', [['true', 'Comes by itself'], ['false', 'When I press Next']], s.auto)) + '</div>';
     },
@@ -113,15 +113,15 @@
         '<tr><td>The bar glows</td><td>' + seg('glow', [['never', 'Never'], ['after2', 'After 2 slips'], ['always', 'Always']], s.glow) + '</td></tr>' +
         '<tr><td>Ghost notes (where a slip landed)</td><td>' + sw('ghost', s.ghost, 'Ghost notes') + '</td></tr>' +
         '<tr><td>Under the notes</td><td>' + seg('labels', [['none', 'Nothing'], ['letters', 'Letter names'], ['syllables', 'Rhythm syllables']], s.labels) + '</td></tr>' +
-        '<tr><td>Practice first (hear it, try it, then I’m ready)</td><td>' + sw('practice', s.practice, 'Practice first') + '</td></tr>' +
-        '<tr><td>Hear it (▶ in Practice)</td><td>' + seg('play', [['shown', 'Yes'], ['hidden', 'No']], s.playHidden ? 'hidden' : 'shown') + '</td></tr>' +
+        '<tr><td>Practice first (Listen, try it, then Test)</td><td>' + sw('practice', s.practice, 'Practice first') + '</td></tr>' +
+        '<tr><td>Listen (▶ in Practice)</td><td>' + seg('play', [['shown', 'Yes'], ['hidden', 'No']], s.playHidden ? 'hidden' : 'shown') + '</td></tr>' +
         '<tr><td>Hearing it lights the bars</td><td>' + sw('playLights', s.playLights, 'Hearing it lights the bars') + '</td></tr>' +
         '<tr><td>Grey out the bars not in the music</td><td>' + sw('grey', s.grey, 'Grey out the bars not in the music') + '</td></tr>' +
         '</tbody></table>';
     },
     points() {
       return '<div class="sec">' + swRow('Points', '@points', RR.device.points) +
-        RR.note('pt-how', 'Each melody earns 1 to 20. Find the notes: 1–8 (a note right first time counts 1, second time ½). Every note first time, in your own steady beat: 9–12. Count me in, every note right and in time: Slow 13–15, Moderate 16–18, Fast 19–20 — but a wrong or missed note in a count-in drops it to 1–8. Stars: ★ 1–7 · ★★ 8–12 · ★★★ 13–20.') +
+        RR.note('pt-how', 'Each melody earns 1 to 20. Find the notes: 1–8 (a note right first time counts 1, second time ½). Every note first time, in your own steady beat: 9–12. A Test with the metronome, every note right and in time: Slow 13–15, Moderate 16–18, Fast 19–20 — but a wrong or missed note with the metronome drops it to 1–8. Stars: ★ 1–7 · ★★ 8–12 · ★★★ 13–20.') +
         RR.note('pt', 'With points off there are no numbers anywhere. The lights, sparkles and stars stay.') +
         swRow('Stars', '@stars', RR.device.stars) +
         swRow('Celebration sounds', '@celebrate', RR.device.celebrate) + '</div>' +

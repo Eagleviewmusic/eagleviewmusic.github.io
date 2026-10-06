@@ -2696,11 +2696,17 @@
        way a printed score runs a line across the page and starts another
        underneath — instrument column and all, because a line of music
        nobody can put a name to is no use. Every other layout is one
-       block holding every bar, and the window on to it does the rest. */
-    blockRanges().forEach(([from, to], i) => {
+       block holding every bar, and the window on to it does the rest.
+       Pages counts blocks too, but must not be built in them: cut up
+       here, its pages were stacked down the screen like Lines, and the
+       window could only ever find the first one. */
+    const blocks = isSystems() ? blockRanges() : [[0, song.measures]];
+    // more than one line: each on its own colour (see A SYSTEM in the stylesheet)
+    grid.classList.toggle('lined', blocks.length > 1);
+    blocks.forEach(([from, to], i) => {
       const host = isSystems() ? document.createElement('div') : grid;
       if (host !== grid) {
-        host.className = 'system';
+        host.className = 'system tone-' + (i % LINE_TONES);
         host.dataset.system = String(i);
       }
       host.appendChild(buildRuler(from, to));
@@ -2811,10 +2817,13 @@
     const groupOf = [];
     trackGroups(track).forEach(group => {
       const colours = groupColours(track, group);
+      /* the run's slots that a word from an earlier beat reads on over —
+         marked by buildSpeech as the beats are built, left to right */
+      const carried = [];
       let at = 0;
       for (let b = group.start; b <= group.end; b++) {
         const slots = track.beats[b].slots;
-        groupOf[b] = { group: group, colours: colours, offset: at, speech: speech };
+        groupOf[b] = { group: group, colours: colours, offset: at, speech: speech, carried: carried };
         at += slots;
       }
     });
@@ -3317,21 +3326,32 @@
      next note in the beat. It still starts under its own notehead: a
      short word is centred on it, a long one reads on to the right, the
      way words are set under a song. The beat only widens when a word will
-     not fit the room it has (layoutAndEngrave reads data-span). */
+     not fit the room it has (layoutAndEngrave reads data-span).
+
+     A note held over the beat line takes its word with it. A whole note's
+     word has the whole bar to read on into — Fruit Rhythms' Ba-ha hon-ey
+     is no reason to stretch the bar — so data-span counts every slot the
+     note still holds in the beats after, and those slots print nothing
+     rather than a dash for the word to run into. */
   function buildSpeech(track, beat, colours, notes, membership) {
     const row = document.createElement('div');
     row.className = 'words';
     const count = !!view.showSyllables;
     const own = view.showWords !== false;
     const spoken = count ? getChantText(beat.cells, view.syllableSystem, beat.slots) : [];
+    // where a held note is named by how long it lasts (Fruit Rhythms' Orange)
+    const longAt = [];
     if (count && membership && membership.group.span > 1) {
       colours.forEach((c, i) => {
         if (c !== 'active') return;
         const long = speechForLongNote(track, membership.group, membership.colours,
           membership.offset + i, view.syllableSystem);
-        if (long) spoken[i] = long;
+        if (long) { spoken[i] = long; longAt[i] = true; }
       });
     }
+    const run = membership ? membership.colours : colours;
+    const offset = membership ? membership.offset : 0;
+    const carried = membership ? membership.carried : [];
 
     let i = 0;
     while (i < colours.length) {
@@ -3339,20 +3359,32 @@
       container.className = 'word-container';
       const note = colours[i] === 'active' && notes ? notes[i] : -1;
       const custom = note >= 0 && own ? ((track.words && track.words[note]) || '') : '';
+      const carries = !!custom || !!longAt[i];
       let span = 1;
-      if (custom) {
+      if (carries) {
         while (i + span < colours.length && colours[i + span] !== 'active') span++;
         container.style.gridColumn = 'span ' + span;
       }
       container.style.setProperty('--span', String(span));
       if (note >= 0) container.dataset.note = String(note);
 
-      const text = custom || (count ? (note >= 0 ? (spoken[i] || '-') : '-') : '');
+      /* the room the word has: this beat up to the next note, and on past
+         the beat line for as long as the note is still held there */
+      let reach = span;
+      if (carries && i + span === colours.length) {
+        for (let k = offset + colours.length; k < run.length && run[k] === 'sustain'; k++) {
+          carried[k] = true;
+          reach++;
+        }
+      }
+
+      const quiet = note < 0 && carried[offset + i];
+      const text = custom || (count && !quiet ? (note >= 0 ? (spoken[i] || '-') : '-') : '');
       const box = document.createElement('span');
       box.className = 'word-box';
       const word = document.createElement('span');
       word.className = 'word' + (text === '-' ? ' rest' : '') + (custom ? ' own' : '');
-      word.dataset.span = String(span);
+      word.dataset.span = String(reach);
       word.textContent = text;
       box.appendChild(word);
       container.appendChild(box);
@@ -4125,7 +4157,13 @@
      one: a bar's width and a block's height are already on the page, and
      a bar is the same width whichever line it lands on, because widths
      are settled per beat across the whole piece. */
-  const SYSTEM_GAP = 26;   /* must match `.system + .system` in the stylesheet */
+  /* These must match `#grid.lined > .system` in the stylesheet: the gap
+     between lines, and the coloured frame round each one — its padding
+     and edge, across and down. A score of one line has no frame. */
+  const SYSTEM_GAP = 12;
+  const LINE_FRAME_X = 12 + 6 + 14;
+  const LINE_FRAME_Y = 10 + 14;
+  const LINE_TONES = 4;    /* --line-1 … --line-4, taken in turn */
 
   function measureAdvances() {
     const adv = [];
@@ -4133,7 +4171,10 @@
       const el = grid.querySelector('.measure[data-measure="' + m + '"]');
       if (!el) { adv[m] = 0; continue; }
       const bar = el.nextElementSibling;
-      adv[m] = el.offsetWidth + (bar ? bar.offsetWidth : 0);
+      // the bar line's margins too: they are 10px of every bar
+      const cs = bar ? getComputedStyle(bar) : null;
+      adv[m] = el.offsetWidth + (bar
+        ? bar.offsetWidth + parseFloat(cs.marginLeft) + parseFloat(cs.marginRight) : 0);
     }
     return adv;
   }
@@ -4147,11 +4188,17 @@
        blocks there are — so it is taken out of the block and put back on
        the total. */
     const addRow = grid.querySelector(':scope > .add-track-row');
-    const addH = addRow ? addRow.offsetHeight + parseFloat(getComputedStyle(addRow).marginTop) : 0;
+    // hidden (a pane not being edited), its margin takes no room either
+    const addH = addRow && addRow.offsetHeight
+      ? addRow.offsetHeight + parseFloat(getComputedStyle(addRow).marginTop) : 0;
     /* one block's height: a system when there are systems, the whole grid
-       when the piece is in one piece — either way, a ruler and every track */
+       when the piece is in one piece — either way, a ruler and every track.
+       Bare: a coloured frame drawn now comes off, and goes back on below
+       only for the shapes that will have more than one line. */
     const system = grid.querySelector('.system');
-    const blockH = system ? system.scrollHeight : grid.scrollHeight - addH;
+    const blockH = system
+      ? system.scrollHeight - (grid.classList.contains('lined') ? LINE_FRAME_Y : 0)
+      : grid.scrollHeight - addH;
     if (!blockH) return [];
 
     const choices = PER_PAGE_CHOICES.filter(n => n < song.measures);
@@ -4165,10 +4212,11 @@
         widest = Math.max(widest, w);
         blocks++;
       }
+      const lined = blocks > 1;
       return {
         n: per,
-        w: headW + widest,
-        h: blockH * blocks + SYSTEM_GAP * (blocks - 1) + addH
+        w: headW + widest + (lined ? LINE_FRAME_X : 0),
+        h: (blockH + (lined ? LINE_FRAME_Y : 0)) * blocks + SYSTEM_GAP * (blocks - 1) + addH
       };
     });
   }

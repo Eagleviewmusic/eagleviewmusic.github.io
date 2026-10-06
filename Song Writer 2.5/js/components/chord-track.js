@@ -90,17 +90,21 @@
   /* ================= DRAWING ================= */
   function schedule() { clearTimeout(timer); timer = setTimeout(draw, 30); }
 
+  /* View → Chord track decides (2026-10-05) — in every workspace, Edit or
+     not. The row takes room only with chords to show, or in Edit with the
+     chord panel out (its + on an empty bar): a song with no chords looks
+     as it always did. */
   function draw() {
     clearTimeout(timer);
-    const on = shown();
+    const g = shown() ? T.grid() : null;
+    const evs = g ? T.events(g) : [];
+    const on = !!g && (evs.length > 0 || (canEdit() && !S.present && SW.settings.shows('strip')));
     document.body.classList.toggle('show-ctrack', on);
     if (!on) {
       score.querySelectorAll('.notation-line > .ctrack').forEach(l => l.remove());
       if (tail) { tail.hidden = true; tail.innerHTML = ''; }
       return;
     }
-    const g = T.grid();
-    const evs = T.events(g);
     const list = T.shown(g);
     const firstOf = new Set();                                   // the first chord of each stretch: it carries the name
     list.forEach((r, i) => { const e = evs.find(x => x.stretch === i); if (e) firstOf.add(e); });
@@ -486,8 +490,8 @@
   /* stepping onto a word where a chord starts plays it (Perform, as the lane did) */
   SW.bus.on('selection', d => {
     if (d && d.stack && S.chordSel && !holdSel) { S.chordSel = null; paintSel(); SW.bus.emit('chordsel:changed', { sel: null }); }
-    if (!d || !d.sounded || !d.stack || !shown() || S.playing) return;
-    if (!SW.settings.view.laneChordsPlay) return;
+    if (!d || !d.sounded || !d.stack || S.playing) return;
+    if (!SW.settings.view.laneChordsPlay) return;               // Sound → Chords: heard whether the track shows or not
     const firstCol = d.syllable && d.syllable.querySelector('.harmony-stack') === d.stack;
     if (!firstCol) return;
     const song = SW.timing.song();

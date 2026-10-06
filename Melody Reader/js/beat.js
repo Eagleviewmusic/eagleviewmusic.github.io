@@ -1,16 +1,16 @@
 /* ==========================================================================
    Melody Reader — beat.js
    --------------------------------------------------------------------------
-   RR.Beat — Count me in (Melody Reader Design/POINTS-AND-COUNT-IN.md).
+   RR.Beat — the count-in run (Melody Reader Design/POINTS-AND-COUNT-IN.md).
 
-   Count me in → the family count-in (EVMCountIn: prime the sound, the
-   "Get ready 1 2 3 4" card, one bar — two in 2/4), then a metronome — the
-   first beat of each bar higher — through the melody, at the pace the
-   player chose (Slow · Moderate · Fast: the practice's three tempos). The
-   music does not wait. Nothing is drawn but the notes lighting as their
-   bars are struck in time: no playhead, no words, no ghost notes. In the
-   game the run is the try (tier 3, points.js); in Practice it ends with
-   what it would have scored.
+   A Test with the metronome on (Slow · Moderate · Fast — the button under
+   the music since 2026-10-05; the practice's three tempos) → the family
+   count-in (EVMCountIn: prime the sound, the "Get ready 1 2 3 4" card, one
+   bar — two in 2/4), then the metronome — the first beat of each bar
+   higher — through the melody. The music does not wait. Nothing is drawn
+   but the notes lighting as their bars are struck in time: no playhead,
+   no words, no ghost notes. The run is the try (tier 3, points.js).
+   (Practice has no count-in any more: its metronome is Listen's.)
 
    A 25 ms timer does all the timing — it places clicks 120 ms ahead on the
    audio clock, marks notes Missed once their window has passed (shown only
@@ -38,13 +38,13 @@
   async function start() {
     const s = G.setup;
     if (G.overlay || G.clock || G.phase === 'countin' || G.phase === 'running' || G.phase === 'done') return;
-    if (G.stage === 'game' && G.started) return;          // the try began on its own
+    if (G.stage !== 'game' || !G.metroOn() || G.started) return;   // a Test, the metronome on, the try not begun on its own
     G.stopHear(true);
     if (G.phase !== 'ready' || G.states.some(x => x !== 'todo')) G.resetCard();
-    const pace = RR.device.pace, tempo = RR.paceTempo(s, pace);
+    const pace = G.metro, tempo = RR.paceTempo(s, pace);
     G.phase = 'countin';
     G.run = { pace, tempo, wrong: 0 };
-    if (G.stage === 'game') G.started = true;             // pressed in the game, it is the try
+    G.started = true;                                     // the run is the try
     RR.Xylo.setGlow(null);
     const my = ++token;
     const CI = window.EVMCountIn;
@@ -96,7 +96,7 @@
     if (G.phase === 'running' && heard > B.end) {
       stop(true);
       G.hidden = false;
-      if (G.stage === 'game') G.finish(); else G.practiceRun();
+      G.finish();
     }
   }
 

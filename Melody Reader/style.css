@@ -68,7 +68,20 @@ svg { display: block; }
 .chip:hover { background: var(--cream); }
 .level-chip { margin-left: 8px; border: 3px solid var(--band, var(--band-red)); padding-left: 10px; }
 .level-chip .band-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--band, var(--band-red)); }
-.level-chip .caret { width: 18px; height: 18px; color: var(--ink-soft); }
+.level-chip .caret { width: 18px; height: 18px; color: var(--ink-soft); flex: none; }
+/* the level, and under it the melody being played (it used to sit under the music) */
+.level-chip { height: 46px; min-width: 0; flex: 0 1 auto; }
+.level-chip .band-dot { flex: none; }
+.chip-text { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; line-height: 1.12; text-align: left; }
+.chip-text > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-text .tune-name { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.chip-text .tune-name:empty { display: none; }
+/* room enough: one line, the melody after a divider */
+@media (min-width: 1180px) {
+  .level-chip { height: 42px; }
+  .chip-text { flex-direction: row; align-items: baseline; gap: 10px; }
+  .chip-text .tune-name { font-size: 15px; padding-left: 10px; border-left: 2px solid #eadcc2; }
+}
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 .score-chip { gap: 14px; padding: 0 16px; }
 .score-chip svg { width: 20px; height: 20px; }
@@ -103,11 +116,24 @@ svg { display: block; }
   box-shadow: 0 10px 28px rgba(62,39,35,.28), inset 0 0 0 3px var(--paper-edge);
   display: flex; flex-direction: column; padding: 14px 18px 10px; overflow: hidden;
 }
-.stand-row { flex: 1; min-height: 0; display: flex; align-items: center; gap: 10px; }
-.side { flex: none; width: 92px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.side-label { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-bottom: 8px; }
-/* a short window: the side columns lose their words before the buttons crowd */
-@media (min-width: 701px) and (max-height: 660px) { .side-label { display: none !important; } .side { gap: 8px; } }
+/* the music in the middle, Start over + Next on the right (an empty column on the left keeps the music
+   centred), and under it Listen · Practice / Test · the metronome (2026-10-05) */
+.stand-row {
+  flex: 1; min-height: 0; display: grid; column-gap: 10px;
+  grid-template-columns: 128px minmax(0, 1fr) 128px; grid-template-rows: minmax(0, 1fr) auto;
+}
+.music { grid-column: 2; grid-row: 1; }
+.side-right { grid-column: 3; grid-row: 1; align-self: center; display: flex; justify-content: center; align-items: flex-start; gap: 10px; }
+.controls { grid-column: 1 / -1; grid-row: 2; display: flex; justify-content: center; align-items: flex-start; gap: 18px; padding-top: 2px; }
+.ctl { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 64px; }
+.ctl-label { font-size: 14px; font-weight: 700; color: var(--ink-soft); line-height: 1.1; white-space: nowrap; }
+/* a short window: smaller buttons, and Next loses its word */
+@media (min-width: 701px) and (max-height: 660px) {
+  .next-label { display: none; }
+  .ctl-btn { width: 50px !important; height: 50px !important; }
+  .ctl-btn svg { width: 26px !important; height: 26px !important; }
+  .ctl-label { font-size: 12.5px; }
+}
 .round-btn {
   width: 72px; height: 72px; border-radius: 50%; border: 0;
   background: var(--gold); color: #fff; display: grid; place-items: center;
@@ -120,53 +146,60 @@ svg { display: block; }
 .round-btn.small svg { width: 26px; height: 26px; fill: var(--ink-soft); }
 .round-btn.playing { background: #f59e0b; }
 .round-btn.playing svg { display: none; }
-.round-btn.playing::after { content: ''; width: 24px; height: 24px; border-radius: 4px; background: #fff; }
-.count-btn { background: #22c55e; box-shadow: 0 5px 0 #15803d, 0 8px 16px rgba(21,128,61,.3); }
-.count-btn svg { fill: none; color: #fff; width: 38px; height: 38px; }
-.count-btn:active { box-shadow: 0 2px 0 #15803d; }
-.count-btn[disabled] { opacity: .35; }
-/* the sides by stage (game.js drawSides): ▶ Hear it when it can be heard (Practice, or a try done);
-   I'm ready in Practice, Again in the game; no count-in in Beat the clock */
-.play-btn, .play-label, .ready-btn, .ready-label { display: none; }
-.can-hear .play-btn, .stage-practice .ready-btn { display: grid; }
-.can-hear .play-label, .stage-practice .ready-label { display: block; }
-.stage-practice .again-btn, .stage-practice .again-label,
-.game-clock .count-btn, .game-clock .count-label, .game-clock .pace-pill { display: none; }
-.ready-btn svg { width: 34px; height: 34px; fill: none; }
-#btn-next.ready, #btn-ready.ready { animation: nudge 1.2s ease-in-out infinite; }
+.round-btn.playing::after { content: ''; width: 22px; height: 22px; border-radius: 4px; background: #fff; }
+.round-btn.ctl-btn { width: 58px; height: 58px; }
+.round-btn.ctl-btn svg { width: 30px; height: 30px; }
+#btn-next.ready, #btn-mode.ready { animation: nudge 1.2s ease-in-out infinite; }
 #btn-next.ready { background: var(--gold); }
 #btn-next.ready svg { fill: #fff; }
-/* Slow · Moderate · Fast — tap to change; in the game it shows the points */
-.pace-pill {
-  border: 0; border-radius: 999px; background: #fff; box-shadow: 0 2px 0 #d9c9ad, 0 3px 8px rgba(62,39,35,.12);
-  padding: 3px 12px 4px; display: flex; flex-direction: column; align-items: center; line-height: 1.15;
-  font-size: 13px; color: var(--ink); min-width: 74px;
-}
-.pace-pill b { font-weight: 700; }
-.pace-pill small { font-size: 11.5px; font-weight: 700; color: #15803d; }
-.pace-pill:hover { background: var(--cream); }
-.pace-pill[disabled] { opacity: .45; }
+#btn-restart svg { fill: none; }
 @keyframes nudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
 .round-btn[disabled] { opacity: .35; pointer-events: none; }
 
-.music { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
+/* Practice: on, blue, a pause sign — Test: white, a red ball in a red ring (record), pulsing while a try is under way */
+.mode-btn { background: #2563eb; box-shadow: 0 5px 0 #1e40af, 0 8px 16px rgba(37,99,235,.3); }
+.mode-btn:active { box-shadow: 0 2px 0 #1e40af; }
+.mode-btn .i-rec { display: none; }
+.mode-btn.test { background: #fff; box-shadow: 0 5px 0 #e5b8b8, 0 8px 16px rgba(185,28,28,.18); }
+.mode-btn.test:active { box-shadow: 0 2px 0 #e5b8b8; }
+.mode-btn.test .i-pause { display: none; }
+.mode-btn.test .i-rec { display: block; }
+.mode-btn .i-rec .ring { stroke: #dc2626; }
+.mode-btn .i-rec .ball { fill: #dc2626; transform-box: fill-box; transform-origin: center; }
+.mode-btn.recording .i-rec .ball { animation: rec 1.1s ease-in-out infinite; }
+@keyframes rec { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.82); } }
+.mode-btn[disabled] { opacity: .55; }
+.stage-practice .mode-label { color: #1d4ed8; }
+.stage-game .mode-label { color: #b91c1c; }
+
+/* the metronome: off — a white button, its picture in ink; on (Slow · Moderate · Fast) — lit */
+.metro-btn { background: #fff; box-shadow: 0 4px 0 #d9c9ad, 0 6px 12px rgba(62,39,35,.15); }
+.metro-btn:active { box-shadow: 0 2px 0 #d9c9ad; }
+.metro-btn svg { fill: none; stroke: var(--ink-soft); }
+.metro-btn svg .mw { fill: var(--ink-soft); stroke: none; }
+.metro-btn.on { background: #15803d; box-shadow: 0 5px 0 #14532d, 0 0 0 4px rgba(34,197,94,.28), 0 8px 18px rgba(21,128,61,.4); }
+.metro-btn.on:active { box-shadow: 0 2px 0 #14532d, 0 0 0 4px rgba(34,197,94,.28); }
+.metro-btn.on svg { stroke: #fff; }
+.metro-btn.on svg .mw { fill: #fde047; }
+.metro-btn.on + .metro-label { color: #15803d; }
+
+.music { min-width: 0; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; }
 .music svg.score { overflow: visible; }
 .music .rows { display: flex; flex-direction: column; align-items: flex-start; width: 100%; }
 
-.stand-foot { flex: none; display: flex; align-items: center; justify-content: center; gap: 22px; min-height: 30px; padding: 0 110px; }
-.tune-name { font-size: 16px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dots { display: flex; gap: 8px; align-items: center; }
-.dot { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid #d6c6a8; background: transparent; position: relative; }
+/* the round's dots, top centre */
+.dots { position: absolute; top: 9px; left: 50%; transform: translateX(-50%); z-index: 2; display: flex; gap: 8px; align-items: center; pointer-events: none; }
+.dot { width: 15px; height: 15px; border-radius: 50%; border: 2.5px solid #d6c6a8; background: transparent; position: relative; }
 .dot.now { border-color: var(--gold); background: #fef3c7; box-shadow: 0 0 0 3px rgba(251,191,36,.25); }
 .dot.done { border-color: var(--gold-deep); background: var(--gold); }
 .dot.done.s1 { background: #fde68a; }
 .dot.done.s2 { background: #fcd34d; }
 .dot.done.s0 { background: #e7e0d3; border-color: #cfc5b3; }
+.dot.done.now { box-shadow: 0 0 0 3px rgba(251,191,36,.45); }
 
-/* Practice · For points — first in the line under the music (top-right on a phone) */
-.stage-tag { flex: none; border-radius: 999px; padding: 1px 11px; font-size: 14px; font-weight: 700; border: 2px solid; }
-.stage-tag.practice { background: #e0f2fe; color: #075985; border-color: #7dd3fc; }
-.stage-tag.game { background: #dcfce7; color: #166534; border-color: #86efac; }
+/* the family's Get ready card takes no clicks; here it does while it counts — a tap stops the count-in
+   (game.js stopCountIn). Only the card: the page around it stays reachable */
+html.ci-tap .evm-count.open .evm-count-card { pointer-events: auto; cursor: pointer; }
 
 /* the music's states (inside the SVG) */
 .now-glow { fill: rgba(253, 224, 71, .5); animation: glowpulse 1.6s ease-in-out infinite; }
@@ -397,32 +430,31 @@ svg { display: block; }
   .topbar { padding: 0 10px; gap: 8px; }
   .brand-name { display: none; }
   .brand-logo { width: 28px; height: 28px; }
-  .level-chip { margin-left: 0; height: 38px; font-size: 14px; padding: 0 8px; min-width: 0; }
-  .level-chip .level-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 34vw; }
+  .level-chip { margin-left: 0; height: 42px; font-size: 14px; padding: 0 8px; min-width: 0; }
+  .chip-text { max-width: 34vw; }
+  .chip-text .tune-name { font-size: 11.5px; }
   .score-chip { height: 38px; gap: 8px; padding: 0 10px; font-size: 14px; }
   .sc-points small { display: none; }
   .icon-btn { width: 38px; height: 38px; }
   .stage { padding: 2px 8px 10px; gap: 8px; grid-template-rows: minmax(0, 45fr) minmax(0, 55fr); }
   .stand { padding: 10px 8px 6px; border-radius: 20px; }
   .rounddone { border-radius: 20px; }
-  .stand-row { flex-direction: column; gap: 4px; }
-  .music { order: 1; width: 100%; }
-  .side { order: 2; width: auto; flex-direction: row; gap: 6px; }
-  .stand-row { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr auto; }
+  /* the music on top; one row under it: Listen · Practice / Test · the metronome, then Start over + Next at the right */
+  .stand-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr) auto; column-gap: 6px; row-gap: 4px; }
   .music { grid-column: 1 / -1; grid-row: 1; }
-  .side-left { grid-column: 1; grid-row: 2; justify-content: flex-start; }
-  .side-right { grid-column: 2; grid-row: 2; justify-content: flex-end; }
-  .side-label { display: none !important; }
+  .controls { grid-column: 1; grid-row: 2; gap: 6px; padding-top: 0; }
+  .side-right { grid-column: 2; grid-row: 2; align-self: start; gap: 6px; }
+  .next-label { display: none; }
+  .ctl { min-width: 52px; gap: 2px; }
+  .ctl-label { font-size: 12px; }
   .round-btn { width: 52px; height: 52px; }
   .round-btn svg { width: 26px; height: 26px; }
-  .round-btn.small { width: 44px; height: 44px; }
+  .round-btn.ctl-btn { width: 46px; height: 46px; }
+  .round-btn.ctl-btn svg { width: 24px; height: 24px; }
+  .round-btn.small { width: 42px; height: 42px; margin-top: 2px; }
   .round-btn.small svg { width: 22px; height: 22px; }
-  /* the round's dots go top-left: the row of buttons along the bottom is full (Hear it, Count me in, the pace pill …) */
-  .stand-foot { padding: 0 0 0 12px; position: absolute; left: 0; right: 0; top: 10px; justify-content: flex-start; min-height: 26px; pointer-events: none; }
-  .tune-name { display: none; }
+  .dots { top: 7px; gap: 6px; }
   .dot { width: 12px; height: 12px; }
-  .stage-tag { order: 2; margin: 0 12px 0 auto; font-size: 13px; padding: 0 9px; }
-  .pace-pill { min-width: 0; padding: 2px 9px 3px; font-size: 12px; }
   .xylo { padding: 10px 8px; border-radius: 18px; }
   .bars { gap: 3px; }
   .bar { border-right-width: 2px; border-bottom-width: 3px; border-radius: 5px; }
@@ -494,7 +526,7 @@ button:focus-visible, .bar:focus-visible { outline: 3px solid #2563eb; outline-o
 /* ---------- Make a melody ---------- */
 .maker-part { display: none; }
 .app.making .maker-part { display: flex; }
-.app.making .stand-row .side, .app.making .stand-foot, .app.making .stage-tag, .app.making .praise, .app.making .clock { display: none !important; }
+.app.making .stand-row .side, .app.making .controls, .app.making .dots, .app.making .praise, .app.making .clock { display: none !important; }
 .app.making .stand { box-shadow: 0 10px 28px rgba(62,39,35,.28), inset 0 0 0 3px var(--gold); }
 .maker-top { flex: none; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 4px 6px; }
 .mk-set { font-weight: 700; font-size: 15px; color: var(--gold-deep); white-space: nowrap; }
@@ -586,8 +618,6 @@ button:focus-visible, .bar:focus-visible { outline: 3px solid #2563eb; outline-o
 /* level numbers: dark on white, ringed in the band's colour — readable on every band */
 .lvl .n { background: #fff; color: #2b1d16; box-shadow: inset 0 0 0 3.5px var(--bc); }
 .pill-btn.go { background: #15803d; box-shadow: 0 3px 0 #14532d; }
-.count-btn { background: #15803d; box-shadow: 0 5px 0 #14532d, 0 8px 16px rgba(21,128,61,.3); }
-.count-btn:active { box-shadow: 0 2px 0 #14532d; }
 .sc-stars b, .t-star, .new-best, .mk-set { color: #b45309; }
 .lvl .s, .rd-rows .rd-c span, .cards-row .rc span, .best li .st, .praise .p-stars { color: #d97706; }
 .rd-ready { color: #15803d; }
@@ -620,7 +650,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, .bar:focus-visible, 
 @media (prefers-reduced-motion: reduce) {
   .praise.show { animation: praise-still 1.7s linear both; }
   @keyframes praise-still { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
-  .score-chip.bump, #mk-save.ready, .ghost { animation: none; }
+  .score-chip.bump, #mk-save.ready, .ghost, #btn-mode.ready, .mode-btn.recording .i-rec .ball { animation: none; }
   .toast { transition: opacity .2s; transform: translate(-50%, 0); }
   .bar, .round-btn, .bar.right { transition: none; animation: none; }
   .col.hidden-note, .beams.hidden-note { transition: none; }
@@ -631,7 +661,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, .bar:focus-visible, 
   html:not(.in-iframe) .brand { display: none; }
   .topbar { gap: 6px; }
   .level-chip { flex: 1 1 auto; min-width: 0; }
-  .level-chip .level-text { max-width: none; min-width: 0; }
+  .chip-text { max-width: none; }
   .topbar-right { gap: 6px; }
   .score-chip { gap: 6px; padding: 0 9px; }
   .level-chip .band-dot, .level-chip .caret { display: none; }
@@ -645,4 +675,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, .bar:focus-visible, 
   .bar { max-width: 124px; }
   .bar .letter { font-size: clamp(30px, 2.4vw, 46px); }
   .bar .num { font-size: clamp(14px, 1vw, 19px); }
+  .round-btn.ctl-btn { width: 74px; height: 74px; }
+  .round-btn.ctl-btn svg { width: 38px; height: 38px; }
+  .round-btn.small { width: 64px; height: 64px; }
+  .round-btn.small svg { width: 30px; height: 30px; }
+  .ctl-label { font-size: 17px; }
+  .controls { gap: 26px; }
+  .stand-row { grid-template-columns: 150px minmax(0, 1fr) 150px; }
+  .dot { width: 18px; height: 18px; }
 }

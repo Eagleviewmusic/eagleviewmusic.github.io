@@ -32,7 +32,7 @@
         <h1 class="brand-name">Melody Reader</h1>
       </div>
       <button class="chip level-chip" id="level-chip" type="button" aria-label="Choose a level">
-        <span class="band-dot"></span><span class="level-text">Level 1 · Mi Re Do</span>
+        <span class="band-dot"></span><span class="chip-text"><span class="level-text">Level 1 · Mi Re Do</span><span class="tune-name" id="tune-name"></span></span>
         <svg class="caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <div class="topbar-right">
@@ -60,33 +60,47 @@
           <div class="seg" id="mk-bars" role="group" aria-label="Length"><button type="button" data-v="1">1 bar</button><button type="button" data-v="2">2 bars</button></div>
           <span class="mk-status" id="mk-status" aria-live="polite"></span>
         </div>
+        <!-- the round's progress, top centre -->
+        <div class="dots" id="dots" aria-hidden="true"></div>
         <div class="stand-row">
-          <div class="side side-left">
-            <!-- by stage (game.js drawSides): Practice ▶ Hear it · Count me in; the game Count me in (▶ again once the try is done) -->
-            <button class="round-btn small play-btn" id="btn-play" type="button" aria-label="Hear it">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.9l10.6-6.8a1 1 0 0 0 0-1.7L9.5 4.3A1 1 0 0 0 8 5.2z"/></svg>
-            </button>
-            <span class="side-label play-label" id="play-label">Hear it</span>
-            <button class="round-btn count-btn" id="btn-count" type="button" aria-label="Count me in">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="9" rx="8" ry="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 9v6.5c0 1.8 3.6 3.2 8 3.2s8-1.4 8-3.2V9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 2.5L11 8.6M20.5 3.8l-6 5.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            </button>
-            <span class="side-label count-label" id="count-label">Count me in</span>
-            <button class="pace-pill" id="pace" type="button"><b>Slow</b></button>
-          </div>
           <div class="music" id="music" role="img" aria-label="The music"></div>
+          <!-- start over (this melody — or, before a note is played, the whole round) beside Next -->
           <div class="side side-right">
-            <button class="round-btn ready-btn" id="btn-ready" type="button" aria-label="I’m ready — play it for points">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h13M12 5.5l6.5 6.5-6.5 6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <span class="side-label ready-label">I’m ready</span>
-            <button class="round-btn small again-btn" id="btn-again" type="button" aria-label="Again">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M4 3.5v5h5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <span class="side-label again-label">Again</span>
-            <button class="round-btn small" id="btn-next" type="button" aria-label="Next melody">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5.5v13l9.5-6.5z"/><rect x="16.5" y="5.5" width="2.8" height="13" rx="1"/></svg>
-            </button>
-            <span class="side-label">Next</span>
+            <div class="ctl">
+              <button class="round-btn small" id="btn-restart" type="button" aria-label="Start over">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.4-5.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M20 3.5v5h-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+            <div class="ctl">
+              <button class="round-btn small" id="btn-next" type="button" aria-label="Next melody">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5.5v13l9.5-6.5z"/><rect x="16.5" y="5.5" width="2.8" height="13" rx="1"/></svg>
+              </button>
+              <span class="ctl-label next-label">Next</span>
+            </div>
+          </div>
+          <!-- under the middle of the music: Listen · Practice / Test · the metronome (game.js drawSides) -->
+          <div class="controls" id="controls">
+            <div class="ctl">
+              <button class="round-btn ctl-btn play-btn" id="btn-play" type="button" aria-label="Listen">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.9l10.6-6.8a1 1 0 0 0 0-1.7L9.5 4.3A1 1 0 0 0 8 5.2z"/></svg>
+              </button>
+              <span class="ctl-label">Listen</span>
+            </div>
+            <div class="ctl">
+              <!-- Practice: a blue pause; Test: a red ball in a red ring (record) -->
+              <button class="round-btn ctl-btn mode-btn" id="btn-mode" type="button" aria-label="Practice">
+                <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1.3"/><rect x="13.5" y="5" width="4" height="14" rx="1.3"/></svg>
+                <svg class="i-rec" viewBox="0 0 24 24" aria-hidden="true"><circle class="ring" cx="12" cy="12" r="9.6" fill="none" stroke-width="2.4"/><circle class="ball" cx="12" cy="12" r="5.6"/></svg>
+              </button>
+              <span class="ctl-label mode-label" id="mode-label">Practice</span>
+            </div>
+            <div class="ctl">
+              <!-- the weight slides up the arm for Slow, down for Fast, as on a real one -->
+              <button class="round-btn ctl-btn metro-btn" id="btn-metro" type="button" aria-label="Metronome off">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path class="body" d="M9.2 3.2h5.6l4 17.3H5.2z" stroke-width="2" stroke-linejoin="round"/><path d="M6.6 15.2h10.8" stroke-width="1.8"/><path class="arm" d="M12 15.2L17.6 3.6" stroke-width="2" stroke-linecap="round"/><rect class="mw" id="metro-weight" x="-2.2" y="-1.4" width="4.4" height="2.8" rx=".7" transform="translate(14.3 9.6) rotate(25.8)"/></svg>
+              </button>
+              <span class="ctl-label metro-label" id="metro-label">Off</span>
+            </div>
           </div>
         </div>
         <div class="maker-part maker-bottom">
@@ -97,11 +111,6 @@
           <span class="mk-gap"></span>
           <button type="button" class="pill-btn" id="mk-cancel">Cancel</button>
           <button type="button" class="pill-btn primary" id="mk-save">Save</button>
-        </div>
-        <div class="stand-foot">
-          <span class="stage-tag practice" id="stage-tag">Practice</span>
-          <span class="tune-name" id="tune-name"></span>
-          <div class="dots" id="dots"></div>
         </div>
         <div class="clock" id="clock" hidden><i></i></div>
         <div class="praise" id="praise"></div>

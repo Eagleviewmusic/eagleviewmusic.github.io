@@ -42,6 +42,21 @@
   --hold-16:      #2FB9A4;   /* held across sixteenths     */
   --rest:         #C3CADA;   /* silence                    */
 
+  /* Lines: each line of the score on a ground of its own, in turn, so an
+     eye coming back from the end of one line finds the next by its
+     colour. Pale enough that the notes read as they do on paper; the
+     edge is the same hue, strong enough to find at a glance. No violet:
+     that is the colour of a sound starting, and of what lights as it
+     plays. */
+  --line-1:       #E4EEFB;   /* sky  */
+  --line-1-edge:  #5B9BE0;
+  --line-2:       #DFF3EC;   /* mint */
+  --line-2-edge:  #3FAE90;
+  --line-3:       #F8EEDF;   /* sand */
+  --line-3-edge:  #D99B45;
+  --line-4:       #F6E7EF;   /* rose */
+  --line-4-edge:  #D06A98;
+
   --accent:       #5B4BD6;
   --accent-soft:  #EAE7FD;
   --accent-deep:  #4A3BC0;   /* the pressed / hovered accent */
@@ -621,14 +636,38 @@ html.in-iframe .home-link { display: none; }
    reason a tall band of instruments can be read on a wide screen
    without being shrunk to fit one long row.
 
-   The gap is larger than the one between tracks on purpose: a
-   reader has to see at a glance where one line ends and the next
-   begins, and 16px (the track gap) would read as just another
-   instrument. The last line does not need it.
+   A reader has to see at a glance where one line ends and the
+   next begins, and a gap alone does that badly: the tracks are
+   16px apart, so anything near that reads as just another
+   instrument. So each line sits on a coloured ground of its
+   own, taking the four colours in turn (--line-1 … --line-4),
+   and the eye coming back from the end of a line finds the
+   next one by its colour.
+
+   Only when there is more than one line (#grid.lined): a score
+   that is all one line has nothing to tell apart, and the frame
+   would only cost it room. The panel is as wide as the widest
+   line, so a short last line still reads as a line. Its edge is
+   a border, not a shadow, so the saved picture carries it too.
+   LINE_FRAME_X / _Y and SYSTEM_GAP in script.js must match the
+   padding, edge and gap here.
    ============================================================ */
-.system + .system { margin-top: 26px; }
 /* the bottom margin of a system's last track, inside the block */
 .system > .track:last-child { margin-bottom: 0; }
+
+#grid.lined > .system {
+  padding: 10px 14px 14px 12px;
+  border-left: 6px solid var(--line-edge);
+  border-radius: var(--r-lg);
+  background: var(--line-bg);
+}
+#grid.lined > .system + .system { margin-top: 12px; }
+#grid.lined > .system.tone-0 { --line-bg: var(--line-1); --line-edge: var(--line-1-edge); }
+#grid.lined > .system.tone-1 { --line-bg: var(--line-2); --line-edge: var(--line-2-edge); }
+#grid.lined > .system.tone-2 { --line-bg: var(--line-3); --line-edge: var(--line-3-edge); }
+#grid.lined > .system.tone-3 { --line-bg: var(--line-4); --line-edge: var(--line-4-edge); }
+/* Add stays under the instrument column, past the panel's edge */
+#grid.lined > .add-track-row { padding-left: 18px; }
 
 
 /* ============================================================

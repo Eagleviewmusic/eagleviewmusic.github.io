@@ -75,7 +75,7 @@
       <svg class="side-tab-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M8.5 5v8M12 5v8M15.5 5v8" stroke-width="3"/></svg>
       <span>Keyboard</span>
     </button>
-    <button class="side-tab" data-ws-tab="chords" role="tab" aria-selected="false" title="The song, with the chord panel, the chord track and the keyboard">
+    <button class="side-tab" data-ws-tab="chords" role="tab" aria-selected="false" title="The song, with the chord panel and the keyboard">
       <svg class="side-tab-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
       <span>Chords</span>
     </button>
@@ -362,7 +362,7 @@
   <div class="popover-scroll">
     <div class="popover-title">On the stage</div>
     <div class="switch-list" id="stage-switches"></div>
-    <p class="popover-note" id="stage-note">The Song · Keyboard · Chords switch at the top sets these three at once.</p>
+    <p class="popover-note" id="stage-note">The Song · Keyboard · Chords switch at the top sets the chord panel and the keyboard. The chord track is its own: on, the song’s chords show everywhere.</p>
 
     <div class="popover-title">On the page</div>
     <div class="switch-list" id="page-switches"></div>
@@ -733,9 +733,9 @@
     <div class="pw-head">
       <h2>Chord Progression</h2>
       <span class="pw-song" id="pw-song"></span>
-      <div class="seg pw-tabs" id="pw-tabs" role="tablist" aria-label="Build or In the song">
-        <button type="button" class="seg-btn active" data-tab="build" role="tab">Build</button>
-        <button type="button" class="seg-btn" data-tab="song" role="tab">In the song</button>
+      <div class="seg pw-tabs" id="pw-tabs" role="tablist" aria-label="Edit the chords, or place them in the song">
+        <button type="button" class="seg-btn active" data-tab="build" role="tab">Edit Chords</button>
+        <button type="button" class="seg-btn" data-tab="song" role="tab">Chord Placement</button>
       </div>
       <span class="pw-undo">
         <button type="button" class="pw-hbtn" id="pw-undo" title="Undo (⌘Z)" aria-label="Undo" disabled>
@@ -762,6 +762,20 @@
     </div>
     <div class="here-body" id="here-body"></div>
     <div class="pw-foot" id="here-foot"></div>
+  </div>
+</div>
+
+<!-- ============ SHEET: A PROGRESSION'S CHORD — More chords… and a double-click on a card (progression-window.js) ============
+     After the Chord Progression window and Just here, so it opens on top of both. -->
+<div class="sheet-backdrop" id="pchord-sheet">
+  <div class="sheet pchord-sheet" role="dialog" aria-label="Chord">
+    <div class="pw-head">
+      <h2 id="pchord-title">Chord</h2>
+      <span class="pw-gap"></span>
+      <button class="sheet-close" data-close="pchord-sheet" title="Close (Esc)" aria-label="Close">&times;</button>
+    </div>
+    <div class="pchord-body" id="pchord-body"></div>
+    <div class="pw-foot" id="pchord-foot"></div>
   </div>
 </div>
 
@@ -943,7 +957,7 @@
       <li><span class="help-key edit">↵</span><div><b>Words &amp; lines</b>, in the Edit box: <b>New line</b> starts a line after this word, and <b>Join up</b> (on the first word of a line) joins the line to the one above. <b>Delete</b> removes the syllable — tap it twice, so one stray tap never loses work. <b>Staff notation</b> at the foot of the box is the same switch as in View: off, the rhythms show under the blocks.</div></li>
       <li><span class="help-key edit">♪</span><div><b>Pick-ups</b> (Layout settings → 1-beat pick-up, saved with the song): every line starts with a one-beat pick-up. With the hat on, point at the bar line after a pick-up and press its <b>×</b>: the bar line goes and the pick-up joins the first bar. Or select a line’s pick-up and <b>Join up</b> moves just that beat to the end of the line above — press it again to join the whole line. <b>Delete</b> on a pick-up takes it away and puts a rest in the bar above. A new line starts with its pick-up again.</div></li>
       <li><span class="help-key edit">A</span><div><b>Section names</b> sit in the top corner of each line; type into them in Edit. ▲ ▼ move the line, ⧉ copies it below, × deletes it. <b>Add a line</b>, at the end of the song, starts a new one.</div></li>
-      <li><span class="help-key">I</span><div><b>Chord progressions</b> (Chords tab): <b>Chord Progression</b>, under the panel, opens their window. <b>Build</b> makes a progression — tap the panel’s chords (or press their keys) to add them, set how long each lasts, and a rhythm every bar plays (a chord can have its own); <b>Hear it</b> plays it round and round. Make as many as you like. <b>In the song</b> is a map of the bars: drag a progression onto it, drag its ends to start or stop it, and it plays on past the melody, to help write the next part.</div></li>
+      <li><span class="help-key">I</span><div><b>Chord progressions</b> (Chords tab): <b>Chord Progression</b>, under the panel, opens their window. <b>Edit Chords</b> makes a progression, top to bottom: choose a rhythm every bar plays (<b>Build your own</b> dot by dot, or tap a <b>Pre-built</b> one) and play chords from the board to explore (hold one to hear it in that rhythm) — the changes under it (sus2, ♭7, 6/4 …) stay on until you tap them again. When you’re ready, tap <b>Add a chord</b>: each chord you play then goes in, until you tap anywhere else. <b>Double-click</b> a chord to change it or give it a custom rhythm. Then name it, <b>Hear it</b>, and <b>Place it in the song</b>. Make as many as you like. <b>Chord Placement</b> is a map of the bars: drag a progression onto it, drag its ends to start or stop it, and it plays on past the melody, to help write the next part.</div></li>
       <li><span class="help-key">I</span><div><b>The chord track</b> draws the chords over the words, and the bars after the melody as a chord chart. Tap a chord to hear it; in Edit, select it and press a chord key to change it, <span class="help-key">⌫</span> to silence it, <span class="help-key">←</span> <span class="help-key">→</span> to walk the chords. <b>Double-click</b> a chord for <b>Just here</b>: change that one bar — one chord or two, any rhythm — and the progression stays as it is. Play starts from a selected chord.</div></li>
       <li><span class="help-key edit">✎</span><div><b>Change a chord</b>: with the hat on, the pencil on any chord opens its editor — root, quality, a 7th or an inversion stuck to it, its name — and <b>Back to the scale’s chord</b> undoes it. The pencil at the end of the Z X C V B row chooses what each button does (sus2 … maj7, or the inversions 6, 6/4, 6/5, 4/3, 4/2). Re-chorded places are saved with the song. Under the panel, the corner shows the chord in hand and its notes; the keyboard’s Octaves and Focus sit below them.</div></li>
       <li><span class="help-key">⛶</span><div><b>Present</b> hides every control and fills the screen. Play and the step arrows stay. Press <span class="help-key">Esc</span> to come back.</div></li>
@@ -979,7 +993,7 @@
       <ul>
         <li>The same frame, toolbar and windows as Rhythm Poetry, Ostinato Builder and the Music Stand.</li>
         <li>The construction hat sits beside Play again, as a switch. With it on, every tool — the value circles, ♯ ♭, harmony, and the word and line tools — is in one Edit box you can drag anywhere on the screen.</li>
-        <li>Song · Keyboard · Chords at the top: the song on its own, with a keyboard that follows the melody, or with the chord panel and the chord track.</li>
+        <li>Song · Keyboard · Chords at the top: the song on its own, with a keyboard that follows the melody, or with the chord panel. The song’s chords show wherever <b>View → Chord track</b> is on, and sound wherever <b>Sound → Chords</b> is on.</li>
         <li>Present mode, a count-in, a steady beat, and Go round or This line at the end — for practising a line over and over.</li>
         <li>Staff notation one note at a time, bar numbers, a tempo from 30 to 300, Save picture, and lesson tempo rules.</li>
         <li>Digital Accordion’s chord panel: the scale’s fourteen chords on the same keys in every scale (F D S A G R E Q W, 1–5), Z X C V B to change them, Core · Full · Extended · Extreme, a chord editor for 7ths and inversions, and a scale menu beside the key.</li>

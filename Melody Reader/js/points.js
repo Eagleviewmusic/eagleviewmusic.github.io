@@ -7,7 +7,7 @@
      tier 1   the notes: first try 1, second try ½ → max(1, ⌊8 × credit ÷ n⌋)
      tier 2   every note first time, in the player's own steady beat → 9–12
               (8 when the spacing isn't the music's)
-     tier 3   Count me in, every note right and in time:
+     tier 3   a Test with the metronome, every note right and in time:
               Slow 13–15 · Moderate 16–18 · Fast 19–20
 
    Times are seconds, starts are the notes' written starts in ticks

@@ -4,14 +4,26 @@
    RR.Game — one card at a time (ENGINE §4; the points and the count-in
    since 2026-10-04: Melody Reader Design/POINTS-AND-COUNT-IN.md).
 
-   A card has two stages. **Practice** (when the practice has it): hear it,
-   try the bars — the notes light as they are found, nothing counts — or a
-   practice count-in; I'm ready ▸ goes on. **The game**: the first bar
-   struck starts a try on your own (judgeFind; tiers 1–2), or Count me in
-   starts a run with the metronome (beat.js; tier 3). Once started, the try
-   is the score. A try done → finish(): RR.Points, stars, the streak, the
-   praise, then the next card (by itself, or the Next button glows), or
-   Round done.
+   A card has two stages, switched by the Practice / Test button under the
+   music (2026-10-05). **Practice** (a blue pause; when the practice has
+   it): Listen, try the bars — the notes light as they are found, nothing
+   counts. **Test** (a red ball in a red ring): with the metronome Off the
+   notes are simply live — the first bar struck starts a try on your own
+   (judgeFind; tiers 1–2); with the metronome on (Slow · Moderate · Fast)
+   the family count-in starts at once and the run is the try (beat.js;
+   tier 3). A try done → finish(): RR.Points, stars, the streak, the
+   praise, then the next card (by itself, or the Next button glows; a Test
+   with the metronome always rolls on, counting in again), or Round done.
+
+   Which stage a card opens in (the user's rule): Practice — unless the
+   player went to Test on the last card *before playing a note in
+   Practice there*; then the next card opens in Test (they want to play
+   without the practice). Practising, then testing, turns Practice back on.
+
+   Start over (↻ beside Next): a card with notes played (or a try under
+   way, or done) starts again; an untouched card starts the whole round
+   again from the first melody, the round's points taken back. A card's
+   try counts once in the round: trying it again replaces it.
 
    The card: evs (the notes with their start ticks), states[i] ('todo' ·
    'lit' · 'missed'), judge[i] (a count-in run's Perfect … Missed — never
@@ -83,6 +95,12 @@
     mode: { kind: 'level', n: 1 }, setup: null, contentChanged: false, roundChanged: false,
     card: null, evs: [], states: [], judge: [], times: [], tries: [], idx: -1, clean: true, slips: 0, slipsHere: 0,
     stage: 'practice', started: false, run: null, result: null, practiceT: null,
+    metro: 'off',                 // the metronome: off · slow · moderate · fast (for this visit; Off when the page opens)
+    practisedHere: false,         // a bar struck in Practice on this card
+    openTest: false,              // the next card opens in Test (see leaveCard)
+    fresh: false,                 // a new practice, set or player: the next card opens in Practice
+    cardEntry: -1, cardStreak: 0, // this card's place in the round once counted; the streak before it
+    dealt: [],                    // the round's cards so far, for starting it over
     phase: 'ready', justLit: -1, justAt: 0, ghosts: [], hearIdx: -1, hearing: false, hearTimers: [],
     hidden: false, rows: null,
     round: [], roundN: 5, points: 0, streak: 0, bestStreak: 0, queue: [], recent: [], songPtr: 0, rstats: {},
@@ -96,6 +114,7 @@
     RR.device.player = name; RR.saveDevice();
     const s = G.sessions[name] || { points: 0, streak: 0, bestStreak: 0 };
     G.points = s.points; G.streak = s.streak; G.bestStreak = s.bestStreak;
+    G.fresh = true;                            // a new player starts with Practice on
     G.newRound();
   };
   const nextNote = from => { for (let i = from; i < G.evs.length; i++) if (!G.evs[i].rest) return i; return -1; };
@@ -127,6 +146,7 @@
       G.setup.set = RR.device.set && RR.Sets.get(RR.device.set) ? RR.device.set : null;
     }
     G.queue = []; G.songPtr = 0; G.contentChanged = false; G.roundChanged = false;
+    G.fresh = true;
     if (mode.kind === 'level') { RR.device.level = mode.n; RR.device.practice = null; RR.saveDevice(); }
     else if (mode.kind === 'custom' || mode.kind === 'mine') { RR.device.practice = { kind: mode.kind, name: mode.name || null, from: mode.from || null, practice: G.setup }; RR.saveDevice(); }
     applyInstrument();
@@ -192,7 +212,8 @@
   function newRound() {
     clearTimeout(G.autoT);
     stopClock();
-    G.round = []; G.rstats = {}; G.overlay = false;
+    G.round = []; G.rstats = {}; G.overlay = false; G.dealt = [];
+    G.roundStreak = G.streak;
     if (RR.Board) RR.Board.hideRound();
     const s = G.setup;
     if (s.game === 'song') { G.queue = []; refill(); G.roundN = G.queue.length; }
@@ -206,20 +227,48 @@
   function nextCard(card) {
     clearTimeout(G.autoT);
     stopHear(true); if (RR.Beat) RR.Beat.stop();
+    if (G.fresh) { G.fresh = false; G.openTest = false; } else leaveCard();
     if (!card) { if (!G.queue.length) refill(); card = G.queue.shift(); }
-    G.card = card;
+    G.card = card; G.dealt.push(card);
+    G.practisedHere = false; G.cardEntry = -1;
     resetCard(openingStage());
     draw();
+    roll();
   }
   G.nextCard = nextCard;
 
-  /* a card opens in Practice, unless the practice has none (the sight-reading
-     levels) or it's Beat the clock */
-  const openingStage = () => G.setup.practice && !G.clock ? 'practice' : 'game';
+  /* the practice rule, as a card is left: went to Test without playing a
+     note in Practice here → the next card opens in Test too; practised,
+     then tested (or still in Practice) → Practice again */
+  function leaveCard() {
+    if (!G.card || !G.setup.practice || G.clock) return;
+    G.openTest = G.stage === 'game' && !G.practisedHere;
+  }
+  /* a card opens in Practice, unless the player has chosen to play without
+     it (above), the practice has none (the sight-reading levels) or it's
+     Beat the clock */
+  const openingStage = () => G.setup.practice && !G.clock && !G.openTest ? 'practice' : 'game';
+
+  /* the metronome */
+  const metroOn = () => G.metro !== 'off';
+  G.metroOn = metroOn;
+  /* Listen's pace: the metronome's, or Slow when it's off (Make a melody and My melodies hear it so too) */
+  RR.listenPace = () => metroOn() ? G.metro : 'slow';
+  const windowOpen = () => !!document.querySelector('.modal:not([hidden]), .evm-shelf.show');
+  /* in a Test with the metronome on, a card waiting to be played counts in by
+     itself — after Next, a finished try, Start over, or a window closing */
+  function roll() {
+    if (G.stage !== 'game' || !metroOn() || G.clock || G.overlay || G.phase !== 'ready' || G.started) return;
+    if (windowOpen() || (RR.Maker && RR.Maker.active)) return;
+    RR.Beat.start();
+  }
+  G.roll = roll;
+  RR.onWindowClosed = () => setTimeout(roll, 0);
 
   /* the card from the top; a stage given = a new start (else the stage stays) */
   function resetCard(stage) {
-    if (stage) { G.stage = stage; $('#btn-ready').classList.remove('ready'); }
+    if (stage) G.stage = stage;
+    $('#btn-mode').classList.remove('ready');
     clearTimeout(G.practiceT);
     G.evs = RR.Eng.events(G.card).evs;
     G.states = G.evs.map(() => 'todo');
@@ -236,12 +285,75 @@
   }
   G.resetCard = resetCard;
 
-  /* I'm ready ▸ — from Practice to the game: the notes dark again, ▶ gone */
+  /* Practice → Test: the notes dark again and live; with the metronome on,
+     the count-in starts at once */
   G.toGame = function () {
     if (G.overlay || G.stage !== 'practice') return;
     stopHear(true); if (RR.Beat) RR.Beat.stop();
+    clearTimeout(G.autoT);
     resetCard('game'); draw();
-    announce('Now for points. Play it on your own, or Count me in for more.');
+    if (metroOn()) RR.Beat.start();
+    else announce('Test: play it for points.');
+  };
+  /* Test → Practice, at any point: a try under way is called off (it never
+     counts), a pending move to the next card too — this card, in Practice */
+  G.toPractice = function () {
+    if (G.overlay || G.stage !== 'game' || !canPractise()) return;
+    stopHear(true); if (RR.Beat) RR.Beat.stop();
+    clearTimeout(G.autoT);
+    resetCard('practice'); draw();
+    announce('Practice: nothing counts.');
+  };
+  G.toggleMode = () => { if (G.stage === 'practice') G.toGame(); else G.toPractice(); };
+  /* the Get ready card tapped while it counts (or Escape): they want it to
+     stop — back to Practice, the pause (or, with no Practice here, a Test
+     waiting). The metronome stays as it was */
+  G.stopCountIn = function () {
+    if (G.phase !== 'countin') return;
+    RR.Beat.stop();
+    const practice = G.setup.practice && !G.clock;
+    resetCard(practice ? 'practice' : undefined); draw();
+    announce(practice ? 'Stopped. Practice: nothing counts.' : 'Stopped.');
+  };
+  /* Practice is there unless the practice has none, it's Beat the clock, or
+     One go and the try has begun */
+  const canPractise = () => G.setup.practice && !G.clock && !(G.setup.oneGo && G.started);
+
+  /* Off → Slow → Moderate → Fast → Off. In a Test not yet finished the try
+     starts again: counted in at the new pace, or the notes simply live */
+  G.cycleMetro = function () {
+    if (G.overlay || G.clock) return;
+    const order = ['off', 'slow', 'moderate', 'fast'];
+    G.metro = order[(order.indexOf(G.metro) + 1) % order.length];
+    if (G.hearing) stopHear(true);
+    if (G.stage === 'game' && G.phase !== 'done' && !(G.setup.oneGo && G.started)) {
+      RR.Beat.stop(); resetCard(); draw();
+      if (metroOn()) RR.Beat.start();
+    } else drawSides();
+    announce(metroOn() ? 'Metronome: ' + RR.Points.paceOf(G.metro).name : 'Metronome off');
+  };
+
+  /* ↻ — a card with something played starts over; an untouched one starts
+     the whole round over */
+  const cardTouched = () => G.started || G.phase !== 'ready' || G.states.some(x => x !== 'todo');
+  const canRestartCard = () => !(G.setup.oneGo && G.stage === 'game' && G.started);
+  G.restart = function () {
+    if (G.overlay) return;
+    if (cardTouched()) {
+      if (!canRestartCard()) return;
+      stopHear(true); if (RR.Beat) RR.Beat.stop();
+      clearTimeout(G.autoT);
+      resetCard(); draw();
+      announce('From the top.');
+      roll();
+    } else {
+      // the round from its first melody: the same melodies, its points taken back
+      G.points -= G.round.reduce((a, r) => a + r.pts, 0);
+      G.streak = G.roundStreak | 0;
+      G.queue = G.dealt.concat(G.queue);
+      newRound();
+      announce('The round starts over.');
+    }
   };
 
   /* ---------------- a bar is struck ---------------- */
@@ -291,6 +403,7 @@
     const s = G.setup, i = G.idx, game = G.stage === 'game';
     if (i < 0) return;
     if (game && !G.started) { G.started = true; drawSides(); }
+    if (!game) G.practisedHere = true;
     const ev = G.evs[i];
     if (id === ev.p) {
       lightNote(i);
@@ -314,8 +427,8 @@
   /* Practice: the notes found — say so, then clear them to go again */
   function practiceFound() {
     G.phase = 'review';
-    showPraise('Got it!', 0, 0, 'Go again — or I’m ready ▸');
-    $('#btn-ready').classList.add('ready');
+    showPraise('Got it!', 0, 0, 'Go again — or tap Practice for the Test');
+    $('#btn-mode').classList.add('ready');
     practiceClear(1500);
   }
   function practiceClear(ms) {
@@ -326,16 +439,6 @@
       resetCard(); draw();
     }, ms);
   }
-  /* Practice: a count-in run over (beat.js) — what it would have scored */
-  G.practiceRun = function () {
-    G.phase = 'review';
-    const r = scoreRun();
-    G.evs.forEach((ev, i) => { if (!ev.rest && G.judge[i] === 'Missed') G.states[i] = 'missed'; });
-    draw();
-    showPraise(r.tier === 3 ? 'All in time!' : r.word, 0, 0, 'That would be ' + r.pts + (r.pts === 1 ? ' point' : ' points') + (r.tier === 1 ? ' · ' + r.detail : ''));
-    $('#btn-ready').classList.add('ready');
-    practiceClear(2600);
-  };
 
   /* the try, worth 1–20 (points.js) */
   function noteIdx() { return G.evs.map((e, i) => e.rest ? -1 : i).filter(i => i >= 0); }
@@ -363,47 +466,49 @@
     let pts = r.pts;
     const stars = RR.Points.starsFor(pts);
     G.clean = pts >= 8;                         // every note first time
-    if (G.clean) { G.streak++; G.bestStreak = Math.max(G.bestStreak, G.streak); } else G.streak = 0;
-    if (G.clock) { G.clock.melodies++; if (G.clean) G.clock.clean++; }
+    // a card counts once in the round: tried again (Start over, or back to Practice), the new try replaces it
+    const again = G.cardEntry >= 0;
+    if (!again) G.cardStreak = G.streak;
+    G.streak = G.clean ? G.cardStreak + 1 : 0;
+    G.bestStreak = Math.max(G.bestStreak, G.streak);
+    if (G.clock && !again) { G.clock.melodies++; if (G.clean) G.clock.clean++; }
     if (!RR.device.points) pts = 0;
+    const c = G.card;
+    const entry = { stars, pts, label: c.set ? '#' + c.part : c.title ? c.title.split(/[ ,]/)[0] + ' ' + c.part : 'Made up' };
+    if (again) {
+      const old = G.round[G.cardEntry];
+      G.points -= old.pts; if (G.clock) G.clock.pts -= old.pts;
+      G.round[G.cardEntry] = entry;
+    } else { G.cardEntry = G.round.length; G.round.push(entry); }
     G.points += pts;
     if (G.clock) G.clock.pts += pts;
     const me = Scores.me();
     me.totals.melodies = (me.totals.melodies | 0) + 1;
     Scores.save();
-    const c = G.card;
-    G.round.push({ stars, pts, label: c.set ? '#' + c.part : c.title ? c.title.split(/[ ,]/)[0] + ' ' + c.part : 'Made up' });
     RR.Xylo.setGlow(null);
     showPraise(r.word, stars, pts, r.detail);
     announce(r.word + ' ' + (r.detail ? r.detail + '. ' : '') + (RR.device.stars ? stars + (stars === 1 ? ' star. ' : ' stars. ') : '') + (RR.device.points && pts ? pts + ' points.' : ''));
     if (RR.device.celebrate) RR.Sound.celebrate(stars);
     draw();
     if (G.clock) { G.autoT = setTimeout(() => nextCard(), 700); return; }
-    if (G.round.length >= G.roundN) G.autoT = setTimeout(() => RR.Board.roundDone(), 1800);
-    else if (s.auto) G.autoT = setTimeout(() => nextCard(), 1900);
+    // a Test with the metronome rolls on: the next card, counted in again
+    const rolling = !!G.run && metroOn();
+    if (G.round.length >= G.roundN) G.autoT = setTimeout(() => { leaveCard(); RR.Board.roundDone(); }, 1800);
+    else if (s.auto || rolling) G.autoT = setTimeout(() => nextCard(), rolling ? 2200 : 1900);
     else $('#btn-next').classList.add('ready');
   }
   G.finish = finish;
 
   function next() {
     if (G.overlay) return;
-    if (!(G.stage === 'game' && G.phase === 'done')) {     // Practice, or a try not finished: skipped
+    if (G.cardEntry < 0) {                       // never finished in a Test: skipped
       G.round.push({ stars: 0, pts: 0, label: 'Skipped' });
       G.streak = 0;
     }
-    if (G.round.length >= G.roundN) { stopHear(true); if (RR.Beat) RR.Beat.stop(); RR.Board.roundDone(); return; }
+    if (G.round.length >= G.roundN) { stopHear(true); if (RR.Beat) RR.Beat.stop(); leaveCard(); RR.Board.roundDone(); return; }
     nextCard();
   }
-  /* the same melody again, from Practice (a new card in the round). A try
-     under way is the score: Again waits for it */
-  function again() {
-    if (G.overlay || G.setup.oneGo) return;
-    if (G.stage === 'game' && G.started && G.phase !== 'done') return;
-    stopHear(true); if (RR.Beat) RR.Beat.stop();
-    clearTimeout(G.autoT);
-    resetCard(openingStage()); draw();
-  }
-  G.next = next; G.again = again;
+  G.next = next;
 
   /* ---------------- Beat the clock ---------------- */
   function startClock() {
@@ -426,20 +531,30 @@
     RR.Board.timeUp();
   }
 
-  /* ---------------- ▶ Play: hear the melody ---------------- */
-  /* Practice's (unless Hear it in Practice is off), and after a try — never
-     during one; at the chosen pace's tempo */
+  /* ---------------- ▶ Listen: hear the melody ---------------- */
+  /* Practice's (unless Listen in Practice is off), and after a try — never
+     during one. At the metronome's pace — and with the metronome on, its
+     clicks too: a bar of them first, then on every beat (Off: Slow, no clicks) */
   const canHear = () => G.phase === 'done' || (G.stage === 'practice' && !G.setup.playHidden);
   G.canHear = canHear;
   function hearIt() {
     if (G.hearing) { stopHear(true); return; }
     if (G.overlay || G.phase === 'countin' || G.phase === 'running' || !canHear()) return;
     if (!RR.Sound.ctx) return;
-    const s = G.setup, spt = 60 / RR.paceTempo(s, RR.device.pace) / 4;
-    const t0 = RR.Sound.now() + 0.12;
+    const s = G.setup, beat = 60 / RR.paceTempo(s, RR.listenPace()), spt = beat / 4;
+    const per = G.card.time[0], lead = metroOn() ? per : 0;
+    const t0 = RR.Sound.now() + 0.12 + lead * beat;
     G.hearing = true; $('#btn-play').classList.add('playing');
     $('#btn-play').setAttribute('aria-label', 'Stop');
     G.hearTimers = [];
+    if (metroOn()) {
+      // clicks aren't stoppable once made, so each is made just before it is due
+      const total = G.evs.reduce((a, e) => a + e.t, 0);
+      for (let b = -lead; b < total / 4; b++) {
+        const t = t0 + b * beat, accent = ((b % per) + per) % per === 0;
+        G.hearTimers.push(setTimeout(() => RR.Sound.click(t, accent, false), Math.max(0, (t - RR.Sound.now() - 0.15) * 1000)));
+      }
+    }
     G.evs.forEach((ev, i) => {
       const t = t0 + ev.start * spt;
       if (!ev.rest) RR.Sound.playAt(ev.p, t);
@@ -458,7 +573,7 @@
     if (was && silence) RR.Sound.stopPlayed();
     G.hearing = false; G.hearIdx = -1;
     $('#btn-play').classList.remove('playing');
-    $('#btn-play').setAttribute('aria-label', 'Play — hear the melody');
+    $('#btn-play').setAttribute('aria-label', 'Listen');
     if (was) draw();
   }
   /* a window opening over the music: Play stops, and a count-in run (which
@@ -477,7 +592,7 @@
     G.stopSong();
     const set = G.playingSet();
     const cards = set ? setCards(set) : RR.Melody.songCards(id); if (!cards.length || !RR.Sound.ctx) return;
-    const spt = 60 / RR.paceTempo(G.setup, RR.device.pace) / 4;
+    const spt = 60 / RR.paceTempo(G.setup, RR.listenPace()) / 4;
     let t = RR.Sound.now() + 0.15;
     G.songPlaying = true;
     cards.forEach(c => c.notes.forEach(n => {
@@ -537,11 +652,12 @@
     drawSides();
     const c = G.card;
     $('#tune-name').textContent = c.title ? c.title + ' · ' + (c.sub ? c.sub + ' · ' : '') + c.part + ' of ' + c.of : 'A made-up melody';
-    const dots = [];
+    // the round's dots, top centre: the card being played rings (a counted one being tried again too)
+    const dots = [], here = G.cardEntry >= 0 ? G.cardEntry : G.round.length;
     if (isFinite(G.roundN)) {
       for (let i = 0; i < G.roundN; i++) {
         const r = G.round[i];
-        dots.push('<span class="dot ' + (r ? 'done s' + r.stars : i === G.round.length ? 'now' : '') + '"></span>');
+        dots.push('<span class="dot' + (r ? ' done s' + r.stars : '') + (i === here ? ' now' : '') + '"></span>');
       }
     }
     $('#dots').innerHTML = dots.join('');
@@ -555,34 +671,53 @@
     const notes = G.evs.filter(e => !e.rest).length, lit = G.states.filter(x => x === 'lit').length;
     const bars = Math.round(total / (c.time[0] * 4));
     const name = c.title ? c.title + ', ' + (c.sub ? c.sub + ', ' : '') + c.part + ' of ' + c.of : 'A made-up melody';
-    return (G.stage === 'practice' ? 'Practice. ' : '') + 'The music: ' + name + '. ' + c.time[0] + '/4, ' + bars + (bars === 1 ? ' bar' : ' bars') + ', ' + notes + ' notes' +
+    return (G.stage === 'practice' ? 'Practice. ' : 'Test. ') + 'The music: ' + name + '. ' + c.time[0] + '/4, ' + bars + (bars === 1 ? ' bar' : ' bars') + ', ' + notes + ' notes' +
       (lit ? ', ' + lit + ' played' : '') + (G.clean ? '' : ', with slips') + '.';
   }
 
-  /* the buttons beside the music, by stage:
-       Practice   ▶ Hear it · Count me in (a practice run) · I'm ready ▸ · Next
-       the game   Count me in · Again (once the try is done) · Next; ▶ after the try
-     and the pace pill (Slow · Moderate · Fast) under Count me in */
+  /* the controls, by stage:
+       under the music   ▶ Listen (Practice, or a try done) · Practice / Test · the metronome
+       beside it         ↻ Start over · Next */
+  const WEIGHT = { off: 0.55, slow: 0.8, moderate: 0.56, fast: 0.32 };   // up the metronome's arm: higher is slower
   function drawSides() {
     const app = $('#app'), s = G.setup, practice = G.stage === 'practice';
     const busy = G.phase === 'countin' || G.phase === 'running';
     app.classList.toggle('stage-practice', practice);
     app.classList.toggle('stage-game', !practice);
     app.classList.toggle('card-done', G.phase === 'done');
-    app.classList.toggle('can-hear', canHear());
-    $('#btn-count').disabled = !!G.clock || G.phase === 'done' || G.phase === 'review' || (!practice && G.started && !busy);
-    $('#btn-again').disabled = !!s.oneGo || busy || (G.started && G.phase !== 'done');
-    const pace = RR.Points.paceOf(RR.device.pace), pill = $('#pace');
-    pill.innerHTML = '<b>' + pace.name + '</b>' + (practice ? '' : '<small>' + pace.lo + (pace.hi > pace.lo ? '–' + pace.hi : '') + '</small>');
-    pill.disabled = busy || (!practice && G.started);
-    pill.title = 'Count me in at ' + pace.name + ' (' + RR.paceTempo(s, pace.id) + ' BPM)' + (practice ? '' : ' — worth ' + pace.lo + '–' + pace.hi + ' points') + '. Tap to change.';
-    pill.setAttribute('aria-label', pill.title);
-    $('#count-label').textContent = busy ? 'Listen…' : 'Count me in';
-    const tag = $('#stage-tag');
-    tag.hidden = !!G.clock;
-    tag.textContent = practice ? 'Practice' : 'For points';
-    tag.className = 'stage-tag ' + (practice ? 'practice' : 'game');
-    tag.title = practice ? 'Practice: nothing counts yet. Hear it, try it, then I’m ready ▸' : 'Play it on your own (up to 12 points), or Count me in for up to ' + pace.hi;
+    // the Get ready card takes a tap only while it counts (stopCountIn) — not in the last
+    // half beat, when a bar under it may be struck early for the first note
+    document.documentElement.classList.toggle('ci-tap', G.phase === 'countin');
+    // ▶ Listen
+    const play = $('#btn-play'), hear = canHear() || G.hearing;
+    play.disabled = !hear;
+    play.title = hear ? 'Listen' + (metroOn() ? ' — with the metronome' : '') : practice ? 'Listening is off for this practice' : 'Listen comes back when the Test is done';
+    // Practice (a blue pause) / Test (a red ball in a red ring — it pulses while a try is under way)
+    const mode = $('#btn-mode');
+    mode.classList.toggle('test', !practice);
+    mode.classList.toggle('recording', !practice && (busy || (G.started && G.phase !== 'done')));
+    mode.disabled = practice ? false : !canPractise();
+    mode.setAttribute('aria-pressed', String(!practice));
+    $('#mode-label').textContent = practice ? 'Practice' : 'Test';
+    mode.title = practice ? 'Practice: nothing counts. Press for a Test' :
+      !s.practice ? 'Test only: no Practice here' : G.clock ? 'Beat the clock is all Test' :
+      s.oneGo && G.started ? 'Test — one go' : 'Test: for points. Press for Practice';
+    mode.setAttribute('aria-label', mode.title);
+    // the metronome: Off · Slow · Moderate · Fast, lit when on
+    const on = metroOn(), pace = RR.Points.paceOf(G.metro), m = $('#btn-metro');
+    m.classList.toggle('on', on);
+    m.disabled = !!G.clock;
+    $('#metro-label').textContent = on ? pace.name : 'Off';
+    m.title = on ? 'Metronome: ' + pace.name + ' (' + RR.paceTempo(s, pace.id) + ' BPM) — a Test counts you in, worth ' + pace.lo + '–' + pace.hi + ' points. Tap to change.' :
+      'Metronome off. Tap for Slow, Moderate or Fast';
+    m.setAttribute('aria-label', m.title);
+    const w = WEIGHT[G.metro] || WEIGHT.off;
+    $('#metro-weight').setAttribute('transform', 'translate(' + (12 + 5.6 * w).toFixed(2) + ' ' + (15.2 - 11.6 * w).toFixed(2) + ') rotate(25.8)');
+    // ↻ Start over
+    const r = $('#btn-restart'), touched = cardTouched();
+    r.disabled = touched && !canRestartCard();
+    r.title = touched ? 'Start this melody over' : 'Start the round over, from the first melody';
+    r.setAttribute('aria-label', r.title);
   }
   G.drawSides = drawSides;
 

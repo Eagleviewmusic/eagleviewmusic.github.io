@@ -116,21 +116,21 @@
   /* ---------------- playing a set ---------------- */
   function play(id) {
     RR.device.set = id; RR.saveDevice();
-    G.setup.set = id; G.queue = [];
+    G.setup.set = id; G.queue = []; G.fresh = true;     // a new set starts with Practice on
     G.applyInstrument(); G.newRound();
     close();
     RR.toast('Playing ' + RR.Sets.get(id).title);
   }
   function stop() {
     RR.device.set = null; RR.saveDevice();
-    G.setup.set = null; G.queue = [];
+    G.setup.set = null; G.queue = []; G.fresh = true;
     G.applyInstrument(); G.newRound();
     render();
   }
   function hear(m) {
     stopHear();
     if (!RR.Sound.ctx) return;
-    const spt = 60 / RR.paceTempo(G.setup, RR.device.pace) / 4;
+    const spt = 60 / RR.paceTempo(G.setup, RR.listenPace()) / 4;
     let t = RR.Sound.now() + 0.1;
     m.notes.forEach(n => {
       if (n.p) { RR.Sound.playAt(n.p, t); const id = n.p; timers.push(setTimeout(() => RR.Xylo.flash(id, 'demo', 260), Math.max(0, RR.Sound.heardAt(t) - RR.now()))); }

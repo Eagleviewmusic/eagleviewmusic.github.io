@@ -1,44 +1,76 @@
 /* ==========================================================================
-   COMPONENT — the Chord Progression window: Build              #prog-sheet
+   COMPONENT — the Chord Progression window: Edit Chords        #prog-sheet
    --------------------------------------------------------------------------
    Phase 2 of ../Song Writer Chord Progressions/ (DESIGN.md §4). Opened by
-   the Chord Progression button at the foot of the chord panel.
+   the Chord Progression button at the foot of the chord panel. Its two
+   tabs: Edit Chords ('build') and Chord Placement ('song', the map).
 
-     THIS SONG       Verse ______   ▶ Hear it  ◌ beat     Each chord − 4 beats +
-     [Verse  ▶]      CHORDS   [ I ][ IV ][ V ][ vi ][ + ]
-     [Chorus ▶]      PICK A CHORD   the panel's board, Z X C V B
-     + New           RHYTHM — every bar plays   ( ● ○ )( ● ○ )( ● ● )( ● ○ )
-     Starters ▾                                    ta     ta    ti-ti   ta
+   The Edit Chords page (2026-10-05), the first time — the draft, or a
+   progression made since the page was opened (`fresh`) — a guide, top
+   to bottom:
+
+     THIS SONG     CHOOSE YOUR CHORDS AND THEIR RHYTHM
+     [Verse  ▶]    RHYTHM — every bar plays            CHORDS [More chords…]
+     [Chorus ▶]    [Build your own][Pre-built] [1 bar|2 bars]   the panel's board
+     + New         ( ● ○ )( ● ○ )( ● ● )( ● ○ )        ‹ sus2 add9 sus4 ♭7 maj7 6 6/4 … ›
+     Starters ▾    BUILD YOUR CHORD PROGRESSION  [ + Add a chord ][ I ][ IV ][ V ]
+                   Each chord lasts − 4 beats +
+                   NAME YOUR CHORD PROGRESSION AND HEAR IT
+                   [Verse____] ▶ Hear it ◌ beat        Place it in the song ▸
      ─────────────────────────────────────────────────────────────────────
-     Duplicate  Delete                       Put it in the song ▸   Done
+     Duplicate  Delete                                              Done
 
-   • THE LIST — the song's progressions; + New; Starters. Tap one to open
-     it. A song with none shows an empty progression: the first chord
-     picked makes it (nothing is saved by just looking).
-   • CHORDS — cards; the selected one (or the dashed +) is where the next
-     chord goes: + adds at the end, a card is replaced. A card: its name
-     and notes, its length (− + on the selected one: its own length, or
-     back to "Each chord"), what it plays as dots. × or Delete removes
-     it; drag it, or ⌥← ⌥→, to move it; ← → walk the cards.
-   • PICK A CHORD — the panel's board (the same blocks, the same set), its
-     keys F D S A G R E Q W 1–5, Z X C V B held (or a tab) to change it.
-     More chords… opens the chord editor on the selected chord.
-   • RHYTHM — one rhythm every bar plays (or two bars), drawn as the beat
-     strip draws a bar: pills of dots (a tap: strike → rings on → silence),
-     ⛓ between beats, + − sixteenths, or Easy circles; the rhythm in notes
-     above, Rhythm Poetry's Simplified Kodály words below; presets. A
-     selected chord can have its own rhythm (as long as the chord).
+   Made, and come back to (another progression tapped, + New, Chord
+   Placement, the window closed and opened): its name, ▶ Hear it and
+   Place it head the page with its chords; then the same Choose… and
+   Build… (the listening box alone); editing there changes the top.
+
+   • THE LIST — the song's progressions (▶ once round; again, it stops);
+     + New; Starters. A song with none shows an empty progression: the
+     first chord picked makes it (nothing is saved by just looking).
+   • ADD A CHORD — off until pressed (chords played meanwhile are only
+     heard: exploring); pressed, it listens ("Play a chord to place it
+     here") and every chord played goes in at the end, until a click
+     anywhere else in the window (the chords, their changes, More chords…
+     aside) turns it off again.
+   • CARDS — a tap selects one (heard; its custom rhythm shows on the
+     left; a chord played never swaps it), a second tap soon after (a
+     double-click), or Enter, opens THE CHORD EDITOR on it. A card: its
+     name and notes, its length (− +
+     on the selected one: its own length, or back to "Each chord"), what
+     it plays as dots. × or Delete removes it; drag it, or ⌥← ⌥→, to
+     move it; ← → walk the cards.
+   • CHORDS (right) — the panel's board (the same blocks, the same set),
+     its keys F D S A G R E Q W 1–5. Under it every change (MOD_FUNCS:
+     sus2 add9 sus4 ♭7 maj7 and the inversions) in a row that scrolls
+     sideways, each a SWITCH here only — on until tapped again (Z X C V B
+     switch theirs); the blocks wear them. A chord HELD plays the rhythm on
+     the left, round and round, until let go; a tap is just the chord.
+     More chords…, beside the title, opens the chord editor on the
+     selected card — with none, a chord to try, placed by Add it.
+   • RHYTHM (left) — one rhythm every bar plays (or two bars), in two
+     tabs: BUILD YOUR OWN draws it as the beat strip draws a bar — pills
+     of dots (a tap: strike → rings on → silence), ⛓ between beats, + −
+     sixteenths; the rhythm in notes above, Rhythm Poetry's Simplified
+     Kodály words below. PRE-BUILT is the meter's presets, each a line of
+     real notation (SW.engrave.rhythm): a tap takes that line and closes
+     the list to it; the tab (or the line) opens it again. 1 bar · 2 bars
+     on the tabs' row. A selected chord with a custom rhythm shows that
+     one instead.
+   • THE CHORD EDITOR (#pchord-sheet) — root; quality (Major · Minor ·
+     Diminished · Augmented) with the changes beside it; from a
+     double-click also Standard / Custom rhythm (the same builder).
    • ▶ HEAR IT — the progression round and round on the audio clock (its
      own little scheduler, the track's strikes); a change while it plays
      takes effect at once, with no gap and no strike played twice.
    • Every change is a step in the song's history (↶ ↷ in the head, ⌘Z).
-   • Put it in the song — the first bar with no chords, to the end of the
-     melody (or once through past it); the window turns to In the song
-     with it selected.
-   • IN THE SONG (phase 3) — the map: below, before the keys.
+   • Place it in the song — the first bar with no chords, to the end of
+     the melody (or once through past it); the window turns to Chord
+     Placement with it selected.
+   • CHORD PLACEMENT (phase 3, was "In the song") — the map: below, before the keys.
 
    • JUST HERE (phase 4) — the window for one chord of the song: below,
-     after In the song.
+     after Chord Placement.
 
    API  SW.progWin.open(progId?, 'build' | 'song') · openHere(tick) · close() · isOpen() · onTop() · keyDown(e)
    ========================================================================== */
@@ -60,17 +92,21 @@
   const esc = C.escapeHtml;
 
   let selProg = null;        // the progression open on the right (null: a new one, not made yet)
-  let sel = 'plus';          // the selected card: 'plus' or an index
-  let mode = 'dots';         // the rhythm: 'dots' | 'easy'
+  let sel = null;            // the selected card's index · 'plus': the Add a chord box, listening · null: nothing (exploring)
+  let rtab = 'build';        // the rhythm's tab: 'build' (Build your own) | 'pre' (Pre-built)
+  let preOpen = true;        // Pre-built: every line (true), or only the one chosen
+  let fresh = null;          // the progression being made now: its page shows as the first time (a guide, top to bottom)
+  const latched = new Set(); // the changes switched on under the board (sus2, ♭7, 6/4 …): on until tapped again
+  let lastTap = null;        // { i, t }: a card tapped — a second tap on it soon after opens its editor
   const fine = new Set();    // beats shown in sixteenths: scopeKey + ':' + beat
   let showStarters = false;
   let confirmDelete = false;
   let beatOn = false;        // Hear it: the steady beat
   let renderTimer = 0;
-  let tab = 'build';         // 'build' | 'song' (In the song)
-  let selFrom = null;        // In the song: the stretch selected, by the bar it starts on
-  let selBars = null;        // In the song: bars selected along the numbers, { a, b }
-  let playhead = 1;          // In the song: where ▶ Play the song starts
+  let tab = 'build';         // 'build' (Edit Chords) | 'song' (Chord Placement)
+  let selFrom = null;        // Chord Placement: the stretch selected, by the bar it starts on
+  let selBars = null;        // Chord Placement: bars selected along the numbers, { a, b }
+  let playhead = 1;          // Chord Placement: where ▶ Play the song starts
 
   const mt = () => SW.meters.byId(S.meter);
   const perBeat = () => mt().beatTicks / CELL;                    // cells in a beat: 4, or 6 in compound time
@@ -202,7 +238,7 @@
         while (j < cells.length && cells[j] === 'O') j++;
         const L = j - i;
         if (i === c0 && L > pb && L % pb === 0) {          // a long note from the beat: drawn once, here
-          html += spell(L).map(id => glyph(id)).join('');
+          html += SW.engrave.spellBeats(L / pb, mt().compound).map(id => glyph(id)).join('');
           skip = { until: i + L };
           return { html, skip };
         }
@@ -247,9 +283,11 @@
     if (!isOpen()) return;
     const keepScroll = body.querySelector('.pw-main');
     const top = keepScroll ? keepScroll.scrollTop : 0;
-    if (selProg && !cur()) { selProg = null; sel = 'plus'; }
+    const modRow = body.querySelector('.pw-modrow');
+    const modOff = modRow ? modOffset(modRow) : 0;             // where the changes' row is in the list, kept over the redraw
+    if (selProg && !cur()) { selProg = null; sel = null; }
     const p = cur();
-    if (p && typeof sel === 'number' && sel >= p.chords.length) sel = 'plus';
+    if (p && typeof sel === 'number' && sel >= p.chords.length) sel = null;
     const label = document.getElementById('song-chip-label');
     songEl.textContent = label ? '· ' + label.textContent : '';
     syncTabs();
@@ -261,6 +299,7 @@
     SW.chordStrip.fitLabels(body.querySelector('.pw-board'));
     const main = body.querySelector('.pw-main');
     if (main) main.scrollTop = top;
+    syncModRow(modOff);
     paintHearing();
     syncUndo();
   }
@@ -276,6 +315,7 @@
     if (t === tab) return;
     if (t === 'song') stopHear();
     tab = t;
+    fresh = null;                // left behind: next time it shows as made
     mdrag = null;
     render();
   }
@@ -289,9 +329,10 @@
   function listHtml() {
     let html = '<p class="pw-kicker">This song</p>';
     T.progressions().forEach(p => {
+      const playing = hear.on && hear.id === p.id;
       html += '<div class="pw-pcard' + (p.id === selProg ? ' on' : '') + '" data-prog="' + p.id + '" role="button" tabindex="-1" style="--bd:' + bandOf(p.id).bd + '">' +
         '<div class="pw-pcard-head"><span class="pw-pname">' + esc(p.name) + '</span>' +
-        '<button type="button" class="pw-pplay" data-once="' + p.id + '" title="Hear ' + esc(p.name) + ' once round" aria-label="Hear it once round">' + playIcon() + '</button></div>' +
+        '<button type="button" class="pw-pplay' + (playing ? ' on' : '') + '" data-once="' + p.id + '" title="' + (playing ? 'Stop' : 'Hear ' + esc(p.name) + ' once round') + '" aria-label="' + (playing ? 'Stop' : 'Hear it once round') + '" aria-pressed="' + playing + '">' + (playing ? stopIcon() : playIcon()) + '</button></div>' +
         '<div class="pw-chips">' + (p.chords.length ? p.chords.map(st => { const l = look(st.chord); return '<span class="pw-chip" style="--c:' + l.color + ';--cink:' + l.ink + '">' + C.labelHTML(l.name) + '</span>'; }).join('') : '<span class="pw-none">no chords yet</span>') + '</div>' +
         '<div class="pw-where">' + esc(whereText(p.id)) + '</div></div>';
     });
@@ -305,36 +346,68 @@
     return html;
   }
   const playIcon = () => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor" stroke="none"/></svg>';
+  const stopIcon = () => '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor" stroke="none"/></svg>';
 
+  /* The page, top to bottom. The first time (a progression being made
+     now — the draft, or one made since it was opened): Choose your
+     chords and their rhythm → Build your chord progression → Name it and
+     hear it, Place it in the song. Made, and come back to: its name,
+     ▶ and Place it at the top with its chords, then the same tools. */
   function mainHtml(p) {
+    if (readOnly()) {
+      if (!p) return '<p class="pw-empty">No chord progressions in this song yet.</p>';
+      return headHtml(p) + '<section class="pw-sec"><div class="pw-rhythm">' + rhythmHtml(p) + '</div></section>';
+    }
+    const first = !p || p.id === fresh;
+    let html = first ? '' : headHtml(p);
+    html += '<section class="pw-sec pw-choose"><h3 class="pw-h">Choose your chords and their rhythm</h3>' +
+      '<div class="pw-duo rhythm-first"><div class="pw-rhythm">' + rhythmHtml(p) + '</div>' +
+        '<div class="pw-pick"><div class="pw-pick-head"><p class="pw-kicker">Chords</p><button type="button" class="btn pw-small-btn pw-more-btn">More chords…</button></div>' + boardHtml(true) + '</div></div>' +
+      '</section>';
+    // right under the chords: its title and Each chord stacked as one narrow block, then the chords four to a
+    // row, Add a chord in the next place after them (it moves along as they come)
+    html += '<section class="pw-sec pw-build"><div class="pw-build-row">' +
+        '<div class="pw-build-head"><h3 class="pw-h">Build your chord progression</h3>' + eachHtml(p) + '</div>' +
+        '<div class="pw-cards pw-grid">' + (first && p ? cardsHtml(p) : '') + plusHtml() + '</div>' +
+      '</div>' +
+      (p && p.chords.length ? ui.note('pw.build2', '<b>Double-click</b> a chord to change it or give it a rhythm of its own; drag one to move it.') : '') +
+      '</section>';
+    if (first) html += '<section class="pw-sec pw-finish"><h3 class="pw-h">Name your chord progression and hear it</h3>' + nameRowHtml(p) + '</section>';
+    return html;
+  }
+  /* made, and come back to: its name, ▶ and Place it, then its chords */
+  function headHtml(p) {
+    return '<section class="pw-sec pw-headsec">' + nameRowHtml(p) +
+      (p.chords.length ? '<div class="pw-cards">' + cardsHtml(p) + '</div>' : '<p class="pw-none">No chords yet — play one below.</p>') +
+    '</section>';
+  }
+  function nameRowHtml(p) {
     const name = p ? p.name : 'Progression ' + (T.progressions().length + 1);
-    const each = p ? (p.beats || barBeats()) : barBeats();
     const hearingThis = hear.on && !hear.once && p && hear.id === p.id;
-    let html = '<div class="pw-top">' +
+    return '<div class="pw-namerow">' +
       '<input class="pw-name text-field" type="text" maxlength="24" value="' + esc(name) + '" aria-label="The progression’s name"' + (p ? '' : ' placeholder="' + esc(name) + '"') + (readOnly() ? ' readonly tabindex="-1"' : '') + '>' +
       '<button type="button" class="pw-hear' + (hearingThis ? ' on' : '') + '"' + (p && p.chords.length ? '' : ' disabled') + ' title="Hear it round and round (Space)">' + (hearingThis ? '<span class="sq"></span> Stop' : playIcon() + ' Hear it') + '</button>' +
       '<label class="pw-beat"><input type="checkbox" class="pw-beat-box"' + (beatOn ? ' checked' : '') + '> beat</label>' +
-      '<div class="pw-each"><span class="pw-each-label">Each chord</span>' +
-        '<span class="pw-stepper"><button type="button" data-each="-1" aria-label="Shorter"' + (each <= 1 ? ' disabled' : '') + '>−</button><b>' + each + (each === 1 ? ' beat' : ' beats') + '</b><button type="button" data-each="1" aria-label="Longer"' + (each >= 16 ? ' disabled' : '') + '>+</button></span>' +
-        '<small>' + esc(barText(each)) + '</small></div>' +
+      (readOnly() ? '' : '<span class="pw-gap"></span><button type="button" class="btn pw-put"' + (p && p.chords.length ? '' : ' disabled') + ' title="Put it in the song, from the first bar with no chords — then Chord Placement shows where">Place it in the song ▸</button>') +
     '</div>';
-
-    // the chords
-    html += '<div class="pw-section"><p class="pw-kicker">Chords ' + ui.note('pw.cards', 'The selected card is where the next chord goes: with <b>+</b> selected a chord is added at the end; with a chord selected it is replaced.') + '</p><div class="pw-cards">';
-    const passes = p ? firstPass(p) : [];
-    (p ? p.chords : []).forEach((st, i) => { html += cardHtml(p, st, i, passes); });
-    html += '<div class="pw-card plus' + (sel === 'plus' ? ' on' : '') + '" data-card="plus" role="button" title="Add a chord at the end"><span class="pw-plus">+</span><small>add a chord</small></div>';
-    html += '</div></div>';
-
-    // pick a chord
-    html += '<div class="pw-section pw-pick"><div class="pw-board-wrap"><p class="pw-kicker">Pick a chord</p>' + boardHtml() + '</div>' +
-      '<div class="pw-pick-side"><p class="pw-kicker">&nbsp;</p>' +
-      ui.note('pw.pick', 'Tap a chord, or press its key — <kbd>F</kbd> <kbd>D</kbd> <kbd>S</kbd> <kbd>A</kbd> … <kbd>1</kbd>–<kbd>5</kbd>. Hold <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd> <kbd>V</kbd> <kbd>B</kbd> (or a tab) to change it: <kbd>V</kbd> + <kbd>D</kbd> is V7. More chords… for any chord at all.') +
-      '<div class="pw-more"><button type="button" class="btn pw-more-btn">More chords…</button></div></div></div>';
-
-    // the rhythm
-    html += '<div class="pw-section pw-rhythm">' + rhythmHtml(p) + '</div>';
-    return html;
+  }
+  function eachHtml(p) {
+    const each = p ? (p.beats || barBeats()) : barBeats();
+    return '<div class="pw-each"><span class="pw-each-label">Each chord lasts</span><span class="pw-each-row">' +
+      '<span class="pw-stepper"><button type="button" data-each="-1" aria-label="Shorter"' + (each <= 1 ? ' disabled' : '') + '>−</button><b>' + each + (each === 1 ? ' beat' : ' beats') + '</b><button type="button" data-each="1" aria-label="Longer"' + (each >= 16 ? ' disabled' : '') + '>+</button></span>' +
+      '<small>' + esc(barText(each)) + '</small></span></div>';
+  }
+  function cardsHtml(p) {
+    const passes = firstPass(p);
+    return p.chords.map((st, i) => cardHtml(p, st, i, passes)).join('');
+  }
+  /* Add a chord: nothing is placed until it is pressed (play chords freely
+     till then). Pressed, it listens — "Play a chord to place it here" — and
+     every chord played goes in at the end, until a press anywhere else. */
+  function plusHtml() {
+    const on = sel === 'plus';
+    return '<div class="pw-card plus' + (on ? ' on listening' : '') + '" data-card="plus" role="button" aria-pressed="' + on + '" title="' + (on ? 'Listening: each chord you play goes in at the end. Tap anywhere else to stop.' : 'Tap, then play a chord: it goes in at the end') + '">' +
+      (on ? '<span class="pw-listen" aria-hidden="true">♪</span><small>Play a chord to place it here</small>' : '<span class="pw-plus">+</span><small>Add a chord</small>') + '</div>';
   }
 
   function cardHtml(p, st, i, passes) {
@@ -353,7 +426,8 @@
           '<circle cx="' + x.toFixed(1) + '" cy="6" r="3.3" fill="' + col + '"/>';
       }).join('') + '</svg>';
     }
-    return '<div class="pw-card' + (on ? ' on' : '') + (l.inScale ? '' : ' out') + (l.known ? '' : ' unknown') + '" data-card="' + i + '" style="--c:' + l.color + ';--cink:' + l.ink + '" role="button" title="' + esc(l.known ? l.d.roman + ' — ' + l.d.letter + ' · ' + l.tones.map(t => t.name).join(' ') : 'A chord the app cannot read') + '">' +
+    const ro = readOnly();
+    return '<div class="pw-card' + (on ? ' on' : '') + (l.inScale ? '' : ' out') + (l.known ? '' : ' unknown') + '" data-card="' + i + '" style="--c:' + l.color + ';--cink:' + l.ink + '" role="button" title="' + esc((l.known ? l.d.roman + ' — ' + l.d.letter + ' · ' + l.tones.map(t => t.name).join(' ') : 'A chord the app cannot read') + (ro ? '' : ' — double-click to change it')) + '">' +
       '<div class="pw-card-top">' + C.labelHTML(l.name) + '</div>' +
       (on ? '<button type="button" class="pw-card-x" data-x="' + i + '" title="Take it out (Delete)" aria-label="Take this chord out">×</button>' : '') +
       '<div class="pw-card-tones">' + tones + '</div>' +
@@ -362,47 +436,147 @@
         '<span>' + beats + (beats === 1 ? ' beat' : ' beats') + '</span>' +
         (on ? '<button type="button" data-len="1" aria-label="Longer"' + (beats >= 16 ? ' disabled' : '') + '>+</button>' : '') +
       '</div>' + dots +
-      (st.rhythm ? '<span class="pw-own-tag">own rhythm</span>' : '') +
+      (st.rhythm ? '<span class="pw-own-tag">custom rhythm</span>' : '') +
     '</div>';
   }
 
-  function boardHtml() {
+  /* the panel's board; `latch` (the Edit Chords page): every change under
+     it, sideways, each on until tapped again — and the blocks wear them */
+  function boardHtml(latch) {
     const offered = C.offered();
     let rows = '';
     C.SHAPE.forEach(row => {
-      const cells = row.filter(cell => offered.indexOf(cell.place) !== -1).map(cell => SW.chordStrip.blockHtml(C.entry(cell.place), cell.w, { noEdit: true })).join('');
+      const cells = row.filter(cell => offered.indexOf(cell.place) !== -1).map(cell => blockFor(cell.place, cell.w, latch)).join('');
       if (cells) rows += '<div class="crow">' + cells + '</div>';
     });
-    return '<div class="pw-board">' +
+    return '<div class="pw-board' + (latch ? ' latch' : '') + '">' +
       '<div class="strip-tower">' + (rows || '<p class="strip-empty">No chords in this set are switched on in Layout settings</p>') + '</div>' +
-      '<div class="strip-mods" role="group" aria-label="Chord buttons Z X C V B">' + C.SLOT_KEYS.map(SW.chordStrip.modTabHtml).join('') + '</div>' +
+      (latch ? modRowHtml() : '<div class="strip-mods" role="group" aria-label="Chord buttons Z X C V B">' + C.SLOT_KEYS.map(SW.chordStrip.modTabHtml).join('') + '</div>') +
     '</div>';
+  }
+  /* Just here's Pick a chord: its title with its buttons beside it, the board (tabs held), the ⓘ note under it */
+  function pickHtml(buttons, note) {
+    return '<div class="pw-pick"><div class="pw-pick-head"><p class="pw-kicker">Pick a chord</p>' + buttons + '</div>' +
+      boardHtml(false) + '<div class="pw-pick-note">' + note + '</div></div>';
+  }
+  function blockFor(place, w, latch) {
+    const e = C.entry(place);
+    return SW.chordStrip.blockHtml(latch ? Object.assign({}, e, { spec: withLatched(e.spec) }) : e, w, { noEdit: true });
+  }
+  const keyOfMod = id => C.SLOT_KEYS.find(K => { const f = C.slotFunc(K); return f && f.id === id; }) || '';
+  /* The changes go round and round: the row is the list five times over
+     and rests in the middle copy — when a scroll settles it is put back
+     there, at the same place in the list, unseen — so left or right it
+     never runs out (after 4/2 comes sus2 again). The copies are only for
+     the eye (aria-hidden); a list that fits whole shows once, no arrows. */
+  const MOD_COPIES = 5, MOD_HOME = 2;
+  function modRowHtml() {
+    let chips = '';
+    for (let c = 0; c < MOD_COPIES; c++) {
+      chips += C.MOD_FUNCS.map(f => {
+        const on = latched.has(f.id), K = keyOfMod(f.id);
+        return '<button type="button" class="cmod pw-mod' + (on ? ' on' : '') + (c === MOD_HOME ? '' : ' copy') + '" data-latch="' + f.id + '" aria-pressed="' + on + '"' + (c === MOD_HOME ? '' : ' aria-hidden="true" tabindex="-1"') + ' title="' + esc(f.does + (K ? ' — or press ' + K : '') + '. On until you tap it again.') + '">' +
+          '<b class="cmod-key">' + (K || '&nbsp;') + '</b><span class="cmod-name">' + C.modLabelHTML(f) + '</span></button>';
+      }).join('');
+    }
+    return '<div class="pw-mods">' +
+      '<button type="button" class="pw-modnav" data-modnav="-1" aria-label="More changes to the left">‹</button>' +
+      '<div class="pw-modrow" role="group" aria-label="Changes — each stays on until you tap it again">' + chips + '</div>' +
+      '<button type="button" class="pw-modnav" data-modnav="1" aria-label="More changes to the right">›</button>' +
+    '</div>';
+  }
+  /* one turn of the list: a chip to the same chip in the next copy */
+  function modPeriod(row) {
+    const a = row.children[0], b = row.children[C.MOD_FUNCS.length];
+    return a && b ? b.offsetLeft - a.offsetLeft : 0;
+  }
+  function modOffset(row) {
+    const P = modPeriod(row);
+    return P > 0 ? ((row.scrollLeft % P) + P) % P : 0;
+  }
+  /* back to the middle copy at the same place in the list */
+  function homeModRow(row) {
+    const P = modPeriod(row);
+    if (P <= 0 || row.parentNode.classList.contains('fits')) return;
+    const want = MOD_HOME * P + modOffset(row);
+    if (Math.abs(row.scrollLeft - want) > 0.5) row.scrollLeft = want;
+  }
+  function syncModRow(offset) {
+    const row = body.querySelector('.pw-modrow');
+    if (!row) return;
+    row.parentNode.classList.remove('fits');
+    const P = modPeriod(row);
+    const fits = P > 0 && P <= row.clientWidth + 2;
+    row.parentNode.classList.toggle('fits', fits);
+    row.scrollLeft = fits ? 0 : MOD_HOME * P + (offset || 0);
+  }
+  let modTimer = 0;
+
+  /* ================= THE CHANGES, LATCHED ================= */
+  /* the chord with every change switched on (one inversion at a time) */
+  function withLatched(spec) {
+    if (!latched.size) return spec;
+    let mods = spec.mods.slice();
+    C.MOD_FUNCS.forEach(f => {
+      if (!latched.has(f.id) || mods.indexOf(f.id) !== -1) return;
+      if (f.inv) mods = mods.filter(id => !C.MOD_BY_ID[id].inv);
+      mods.push(f.id);
+    });
+    return Object.assign({}, spec, { mods: C.MOD_FUNCS.map(x => x.id).filter(id => mods.indexOf(id) !== -1) });
+  }
+  function toggleLatch(id) {
+    const f = C.MOD_BY_ID[id];
+    if (!f) return;
+    if (latched.has(id)) latched.delete(id);
+    else {
+      if (f.inv) C.MOD_FUNCS.forEach(x => { if (x.inv) latched.delete(x.id); });
+      latched.add(id);
+    }
+    const board = body.querySelector('.pw-board.latch');
+    if (!board) return;
+    board.querySelectorAll('[data-latch]').forEach(b => { const on = latched.has(b.dataset.latch); b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+    relabelBoard(board);
   }
 
   function rhythmHtml(p) {
     const sc = scope();
-    const card = p && typeof sel === 'number' ? p.chords[sel] : null;
     let html = '<div class="pw-rhead">';
     if (sc.kind === 'own') {
-      html += '<p class="pw-kicker">Rhythm <span class="pw-sub">— ' + C.labelHTML(look(sc.st.chord).name) + ' plays its own</span></p>' +
+      html += '<p class="pw-kicker">Rhythm <span class="pw-sub">— ' + C.labelHTML(look(sc.st.chord).name) + '’s custom rhythm</span></p>' +
         '<span class="pw-gap"></span>' +
-        '<div class="seg"><button type="button" class="seg-btn" data-own="off">The bar’s rhythm</button><button type="button" class="seg-btn active">Its own</button></div>';
+        '<div class="seg"><button type="button" class="seg-btn" data-own="off">Standard rhythm</button><button type="button" class="seg-btn active">Custom rhythm</button></div>';
     } else {
-      html += '<p class="pw-kicker">Rhythm <span class="pw-sub">— every bar plays</span></p>' +
-        '<label class="pw-twobars"><input type="checkbox" class="pw-two-box"' + (sc.bars === 2 ? ' checked' : '') + '> 2 bars</label>' +
-        '<span class="pw-gap"></span>';
+      html += '<p class="pw-kicker">Rhythm <span class="pw-sub">— every bar plays</span></p>';
     }
-    html += '<div class="seg pw-mode"><button type="button" class="seg-btn' + (mode === 'dots' ? ' active' : '') + '" data-mode="dots">Dots</button><button type="button" class="seg-btn' + (mode === 'easy' ? ' active' : '') + '" data-mode="easy">Easy</button></div></div>';
-    html += stripHtml(sc);
-    html += '<div class="pw-presets">' + presets(sc).map(pr => '<button type="button" class="pw-preset' + (pr.cells === sc.cells ? ' on' : '') + '" data-preset="' + pr.cells + '">' + esc(pr.label) + '</button>').join('') + '</div>';
-    if (sc.kind === 'own') {
-      html += '<p class="pw-rnote">' + ui.note('pw.own', 'Only this chord plays this rhythm; the others keep the bar’s. Tap a dot: a strike starts there, rings on, or goes silent.') + '</p>';
-    } else if (card) {
-      html += '<p class="pw-ownline">' + C.labelHTML(look(card.chord).name) + ' plays: <span class="seg"><button type="button" class="seg-btn active">The bar’s rhythm</button><button type="button" class="seg-btn" data-own="on">Its own</button></span></p>';
-    } else {
-      html += '<p class="pw-rnote">' + ui.note('pw.rhythm', 'Tap a dot: a strike starts there, rings on, or goes silent. Each strike plays the chord in force at that moment, and a chord always sounds where it starts. Select a chord above to give it a rhythm of its own.') + '</p>';
-    }
-    return html;
+    return html + '</div>' + rhythmTabsHtml(sc);
+  }
+
+  /* the rhythm's two tabs — Build your own (the pills) · Pre-built (lines
+     of notes) — over the box that shows the one chosen. Listen only: the
+     rhythm as it is, no tabs. */
+  const shownTab = () => (readOnly() ? 'build' : rtab);
+  function rhythmTabsHtml(sc) {
+    const t = shownTab();
+    const tabBtn = (id, label) => '<button type="button" class="pw-rtab' + (t === id ? ' on' : '') + '" data-rtab="' + id + '" role="tab" aria-selected="' + (t === id) + '">' + label + '</button>';
+    const bars = sc.kind === 'bar'
+      ? '<div class="seg pw-bars" role="group" aria-label="How long the rhythm is"><button type="button" class="seg-btn' + (sc.bars === 2 ? '' : ' active') + '" data-bars="1">1 bar</button><button type="button" class="seg-btn' + (sc.bars === 2 ? ' active' : '') + '" data-bars="2">2 bars</button></div>'
+      : '';
+    return (readOnly() ? '' : '<div class="pw-rtabs" role="tablist" aria-label="Build a rhythm, or pick a pre-built one">' + tabBtn('build', 'Build your own') + tabBtn('pre', 'Pre-built') + bars + '</div>') +
+      '<div class="pw-rbox' + (readOnly() ? ' solo' : '') + (t === 'pre' ? ' pre' : '') + '" role="tabpanel">' + (t === 'pre' ? prebuiltHtml(sc) : stripHtml(sc)) + '</div>';
+  }
+  /* Pre-built: the meter's presets as lines of real notation, the one playing lit.
+     A line chosen closes the list to it; the Pre-built tab (or the line) opens it again. */
+  function prebuiltHtml(sc) {
+    const m = mt();
+    const o = { perBeat: perBeat(), barCells: m.barTicks / CELL, compound: m.compound, top: m.top, bottom: m.bottom, ss: 8 };
+    const list = presets(sc);
+    const chosen = list.find(pr => pr.cells === sc.cells);
+    const closed = !preOpen && chosen;
+    return '<div class="pw-lines' + (closed ? ' closed' : '') + '">' + (closed ? [chosen] : list).map(pr => {
+      const on = pr.cells === sc.cells;
+      return '<button type="button" class="pw-line' + (on ? ' on' : '') + '" data-preset="' + pr.cells + '" title="' + esc(pr.label) + (closed ? ' — tap for every rhythm' : '') + '" aria-label="' + esc(pr.label) + '" aria-pressed="' + on + '">' +
+        SW.engrave.rhythm(pr.cells, o) + (closed ? '<span class="pw-line-more" aria-hidden="true">▾</span>' : '') + '</button>';
+    }).join('') + '</div>';
   }
 
   /* the pills: the beat strip's look, on a string of cells */
@@ -410,15 +584,16 @@
     const pb = perBeat();
     const cells = sc.cells;
     const beats = Math.round(sc.beats);
-    const easy = mode === 'easy' && SW.beats && SW.beats.easy;
-    let html = '<div class="pw-strip">';
+    const B = barBeats();
+    const rows = beats > B;                // more than a bar: each bar on its own line, its first beat's ⛓ leading it
+    let html = '<div class="pw-strip' + (rows ? ' bars' : '') + '">';
     let skip = { until: 0 };
     for (let b = 0; b < beats; b++) {
       const c0 = b * pb;
       const sixteen = fine.has(sc.key + ':' + b) || needs16(cells, c0);
       const d = sixteen ? pb : pb / 2, span = pb / d;
+      if (rows && b % B === 0) html += (b ? '</div>' : '') + '<div class="pw-barrow">' + (b ? '' : '<span class="pw-chain-gap" aria-hidden="true"></span>');
       if (b > 0) {
-        if (sc.kind === 'bar' && b % barBeats() === 0) html += '<span class="pw-barline" aria-hidden="true"></span>';
         const joined = cells[c0] === 'O';
         const can = joined || (cells[c0 - 1] !== 'R' && cells[c0] === 'X');
         html += '<button type="button" class="bb-chain' + (joined ? ' on' : '') + '" data-join="' + b + '"' + (can ? '' : ' disabled') + ' title="' + (joined ? 'Joined — the strike rings on over the beat line; tap to strike again here' : 'Join to the beat before — the strike rings on over the beat line') + '">' +
@@ -427,57 +602,23 @@
       const notes = beatNotes(cells, b, skip);
       skip = notes.skip;
       html += '<div class="bb-beat pw-beatcol" style="--c:' + sc.colour + '">' +
-        '<div class="pw-notes">' + notes.html + '</div>';
-      if (easy) html += easyPill(sc, b);
-      else {
-        html += '<div class="bb-pill d' + d + '">';
-        for (let i = 0; i < d; i++) {
-          const c = c0 + i * span;
-          const ch = cells[c];
-          const cls = ch === 'X' ? 'on' : ch === 'O' ? 'hold' : 'rest';
-          const title = ch === 'X' ? 'A strike — tap: it rings on from before' : ch === 'O' ? 'Ringing on — tap: silence' : 'Silence — tap: a strike';
-          html += '<button type="button" class="bb-dot ' + cls + '" data-cell="' + c + '" data-span="' + span + '" style="--c:' + sc.colour + '" title="' + title + '"></button>';
-        }
-        html += '</div>';
+        '<div class="pw-notes">' + notes.html + '</div>' +
+        '<div class="bb-pill d' + d + '">';
+      for (let i = 0; i < d; i++) {
+        const c = c0 + i * span;
+        const ch = cells[c];
+        const cls = ch === 'X' ? 'on' : ch === 'O' ? 'hold' : 'rest';
+        const title = ch === 'X' ? 'A strike — tap: it rings on from before' : ch === 'O' ? 'Ringing on — tap: silence' : 'Silence — tap: a strike';
+        html += '<button type="button" class="bb-dot ' + cls + '" data-cell="' + c + '" data-span="' + span + '" style="--c:' + sc.colour + '" title="' + title + '"></button>';
       }
-      html += '<div class="pw-say">' + esc(sayBeat(cells, c0)) + '</div>';
-      if (!easy) {
-        html += '<div class="bb-pm">' +
+      html += '</div>' +
+        '<div class="pw-say">' + esc(sayBeat(cells, c0)) + '</div>' +
+        '<div class="bb-pm">' +
           '<button type="button" class="bb-fine" data-coarse="' + b + '"' + (sixteen ? '' : ' disabled') + ' title="Eighths — sixteenths move onto the eighth before them" aria-label="Eighths">−</button>' +
-          '<button type="button" class="bb-fine" data-fine="' + b + '"' + (sixteen ? ' disabled' : '') + ' title="Sixteenths in this beat" aria-label="Sixteenths">+</button></div>';
-      }
-      html += '</div>';
+          '<button type="button" class="bb-fine" data-fine="' + b + '"' + (sixteen ? ' disabled' : '') + ' title="Sixteenths in this beat" aria-label="Sixteenths">+</button></div>' +
+      '</div>';
     }
-    return html + '</div>';
-  }
-  function easyFits(ch, b, sc) {
-    if (sc.kind === 'bar') {
-      const B = barBeats(), at = b % B;
-      if (at + ch.beats > B) return false;
-      return B % ch.beats === 0 ? at % ch.beats === 0 : true;
-    }
-    const L = Math.round(sc.beats);
-    if (b + ch.beats > L) return false;
-    return L % ch.beats === 0 ? b % ch.beats === 0 : true;
-  }
-  function easyLit(cells, c0, ch) {
-    const n = ch.pattern.length;
-    const s = cells.slice(c0, c0 + n);
-    if (s === ch.pattern && cells[c0 + n] !== 'O') return 'note';
-    if (ch.beats === 1 && s === 'R'.repeat(n)) return 'rest';
-    return null;
-  }
-  function easyPill(sc, b) {
-    const c0 = b * perBeat();
-    let html = '<div class="bb-pill easy">';
-    SW.beats.easy().forEach(ch => {
-      if (!easyFits(ch, b, sc)) return;
-      const lit = easyLit(sc.cells, c0, ch);
-      const glyphs = ch.four ? '<span class="bb-four">' + SW.engrave.value('s', { height: 16 }) + '×4</span>'
-        : '<span class="bb-glyphs">' + ch.glyph.map((id, i) => SW.engrave.value(id, { height: 18, rest: lit === 'rest' || (ch.restFirst && i === 0) })).join('') + '</span>';
-      html += '<button type="button" class="bb-easy' + (lit ? ' on' : '') + (lit === 'rest' ? ' is-rest' : '') + '" data-easy="' + ch.id + '" data-beat="' + b + '" style="--c:' + SW.values.colour(ch.colour) + '" title="' + ch.name + (lit === 'note' ? ' — tap again for silence as long' : '') + '">' + glyphs + '</button>';
-    });
-    return html + '</div>';
+    return html + (rows ? '</div>' : '') + '</div>';
   }
 
   function footHtml(p) {
@@ -490,7 +631,6 @@
     return '<button type="button" class="btn" data-act="duplicate"' + (p ? '' : ' disabled') + '>Duplicate</button>' +
       '<button type="button" class="btn pw-ghost" data-act="delete"' + (p ? '' : ' disabled') + '>Delete</button>' +
       '<span class="pw-gap"></span>' +
-      '<button type="button" class="btn" data-act="put"' + (p && p.chords.length ? '' : ' disabled') + ' title="Put this progression in the song, from the first bar with no chords"><span class="pw-long">Put it in the song ▸</span><span class="pw-short">Put in song ▸</span></button>' +
       '<button type="button" class="btn btn-primary" data-act="done">Done</button>';
   }
 
@@ -508,36 +648,48 @@
     const spec = { chords: first ? [first] : [] };
     if (name && name.trim() && name.trim() !== 'Progression ' + (T.progressions().length + 1)) spec.name = name.trim();
     selProg = T.addProg(spec);
+    fresh = selProg;                                     // being made now: the first-time page
     return selProg;
   }
 
-  /* a chord picked (the board, its key): added at the end, or the selected card replaced */
-  function pick(place) {
+  /* a chord played (the board, its key): always heard — held, in the
+     rhythm on the left — and placed at the end only while Add a chord
+     listens. A selected card is never swapped by it: playing chords to
+     explore changes nothing (double-click a card to change it). */
+  function pick(place, holder) {
     const e = C.entry(place);
     if (!e) return;
     if (C.offered().indexOf(place) === -1) {
       ui.toast(C.placeShown(place) ? 'That chord is switched off in Layout settings' : 'That chord is outside the ' + C.CHORD_SETS[C.setIndex()].name + ' set — the set button on the panel shows more');
       return;
     }
-    const id = C.toId(C.withHeld(e.spec));
-    C.play(id, 'progression');
-    flash(place);
+    const id = C.toId(withLatched(C.withHeld(e.spec)));
+    startPreview(id, place, holder);
+    if (sel !== 'plus') return;
     const step = { chord: id };
-    if (!C.heldMods.size) step.place = place;            // the panel's own chord: it follows the scale (D16)
-    putChord(step);
+    if (!C.heldMods.size && !latched.size) step.place = place;   // the panel's own chord: it follows the scale (D16)
+    addChord(step);
   }
-  function putChord(step) {
+  /* a chord at the end (the progression made by its first) */
+  function addChord(step) {
     const p = cur();
-    if (!p) { ensureProg(step); sel = 'plus'; return; }
-    if (sel === 'plus') T.insertStep(p.id, p.chords.length, step);
-    else T.setStep(p.id, sel, { chord: step.chord, place: step.place || null });
+    if (!p) ensureProg(step);
+    else T.insertStep(p.id, p.chords.length, step);
   }
-  let flashTimer = 0;
-  function flash(place) {
-    body.querySelectorAll('.pw-board .cblock').forEach(b => b.classList.toggle('is-on', b.dataset.place === place));
-    clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => body.querySelectorAll('.pw-board .cblock.is-on').forEach(b => b.classList.remove('is-on')), 240);
+  /* the block a finger or key holds: lit while it sounds */
+  function lightBlock(place, on) {
+    body.querySelectorAll('.pw-board .cblock').forEach(b => { if (b.dataset.place === place || !on) b.classList.toggle('is-on', on && b.dataset.place === place); });
   }
+  /* Add a chord stops listening at a press anywhere else in the window —
+     the chords, their changes and More chords… aside — a sign the player
+     wants more time to explore. A click, not a press, so scrolling never
+     counts. */
+  sheet.addEventListener('click', e => {
+    if (sel !== 'plus' || tab !== 'build' || !isOpen()) return;
+    if (e.target.closest && e.target.closest('.pw-board, .pw-card.plus, .pw-more-btn, .note-i')) return;
+    sel = null;
+    schedule();
+  }, true);
   function selectCard(i) {
     sel = i;
     const p = cur();
@@ -547,12 +699,13 @@
     }
     render();
   }
+  /* ← →: walk the chords (from nothing: the first, or the last) */
   function stepSel(d) {
     const p = cur();
     const n = p ? p.chords.length : 0;
-    let i = sel === 'plus' ? n : sel;
-    i = Math.max(0, Math.min(n, i + d));
-    selectCard(i === n ? 'plus' : i);
+    if (!n) return;
+    const i = typeof sel === 'number' ? sel + d : (d > 0 ? 0 : n - 1);
+    selectCard(Math.max(0, Math.min(n - 1, i)));
   }
   function moveSel(d) {
     const p = cur();
@@ -568,7 +721,7 @@
     const i = sel;
     T.removeStep(p.id, i);
     const left = T.prog(p.id);
-    sel = left && i < left.chords.length ? i : 'plus';
+    sel = left && i < left.chords.length ? i : null;
   }
   /* a chord's own length; a chord with its own rhythm keeps it, repeated or cut to fit */
   function setLength(i, d) {
@@ -596,20 +749,21 @@
     if (next === now) return;
     T.setProg(id, { beats: next === barBeats() ? null : next });
   }
-  function giveOwnRhythm(on) {
-    const p = cur();
-    if (!p || typeof sel !== 'number') return;
-    const st = p.chords[sel];
-    if (!on) { T.setStep(p.id, sel, { rhythm: null }); return; }
-    // a copy of what it was playing
-    const ev = firstPass(p).find(e => e.step === sel);
+  /* a chord's own rhythm, on or off (the selected card, or the editor's): on, a copy of what it was playing */
+  function giveOwnRhythm(on, progId, idx) {
+    const p = T.prog(progId || selProg);
+    const i = idx === undefined ? sel : idx;
+    if (!p || typeof i !== 'number' || !p.chords[i]) return;
+    const st = p.chords[i];
+    if (!on) { T.setStep(p.id, i, { rhythm: null }); return; }
+    const ev = firstPass(p).find(e => e.step === i);
     const n = toTicks(stepBeats(p, st)) / CELL;
     const a = 'R'.repeat(n).split('');
     if (ev) ev.strikes.forEach(s => {
       const k0 = (s.at - ev.at) / CELL;
       for (let k = 0; k < s.len / CELL; k++) if (k0 + k < n) a[k0 + k] = k ? 'O' : 'X';
     });
-    T.setStep(p.id, sel, { rhythm: T.rhythmOf(sanitize(a.join(''))) });
+    T.setStep(p.id, i, { rhythm: T.rhythmOf(sanitize(a.join(''))) });
   }
 
   function tapDot(c, span, sc) {
@@ -643,27 +797,24 @@
     const out = a.join('');
     if (out !== sc.cells) writeScope(sc, out); else (redraw || render)();
   }
-  function writeEasy(id, b, sc) {
-    sc = sc || scope();
-    const ch = SW.beats.easy().find(x => x.id === id);
-    if (!ch) return;
-    const c0 = b * perBeat(), n = ch.pattern.length;
-    const lit = easyLit(sc.cells, c0, ch);
-    const put = lit === 'note' ? 'R'.repeat(n) : ch.pattern;
-    writeScope(sc, sc.cells.slice(0, c0) + put + sc.cells.slice(c0 + n));
-  }
-  /* a tap on the rhythm (the strip, Easy, presets, Dots · Easy), whichever rhythm `sc` is */
+  /* a tap on the rhythm (its tabs, the strip, a pre-built line), whichever rhythm `sc` is */
   function rhythmClick(b, sc, redraw) {
-    if (b.dataset.mode) { mode = b.dataset.mode; redraw(); return true; }
-    if (b.dataset.preset) { writeScope(sc, b.dataset.preset); return true; }
+    if (b.dataset.rtab) { rtab = b.dataset.rtab; if (rtab === 'pre') preOpen = true; redraw(); return true; }   // Pre-built, pressed: every line again
+    if (b.dataset.preset) {
+      if (b.dataset.preset === sc.cells) { preOpen = !preOpen; redraw(); return true; }     // the line chosen: open the list, or close it to that line
+      preOpen = false;
+      writeScope(sc, b.dataset.preset);
+      return true;
+    }
+    if (b.dataset.bars) { if (sc.kind === 'bar') setTwoBars(b.dataset.bars === '2'); return true; }
     if (b.dataset.join !== undefined) { toggleJoin(Number(b.dataset.join), sc); return true; }
     if (b.dataset.fine !== undefined) { fine.add(sc.key + ':' + b.dataset.fine); redraw(); return true; }
     if (b.dataset.coarse !== undefined) { coarsen(Number(b.dataset.coarse), sc, redraw); return true; }
-    if (b.dataset.easy) { writeEasy(b.dataset.easy, Number(b.dataset.beat), sc); return true; }
     if (b.dataset.cell !== undefined) { tapDot(Number(b.dataset.cell), Number(b.dataset.span) || 1, sc); return true; }
     return false;
   }
   function setTwoBars(on) {
+    if (((cur() && cur().bars) || 1) === (on ? 2 : 1)) return;
     const id = ensureProg();
     const p = T.prog(id);
     const m = mt();
@@ -700,7 +851,8 @@
     }) };
     if (s.half && B % 2 === 0) spec.beats = B / 2;
     selProg = T.addProg(spec);
-    sel = 'plus';
+    fresh = selProg;
+    sel = null;
     showStarters = false;
   }
   function freeName(base) {
@@ -727,6 +879,7 @@
     playhead = from;
     stopHear();
     tab = 'song';
+    fresh = null;
     render();
   }
 
@@ -858,6 +1011,86 @@
     if (p && p.chords.length) startHear(p.id, false);
   }
 
+  /* ================= A CHORD HELD: HEARD IN THE RHYTHM =================
+     A chord pressed on the board (or its key) sounds at once. Held past a
+     moment, it plays the rhythm on the left — the bar's, or the selected
+     chord's custom one — round and round from the press, until it is let
+     go: what it would sound like in the progression, before it is placed.
+     A quick tap is just the chord, as long as a tapped chord. */
+  const HOLD_S = 0.3;            // held this long, it is a hold
+  const TAP_S = 0.75;            // a tapped chord's length (audio.js CHORD_HOLD)
+  let pv = null;                 // { holder, place, freqs, t0, tickSec, strikes, period, cursor, held, voices, timer }
+  function cellStrikes(cells) {
+    const out = [];
+    for (let i = 0; i < cells.length; i++) {
+      if (cells[i] !== 'X') continue;
+      let j = i + 1;
+      while (j < cells.length && cells[j] === 'O') j++;
+      out.push({ at: i * CELL, len: (j - i) * CELL });
+    }
+    return out;
+  }
+  function startPreview(id, place, holder) {
+    releasePreview();
+    const list = id && C.isKnown(id) ? C.midis(id) : [];
+    if (!list.length) return;
+    S.soundingChord = { id, midis: list };                     // the keyboard's lights and the corner, as C.play does
+    SW.bus.emit('chord:played', { id, midis: list, source: 'progression' });
+    const freqs = list.map(SW.music.midiToFreq);
+    if (!holder) { SW.audio.playChordFrequencies(freqs); return; }   // nothing to hold it: a tap
+    const cells = scope().cells;
+    const ac = SW.audio.context();
+    pv = { holder, place, freqs, t0: ac.currentTime + 0.01, tickSec: SW.timing.tickMs() / 1000,
+      strikes: cellStrikes(cells), period: cells.length * CELL, cursor: 0, held: false, voices: [], timer: 0 };
+    if (cells[0] !== 'X') SW.audio.playChordFrequencies(freqs);      // the rhythm starts silent: a tap is still heard
+    lightBlock(place, true);
+    pvPump();
+  }
+  function pvPump() {
+    if (!pv || !pv.period) return;
+    const now = SW.audio.context().currentTime;
+    if (!pv.held && now - pv.t0 >= HOLD_S) {
+      pv.held = true;
+      if (hear.on) { stopHear(); render(); }                       // one rhythm at a time
+      pv.voices.forEach(v => { if (v.cut) setTimeout(() => v.h.stop(), Math.max(0, v.cut - now) * 1000); });   // the first strike: its own length after all
+    }
+    const limit = pv.held ? now + 0.25 : Math.min(now + 0.25, pv.t0 + HOLD_S);   // a tap never gets past its first moment
+    const horizon = (limit - pv.t0) / pv.tickSec;
+    let guard = 0;
+    while (pv.cursor < horizon && guard++ < 64) {
+      const base = Math.floor(pv.cursor / pv.period) * pv.period;
+      const end = Math.min(horizon, base + pv.period);
+      pv.strikes.forEach(st => {
+        const abs = base + st.at;
+        if (abs < pv.cursor || abs >= end) return;
+        const when = pv.t0 + abs * pv.tickSec, hold = st.len * pv.tickSec * 0.95;
+        // the very first strike rings as long as a tapped chord, in case it is only a tap; a hold cuts it back to its length
+        const first = abs === 0 && hold < TAP_S;
+        SW.audio.playChordFrequencies(pv.freqs, when, first ? TAP_S : hold).forEach(h => pv.voices.push({ h, start: when, end: when + (first ? TAP_S : hold), cut: first ? when + hold : 0 }));
+      });
+      pv.cursor = end;
+    }
+    pv.voices = pv.voices.filter(v => v.end > now);
+    pv.timer = setTimeout(pvPump, 40);
+  }
+  /* let go: a hold stops; a tap rings as long as a tapped chord */
+  function releasePreview(holder) {
+    if (!pv || (holder && pv.holder !== holder)) return;
+    const p = pv;
+    pv = null;
+    clearTimeout(p.timer);
+    lightBlock(p.place, false);
+    const now = SW.audio.context().currentTime;
+    p.voices.forEach(v => {
+      if (v.start > now + 0.005 || p.held) { v.h.stop(); return; }
+      if (v.end - v.start > TAP_S) setTimeout(() => v.h.stop(), Math.max(0, v.start + TAP_S - now) * 1000);
+    });
+  }
+  ['pointerup', 'pointercancel'].forEach(type => window.addEventListener(type, e => releasePreview('p' + e.pointerId)));
+  const keyHolder = e => 'k' + (e.code || String(e.key || '').toLowerCase());
+  document.addEventListener('keyup', e => releasePreview(keyHolder(e)));
+  window.addEventListener('blur', () => releasePreview());
+
   /* ================= GESTURES ================= */
   /* a Z X C V B tab, held while the pointer is down (two fingers: a tab and a chord) */
   function holdTab(modTab, e) {
@@ -874,11 +1107,11 @@
   body.addEventListener('pointerdown', e => {
     if (tab !== 'build') return;
     // Z X C V B tabs: held while the pointer is down (two fingers: a tab and a chord)
-    const modTab = e.target.closest('.pw-board .cmod');
+    const modTab = e.target.closest('.pw-board .cmod:not([data-latch])');
     if (modTab) { holdTab(modTab, e); return; }
     const block = e.target.closest('.pw-board .cblock');
-    if (block) { e.preventDefault(); pick(block.dataset.place); return; }
-    // a chord card: a tap selects it, a drag moves it
+    if (block) { e.preventDefault(); pick(block.dataset.place, 'p' + e.pointerId); return; }
+    // a chord card: a tap selects it, a drag moves it, a second tap soon after opens its editor
     const card = e.target.closest('.pw-card[data-card]');
     if (card && card.dataset.card !== 'plus' && !e.target.closest('button')) {
       drag = { from: Number(card.dataset.card), x: e.clientX, y: e.clientY, moved: false, card, id: e.pointerId, to: null };
@@ -911,7 +1144,13 @@
       d.card.classList.remove('dragging');
       if (d.to !== null && d.to !== d.from && cur()) { T.moveStep(selProg, d.from, d.to); sel = d.to; }
       else render();
-    } else selectCard(d.from);
+      lastTap = null;
+      return;
+    }
+    const now = Date.now();
+    if (lastTap && lastTap.i === d.from && now - lastTap.t < 450 && !readOnly()) { lastTap = null; editStep(d.from, true); return; }
+    lastTap = { i: d.from, t: now };
+    selectCard(d.from);
   };
   body.addEventListener('pointerup', endDrag);
   body.addEventListener('pointercancel', e => { if (drag) { drag.card.classList.remove('dragging'); drag = null; render(); } });
@@ -921,9 +1160,20 @@
     const t = e.target;
     const b = t.closest('button, .pw-pcard, .pw-card');
     if (!b) return;
-    if (b.dataset.once) { e.stopPropagation(); startHear(b.dataset.once, true); return; }
-    if (b.classList.contains('pw-pcard') && b.dataset.prog) { if (b.dataset.prog !== selProg) { selProg = b.dataset.prog; sel = 'plus'; confirmDelete = false; render(); } return; }
-    if (b.classList.contains('pw-new')) { selProg = null; sel = 'plus'; confirmDelete = false; render(); const n = body.querySelector('.pw-name'); if (n) { n.focus(); n.select(); } return; }
+    if (b.dataset.once) {                                 // ▶ on the list: once round — again, it stops
+      e.stopPropagation();
+      if (hear.on && hear.id === b.dataset.once) { stopHear(); render(); } else startHear(b.dataset.once, true);
+      return;
+    }
+    if (b.classList.contains('pw-pcard') && b.dataset.prog) { if (b.dataset.prog !== selProg) { selProg = b.dataset.prog; sel = null; fresh = null; confirmDelete = false; render(); } return; }
+    if (b.classList.contains('pw-new')) { selProg = null; sel = null; fresh = null; confirmDelete = false; render(); body.querySelector('.pw-main').scrollTop = 0; return; }
+    if (b.dataset.latch) { toggleLatch(b.dataset.latch); return; }
+    if (b.dataset.modnav) {                               // ‹ ›: on round the list, either way, for ever
+      const row = body.querySelector('.pw-modrow');
+      if (row) { homeModRow(row); row.scrollBy({ left: Number(b.dataset.modnav) * Math.max(120, row.clientWidth * 0.7), behavior: 'smooth' }); }
+      return;
+    }
+    if (b.classList.contains('pw-put')) { putInSong(); return; }
     if (b.classList.contains('pw-starters-btn')) { showStarters = !showStarters; render(); return; }
     if (b.dataset.starter !== undefined) { useStarter(Number(b.dataset.starter)); return; }
     if (b.classList.contains('pw-card') && b.dataset.card === 'plus') { selectCard('plus'); return; }
@@ -946,31 +1196,197 @@
       return;
     }
     if (t.classList.contains('pw-beat-box')) { beatOn = t.checked; if (hear.on) rehear(); return; }
-    if (t.classList.contains('pw-two-box')) { setTwoBars(t.checked); }
   });
   body.addEventListener('keydown', e => {
     if (e.target.classList && e.target.classList.contains('pw-name') && e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
   });
   body.addEventListener('contextmenu', e => { if (e.target.closest('.cblock, .cmod')) e.preventDefault(); });
+  // the changes' row: once a scroll settles (or nears either end), back to the middle copy
+  body.addEventListener('scroll', e => {
+    const row = e.target;
+    if (!row.classList || !row.classList.contains('pw-modrow')) return;
+    const P = modPeriod(row);
+    if (P > 0 && (row.scrollLeft < P * 0.5 || row.scrollLeft > (MOD_COPIES - 1.5) * P)) { homeModRow(row); return; }
+    clearTimeout(modTimer);
+    modTimer = setTimeout(() => homeModRow(row), 160);
+  }, true);
 
-  /* More chords…: the chord editor on the selected chord (+ selected: a new one, I to start) */
+  /* More chords…: the chord editor on the selected card; with none, any
+     chord to try (I to start) — heard, and placed only by Add it */
   function moreChords() {
-    let p = cur();
-    let i = sel;
-    if (!p || i === 'plus') {
-      if (!p) { ensureProg({ chord: 'I' }); p = cur(); i = 0; }
-      else { T.insertStep(p.id, p.chords.length, { chord: 'I' }); p = cur(); i = p.chords.length - 1; }
-      sel = i;
-    }
-    const st = p.chords[i];
-    const spec = C.parse(st.chord) || { root: '1', q: 'maj', mods: [] };
+    const p = cur();
+    if (p && typeof sel === 'number' && p.chords[sel]) { editStep(sel, false); return; }
+    stopHear();
+    openChordEditor({
+      title: 'More chords',
+      spec: { root: '1', q: 'maj', mods: [] },
+      onChange: () => {},
+      add: sp => addChord({ chord: C.toId(sp) })
+    });
+  }
+
+  /* ==================================================================
+     THE CHORD EDITOR — #pchord-sheet. More chords… and a double-click
+     on a card (Enter on a selected one) open it. The chord's root; its
+     quality — Major · Minor · Diminished · Augmented, nothing else —
+     with every change beside it as a switch (sus2 add9 sus4 ♭7 maj7,
+     the inversions): a 7th chord is Major + ♭7, a °7 Diminished + ♭7 +
+     maj7. A chord of another quality (7♭9 …) keeps it as an extra
+     choice until another is picked. From a double-click it has its
+     rhythm too: the progression's (Standard) or Custom — the same
+     builder, and the one the big window shows while it is selected.
+     Every change is heard, written at once, and one Undo step.
+     ================================================================== */
+  const edSheet = document.getElementById('pchord-sheet');
+  const edBody = document.getElementById('pchord-body');
+  const edFoot = document.getElementById('pchord-foot');
+  const edTitle = document.getElementById('pchord-title');
+  let ed = null;             // { title, view: { root, q, mods, special }, id, step: { prog, i } | null, rhythm, onChange }
+  const edOpen = () => !!(edSheet && edSheet.classList.contains('show'));
+  const BASES = ['maj', 'min', 'dim', 'aug'];
+  /* the qualities that are a base and changes (checked by ear against Theory, 2026-10-05) */
+  const AS_BASE = {
+    sus2: ['maj', ['sus2']], sus4: ['maj', ['sus4']], dom7: ['maj', ['b7']], maj7: ['maj', ['maj7']],
+    min7: ['min', ['b7']], m7b5: ['dim', ['b7']], dim7: ['dim', ['b7', 'maj7']], mmaj7: ['min', ['maj7']],
+    aug7: ['aug', ['b7']], six: ['maj', ['b7', 'maj7']], min6: ['min', ['b7', 'maj7']], add9: ['maj', ['add9']],
+    madd9: ['min', ['add9']], six9: ['maj', ['add9', 'b7', 'maj7']], dom9sus4: ['maj', ['add9', 'sus4', 'b7']], dom9s5: ['aug', ['add9', 'b7']]
+  };
+  const modOrder = list => C.MOD_FUNCS.map(f => f.id).filter(id => list.indexOf(id) !== -1);
+  function splitQuality(spec) {
+    if (BASES.indexOf(spec.q) !== -1) return { root: spec.root, q: spec.q, mods: spec.mods.slice(), special: null };
+    const m = AS_BASE[spec.q];
+    if (m) return { root: spec.root, q: m[0], mods: modOrder(m[1].concat(spec.mods)), special: null };
+    return { root: spec.root, q: spec.q, mods: spec.mods.slice(), special: spec.q };
+  }
+  const edSpec = () => ({ root: ed.view.root, q: ed.view.q, mods: ed.view.mods.slice() });
+
+  /* opts: { title, spec, onChange(spec), step: { prog, i } (its rhythm, Take it out), rhythm, add(spec) (a chord to try: Add it) } */
+  function openChordEditor(opts) {
+    if (!edSheet) return;
+    ed = { title: opts.title, view: splitQuality(opts.spec), step: opts.step || null, rhythm: !!opts.rhythm, onChange: opts.onChange, add: opts.add || null };
+    ed.id = C.toId(opts.spec);
+    ui.openSheet('pchord-sheet');
+    renderEditor();
+  }
+  function editStep(i, withRhythm) {
+    const p = cur();
+    if (!p || !p.chords[i] || readOnly()) return;
     const id = p.id;
-    SW.chordStrip.openSpecEditor({
-      title: 'Chord ' + (i + 1) + ' of ' + p.name,
-      spec,
-      label: false,
+    if (sel !== i) { sel = i; render(); }               // selected in the big window too: its rhythm shows there
+    stopHear();
+    openChordEditor({
+      title: (withRhythm ? 'Chord ' : 'More chords — chord ') + (i + 1) + ' of ' + p.name,
+      spec: C.parse(p.chords[i].chord) || { root: '1', q: 'maj', mods: [] },
+      step: { prog: id, i },
+      rhythm: withRhythm,
       onChange: sp => T.setStep(id, i, { chord: C.toId(sp), place: null })
     });
+  }
+  /* the chord's own rhythm, as the big window's builder draws it */
+  function stepScope() {
+    const p = T.prog(ed.step.prog);
+    const st = p.chords[ed.step.i];
+    const n = toTicks(stepBeats(p, st)) / CELL;
+    const i = ed.step.i, id = p.id;
+    return { kind: 'own', key: 'ed' + i, step: i, st, cells: T.fit(T.cells(st.rhythm || '') || '', n), beats: n / perBeat(), colour: look(st.chord).color,
+      write: r => T.setStep(id, i, { rhythm: r }), redraw: renderEditor };
+  }
+
+  function renderEditor() {
+    if (!ed || !edOpen()) return;
+    let st = null;
+    if (ed.step) {
+      const p = T.prog(ed.step.prog);
+      st = p && p.chords[ed.step.i];
+      if (!st) { ui.closeSheet('pchord-sheet'); return; }
+      if (st.chord !== ed.id) { ed.id = st.chord; ed.view = splitQuality(C.parse(st.chord) || { root: '1', q: 'maj', mods: [] }); }   // Undo, or a change elsewhere
+    }
+    const spec = edSpec();
+    const d = C.describe(spec);
+    const ink = SW.chordStrip.inkOn;
+    edTitle.textContent = ed.title;
+    // hear it
+    let html = '<button type="button" class="chord-preview ce-hear" data-ce="hear" style="--c:' + d.color + ';--ink:' + ink(d.color) + '" title="Hear it">' +
+      '<span class="cp-name">' + C.labelHTML(C.nameOf(d)) + '</span><span class="cp-letter">' + esc(d.letter) + '</span>' +
+      '<span class="cp-tones">' + d.tones.map(t => '<i style="--c:' + t.color + ';color:' + ink(t.color) + '">' + esc(t.name) + '</i>').join('') + '</span>' +
+      (d.inScale ? '' : '<span class="cp-warn">outside the scale</span>') + '</button>';
+    // the root: the twelve notes, spelled for the scale
+    const scaleSet = new Set(C.scale().degrees.map(Theory.degreeSemis));
+    html += '<div class="ce-row"><span class="editor-label">Root</span><div class="chips">' +
+      Theory.chromaticDegrees(C.scaleId()).map(deg => {
+        const sp = Theory.spellDegree(S.key, deg);
+        const c = SW.music.LETTER_COLORS[sp.letter];
+        return '<button type="button" class="chip root-chip' + (scaleSet.has(Theory.degreeSemis(deg)) ? ' in-scale' : ' dim') + (Theory.degreeSemis(deg) === Theory.degreeSemis(spec.root) ? ' selected' : '') + '" data-root="' + deg + '" style="--c:' + c + ';--ink:' + ink(c) + '">' +
+          '<span>' + esc(sp.name) + '</span><small>' + esc(deg.replace(/#/g, '♯').replace(/b/g, '♭')) + '</small></button>';
+      }).join('') + '</div></div>';
+    // the quality, and the changes beside it
+    const opts = BASES.map(q => '<option value="' + q + '"' + (q === spec.q ? ' selected' : '') + '>' + esc(Theory.QUALITIES[q].name) + '</option>').join('') +
+      (ed.view.special ? '<option value="' + ed.view.special + '"' + (spec.q === ed.view.special ? ' selected' : '') + '>' + esc(Theory.QUALITIES[ed.view.special].name) + ' (as it is)</option>' : '');
+    html += '<div class="ce-row"><span class="editor-label">Quality</span><div class="ce-qrow">' +
+      '<select class="sound-select ce-quality" aria-label="Quality">' + opts + '</select>' +
+      '<div class="ce-mods" role="group" aria-label="Changes">' + C.MOD_FUNCS.map(f => {
+        const on = spec.mods.indexOf(f.id) !== -1;
+        return '<button type="button" class="chip mod-chip' + (on ? ' active' : '') + '" data-cemod="' + f.id + '" aria-pressed="' + on + '" title="' + esc(f.does) + '"><span>' + C.modLabelHTML(f) + '</span></button>';
+      }).join('') + '</div></div></div>';
+    // its rhythm (a double-click: a chord of the progression)
+    if (ed.step && ed.rhythm) {
+      const own = !!st.rhythm;
+      html += '<div class="ce-rhythm"><div class="pw-rhead"><p class="pw-kicker">Rhythm</p>' +
+        '<div class="seg"><button type="button" class="seg-btn' + (own ? '' : ' active') + '" data-ceown="off">Standard rhythm</button><button type="button" class="seg-btn' + (own ? ' active' : '') + '" data-ceown="on">Custom rhythm</button></div></div>' +
+        (own ? '<div class="pw-rhythm">' + rhythmTabsHtml(stepScope()) + '</div>' : '') + '</div>';
+    }
+    edBody.innerHTML = html;
+    edFoot.innerHTML = (ed.step ? '<button type="button" class="btn pw-ghost" data-ce="remove">Take it out</button>' : '') +
+      '<span class="pw-gap"></span>' +
+      (ed.add ? '<button type="button" class="btn" data-ce="done">Close</button><button type="button" class="btn btn-primary" data-ce="add">Add it to the progression</button>'
+        : '<button type="button" class="btn btn-primary" data-ce="done">Done</button>');
+  }
+  function edCommit() {
+    const spec = edSpec();
+    ed.id = C.toId(spec);
+    C.play(spec, 'editor');
+    ed.onChange(spec);
+    renderEditor();
+  }
+  if (edSheet) {
+    edBody.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b || !ed) return;
+      if (b.dataset.ce === 'hear') { C.play(edSpec(), 'editor'); return; }
+      if (b.dataset.root) { ed.view.root = b.dataset.root; edCommit(); return; }
+      if (b.dataset.cemod) {
+        const f = C.MOD_BY_ID[b.dataset.cemod];
+        let set = ed.view.mods.filter(id => id !== f.id);
+        if (set.length === ed.view.mods.length) { if (f.inv) set = set.filter(id => !C.MOD_BY_ID[id].inv); set.push(f.id); }
+        ed.view.mods = modOrder(set);
+        edCommit();
+        return;
+      }
+      if (b.dataset.ceown) { giveOwnRhythm(b.dataset.ceown === 'on', ed.step.prog, ed.step.i); return; }
+      if (ed.step) rhythmClick(b, stepScope(), renderEditor);
+    });
+    edBody.addEventListener('change', e => {
+      if (!ed || !e.target.classList.contains('ce-quality')) return;
+      ed.view.q = e.target.value;
+      e.target.blur();
+      edCommit();
+    });
+    edFoot.addEventListener('click', e => {
+      const b = e.target.closest('button[data-ce]');
+      if (!b || !ed) return;
+      if (b.dataset.ce === 'done') { ui.closeSheet('pchord-sheet'); return; }
+      if (b.dataset.ce === 'add' && ed.add) { const add = ed.add, sp = edSpec(); ui.closeSheet('pchord-sheet'); add(sp); return; }
+      if (b.dataset.ce === 'remove' && ed.step) {
+        const { prog, i } = ed.step;
+        ui.closeSheet('pchord-sheet');
+        T.removeStep(prog, i);
+        if (prog === selProg) { const left = T.prog(prog); sel = left && i < left.chords.length ? i : null; }
+      }
+    });
+    SW.bus.on('sheet:closed', d => { if (d.id === 'pchord-sheet') ed = null; });
+    SW.bus.on('score:changed', () => { if (edOpen()) renderEditor(); });
+    SW.bus.on('score:loaded', () => { if (edOpen()) ui.closeSheet('pchord-sheet'); });
+    ['chords:changed', 'names:changed', 'key:changed', 'meter:changed'].forEach(evt => SW.bus.on(evt, () => { if (edOpen()) renderEditor(); }));
   }
 
   foot.addEventListener('click', e => {
@@ -978,7 +1394,7 @@
     if (!b) return;
     const p = cur();
     switch (b.dataset.act) {
-      case 'duplicate': if (p) { selProg = T.duplicateProg(p.id); sel = 'plus'; } break;
+      case 'duplicate': if (p) { selProg = T.duplicateProg(p.id); sel = null; fresh = null; } break;
       case 'delete': confirmDelete = true; render(); break;
       case 'delete-no': confirmDelete = false; render(); break;
       case 'delete-yes': {
@@ -990,7 +1406,7 @@
         T.removeProg(p.id);
         const left = T.progressions();
         selProg = left.length ? left[Math.min(i, left.length - 1)].id : null;
-        sel = 'plus';
+        sel = null;
         render();
         break;
       }
@@ -1003,7 +1419,7 @@
 
 
   /* ==================================================================
-     IN THE SONG (phase 3, DESIGN.md §5) — the map of the song's bars:
+     CHORD PLACEMENT (phase 3, DESIGN.md §5 — "In the song" there) — the map of the song's bars:
      the melody's lines, and the stretches of chords over them.
        • tap a band: select it (its card below: from, to, starts on,
          just here, edit, take out); drag its ends to trim, its middle
@@ -1412,8 +1828,8 @@
       case 'play-band': if (r) { playhead = Math.max(m.firstBar, r.from); playSongFrom(playhead); } break;
       case 'clear-sel': if (selBars) { const s = selBars; selBars = null; T.clearBars(s.a, s.b); } break;
       case 'unselect': selBars = null; renderSong(); break;
-      case 'new': tab = 'build'; selProg = null; sel = 'plus'; render(); break;
-      case 'edit': if (r && r.prog) { selProg = r.prog; sel = 'plus'; tab = 'build'; render(); } break;
+      case 'new': tab = 'build'; selProg = null; sel = null; fresh = null; render(); break;
+      case 'edit': if (r && r.prog) { selProg = r.prog; sel = null; tab = 'build'; fresh = null; render(); } break;
       case 'remove': if (si >= 0) { selFrom = null; T.removeStretch(si); } break;
       case 'clear-here': if (si >= 0) T.setStretch(si, { here: null }); break;
       case 'to-melody':
@@ -1558,11 +1974,11 @@
     html += '<div class="hw-split"><div class="hw-cards">' + here.chords.map((c, i) => hereCardHtml(c, i)).join('') + '</div>' +
       (splits.length > 1 ? '<div class="seg hw-seg" role="group" aria-label="How many chords">' + splits.map(([t, k]) => '<button type="button" class="seg-btn' + (n === k ? ' active' : '') + '" data-split="' + k + '">' + t + '</button>').join('') + '</div>' : '') +
     '</div>';
-    html += '<div class="pw-pick"><div class="pw-board-wrap"><p class="pw-kicker">Pick a chord</p>' + boardHtml() + '</div>' +
-      '<div class="pw-pick-side"><p class="pw-kicker">&nbsp;</p>' +
-      ui.note('here.pick', 'Tap a card above, then a chord (or press its key — hold <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd> <kbd>V</kbd> <kbd>B</kbd> to change it). <b>No chord</b> makes it silent.') +
-      '<div class="pw-more"><button type="button" class="btn" data-hw="more">More chords…</button> <button type="button" class="btn" data-hw="none">No chord</button></div></div></div>';
-    html += '<div class="pw-rhythm">' + hereRhythmHtml(p) + '</div>';
+    html += '<div class="pw-duo">' +
+      pickHtml('<button type="button" class="btn pw-small-btn" data-hw="more">More chords…</button><button type="button" class="btn pw-small-btn" data-hw="none">No chord</button>',
+        ui.note('here.pick', 'Tap a card above, then a chord (or press its key — hold <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd> <kbd>V</kbd> <kbd>B</kbd> to change it). <b>No chord</b> makes it silent.')) +
+      '<div class="pw-rhythm">' + hereRhythmHtml(p) + '</div>' +
+    '</div>';
     hereBody.innerHTML = html;
     const one = n === 1;
     hereFoot.innerHTML =
@@ -1602,11 +2018,10 @@
     const theirs = p ? esc(p.name) + '’s rhythm' : 'Held (struck once)';
     let html = '<div class="pw-rhead"><p class="pw-kicker">Rhythm <span class="pw-sub">— ' + name + '</span></p><span class="pw-gap"></span>' +
       '<div class="seg"><button type="button" class="seg-btn' + (c.rhythm ? '' : ' active') + '" data-hown="off">' + theirs + '</button><button type="button" class="seg-btn' + (c.rhythm ? ' active' : '') + '" data-hown="on">Its own</button></div>' +
-      (c.rhythm ? '<div class="seg pw-mode"><button type="button" class="seg-btn' + (mode === 'dots' ? ' active' : '') + '" data-mode="dots">Dots</button><button type="button" class="seg-btn' + (mode === 'easy' ? ' active' : '') + '" data-mode="easy">Easy</button></div>' : '') +
       '</div>';
     if (c.rhythm) {
-      const sc = hereScope();
-      html += stripHtml(sc) + '<div class="pw-presets">' + presets(sc).map(pr => '<button type="button" class="pw-preset' + (pr.cells === sc.cells ? ' on' : '') + '" data-preset="' + pr.cells + '">' + esc(pr.label) + '</button>').join('') + '</div>';
+      html += rhythmTabsHtml(hereScope());
+      if (rtab === 'pre') html += '<p class="pw-rnote">' + ui.note('pw.pre', 'Tap a line to play it. <b>Build your own</b> shows it as dots, to change it beat by beat.') + '</p>';
     } else {
       html += '<p class="pw-rnote">' + ui.note('here.rhythm', p ? 'It plays ' + esc(p.name) + '’s rhythm, as the bars around it do. <b>Its own</b> gives it a rhythm of its own, just here.' : 'Struck once and held. <b>Its own</b> gives it a rhythm.') + '</p>';
     }
@@ -1701,11 +2116,10 @@
       if (b.dataset.hw === 'more') {
         const c = here.chords[here.sel];
         const idx = here.sel;
-        SW.chordStrip.openSpecEditor({
-          title: 'Bar ' + here.bar + ' — just here',
+        openChordEditor({
+          title: 'More chords — bar ' + here.bar + ', just here',
           spec: C.parse(c.chord) || { root: '1', q: 'maj', mods: [] },
-          label: false,
-          onChange: sp => { if (!here) return; here.chords[idx].chord = C.toId(sp); delete here.chords[idx].place; commitHere(); }
+          onChange: sp => { if (!here) return; here.chords[idx].chord = C.toId(sp); delete here.chords[idx].place; commitHere(); renderHere(); }
         });
         return;
       }
@@ -1773,10 +2187,18 @@
     if (readOnly() && k !== ' ' && !((k === 'ArrowLeft' || k === 'ArrowRight') && !e.altKey)) return true;   // listen only: Space and the arrows
     if (tab === 'song') return songKeyDown(e);
     const key1 = k.length === 1 ? k.toLowerCase() : null;
-    if (key1 && C.isModKey(key1)) { e.preventDefault(); if (!e.repeat) C.setMod(key1.toUpperCase(), true); return true; }
+    if (key1 && C.isModKey(key1)) {                      // here a change is a switch: on until pressed again
+      e.preventDefault();
+      const f = C.slotFunc(key1.toUpperCase());
+      if (!e.repeat && f) toggleLatch(f.id);
+      return true;
+    }
     const place = key1 && !e.altKey ? C.placeForKey(key1) : null;
-    if (place) { e.preventDefault(); if (!e.repeat) pick(place); return true; }
+    if (place) { e.preventDefault(); if (!e.repeat) pick(place, keyHolder(e)); return true; }
     switch (k) {
+      case 'Enter':
+        if (typeof sel === 'number') { e.preventDefault(); editStep(sel, true); }
+        return true;
       case 'ArrowLeft': case 'ArrowRight':
         e.preventDefault();
         if (e.altKey) moveSel(k === 'ArrowLeft' ? -1 : 1); else stepSel(k === 'ArrowLeft' ? -1 : 1);
@@ -1799,7 +2221,7 @@
      changes the song. One guard on the sheet stops every other control
      before its own handler sees it; drags never move. */
   const readOnly = () => !SW.settings.can('chords');
-  const RO_OK = '[data-tab], .sheet-close, [data-act="done"], .pw-pcard, .pw-pplay, .pw-hear, .pw-beat, [data-mode], .note-i, .fold-note, ' +
+  const RO_OK = '[data-tab], .sheet-close, [data-act="done"], .pw-pcard, .pw-pplay, .pw-hear, .pw-beat, .note-i, .fold-note, ' +
     '[data-song="play"], [data-song="play-sel"], [data-song="play-band"], [data-song="unselect"], [data-song="edit"]';
   function roGuard(e) {
     if (!isOpen() || !readOnly()) return;
@@ -1817,7 +2239,8 @@
     if (!SW.settings.can('chords') && !SW.settings.can('chordsListen')) return;
     const list = T.progressions();
     selProg = (progId && T.prog(progId)) ? progId : (T.prog(selProg) ? selProg : (list[0] ? list[0].id : null));
-    sel = 'plus';
+    sel = null;
+    fresh = null;
     if (which === 'song' || which === 'build') tab = which;
     selBars = null;
     confirmDelete = false;
@@ -1831,6 +2254,7 @@
   SW.bus.on('sheet:closed', d => {
     if (d.id !== 'prog-sheet') return;
     stopHear();
+    releasePreview();
     clearTimeout(headTimer);
     if (mdrag && mdrag.ghost) mdrag.ghost.remove();
     mdrag = null;
@@ -1848,18 +2272,19 @@
   });
   function relabelBoard(board) {
     if (!board) return;
+    const latch = board.classList.contains('latch');     // Edit Chords: the blocks wear the changes switched on
     board.querySelectorAll('.cblock').forEach(b => {
       const e = C.entry(b.dataset.place);
       if (!e) return;
       const tmp = document.createElement('div');
-      tmp.innerHTML = SW.chordStrip.blockHtml(e, 1, { noEdit: true });
+      tmp.innerHTML = blockFor(b.dataset.place, 1, latch);
       const nb = tmp.firstChild;
       b.innerHTML = nb.innerHTML;
       b.className = nb.className;
       b.style.setProperty('--c', nb.style.getPropertyValue('--c'));
       b.style.setProperty('--ink', nb.style.getPropertyValue('--ink'));
     });
-    board.querySelectorAll('.cmod').forEach(t => t.classList.toggle('on', C.heldMods.has(t.dataset.mod)));
+    board.querySelectorAll('.cmod[data-mod]').forEach(t => t.classList.toggle('on', C.heldMods.has(t.dataset.mod)));
     SW.chordStrip.fitLabels(board);
   }
   // the song starting stops Hear it
@@ -1874,6 +2299,8 @@
   });
   window.addEventListener('resize', () => {
     if (!isOpen()) return;
+    const mr = body.querySelector('.pw-modrow');
+    if (mr) syncModRow(modOffset(mr));
     if (tab === 'song') schedule(); else SW.chordStrip.fitLabels(body.querySelector('.pw-board'));
   });
 

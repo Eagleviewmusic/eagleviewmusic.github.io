@@ -50,26 +50,59 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   until played), lit when played, or black; the next note's glow; ghost
   notes where a slip landed; letter names or rhythm syllables under the
   notes; two rows on a phone held upright.
-- **Practice, then the game** (2026-10-04, `../Melody Reader Design/POINTS-AND-COUNT-IN.md`)
-  — each melody opens in **Practice**: ▶ Hear it, try the bars (the notes
-  light as they're found, nothing counts), or a practice count-in that ends
-  with *That would be 14 points*; **I'm ready ▸** goes to the game, where
-  the notes are dark again and ▶ is gone. The first bar struck starts a try
-  on your own; **Count me in** starts a run. Once started, the try is the
-  score (Again waits). Levels 14–15 (sight-reading) have no Practice; it is
-  a switch in Helps, as is *Hear it in Practice*. Beat the clock has neither
-  Practice nor the count-in.
-- **Count me in** — the family count-in (*Get ready 1 2 3 4*), then a
-  metronome through the melody at **Slow 60 · Moderate 80 · Fast 100** (the
-  pace pill under the button; the three tempos are in How to play). Nothing
+- **The controls** (2026-10-05, the user's layout) — under the middle of
+  the music: **▶ Listen** · **Practice / Test** · **the metronome**; beside
+  Next, **↻ Start over** (no word); the round's dots top centre; the melody's
+  name ("Hot Cross Buns · 1 of 4") in the level box at the top (one line from
+  1180 px, two lines below). The Practice tag, I'm ready, Again, the drum
+  (Count me in) and the pace pill are gone.
+  - **Practice / Test** — Practice is on by default: a blue pause sign. Pressed,
+    it becomes Test: a red ball in a red ring (record), pulsing while a try is
+    under way. Practice: Listen, try the bars (the notes light, nothing counts).
+    Test: with the metronome Off the notes are simply live — the first bar
+    struck starts a try on your own; with the metronome on, the count-in
+    starts at once. Back to Practice at any point calls the try off (it
+    never counts). Levels 14–15 (no Practice) and Beat the clock show Test,
+    greyed; One go locks it once a Test has begun.
+  - **Which stage a card opens in** (the user's rule): Practice — unless the
+    player went to Test on the last card *before striking a bar in Practice
+    there*; then the next card opens in Test (they want to play without the
+    practice). Practised, then tested → Practice again. Kept for the visit;
+    a new level, set or player starts with Practice on (`G.fresh`).
+  - **The metronome** — Off · Slow · Moderate · Fast (tap to cycle; the label
+    under it says which, and it lights green; its weight sits higher on the
+    arm for slower, as on a real one). Off each time the page opens (not
+    saved — the old `device.pace` is dropped). In a Test it counts in; a Test
+    with it on **rolls**: a finished try shows its points, and 2.2 s later the
+    next card counts in by itself (also after Start over, Play again, or a
+    window closing). Changing it mid-Test starts the try again at the new
+    pace. Listen plays at its pace with its clicks (a bar of them first);
+    Off = Slow, no clicks. Space counts in by hand if a Test is waiting.
+  - **Stopping a count-in** — tapping the *Get ready 1 2 3 4* card while it
+    counts (or Escape) stops it and goes back to Practice, the pause; the
+    metronome stays on. (No Practice here: the Test waits.) The family card
+    takes no clicks; `style.css` lets it here, only while the phase is
+    `countin` (`html.ci-tap`) — not in the last half beat, when a bar under
+    it may be struck early for the first note.
+  - **↻ Start over** — a card with anything played (or a try under way, or
+    done) starts that card again, same stage; an untouched card starts the
+    whole round again from its first melody (the same melodies, the round's
+    points taken back, the streak as it was). A card counts once in the
+    round: tried again, the new try replaces its entry. One go: no starting a
+    begun Test over.
+- **Count me in** (the count-in run, `beat.js`) — the family count-in (*Get
+  ready 1 2 3 4*), then the metronome through the melody at **Slow 60 ·
+  Moderate 80 · Fast 100** (the three tempos are in How to play). Nothing
   shows but the notes lighting when struck in time — no playhead, no words,
   no ghosts; the missed notes show at the end. Judged by the time the child
   *heard* (Perfect · Good · Early/Late · Missed windows, never shown).
+  Practice has no count-in run any more (it had a "That would be 14 points"
+  one until 2026-10-05).
 - **Points: 1–20 a melody** (`js/points.js`) — **1–8** finding the notes
   (first try 1, second ½); **9–12** every note first time in your own steady
   beat (a least-squares fit finds your tempo; the leftover, in beats, is the
   grade — 12 ≤ 0.06, 11 ≤ 0.10, 10 ≤ 0.15, 9 ≤ 0.21, else 8); **13–20** a
-  clean count-in run: Slow 13–15, Moderate 16–18, Fast 19–20. A count-in
+  clean Test with the metronome: Slow 13–15, Moderate 16–18, Fast 19–20. A count-in
   with every bar right but some early/late drops to 9–12; a wrong or missed
   note drops it to 1–8 (−½ a wrong bar). Stars: ★ 1–7 · ★★ 8–12 · ★★★ 13–20;
   next level at ★★ or better in 4 of 5. The streak counts 8+ in a row (no
@@ -227,9 +260,15 @@ falls back to defaults; a change of shape gets a new `_v2` key.
 - A card is counted only when the *game* stage finishes; Next from Practice
   or mid-try is a skip (0). Enter acts only on a finished try (I'm ready in
   Practice) — Enter, Enter used to skip the melody it had just opened.
-- The Practice / For points tag sits in the line under the music: at the
-  top-right it covered I'm ready on a 600 px-tall window. On a phone the
-  round's dots move to the top-left — the bottom row (Hear it, Count me in,
-  the pace pill, I'm ready, Next) is full.
+- **The controls (2026-10-05).** The music card's middle is a grid: an
+  empty left column as wide as the right one (↻ + Next) keeps the music
+  centred over Listen · Practice/Test · the metronome. On a phone they
+  share one row under the music. The dots are absolutely placed in the
+  card's top padding, so they cost the staff no height.
+- Clicks can't be stopped once made (`Sound.click` isn't in `played`), so
+  Listen makes each just before it is due, on `G.hearTimers`.
+- The count-in rolls on only when no window is open: `RR.windowClosed`
+  calls `RR.onWindowClosed` (game.js `roll`), so closing Settings, the
+  Score board or My melodies counts in again; the Maker blocks it.
 - The scores became `v: 2`: loading a `v: 1` file clears the best rounds
   (old scale) and keeps the ladder's stars, tricky notes, mix-ups, totals.

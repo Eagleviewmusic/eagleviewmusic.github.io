@@ -4,11 +4,13 @@
    RR.App — starts everything and wires the page:
 
      the keys       1 2 3 4 5 6 7 8 9 0 − = (and the number pad) play the
-                    bars; Space is Hear it (Practice, or a try done) or
-                    Count me in (the game); Enter is I'm ready (Practice)
-                    or Next (a try done); Escape closes a window
-     the buttons    Hear it · Count me in · the pace pill · I'm ready ·
-                    Again · Next · the level chip · the score chip · Settings
+                    bars; Space is Listen (Practice, or a try done) or, in
+                    a Test with the metronome on, the count-in; Enter is
+                    Test (from Practice) or Next (a try done); Escape
+                    closes a window, or stops a count-in (as tapping its
+                    Get ready card does: back to Practice)
+     the buttons    Listen · Practice / Test · the metronome · Start over ·
+                    Next · the level chip · the score chip · Settings
      the start      a lesson link if the address has one; else the practice
                     or level this browser was last on
      the sound      woken on the first touch or key (the family's priming)
@@ -30,7 +32,12 @@
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const tag = e.target && e.target.tagName;
     if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
-    if (e.key === 'Escape') { if (RR.Maker.active && !anyWindow()) RR.Maker.cancel(); else closeWindows(); return; }
+    if (e.key === 'Escape') {
+      if (RR.Maker.active && !anyWindow()) RR.Maker.cancel();
+      else if (G.phase === 'countin' && !anyWindow()) G.stopCountIn();
+      else closeWindows();
+      return;
+    }
     if (anyWindow()) return;
     if (RR.Maker.active) {                       // Make a melody: ⌫ takes back, Space hears it
       if (e.key === 'Backspace') { e.preventDefault(); RR.Maker.undo(); return; }
@@ -51,26 +58,25 @@
     if (e.key === ' ') {
       e.preventDefault();
       if (G.canHear() || G.hearing) G.hearIt();
-      else if (G.stage === 'game' && G.phase === 'ready' && !G.started) RR.Beat.start();
+      else G.roll();                               // a Test with the metronome on, waiting: count in
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (G.overlay) { const b = $('#rounddone .pill-btn.go') || $('#rounddone .pill-btn'); if (b) b.click(); }
-      else if (G.stage === 'practice') G.toGame();
+      else if (G.stage === 'practice') G.toGame();   // Practice → Test
       else if (G.phase === 'done') G.next();          // never mid-try: Enter, Enter would skip the melody
     }
   });
 
   $('#btn-play').addEventListener('click', () => G.hearIt());
-  $('#btn-count').addEventListener('click', () => RR.Beat.start());
-  $('#btn-ready').addEventListener('click', () => G.toGame());
-  // Slow → Moderate → Fast: the player's, kept with the browser (it never makes a practice Custom)
-  $('#pace').addEventListener('click', () => {
-    const P = RR.Points.PACES, i = P.findIndex(p => p.id === RR.device.pace);
-    RR.device.pace = P[(i + 1) % P.length].id; RR.saveDevice();
-    G.drawSides();
-  });
-  $('#btn-again').addEventListener('click', () => G.again());
+  $('#btn-mode').addEventListener('click', () => G.toggleMode());
+  // Off → Slow → Moderate → Fast: the player's, for this visit (it never makes a practice Custom)
+  $('#btn-metro').addEventListener('click', () => G.cycleMetro());
+  $('#btn-restart').addEventListener('click', () => G.restart());
   $('#btn-next').addEventListener('click', () => G.next());
+  // the Get ready card tapped while it counts: stop, back to Practice (the user's wish, 2026-10-05)
+  document.addEventListener('pointerdown', e => {
+    if (G.phase === 'countin' && e.target.closest && e.target.closest('.evm-count-card')) { e.preventDefault(); G.stopCountIn(); }
+  });
   $('#gear').addEventListener('click', () => { if (!RR.Maker.active) RR.Settings.open(); });
   $('#mel-btn').addEventListener('click', () => { if (!RR.Maker.active) RR.Melodies.open(); });
   $('#level-chip').addEventListener('click', () => { if (!RR.Maker.active) RR.Settings.open(G.mode.kind === 'lesson' ? 'leave' : 'level'); });

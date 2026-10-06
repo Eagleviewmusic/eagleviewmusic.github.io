@@ -1089,7 +1089,7 @@
     addProg, setProg, removeProg, duplicateProg, moveProg,
     setStep, insertStep, removeStep, moveStep,
     place, setStretch, moveStretch, trimStart, removeStretch, clear, clearBars,
-    // for the map (the window's In the song)
+    // for the map (the window's Chord Placement)
     shown: g => current(g || grid()),                               // the stretches on show (an old song's lane, read as one)
     lastOf: (r, g) => lastOf(r, (g || grid()).lastBar),             // a stretch's last bar, 'melody' resolved
     cycleBeats: p => cycleBeats(p, meterOf()),

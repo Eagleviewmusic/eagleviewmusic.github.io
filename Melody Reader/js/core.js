@@ -73,7 +73,6 @@
     player: '',
     game: 'round5', clockSecs: 60, song: null,  // how this browser plays: Round of 5 · 10 · Song · Beat the clock · Endless
     tricky: false,                              // Practise my tricky notes — a personal help, kept with the browser
-    pace: 'slow',                               // Count me in: slow · moderate · fast — the player's choice, like the game
     set: null,                                  // a My melodies set being played (laid over the level)
     players: []                                 // first names on a shared computer (players.js)
   };
@@ -82,7 +81,7 @@
     return d && typeof d === 'object' && !Array.isArray(d) ? d : {};
   })());
   if (!RR.device.folded || typeof RR.device.folded !== 'object') RR.device.folded = {};
-  if (!['slow', 'moderate', 'fast'].includes(RR.device.pace)) RR.device.pace = 'slow';
+  delete RR.device.pace;       // the pace pill's (retired 2026-10-05: the metronome is Off each time the page opens)
   RR.saveDevice = () => RR.save(RR.KEY.device, RR.device);
 
   /* ---- links: JSON as base64url, UTF-8 safe (lesson and melody-set links) ---- */
@@ -162,6 +161,7 @@
     const f = el && el._returnFocus;
     if (el) el._returnFocus = null;
     if (f && document.contains(f) && f.focus && !f.closest('[hidden]')) f.focus();
+    if (RR.onWindowClosed) RR.onWindowClosed();   // a Test with the metronome on counts in again (game.js)
   };
 
   /* An explaining note that folds into its ⓘ (the user's rule, D25). */

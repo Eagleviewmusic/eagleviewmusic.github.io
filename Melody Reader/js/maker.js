@@ -155,7 +155,7 @@
   function hear() {
     if (M.timers.length) { stopHear(); return; }
     if (!M.melody.notes.length || !RR.Sound.ctx) return;
-    const spt = 60 / RR.paceTempo(G.setup, RR.device.pace) / 4;
+    const spt = 60 / RR.paceTempo(G.setup, RR.listenPace()) / 4;
     let t = RR.Sound.now() + 0.1;
     $('#mk-hear').classList.add('playing');
     M.melody.notes.forEach(n => {

@@ -29,7 +29,7 @@
   RR.DEFAULTS = {
     notes: ['C4', 'D4', 'E4', 'F4', 'G4'], moves: 'steps', endDo: true, tricky: false, grey: false,
     rhythms: ['q', 'h'], time: [4, 4], bars: 1, endLong: true,
-    tempos: [60, 80, 100], practice: true, oneGo: false, flash: 0,     // Count me in: Slow · Moderate · Fast (POINTS-AND-COUNT-IN.md)
+    tempos: [60, 80, 100], practice: true, oneGo: false, flash: 0,     // the metronome: Slow · Moderate · Fast (POINTS-AND-COUNT-IN.md)
     game: 'round5', clockSecs: 60, song: null, from: 'both', auto: true,
     colour: 'always', letters: true, nums: true, glow: 'after2', ghost: true, labels: 'none',
     playHidden: false, playLights: true,

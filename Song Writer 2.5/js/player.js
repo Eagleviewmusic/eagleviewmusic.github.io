@@ -26,7 +26,7 @@
      Chords    the chord track (js/track.js): every strike of every
                chord, in its rhythm, on the audio clock — or an old
                song's lane chords, read by the track as loose chords
-               (View pref laneChordsPlay; heard with the chord track out)
+               (View pref laneChordsPlay — on, they are heard whatever is out)
      beat      a soft tick on every beat
      countIn   one bar first (two when the bar has two beats); when Play
                starts in a line's pick-up, the count stops where the
@@ -130,7 +130,9 @@
     return all;
   }
 
-  function chordsHeard() { return SW.settings.shows('lane') && !!SW.settings.view.laneChordsPlay; }
+  /* Sound → Chords alone (2026-10-05): not the chord track being out, not the workspace, not Edit —
+     only a lesson that leaves the chords out altogether silences them */
+  function chordsHeard() { return !!SW.settings.view.laneChordsPlay && (!SW.lessons || SW.lessons.shellAllows('strip')); }
 
   /* What a run plays: the first pass, and (for the two loops) the span
      every later pass repeats. Ticks are absolute, from the song's top.
@@ -343,7 +345,8 @@
         if (first) SW.score.setNoteAsActive(first, false);
         markSounding(ev.syllable, ev.stack);
       }
-      if (cue.chord) SW.chords.announce(cue.chord.id, cue.chord.list, 'track');
+      // the keyboard's chord wash and the corner go with the chord panel; without it the chords are only heard
+      if (cue.chord && SW.settings.shows('strip')) SW.chords.announce(cue.chord.id, cue.chord.list, 'track');
       if (cue.track) SW.bus.emit('track:sounding', { at: cue.track.at, event: cue.track });
       if (cue.melodyEnd) markSounding(null);
       if (cue.bar) SW.bus.emit('track:bar', { bar: cue.bar });
