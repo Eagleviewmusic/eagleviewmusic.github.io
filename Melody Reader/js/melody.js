@@ -238,13 +238,14 @@
     const sounding = durs.filter(t => t > 0);
     const target = difficulty(model).pitch, ms = Object.assign({}, s, { moves });
     let pickNotes = null, bestGap = Infinity;
-    for (let t = 0; t < 40; t++) {
+    // up to 200 walks, stopping at the first within a quarter point (a melody with unusual leaps needs more looking)
+    for (let t = 0; t < 200; t++) {
       const seq = makePitches(ms, sounding, r, null);
-      if (new Set(seq).size < Math.min(3, s.notes.length, Math.ceil(seq.length * 0.6)) && t < 30) continue;
+      if (new Set(seq).size < Math.min(3, s.notes.length, Math.ceil(seq.length * 0.6)) && t < 150) continue;
       let j = 0;
       const notes = durs.map(d => d < 0 ? { p: null, t: -d } : { p: seq[j++], t: d });
       const m = { notes };
-      if (pitchKey(m) === pitchKey(model) && t < 35) continue;
+      if (pitchKey(m) === pitchKey(model) && t < 190) continue;
       const gap = Math.abs(difficulty(m).pitch - target) + (used.has(pitchKey(m)) ? 3 : 0);
       if (gap < bestGap) { bestGap = gap; pickNotes = notes; }
       if (gap < 0.25) break;
