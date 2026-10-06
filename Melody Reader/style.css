@@ -405,7 +405,15 @@ html.ci-tap .evm-count.open .evm-count-card { pointer-events: auto; cursor: poin
 /* helps table */
 .helps { width: 100%; border-collapse: collapse; }
 .helps td { padding: 9px 6px; border-bottom: 1px solid #efe5d3; vertical-align: middle; }
-.helps td:first-child { font-weight: 600; font-size: 15px; width: 44%; }
+.helps td:first-child { font-weight: 600; font-size: 15px; width: 30%; }
+.helps .seg { flex-wrap: wrap; }
+.helps td .note { margin: 6px 0 0; }
+/* a phone: each question above its choices */
+@media (max-width: 700px) {
+  .helps tr { display: block; border-bottom: 1px solid #efe5d3; padding: 8px 0; }
+  .helps td { display: block; width: auto !important; border: 0; padding: 2px 2px; }
+  .helps td:first-child { margin-bottom: 4px; }
+}
 
 /* score board */
 .board-sheet { width: min(900px, 100%); }
@@ -795,3 +803,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, .bar:focus-visible, 
 .metro-pick button.off { background: #f3ede1; color: var(--ink); box-shadow: 0 3px 0 #d9c9ad; justify-content: center; font-weight: 700; }
 .metro-pick button:active { transform: translateY(2px); box-shadow: none; }
 @media (max-width: 700px) { .metro-pick { padding: 6px; gap: 4px; } .metro-pick button { padding: 7px 9px 6px; } .metro-pick button b { font-size: 14px; } }
+
+/* the session page's first row: Session Name: [the name] ▶ Play Session (2026-10-06) */
+.ses-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ses-row label { font-weight: 700; font-size: 17px; white-space: nowrap; }
+.ses-row input { flex: 1 1 200px; min-width: 160px; padding: 9px 12px; border-radius: 12px; border: 2px solid #e6dac4; font: inherit; font-size: 18px; font-weight: 600; background: #fff; color: var(--ink); }
+.ses-head { padding-bottom: 4px; }
+/* Format: Song — the songs picked, numbered in the order they'll play */
+.picks-head { margin: 10px 0 4px; font-size: 14px; font-weight: 700; color: var(--ink-soft); }
+.song-picks button { display: inline-flex; align-items: center; gap: 6px; }
+.song-picks .ord { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #3b2306; color: #fff; font-size: 12px; font-weight: 700; }

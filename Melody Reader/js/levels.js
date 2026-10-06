@@ -21,7 +21,7 @@
   RR.BANDS = [
     { id: 'red', name: 'Red', title: 'First notes', colour: '#ef4444', about: 'Find the notes — anything in between is fine' },
     { id: 'orange', name: 'Orange', title: 'Reading, not colours', colour: '#f97316', about: 'Black notes that light up when played; clean runs' },
-    { id: 'yellow', name: 'Yellow', title: 'Rhythm joins in', colour: '#eab308', about: 'Rhythm syllables, a steady beat, the count-in' },
+    { id: 'yellow', name: 'Yellow', title: 'Rhythm joins in', colour: '#eab308', about: 'A steady beat, rests, the metronome' },
     { id: 'green', name: 'Green', title: 'The whole staff', colour: '#22c55e', about: 'Lines, spaces, two bars, skips' },
     { id: 'blue', name: 'Blue', title: 'Leaps and new times', colour: '#3b82f6', about: 'No letters on the bars; 3/4, dotted rhythms' },
     { id: 'violet', name: 'Violet', title: 'Sight-reader', colour: '#8b5cf6', about: 'Black notes, one go, no Practice; Flash' }
@@ -31,10 +31,10 @@
   RR.DEFAULTS = {
     notes: ['C4', 'D4', 'E4', 'F4', 'G4'], moves: 'steps', endDo: true, tricky: false, grey: false,
     rhythms: ['q', 'h'], time: [4, 4], bars: 1, endLong: true,
-    tempos: [60, 80, 100], practice: true, oneGo: false, flash: 0,     // the metronome: Slow · Moderate · Fast (POINTS-AND-COUNT-IN.md)
+    tempos: [60, 80, 100], practice: true, practiceStart: 'on', oneGo: false, flash: 0,   // practiceStart: 'off' = each melody starts in Test     // the metronome: Slow · Moderate · Fast (POINTS-AND-COUNT-IN.md)
     gold: 11,                                                          // a gold star from this many points (of 20): over 10
-    game: 'round5', clockSecs: 60, song: null, from: 'both', auto: true,
-    colour: 'always', letters: true, nums: true, glow: 'after2', ghost: true, labels: 'none',
+    game: 'round5', clockSecs: 60, song: null, songPicks: [], from: 'both', auto: true,   // songPicks: the Song format's songs ('ode', 'set:<id>'), in order
+    colour: 'always', letters: true, nums: true, glow: 'after2', labels: 'none',   // labels: 'none' · 'letters' · 'solfege'
     playHidden: false, playLights: true,
     songs: [], set: null
   };
@@ -49,15 +49,15 @@
     L({ n: 4, band: 'orange', name: 'Lit when played', notes: CtoG, rhythms: ['q', 'h', 'ee'], bars: 2, colour: 'lit', songs: ['lightly-row', 'ode'] }),
     L({ n: 5, band: 'orange', name: 'No slips', notes: CtoG, rhythms: ['q', 'h', 'ee'], bars: 2, colour: 'lit', songs: ['ode', 'frere'] }),
     L({ n: 6, band: 'orange', name: 'Up to high C', notes: CtoC, rhythms: ['q', 'h', 'ee'], bars: 2, colour: 'lit', moves: 'skips', songs: ['twinkle', 'london'] }),
-    L({ n: 7, band: 'yellow', name: 'With the beat', notes: CtoG, rhythms: ['q', 'h'], colour: 'lit', labels: 'syllables', glow: 'never', auto: false, songs: ['au-clair'] }),
-    L({ n: 8, band: 'yellow', name: 'Ti-ti and rests', notes: CtoC, rhythms: ['q', 'h', 'ee', 'qr'], bars: 2, colour: 'lit', labels: 'syllables', glow: 'never', auto: false, songs: ['saints'] }),
+    L({ n: 7, band: 'yellow', name: 'With the beat', notes: CtoG, rhythms: ['q', 'h'], colour: 'lit', glow: 'never', auto: false, songs: ['au-clair'] }),
+    L({ n: 8, band: 'yellow', name: 'Ti-ti and rests', notes: CtoC, rhythms: ['q', 'h', 'ee', 'qr'], bars: 2, colour: 'lit', glow: 'never', auto: false, songs: ['saints'] }),
     L({ n: 9, band: 'green', name: 'Line notes', notes: ['E4', 'G4', 'B4', 'D5', 'F5'], rhythms: ['q', 'h', 'ee'], bars: 2, colour: 'lit', glow: 'never', endDo: false, auto: false }),
     L({ n: 10, band: 'green', name: 'Space notes', notes: ['F4', 'A4', 'C5', 'E5'], rhythms: ['q', 'h', 'ee'], bars: 2, colour: 'lit', glow: 'never', endDo: false, auto: false }),
     L({ n: 11, band: 'green', name: 'All ten', notes: RR.TEN, rhythms: ['q', 'h', 'ee', 'qr'], bars: 2, colour: 'lit', moves: 'skips', glow: 'never', auto: false, songs: ['old-macdonald'] }),
     L({ n: 12, band: 'blue', name: 'Leaps and 3/4', notes: RR.TEN, rhythms: ['q', 'h', 'dh', 'ee'], time: [3, 4], bars: 2, colour: 'lit', moves: 'leaps', letters: false, glow: 'never', auto: false, playLights: false }),
     L({ n: 13, band: 'blue', name: 'Dotted rhythms', notes: RR.TEN, rhythms: ['q', 'h', 'w', 'ee', 'dqe', 'qr', 'hr'], bars: 2, colour: 'lit', moves: 'skips', letters: false, glow: 'never', auto: false, playLights: false, songs: ['ode', 'london', 'jingle'] }),
-    L({ n: 14, band: 'violet', name: 'Sight-read', notes: RR.TEN, rhythms: ['q', 'h', 'dh', 'ee', 'dqe', 'qr'], bars: 2, colour: 'black', moves: 'leaps', letters: false, ghost: false, glow: 'never', auto: false, playHidden: true, playLights: false, oneGo: true, practice: false }),
-    L({ n: 15, band: 'violet', name: 'Flash', notes: RR.TWELVE, rhythms: ['q', 'h', 'ee', 'dqe', 'ssss', 'ess', 'sse', 'qr'], bars: 2, colour: 'black', moves: 'leaps', letters: false, ghost: false, glow: 'never', auto: false, playHidden: true, playLights: false, oneGo: true, flash: 4, practice: false })
+    L({ n: 14, band: 'violet', name: 'Sight-read', notes: RR.TEN, rhythms: ['q', 'h', 'dh', 'ee', 'dqe', 'qr'], bars: 2, colour: 'black', moves: 'leaps', letters: false, glow: 'never', auto: false, playHidden: true, playLights: false, oneGo: true, practice: false }),
+    L({ n: 15, band: 'violet', name: 'Flash', notes: RR.TWELVE, rhythms: ['q', 'h', 'ee', 'dqe', 'ssss', 'ess', 'sse', 'qr'], bars: 2, colour: 'black', moves: 'leaps', letters: false, glow: 'never', auto: false, playHidden: true, playLights: false, oneGo: true, flash: 4, practice: false })
   ];
   RR.bandOf = n => RR.BANDS.find(b => b.id === RR.LEVELS[n - 1].band);
   RR.practiceOfLevel = n => {
@@ -74,7 +74,8 @@
   RR.roundLen = g => { const m = /^round(\d{1,3})$/.exec(typeof g === 'string' ? g : ''); return m && +m[1] >= 1 && +m[1] <= RR.ROUND_MAX ? +m[1] : 0; };
   RR.gameText = p => {
     const n = RR.roundLen(p.game);
-    return n ? n + (n === 1 ? ' melody' : ' melodies') : p.game === 'song' ? 'a Songbook song' : p.game === 'clock' ? 'Beat the clock' : 'Endless';
+    const songs = Math.max(1, (p.songPicks || []).length);
+    return n ? n + (n === 1 ? ' melody' : ' melodies') : p.game === 'song' ? (songs === 1 ? 'a song' : songs + ' songs') : p.game === 'clock' ? 'Beat the clock' : 'Endless';
   };
 
   /* the gold star's marks: [points, the button, what it means] */
@@ -107,12 +108,14 @@
     p.game = RR.roundLen(raw.game) ? 'round' + RR.roundLen(raw.game) : oneOf(raw.game, ['song', 'clock', 'endless'], D.game);
     p.clockSecs = oneOf(raw.clockSecs, [30, 60, 120], D.clockSecs);
     p.song = RR.SONGS[raw.song] ? raw.song : null;
+    if (Array.isArray(raw.songPicks)) p.songPicks = Array.from(new Set(raw.songPicks.filter(id => typeof id === 'string' && (RR.SONGS[id] || /^set:[\w-]{1,80}$/.test(id))))).slice(0, 40);
     p.set = typeof raw.set === 'string' && raw.set ? raw.set.slice(0, 80) : null;
     p.from = oneOf(raw.from, ['both', 'made', 'songbook'], D.from);
     p.colour = oneOf(raw.colour, ['always', 'lit', 'black'], D.colour);
     p.glow = oneOf(raw.glow, ['never', 'after2', 'always'], D.glow);
-    p.labels = oneOf(raw.labels, ['none', 'letters', 'syllables'], D.labels);
-    ['endDo', 'tricky', 'grey', 'endLong', 'practice', 'oneGo', 'auto', 'letters', 'nums', 'ghost',
+    p.labels = oneOf(raw.labels, ['none', 'letters', 'solfege'], D.labels);   // rhythm syllables were retired 2026-10-06
+    p.practiceStart = oneOf(raw.practiceStart, ['on', 'off'], D.practiceStart);
+    ['endDo', 'tricky', 'grey', 'endLong', 'practice', 'oneGo', 'auto', 'letters', 'nums',
       'playHidden', 'playLights'].forEach(k => { p[k] = bool(raw[k], D[k]); });
     return p;
   };
@@ -138,7 +141,7 @@
     return RR.notesText(p.notes) + ' · ' + p.rhythms.filter(r => !C[r].rest).map(r => C[r].name).join(' ') +
       (p.rhythms.some(r => C[r].rest) ? ' · rests' : '') + (p.time[0] !== 4 ? ' · ' + p.time.join('/') : '') +
       (p.tempos.join() !== RR.DEFAULTS.tempos.join() ? ' · ' + p.tempos.join('/') + ' BPM' : '') +
-      (p.practice ? '' : ' · no Practice') + (p.flash ? ' · Flash' : '') + (p.gold !== RR.DEFAULTS.gold ? ' · ★ ' + p.gold + '+' : '');
+      (p.practice ? (p.practiceStart === 'off' ? ' · Practice off' : '') : ' · no Practice') + (p.flash ? ' · Flash' : '') + (p.gold !== RR.DEFAULTS.gold ? ' · ★ ' + p.gold + '+' : '');
   };
 
   /* ---- Battle Mode: the teams' colours, and a battle made safe ----
@@ -184,7 +187,7 @@
      browser's own things: a My melodies set laid over it, or Practise my
      tricky notes. */
   const newId = () => 'ses_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
-  const own = p => { const c = RR.sanitize(p); c.set = null; c.tricky = false; return c; };
+  const own = p => { const c = RR.sanitize(p); c.set = null; c.tricky = false; c.endDo = false; if (c.from === 'both') c.from = 'made'; return c; };
   function readSessions() {
     let v = RR.load(RR.KEY.sessions, null);
     if (!Array.isArray(v)) {

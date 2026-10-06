@@ -12,8 +12,10 @@
    (judgeFind; tiers 1–2); with the metronome on (Slow · Moderate · Fast)
    the family count-in starts at once and the run is the try (beat.js;
    tier 3). A try done → finish(): RR.Points, stars, the streak, the
-   praise, then the next card (by itself, or the Next button glows; a Test
-   with the metronome always rolls on, counting in again), or Round done.
+   praise, then the next card (by itself, or the Next button glows), or
+   Round done. The metronome (2026-10-06): a tap opens Slow · Moderate ·
+   Fast; picking one in a Test counts in at once; it is Off again on every
+   new melody — nothing ever counts in by itself.
 
    Which stage a card opens in (the user's rule): Practice — unless the
    player went to Test on the last card *before playing a note in
@@ -29,7 +31,10 @@
    melodies a turn, every team once a round, `rounds` rounds; the whole
    battle is one long round (G.roundN = rounds × teams × per) whose entries
    carry their `team`. Board.js puts a card up at each turn (Go ▸), between
-   rounds (the standings) and at the end (the winner). Points go to the team,
+   rounds (the standings) and at the end (the winner). Every melody of the
+   battle is planned when it starts (RR.Melody.battlePlan, 2026-10-06): in a
+   round every team gets the same rhythms, reordered, with notes of matching
+   difficulty; the rounds vary and mostly grow harder. Points go to the team,
    not the player's session total; with points off a battle counts gold
    stars. A battle in progress is kept in device.battle, so a reload can
    carry on.
@@ -162,8 +167,8 @@
     if (G.battle) G.setup.game = 'round5';      // a battle's length is its own (newRound); never Song or the clock
     if (mode.kind !== 'lesson') {
       if (mode.kind !== 'session') {          // the game this browser plays (see settings.js); a session keeps its own
-        const g = RR.sanitize({ game: RR.device.game, clockSecs: RR.device.clockSecs, song: RR.device.song });
-        G.setup.game = g.game; G.setup.clockSecs = g.clockSecs; G.setup.song = g.song;
+        const g = RR.sanitize({ game: RR.device.game, clockSecs: RR.device.clockSecs, song: RR.device.song, songPicks: RR.device.songPicks });
+        G.setup.game = g.game; G.setup.clockSecs = g.clockSecs; G.setup.song = g.song; G.setup.songPicks = g.songPicks;
       }
       G.setup.tricky = RR.device.tricky === true;
       // a melody set chosen to play (My melodies) is laid over the same way
@@ -204,14 +209,29 @@
   function mixedSongs() {
     const s = G.setup;
     if (s.from === 'made') return [];
-    return s.songs.filter(id => RR.SONGS[id] && Array.from(RR.Melody.songNotes(id)).every(n => s.notes.includes(n)));
+    // Songbook as the Melody Source with no songs of its own (a session): every song that fits
+    const list = s.songs.length || s.from !== 'songbook' ? s.songs : Object.keys(RR.SONGS);
+    return list.filter(id => RR.SONGS[id] && Array.from(RR.Melody.songNotes(id)).every(n => s.notes.includes(n)));
   }
+  /* the Song format's songs, in order: Songbook songs and My melodies sets ('set:<id>'), any number —
+     or the one song an older practice had */
+  G.songPicks = function () {
+    const s = G.setup;
+    const ok = id => RR.SONGS[id] || (id.indexOf('set:') === 0 && RR.Sets.get(id.slice(4)) && RR.Sets.get(id.slice(4)).melodies.length);
+    const list = (s.songPicks || []).filter(ok);
+    return list.length ? list : [s.song || s.songs[0] || 'hot-cross-buns'];
+  };
+  /* each pick: its title, its cards and its notes */
+  G.songItems = () => G.songPicks().map(id => {
+    if (id.indexOf('set:') === 0) { const set = RR.Sets.get(id.slice(4)); return { id, title: set.title, cards: setCards(set), notes: RR.Sets.notesOf(set) }; }
+    return { id, title: RR.SONGS[id].title, cards: RR.Melody.songCards(id), notes: RR.Melody.songNotes(id) };
+  });
   function liveBars() {
     const s = G.setup, set = G.playingSet();
     if (set) return RR.Sets.notesOf(set);                       // a set: its own notes, nothing else
     const live = new Set(s.notes);
-    const songs = s.game === 'song' ? [s.song || s.songs[0] || 'hot-cross-buns'] : mixedSongs();
-    songs.forEach(id => RR.Melody.songNotes(id).forEach(n => live.add(n)));
+    if (s.game === 'song') G.songItems().forEach(x => x.notes.forEach(n => live.add(n)));
+    else mixedSongs().forEach(id => RR.Melody.songNotes(id).forEach(n => live.add(n)));
     return live;
   }
   function applyInstrument() {
@@ -238,7 +258,7 @@
     const set = G.playingSet();
     if (set) { G.queue.push.apply(G.queue, setCards(set)); return; }
     const songs = mixedSongs();
-    if (s.game === 'song') { G.queue.push.apply(G.queue, RR.Melody.songCards(s.song || songs[0] || 'hot-cross-buns')); return; }
+    if (s.game === 'song') { G.songItems().forEach(x => G.queue.push.apply(G.queue, x.cards)); return; }
     if (songs.length) { G.queue.push.apply(G.queue, RR.Melody.songCards(songs[G.songPtr % songs.length])); G.songPtr++; }
     if (s.from !== 'songbook' || !songs.length) {
       for (let i = 0; i < 2; i++) { const m = RR.Melody.make(s, { recent: G.recent, stats: Scores.me().stats }); if (m) G.queue.push(m); }
@@ -266,7 +286,9 @@
         saved.round.length > 0 && saved.round.length < G.roundN) {
         G.round = saved.round.map(e => Object.assign({}, e));
         G.battleResume = true;
-      } else clearBattle();
+        // the same melodies as before the reload, so the round stays fair
+        G.battlePlan = Array.isArray(saved.plan) && saved.plan.length === G.roundN ? saved.plan : planBattle();
+      } else { clearBattle(); G.battlePlan = planBattle(); }
     }
     nextCard();
   }
@@ -274,9 +296,19 @@
 
   /* ---------------- Battle Mode ---------------- */
   const battleShape = () => G.battle.teams.length + '-' + G.battle.per + '-' + G.battle.rounds;
+  /* the battle's melodies, planned at the start (melody.js) — none when a My melodies set is played */
+  const planBattle = () => G.playingSet() ? null : RR.Melody.battlePlan(G.setup, G.battle);
+  /* the notes or rhythms changed part-way (Settings): the rounds to come are planned again; this one stays as it was */
+  G.replanBattle = function () {
+    if (!G.battle) return;
+    const fresh = planBattle(), old = G.battlePlan, now = G.battleNow().round, per = G.battle.teams.length * G.battle.per;
+    G.battlePlan = fresh && old ? fresh.map((c, k) => Math.floor(k / per) <= now ? old[k] : c) : fresh;
+    saveBattle();
+  };
   function saveBattle() {
     if (!G.battle || G.mode.kind !== 'session') return;
-    RR.device.battle = { id: G.mode.id, shape: battleShape(), round: G.round.map(e => ({ team: e.team, pts: e.pts, stars: e.stars, made: !!e.made, gold: !!e.gold, skip: !!e.skip, label: e.label })) };
+    RR.device.battle = { id: G.mode.id, shape: battleShape(), plan: G.battlePlan || null,
+      round: G.round.map(e => ({ team: e.team, pts: e.pts, stars: e.stars, made: !!e.made, gold: !!e.gold, skip: !!e.skip, label: e.label })) };
     RR.saveDevice();
   }
   function clearBattle() { if (RR.device.battle) { RR.device.battle = null; RR.saveDevice(); } }
@@ -306,14 +338,15 @@
     closePick();
     stopHear(true); if (RR.Beat) RR.Beat.stop();
     if (G.fresh) { G.fresh = false; G.openTest = false; } else leaveCard();
-    if (G.battle && RR.battleAt(G.battle, G.round.length).q === 0) { G.openTest = false; G.metro = 'off'; }   // each team's turn starts afresh: Practice (if any), the metronome off
+    if (G.battle && RR.battleAt(G.battle, G.round.length).q === 0) G.openTest = false;   // each team's turn starts afresh: Practice (if any)
+    G.metro = 'off';                                       // every melody: tap the metronome and pick a tempo (the user's, 2026-10-06)
+    if (!card && G.battle && G.battlePlan) card = RR.clone(G.battlePlan[Math.min(G.round.length, G.roundN - 1)]);
     if (!card) { if (!G.queue.length) refill(); card = G.queue.shift(); }
     G.card = card; G.dealt.push(card);
     G.practisedHere = false; G.cardEntry = -1;
     resetCard(openingStage());
     draw();
-    if (G.battle && RR.Board) RR.Board.battleCard();       // whose turn: a card with Go ▸ (holds the count-in back)
-    roll();
+    if (G.battle && RR.Board) RR.Board.battleCard();       // whose turn: a card with Go ▸
   }
   G.nextCard = nextCard;
 
@@ -327,7 +360,7 @@
   /* a card opens in Practice, unless the player has chosen to play without
      it (above), the practice has none (the sight-reading levels) or it's
      Beat the clock */
-  const openingStage = () => G.setup.practice && !G.clock && !G.openTest ? 'practice' : 'game';
+  const openingStage = () => G.setup.practice && G.setup.practiceStart !== 'off' && !G.clock && !G.openTest ? 'practice' : 'game';   // Practice Off (default): Test first
 
   /* the metronome */
   const metroOn = () => G.metro !== 'off';
@@ -335,15 +368,14 @@
   /* Listen's pace: the metronome's, or Slow when it's off (Make a melody and My melodies hear it so too) */
   RR.listenPace = () => metroOn() ? G.metro : 'slow';
   const windowOpen = () => !!document.querySelector('.modal:not([hidden]), .evm-shelf.show');
-  /* in a Test with the metronome on, a card waiting to be played counts in by
-     itself — after Next, a finished try, Start over, or a window closing */
+  /* a Test with the metronome on, waiting: count in — for Start over and the
+     Space key only (2026-10-06: nothing counts in by itself any more) */
   function roll() {
     if (G.stage !== 'game' || !metroOn() || G.clock || G.overlay || G.phase !== 'ready' || G.started) return;
     if (windowOpen() || (RR.Maker && RR.Maker.active)) return;
     RR.Beat.start();
   }
   G.roll = roll;
-  RR.onWindowClosed = () => setTimeout(roll, 0);
 
   /* the card from the top; a stage given = a new start (else the stage stays) */
   function resetCard(stage) {
@@ -399,20 +431,12 @@
      One go and the try has begun */
   const canPractise = () => G.setup.practice && !G.clock && !(G.setup.oneGo && G.started);
 
-  /* Off → Slow → Moderate → Fast → Off. In a Test not yet finished the try
-     starts again: counted in at the new pace, or the notes simply live */
-  G.cycleMetro = function () {
-    if (G.overlay || G.clock) return;
-    const order = ['off', 'slow', 'moderate', 'fast'];
-    setMetro(order[(order.indexOf(G.metro) + 1) % order.length]);
-  };
-  /* Battle Mode (the user's, 2026-10-05): the metronome opens a choice — Slow ·
-     Moderate · Fast (and Off while it is on) — and picking a tempo counts in at
-     once. It goes back to Off at each team's turn (nextCard): every team turns
-     it on for itself. Anywhere else it cycles, as above */
+  /* the metronome (Battle Mode's way, everywhere since 2026-10-06): a tap opens
+     a choice — Slow · Moderate · Fast (and Off while it is on) — and picking a
+     tempo in a Test counts in at once. It goes back to Off on every new
+     melody (nextCard) */
   G.metroTap = function () {
     if (G.overlay || G.clock) return;
-    if (!G.battle) { G.cycleMetro(); return; }
     if (pickOpen()) { closePick(); return; }
     const s = G.setup, pick = $('#metro-pick');
     pick.innerHTML = (metroOn() ? '<button type="button" data-metro="off" class="off">Off</button>' : '') +
@@ -430,6 +454,8 @@
   }
   G.closePick = closePick; G.pickOpen = pickOpen;
   G.setMetro = id => { closePick(); setMetro(id); };
+  /* a tempo picked (or Off): in a Test not yet finished the try starts again —
+     counted in at the new pace, or the notes simply live */
   function setMetro(id) {
     if (G.overlay || G.clock) return;
     G.metro = ['off', 'slow', 'moderate', 'fast'].includes(id) ? id : 'off';
@@ -534,7 +560,7 @@
     } else {
       G.clean = false; G.slips++; G.slipsHere++;
       if (game) mixup(ev.p, id);
-      if (s.ghost) addGhost(id, i);
+      addGhost(id, i);                        // ghost notes are always on (2026-10-06)
       if (s.glow === 'after2' && G.slipsHere >= 2) RR.Xylo.setGlow(ev.p);
       draw();
     }
@@ -615,10 +641,8 @@
     if (RR.device.celebrate && made) RR.Sound.celebrate(gold ? 3 : 2);
     draw();
     if (G.clock) { G.autoT = setTimeout(() => nextCard(), 700); return; }
-    // a Test with the metronome rolls on: the next card, counted in again
-    const rolling = !!G.run && metroOn();
     if (G.round.length >= G.roundN) G.autoT = setTimeout(() => { leaveCard(); RR.Board.roundDone(); }, 1800);
-    else if (s.auto || rolling) G.autoT = setTimeout(() => nextCard(), rolling ? 2200 : 1900);
+    else if (s.auto) G.autoT = setTimeout(() => nextCard(), 1900);
     else $('#btn-next').classList.add('ready');
   }
   G.finish = finish;
@@ -662,7 +686,7 @@
   /* Practice's (unless Listen in Practice is off), and after a try — never
      during one. At the metronome's pace — and with the metronome on, its
      clicks too: a bar of them first, then on every beat (Off: Slow, no clicks) */
-  const canHear = () => G.phase === 'done' || (G.stage === 'practice' && !G.setup.playHidden);
+  const canHear = () => !G.setup.playHidden && (G.phase === 'done' || G.stage === 'practice');   // Play button Disabled: never
   G.canHear = canHear;
   function hearIt() {
     if (G.hearing) { stopHear(true); return; }
@@ -686,8 +710,8 @@
       const t = t0 + ev.start * spt;
       if (!ev.rest) RR.Sound.playAt(ev.p, t);
       G.hearTimers.push(setTimeout(() => {
-        G.hearIdx = i;
-        if (!ev.rest && s.playLights) RR.Xylo.flash(ev.p, 'demo', Math.min(380, ev.t * spt * 900));
+        // Animates music and bars: the note glows and its bar lights; Plays sounds only: neither
+        if (s.playLights) { G.hearIdx = i; if (!ev.rest) RR.Xylo.flash(ev.p, 'demo', Math.min(380, ev.t * spt * 900)); }
         draw();
       }, Math.max(0, RR.Sound.heardAt(t) - RR.now())));
     });
@@ -712,13 +736,13 @@
   G.hearIt = hearIt;
   G.stopHear = stopHear;
 
-  /* Hear your song: every card of a Songbook song, one after another */
+  /* Hear your song(s): every card of the Song format's songs (or the set played), one after another */
   let songTimers = [];
   G.songPlaying = false;
-  G.hearSong = function (id, onEnd) {
+  G.hearSong = function (onEnd) {
     G.stopSong();
     const set = G.playingSet();
-    const cards = set ? setCards(set) : RR.Melody.songCards(id); if (!cards.length || !RR.Sound.ctx) return;
+    const cards = set ? setCards(set) : [].concat.apply([], G.songItems().map(x => x.cards)); if (!cards.length || !RR.Sound.ctx) return;
     const spt = 60 / RR.paceTempo(G.setup, RR.listenPace()) / 4;
     let t = RR.Sound.now() + 0.15;
     G.songPlaying = true;
@@ -835,7 +859,7 @@
     // ▶ Listen
     const play = $('#btn-play'), hear = canHear() || G.hearing;
     play.disabled = !hear;
-    play.title = hear ? 'Listen' + (metroOn() ? ' — with the metronome' : '') : practice ? 'Listening is off for this practice' : 'Listen comes back when the Test is done';
+    play.title = hear ? 'Listen' + (metroOn() ? ' — with the metronome' : '') : s.playHidden ? 'The Play button is off for this practice' : 'Listen comes back when the Test is done';
     // Practice (a blue pause) / Test (a red ball in a red ring — it pulses while a try is under way)
     const mode = $('#btn-mode');
     mode.classList.toggle('test', !practice);
@@ -851,10 +875,10 @@
     const on = metroOn(), pace = RR.Points.paceOf(G.metro), m = $('#btn-metro');
     m.classList.toggle('on', on);
     m.disabled = !!G.clock;
-    if (G.battle) m.setAttribute('aria-haspopup', 'true'); else { m.removeAttribute('aria-haspopup'); m.removeAttribute('aria-expanded'); }
+    m.setAttribute('aria-haspopup', 'true');
     $('#metro-label').textContent = on ? pace.name : 'Off';
     m.title = on ? 'Metronome: ' + pace.name + ' (' + RR.paceTempo(s, pace.id) + ' BPM) — a Test counts you in, worth ' + pace.lo + '–' + pace.hi + ' points. Tap to change.' :
-      G.battle ? 'Metronome off. Tap to pick a tempo — the count-in starts at once' : 'Metronome off. Tap for Slow, Moderate or Fast';
+      'Metronome off. Tap to pick a tempo' + (practice ? ' (Listen plays at it; a Test counts in)' : ' — the count-in starts at once');
     m.setAttribute('aria-label', m.title);
     const w = WEIGHT[G.metro] || WEIGHT.off;
     $('#metro-weight').setAttribute('transform', 'translate(' + (12 + 5.6 * w).toFixed(2) + ' ' + (15.2 - 11.6 * w).toFixed(2) + ') rotate(25.8)');

@@ -12,7 +12,7 @@
    render(card, o) → { svg, W, H, evs, total, yOf, xAtTick, ss }
      o: { ss, maxW, maxStretch, colour: 'always'|'lit'|'black',
           states[], judge[], nextIdx, hearIdx, justLit, justAge,
-          labels: 'none'|'letters'|'syllables', judgeRow, ghosts[],
+          labels: 'none'|'letters'|'solfege'|'syllables', judgeRow, ghosts[],
           playTick, hidden, bare, noTime, endBar: 'final'|'single',
           noHalo, faintFrom }   (Make a melody: solid colours; the bars'
                                  empty rest drawn faintly from faintFrom)
@@ -77,6 +77,7 @@
   const dotted = t => t === 3 || t === 6 || t === 12;
   const spaceSS = t => Math.max(2.0, 3.4 * Math.sqrt(t / 4)) + (dotted(t) ? 0.5 : 0);
 
+  const SOLFEGE = { C: 'Do', D: 'Re', E: 'Mi', F: 'Fa', G: 'So', A: 'La', B: 'Ti' };
   function sylOf(ev) {
     if (ev.rest) return 'sh';
     const t = ev.t, pos = ev.start % 4;
@@ -225,6 +226,11 @@
         const b = BAR[ev.p];
         p.push('<rect x="' + r2(ev.cx - ss * 0.75) + '" y="' + r2(labelY - ss * 0.95) + '" width="' + r2(ss * 1.5) + '" height="' + r2(ss * 1.3) + '" rx="' + r2(ss * 0.4) + '" fill="' + b.colour + '" fill-opacity=".3"/>');
         p.push('<text class="label-letter" x="' + r2(ev.cx) + '" y="' + r2(labelY) + '" font-size="' + r2(ss * 1.05) + '" text-anchor="middle" fill="' + INK + '">' + b.letter + '</text>');
+      } else if (o.labels === 'solfege' && !ev.rest) {
+        // the solfège name (C is Do — the xylophone's own key), tinted with its bar's colour like the letters
+        const b = BAR[ev.p], name = SOLFEGE[b.letter];
+        p.push('<rect x="' + r2(ev.cx - ss * 0.95) + '" y="' + r2(labelY - ss * 0.95) + '" width="' + r2(ss * 1.9) + '" height="' + r2(ss * 1.3) + '" rx="' + r2(ss * 0.4) + '" fill="' + b.colour + '" fill-opacity=".3"/>');
+        p.push('<text class="label-letter" x="' + r2(ev.cx) + '" y="' + r2(labelY) + '" font-size="' + r2(ss * 0.92) + '" text-anchor="middle" fill="' + INK + '">' + name + '</text>');
       } else if (o.labels === 'syllables') {
         p.push('<text class="label-syl" x="' + r2(ev.cx) + '" y="' + r2(labelY) + '" font-size="' + r2(ss * 0.95) + '" text-anchor="middle">' + sylOf(ev) + '</text>');
       }

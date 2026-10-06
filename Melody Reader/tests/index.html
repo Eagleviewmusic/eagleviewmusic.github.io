@@ -230,6 +230,52 @@
       const order = Array.from({ length: RR.battleTotal(b3) }, (_, k) => RR.battleAt(b3, k)).map(a => a.round + ':' + a.team + ':' + a.q).join(' ');
       check('A battle takes turns: each team its melodies, every team a round', RR.battleTotal(b3) === 12 &&
         order === '0:0:0 0:0:1 0:1:0 0:1:1 0:2:0 0:2:1 1:0:0 1:0:1 1:1:0 1:1:1 1:2:0 1:2:1');
+      // a battle's melodies (2026-10-06): fair in every round, harder as it goes
+      (function () {
+        const M = RR.Melody, cellsKey = c => (c.cells || []).flat().slice().sort().join(',');
+        const hard = RR.sanitize(Object.assign(RR.clone(RR.DEFAULTS), { notes: RR.TEN, rhythms: ['q', 'h', 'ee', 'dqe', 'ssss', 'ess', 'sse', 'qr'], moves: 'leaps', bars: 2 }));
+        let fair = true, spread = 0, rising = 0, trials = 0, ok = true;
+        [[hard, { teams: [{}, {}, {}, {}], per: 1, rounds: 6 }], [RR.practiceOfLevel(8), { teams: [{}, {}], per: 3, rounds: 4 }], [RR.practiceOfLevel(1), { teams: [{}, {}, {}], per: 2, rounds: 3 }]].forEach(([s, raw]) => {
+          const b = RR.cleanBattle(raw), T = b.teams.length * b.per;
+          for (let n = 0; n < 8; n++) {
+            const plan = M.battlePlan(s, b);
+            if (plan.length !== RR.battleTotal(b) || plan.some(c => !c || c.notes.reduce((a, x) => a + x.t, 0) !== s.time[0] * 4 * s.bars)) ok = false;
+            const means = [];
+            for (let rd = 0; rd < b.rounds; rd++) {
+              let m = 0;
+              for (let q = 0; q < b.per; q++) {
+                const cards = b.teams.map((_, t) => plan[rd * T + t * b.per + q]), d = cards.map(c => M.difficulty(c).total);
+                if (new Set(cards.map(cellsKey)).size !== 1) fair = false;
+                spread = Math.max(spread, Math.max.apply(null, d) - Math.min.apply(null, d));
+                m += d.reduce((a, x) => a + x, 0);
+              }
+              means.push(m);
+            }
+            if (s === hard) { trials++; if (means[means.length - 1] > means[0]) rising++; }
+          }
+        });
+        check('A battle plans every melody, each filling its bars', ok);
+        check('In every round of a battle each team gets the same rhythms, at much the same difficulty', fair && spread < 1.5, 'widest gap ' + spread.toFixed(2));
+        check('A battle’s last round is harder than its first', rising === trials, rising + ' of ' + trials);
+        const easy = { time: [4, 4], notes: [{ p: 'E4', t: 4 }, { p: 'D4', t: 4 }, { p: 'C4', t: 8 }] };
+        const busy = { time: [4, 4], notes: [{ p: 'C4', t: 1 }, { p: 'G4', t: 1 }, { p: 'C5', t: 2 }, { p: 'E4', t: 6 }, { p: 'A4', t: 2 }, { p: null, t: 4 }] };
+        check('Sixteenths, dotted notes, rests and leaps make a melody harder to read', M.difficulty(busy).total > M.difficulty(easy).total * 2 && M.difficulty(busy).pitch > M.difficulty(easy).pitch);
+      })();
+      // the Helps' wording and choices (2026-10-06)
+      check('Practice is On, Off (each melody starts in Test) or Disabled', RR.DEFAULTS.practiceStart === 'on' &&
+        RR.sanitize({ practiceStart: 'off' }).practiceStart === 'off' && RR.sanitize({ practiceStart: 'maybe' }).practiceStart === 'on' &&
+        RR.sanitize({ practice: false }).practice === false);
+      check('Text below the notes: letter names, solfège names or nothing (old rhythm syllables read as nothing)',
+        RR.sanitize({ labels: 'solfege' }).labels === 'solfege' && RR.sanitize({ labels: 'syllables' }).labels === 'none' &&
+        RR.LEVELS.every(l => l.labels !== 'syllables') && !('ghost' in RR.DEFAULTS) && !('ghost' in RR.sanitize({ ghost: false })));
+      let solOk = true; try {
+        const g = RR.Eng.render({ time: [4, 4], notes: [{ p: 'C4', t: 4 }, { p: 'E4', t: 4 }, { p: 'G4', t: 4 }, { p: null, t: 4 }] }, { ss: 20, maxW: 600, colour: 'always', labels: 'solfege' });
+        solOk = /Do<\/text>/.test(g.svg) && /Mi<\/text>/.test(g.svg) && /So<\/text>/.test(g.svg);
+      } catch (e) { solOk = false; }
+      check('Solfège names under the notes: C is Do', solOk);
+      // the session page's rules (2026-10-06): Song plays any number of songs; a session never ends on Do or mixes the Songbook
+      check('Song: any number of songs and My melodies sets, in order, nothing else', JSON.stringify(RR.sanitize({ songPicks: ['ode', 'nope', 'set:set_1_ab', 'ode', 5, 'twinkle'] }).songPicks) === JSON.stringify(['ode', 'set:set_1_ab', 'twinkle']) &&
+        RR.sanitize({}).songPicks.length === 0 && RR.gameText({ game: 'song', songPicks: ['ode', 'twinkle'] }) === '2 songs' && RR.gameText({ game: 'song', songPicks: [] }) === 'a song');
       check('The gold star comes from over 10 by default, and only from its marks', RR.DEFAULTS.gold === 11 &&
         RR.sanitize({ gold: 13 }).gold === 13 && RR.sanitize({ gold: 12 }).gold === 11 && RR.sanitize({ gold: '16' }).gold === 11);
       // run against this page's own storage, put back afterwards
@@ -253,6 +299,8 @@
         const bt = RR.Sessions.add('Friday', RR.DEFAULTS, { teams: [{ name: 'Eagles', colour: '#a855f7' }, {}], per: 2, rounds: 4 });
         RR.Sessions.updateBattle(bt.id, Object.assign(RR.clone(RR.Sessions.get(bt.id).battle), { rounds: 5 }));
         const btx = RR.Sessions.get(bt.id);
+        const sx = RR.Sessions.add('Rules', Object.assign(RR.clone(RR.DEFAULTS), { endDo: true, from: 'both' }));
+        check('A session never ends on Do by itself, and plays Generated melodies rather than "made up + Songbook"', RR.Sessions.get(sx.id).practice.endDo === false && RR.Sessions.get(sx.id).practice.from === 'made');
         check('A battle is saved with the sessions, labelled, with its teams', btx.kind === 'battle' && btx.battle.teams[0].name === 'Eagles' &&
           btx.battle.teams.length === 2 && btx.battle.per === 2 && btx.battle.rounds === 5 && !RR.Sessions.get(a.id).kind &&
           RR.Sessions.updateBattle(a.id, { rounds: 2 }) === null);

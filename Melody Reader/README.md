@@ -31,7 +31,8 @@ Through the Claude Apps server (`../.claude/serve.js`; python's
 `http://localhost:8816/tests/` runs the engine checks (generator, Songbook,
 levels, engraver, practices, lesson links, melody sets under the library
 rules, the points, My sessions, the gold star, round lengths, Battle
-Mode) — 68 of them, all passing
+Mode and its fair plan, the Helps' choices, the session page's rules) —
+77 of them, all passing
 as of 2026-10-05.
 
 The Teacher Library shelf reads `../Teacher Library/index.json`, which only
@@ -71,15 +72,17 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
     there*; then the next card opens in Test (they want to play without the
     practice). Practised, then tested → Practice again. Kept for the visit;
     a new level, set or player starts with Practice on (`G.fresh`).
-  - **The metronome** — Off · Slow · Moderate · Fast (tap to cycle; the label
-    under it says which, and it lights green; its weight sits higher on the
-    arm for slower, as on a real one). Off each time the page opens (not
-    saved — the old `device.pace` is dropped). In a Test it counts in; a Test
-    with it on **rolls**: a finished try shows its points, and 2.2 s later the
-    next card counts in by itself (also after Start over, Play again, or a
-    window closing). Changing it mid-Test starts the try again at the new
-    pace. Listen plays at its pace with its clicks (a bar of them first);
-    Off = Slow, no clicks. Space counts in by hand if a Test is waiting.
+  - **The metronome** (one way everywhere since 2026-10-06 — Battle Mode's) —
+    a tap opens a choice: **Slow · Moderate · Fast** (each with its BPM; Off
+    too while it is on). Picking one in a Test **counts in at once**; in
+    Practice it sets Listen's pace and clicks, and Test then counts in. The
+    label under it says which, it lights green, and its weight sits higher
+    on the arm for slower, as on a real one. It is **Off again on every new
+    melody** — nothing counts in by itself: no rolling on to the next
+    melody, no count-in after a window closes (only Start over, Space, or
+    picking a tempo start one). Off each time the page opens (not saved).
+    Changing it mid-Test starts the try again at the new pace. Listen plays
+    at its pace with its clicks (a bar of them first); Off = Slow, no clicks.
   - **Stopping a count-in** — tapping the *Get ready 1 2 3 4* card while it
     counts (or Escape) stops it and goes back to Practice, the pause; the
     metronome stays on. (No Practice here: the Test waits.) The family card
@@ -121,12 +124,20 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   `device.battle`, so a reload resumes); each team's turn is a card in its
   colour (*Blue team — Go ▸*; Enter works); between rounds the standings;
   at the end *Battle over — the winner* 🏆, the table, Battle again · Change
-  the battle. **The metronome in a battle** (the user's, same day): a tap opens
-  a choice — Slow · Moderate · Fast (with Off while it is on), each with its
-  BPM — and picking one counts in at once. It goes back to Off at every
-  team's turn, so each team turns it on for itself; within a team's turn it
-  rolls on as usual. (Outside a battle it still cycles Off → Slow → Moderate
-  → Fast.) While it runs the music card wears the team's colour, its name
+  the battle. **The metronome** works as everywhere: each team picks a tempo
+  for each melody. **Fair melodies** (2026-10-06, the user's): every melody of
+  the battle is planned when it starts (`RR.Melody.battlePlan`). A sample of
+  what the session can make is scored for difficulty (`RR.Melody.difficulty`:
+  sixteenths, dotted notes, rests, leaps, the ledger line, the range); each
+  round takes a target — easier early, harder late, wobbling a little — and
+  a rhythm focus it didn't have last round (more variety); its first melody
+  is the one nearest the target, and **every other team gets the same
+  rhythms in another order with other notes of matching difficulty** (in
+  testing, within about 1 point of each other on a scale where a battle runs
+  ~15 → ~40). Battles make up their melodies (no Songbook cards) unless a My
+  melodies set is played. The plan is saved with the battle, so Carry on
+  after a reload stays fair; changing the notes or rhythms part-way re-plans
+  only the rounds still to come. While it runs the music card wears the team's colour, its name
   sits with the turn's dots at the top, the level box says "Round 2 of 5",
   and the **score chip becomes the teams' scores** (the team playing
   ringed; a phone shows dots and numbers). The **Score board** shows the
@@ -173,6 +184,41 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   made-up melodies for every card.
 - **Settings** — Level (My sessions on top, then the levels with their best
   stars), Notes, Rhythms, How to play, Helps, Points, Sound, Share.
+- **The session page, laid out by the user** (2026-10-06; a battle's the
+  same, with its teams first): **Session Name:** [the name] **▶ Play
+  Session** on one row (Battle Name / Play Battle) · **Choose the Notes** —
+  the staff and the bars (the quick-pick buttons, End on Do and Practise my
+  tricky notes are gone; a session never ends on Do by itself, tricky notes
+  live on the Score board) and **Melodic Difficulty** Steps / Steps and
+  skips / Leaps too · **Choose the Rhythm** · **Look & Feel** (the Helps,
+  then **Auto-Progress to next melody** On / Off) · **Format** Rounds (how
+  many) / Song / Beat the Clock / Endless — **Song** lists every Songbook
+  song and every My melodies set; pick any number (numbered in the order
+  they'll play; `songPicks`, e.g. 'ode', 'set:<id>') · **Melody Source**
+  (not for Song) Generated / My Melodies / Songbook, then Open My
+  Melodies… (a battle: Generated / My Melodies). No explaining notes, no
+  Delete (× on the session's row). The level tabs are the same sections and
+  were renamed to match: Notes · Rhythm · Format · Look & Feel. A level's
+  old "made up + Songbook" shows as Generated (it still mixes the level's
+  own songs in); a session's is saved as Generated. Songbook as a source
+  with no songs of its own plays every song that fits the notes.
+- **The Helps, in the user's words** (2026-10-06; the same table on a
+  session's and a battle's page): **Note Colors** Always / When Played /
+  Black · **Xylophone Bar** Letter Name / Number / Both / Neither (sets
+  `letters` + `nums`) · **Xylophone hint** Never / After 2 slips / Always ·
+  **Grey out unused bars** On / Off (moved here from Notes) · **Text below
+  the notes** Letter Name / Solfege Name (C = Do, tinted like the letters) /
+  Nothing · **Practice** On (default) — each melody starts in Practice / Off
+  (default) — starts in Test, Practice a tap away (`practiceStart: 'off'`) /
+  Disabled · **Play button** Animates music and bars / Plays sounds only (no
+  note glow, no bar lights) / Disabled (no Listen at all, not even after a
+  Test). Gone: Ghost notes (always on now, the sight-reading levels too),
+  Hearing it lights the bars (in Play button), and from How to play the gold
+  star, the metronome's tempos, Flash and One go — their values stay as they
+  are (Level 15 still flashes, 14–15 are still one go, tempos 60/80/100, the
+  star over 10). Rhythm syllables went with Under the notes: Levels 7–8 now
+  show nothing below the notes, and an old practice or link with rhythm
+  syllables reads as Nothing (the engraver can still draw them).
 - **Score board** — this round, best scores per practice and game, tricky
   notes on a little xylophone and the mix-ups (*You played F for E*),
   *Practise these*, totals, Reset.
@@ -327,9 +373,9 @@ falls back to defaults; a change of shape gets a new `_v2` key.
   card's top padding, so they cost the staff no height.
 - Clicks can't be stopped once made (`Sound.click` isn't in `played`), so
   Listen makes each just before it is due, on `G.hearTimers`.
-- The count-in rolls on only when no window is open: `RR.windowClosed`
-  calls `RR.onWindowClosed` (game.js `roll`), so closing Settings, the
-  Score board or My melodies counts in again; the Maker blocks it.
+- Nothing counts in by itself (2026-10-06): `nextCard` sets `G.metro`
+  back to 'off', `roll()` is only for Start over and Space, and the
+  window-closed hook that used to count in again is gone.
 - The scores became `v: 2`: loading a `v: 1` file clears the best rounds
   (old scale) and keeps the ladder's stars, tricky notes, mix-ups, totals.
 - **My sessions (2026-10-05).** The session page is the other tabs' renderers
@@ -350,9 +396,10 @@ falls back to defaults; a change of shape gets a new `_v2` key.
   unchanged. `sanitize` takes 1–99; anything else falls back to round5.
 - **Battle Mode (2026-10-05).** A battle is one long round (`G.roundN =
   rounds × teams × per`) whose entries carry `team`; `RR.battleAt(b, k)`
-  says whose turn melody k is. `nextCard` shows the turn card
-  (`Board.battleCard`) before `roll()`, so the overlay holds a metronome
-  count-in back until Go. The battle's own `G.setup.game` is forced to a
+  says whose turn melody k is; `G.battlePlan[k]` is its melody (the plan
+  is laid out in that same order: round, then team, then the turn's
+  melodies). A variant keeps a long last note last and checks the bar
+  rules again (`cellsOk`) before it is used. The battle's own `G.setup.game` is forced to a
   round (never Song or the clock). Progress is saved after every finish or
   skip and cleared at the end; `newRound` resumes it only when the session
   id and the shape (teams-per-rounds) still match. Plain ⚔ draws as a thin

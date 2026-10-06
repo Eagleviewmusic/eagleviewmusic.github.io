@@ -2,7 +2,9 @@
    Melody Reader — settings.js
    --------------------------------------------------------------------------
    RR.Settings — one window, tabs down the side (across the top on a phone):
-   Level · Notes · Rhythms · How to play · Helps · Points · Sound · Share.
+   Level · Notes · Rhythm · Format · Look & Feel · Points · Sound · Share
+   (renamed 2026-10-06 for what they hold: Choose the Notes, Choose the
+   Rhythm, Format + Melody Source, Look & Feel).
 
    Changing anything in a practice tab makes the practice Custom (from the
    level it started as). Helps change the card at once; notes, rhythms and
@@ -31,29 +33,36 @@
   const row = (label, ctl) => '<div class="row"><span class="lbl">' + label + '</span>' + ctl + '</div>';
   const swRow = (label, k, on) => row(label, sw(k, on, label));
 
-  const PICKS = [
-    ['E D C', ['C4', 'D4', 'E4']], ['Do Re Mi So', ['C4', 'D4', 'E4', 'G4']], ['Do to So', ['C4', 'D4', 'E4', 'F4', 'G4']],
-    ['Do to Do', ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5']], ['Lines', ['E4', 'G4', 'B4', 'D5', 'F5']],
-    ['Spaces', ['F4', 'A4', 'C5', 'E5']], ['All ten', RR.TEN], ['All twelve', RR.TWELVE]
-  ];
 
-  /* Melodies from: made up, the Songbook — or a set from My melodies, which
-     belongs to the browser like the game (melodies.js) */
-  function fromHtml(s) {
-    const lesson = G.mode.kind === 'lesson';
+  /* Melody Source: Generated · My Melodies (a set, laid over the practice — the browser's, like the game) ·
+     Songbook (the songs whose notes are all in the practice). A battle: Generated or My Melodies only (its
+     melodies are planned fair for every team). Levels' old "made up + Songbook" shows as Generated */
+  function sourceHtml(s) {
     const playingSet = G.playingSet();
-    const cur = playingSet ? 'set' : s.from;
-    const opts = [['both', 'Made up + Songbook'], ['made', 'Made up'], ['songbook', 'Songbook']];
-    if (lesson) return playingSet ? '<p class="note">This lesson plays its own melodies: <b>' + RR.esc(playingSet.title) + '</b>.</p>' : seg('from', opts, cur);
+    const cur = playingSet ? 'set' : s.from === 'songbook' && !G.battle ? 'songbook' : 'made';
+    const opts = [['made', 'Generated'], ['set', 'My Melodies']].concat(G.battle ? [] : [['songbook', 'Songbook']]);
+    if (G.mode.kind === 'lesson') return playingSet ? '<p class="note">This lesson plays its own melodies: <b>' + RR.esc(playingSet.title) + '</b>.</p>' : seg('from', opts, cur);
     const sets = RR.Sets.list().filter(x => x.melodies.length);
-    let h = seg('from', opts.concat([['set', 'My melodies']]), cur);
-    if (cur === 'set' || sets.length) {
+    let h = seg('from', opts, cur);
+    if (cur === 'set' && sets.length) {
       h += '<div class="picks">' + sets.map(x => '<button type="button" data-k="@set" data-v="' + x.id + '" class="' + (playingSet && playingSet.id === x.id ? 'on' : '') + '">' + RR.esc(x.title) + (x.received ? ' ·  shared' : '') + '</button>').join('') + '</div>';
     }
-    h += '<div class="row"><button type="button" class="pill-btn" data-act="melodies">Open My melodies…</button></div>' +
-      RR.note('mf', 'A set from My melodies is played with these helps and tempos. Write sets in My melodies (the ♫ button at the top).');
-    return h;
+    return h + '<div class="row"><button type="button" class="pill-btn" data-act="melodies">Open My Melodies…</button></div>';
   }
+  /* Format: Song — the Songbook's songs and the My melodies sets, any number, played in the order picked */
+  function songPicksHtml(s) {
+    const picks = G.songPicks(), at = id => picks.indexOf(id);
+    const btn = (id, title) => '<button type="button" data-songpick="' + RR.esc(id) + '" class="' + (at(id) >= 0 ? 'on' : '') + '" aria-pressed="' + (at(id) >= 0) + '">' +
+      (at(id) >= 0 ? '<b class="ord">' + (at(id) + 1) + '</b>' : '') + RR.esc(title) + '</button>';
+    const sets = RR.Sets.list().filter(x => x.melodies.length);
+    return '<div class="picks song-picks">' + Object.keys(RR.SONGS).map(id => btn(id, RR.SONGS[id].title)).join('') + '</div>' +
+      (sets.length ? '<div class="picks-head">My Melodies</div><div class="picks song-picks">' + sets.map(x => btn('set:' + x.id, x.title)).join('') + '</div>' : '');
+  }
+
+  /* ---- three questions that each set two of a practice's fields (2026-10-06, the user's wording) ---- */
+  const barText = s => s.letters && s.nums ? 'both' : s.letters ? 'letters' : s.nums ? 'numbers' : 'neither';
+  const practiceMode = s => !s.practice ? 'disabled' : s.practiceStart === 'off' ? 'off' : 'on';
+  const playMode = s => s.playHidden ? 'off' : s.playLights ? 'anim' : 'sound';
 
   /* ---- Battle Mode: the teams, and turns and rounds (2026-10-05) ---- */
   const battleText = b => b.teams.length + ' teams · ' + b.rounds + (b.rounds === 1 ? ' round' : ' rounds') + ' · ' + b.per + (b.per === 1 ? ' melody' : ' melodies') + ' a turn';
@@ -111,82 +120,60 @@
             '<span class="s" aria-label="best ' + RR.Scores.levelStars(String(l.n)) + ' stars">' + RR.starsHtml(RR.Scores.levelStars(String(l.n)), 3) + '</span></button>').join('') +
           '</div>').join('');
     },
-    /* a session's page: every choice, one page, saved as you go */
+    /* a session's (or a battle's) page — every choice on one page, saved as you go; laid out by the user (2026-10-06):
+       Name + Play · Choose the Notes · Choose the Rhythm · Look & Feel · Format · Melody Source */
     session() {
       const x = G.mode.kind === 'session' && RR.Sessions.get(G.mode.id);
       if (!x) return '';
-      const battle = x.kind === 'battle';
-      return '<div class="sec ses-head"><h3>' + (battle ? '⚔️ Battle' : 'Session') + '</h3>' +
-        '<div class="save-mine"><input type="text" id="session-name" maxlength="40" value="' + RR.esc(x.name) + '" aria-label="The ' + (battle ? 'battle' : 'session') + '’s name" placeholder="A name for this ' + (battle ? 'battle' : 'session') + '">' +
-        '<button type="button" class="pill-btn primary" data-act="play-session">▶ Play it</button></div>' +
-        RR.note('ses', 'Every melody in this session is made up from what you choose below — new ones each time it is played. Changes save as you go.') + '</div>' +
-        (battle ? battlePage() : '') +
-        TAB.notes() + TAB.rhythms() +
-        '<div class="sec"><h3>How it looks, and the helps</h3>' + TAB.helps() + '</div>' +
-        TAB.play() +
-        '<div class="sec"><button type="button" class="pill-btn danger" data-act="delete-session">Delete this session…</button></div>';
+      const what = x.kind === 'battle' ? 'Battle' : 'Session';
+      return '<div class="sec ses-head"><div class="ses-row"><label for="session-name">' + what + ' Name:</label>' +
+        '<input type="text" id="session-name" maxlength="40" value="' + RR.esc(x.name) + '" placeholder="A name for this ' + what.toLowerCase() + '">' +
+        '<button type="button" class="pill-btn primary" data-act="play-session">▶ Play ' + what + '</button></div></div>' +
+        (x.kind === 'battle' ? battlePage() : '') +
+        TAB.notes() + TAB.rhythms() + TAB.helps() + TAB.play();
     },
     notes() {
-      const s = G.setup, cur = s.notes.slice().sort().join();
-      return '<div class="sec"><h3>The notes to read</h3>' + RR.note('nt', 'Tap a note on the staff, or a bar, to put it in the practice or take it out. The two show the same choice.') +
+      const s = G.setup;
+      return '<div class="sec"><h3>Choose the Notes</h3>' +
         '<div class="notes-pick">' + RR.Eng.picker(s.notes) +
         '<div class="pick-xylo">' + RR.BARS.map(b => '<button type="button" data-note="' + b.id + '" class="' + (s.notes.includes(b.id) ? '' : 'off') + '" style="--c:' + b.colour + ';--len:' + (b.len * 0.8) + '%" aria-pressed="' + s.notes.includes(b.id) + '" aria-label="' + b.id + '">' + b.letter + '</button>').join('') + '</div></div>' +
-        '<div class="picks">' + PICKS.map(p => '<button type="button" data-pick="' + p[1].join(',') + '" class="' + (p[1].slice().sort().join() === cur ? 'on' : '') + '">' + p[0] + '</button>').join('') + '</div></div>' +
-        '<div class="sec"><h3>How it moves</h3>' + seg('moves', [['steps', 'Steps'], ['skips', 'Steps and skips'], ['leaps', 'Leaps too']], s.moves) +
-        RR.note('mv', 'A step is to the next note in the practice — in Lines, E to G is a step.') + '</div>' +
-        '<div class="sec">' + swRow('End on Do', 'endDo', s.endDo) + swRow('Practise my tricky notes', 'tricky', s.tricky) +
-        swRow('Grey out the bars not in the music', 'grey', s.grey) + '</div>';
+        row('Melodic Difficulty', seg('moves', [['steps', 'Steps'], ['skips', 'Steps and skips'], ['leaps', 'Leaps too']], s.moves)) + '</div>';
     },
     rhythms() {
       const s = G.setup;
-      return '<div class="sec"><h3>The rhythms to use</h3>' + RR.note('rh', 'Tap a card to put it in or take it out, and to hear it. Made-up melodies are built from these, bar by bar.') +
+      return '<div class="sec"><h3>Choose the Rhythm</h3>' +
         '<div class="cells">' + RR.Melody.CELLS.map(c => {
           const pic = RR.Eng.render({ time: [Math.max(1, c.len / 4), 4], notes: c.ticks.map(t => t < 0 ? { p: null, t: -t } : { p: 'A4', t }) }, { ss: 6.5, bare: true, colour: 'black', labels: 'none', maxStretch: 1 }).svg;
           return '<button type="button" class="cell' + (s.rhythms.includes(c.id) ? ' on' : '') + '" data-cell="' + c.id + '" aria-pressed="' + s.rhythms.includes(c.id) + '"><span class="pic">' + pic + '</span><b>' + c.name + '</b><small>' + c.about + '</small></button>';
-        }).join('') + '</div></div>' +
-        '<div class="sec">' + row('Time', seg('time', [['2', '2/4'], ['3', '3/4'], ['4', '4/4']], s.time[0])) +
+        }).join('') + '</div>' +
+        row('Time', seg('time', [['2', '2/4'], ['3', '3/4'], ['4', '4/4']], s.time[0])) +
         row('Length', seg('bars', [['1', '1 bar'], ['2', '2 bars']], s.bars)) + swRow('End on a long note', 'endLong', s.endLong) + '</div>';
     },
+    /* Format: Rounds (how many) · Song (the songs and My melodies sets to play, any number of them) · Beat the Clock · Endless;
+       then — not for a Song — Melody Source */
     play() {
       const s = G.setup, len = RR.roundLen(s.game);
-      return '<div class="sec"><h3>The gold star</h3>' +
-        RR.note('gold', 'After each melody: a green check when it is played all the way through, and a gold star for a high score. Each melody is worth 1–20 points: 1–8 finding the notes, 9–12 every note first time in a steady beat, 13–20 in time with the metronome.') +
-        row('A gold star for', seg('gold', RR.GOLDS.map(g => [g[0], g[1]]), s.gold)) +
-        '<p class="note gold-means">' + RR.esc((RR.GOLDS.find(g => g[0] === s.gold) || RR.GOLDS[1])[2]) + '</p></div>' +
-        '<div class="sec"><h3>The metronome</h3>' +
-        RR.note('ci', 'With the metronome on, a Test starts with a 1 2 3 4 count-in, then the metronome through the melody — nothing shows but the notes lighting as they are played — and rolls on to the next melody, counting in again. The player taps the metronome under the music for Slow, Moderate or Fast; these are the three tempos (Listen plays at them too).') +
-        RR.Points.PACES.map((p, i) => '<div class="row"><span class="lbl">' + p.name + ' <small class="pts-range">' + p.lo + '–' + p.hi + ' points</small></span>' +
-          '<input type="range" min="40" max="160" step="2" value="' + s.tempos[i] + '" data-range="tempo' + i + '" aria-label="' + p.name + ' tempo"><b id="tempo' + i + '-v">' + s.tempos[i] + ' BPM</b></div>').join('') +
-        row('Flash (the notes fade after the count-in)', seg('flash', [['0', 'Off'], ['2', '2 s'], ['3', '3 s'], ['4', '4 s'], ['6', '6 s']], s.flash)) +
-        swRow('One go (no starting a Test over)', 'oneGo', s.oneGo) + '</div>' +
-        (G.battle ? '' : '<div class="sec"><h3>Game</h3>' + seg('game', [['round', len ? 'Round of ' + len : 'A round'], ['song', 'Song'], ['clock', 'Beat the clock'], ['endless', 'Endless']], len ? 'round' : s.game) +
+      return (G.battle ? '' : '<div class="sec"><h3>Format</h3>' + seg('game', [['round', 'Rounds'], ['song', 'Song'], ['clock', 'Beat the Clock'], ['endless', 'Endless']], len ? 'round' : s.game) +
         (len ? '<div class="row count-row"><span class="lbl">How many melodies</span><div class="stepper" role="group" aria-label="How many melodies">' +
           '<button type="button" data-k="count" data-v="-1" aria-label="One melody fewer"' + (len <= 1 ? ' disabled' : '') + '>−</button>' +
           '<input type="number" id="round-count" min="1" max="' + RR.ROUND_MAX + '" step="1" inputmode="numeric" value="' + len + '" aria-label="How many melodies">' +
-          '<button type="button" data-k="count" data-v="1" aria-label="One melody more"' + (len >= RR.ROUND_MAX ? ' disabled' : '') + '>+</button></div></div>' +
-          RR.note('cnt', 'Any number from 1 to ' + RR.ROUND_MAX + '. Round done comes after the last one. A level’s stars on the list, and Level n+1 ▸, count rounds of 5 or more.') : '') +
-        (s.game === 'song' ? '<div class="picks">' + Object.keys(RR.SONGS).map(id => '<button type="button" data-song="' + id + '" class="' + ((s.song || s.songs[0] || 'hot-cross-buns') === id ? 'on' : '') + '">' + RR.esc(RR.SONGS[id].title) + '</button>').join('') + '</div>' +
-          RR.note('sg', 'The song, card by card — and at the end, Hear your song.') : '') +
-        (s.game === 'clock' ? '<div class="row">' + seg('clockSecs', [['30', '30 s'], ['60', '60 s'], ['120', '2 min']], s.clockSecs) + '</div>' +
-          RR.note('ck', 'As many melodies as you can — no Practice, no metronome. The clock starts with your first note; each melody scores 1–12.') : '') + '</div>') +
-        '<div class="sec"><h3>Melodies from</h3>' + fromHtml(s) +
-        row('Next melody', seg('auto', [['true', 'Comes by itself'], ['false', 'When I press Next']], s.auto)) + '</div>';
+          '<button type="button" data-k="count" data-v="1" aria-label="One melody more"' + (len >= RR.ROUND_MAX ? ' disabled' : '') + '>+</button></div></div>' : '') +
+        (s.game === 'song' ? songPicksHtml(s) : '') +
+        (s.game === 'clock' ? '<div class="row">' + seg('clockSecs', [['30', '30 s'], ['60', '60 s'], ['120', '2 min']], s.clockSecs) + '</div>' : '') + '</div>') +
+        (s.game === 'song' && !G.battle ? '' : '<div class="sec"><h3>Melody Source</h3>' + sourceHtml(s) + '</div>');
     },
     helps() {
       const s = G.setup;
-      return RR.note('hp', 'Every help, so they can be taken away one at a time. The levels turn them off as the bands go up.') +
-        '<table class="helps"><tbody>' +
-        '<tr><td>Coloured notes</td><td>' + seg('colour', [['always', 'Always'], ['lit', 'Lit when played'], ['black', 'Black']], s.colour) + '</td></tr>' +
-        '<tr><td>Letters on the bars</td><td>' + sw('letters', s.letters, 'Letters on the bars') + '</td></tr>' +
-        '<tr><td>Numbers on the bars</td><td>' + sw('nums', s.nums, 'Numbers on the bars') + '</td></tr>' +
-        '<tr><td>The bar glows</td><td>' + seg('glow', [['never', 'Never'], ['after2', 'After 2 slips'], ['always', 'Always']], s.glow) + '</td></tr>' +
-        '<tr><td>Ghost notes (where a slip landed)</td><td>' + sw('ghost', s.ghost, 'Ghost notes') + '</td></tr>' +
-        '<tr><td>Under the notes</td><td>' + seg('labels', [['none', 'Nothing'], ['letters', 'Letter names'], ['syllables', 'Rhythm syllables']], s.labels) + '</td></tr>' +
-        '<tr><td>Practice first (Listen, try it, then Test)</td><td>' + sw('practice', s.practice, 'Practice first') + '</td></tr>' +
-        '<tr><td>Listen (▶ in Practice)</td><td>' + seg('play', [['shown', 'Yes'], ['hidden', 'No']], s.playHidden ? 'hidden' : 'shown') + '</td></tr>' +
-        '<tr><td>Hearing it lights the bars</td><td>' + sw('playLights', s.playLights, 'Hearing it lights the bars') + '</td></tr>' +
-        '<tr><td>Grey out the bars not in the music</td><td>' + sw('grey', s.grey, 'Grey out the bars not in the music') + '</td></tr>' +
-        '</tbody></table>';
+      return '<div class="sec"><h3>Look &amp; Feel</h3><table class="helps"><tbody>' +
+        '<tr><td>Note Colors</td><td>' + seg('colour', [['always', 'Always'], ['lit', 'When Played'], ['black', 'Black']], s.colour) + '</td></tr>' +
+        '<tr><td>Xylophone Bar</td><td>' + seg('barText', [['letters', 'Letter Name'], ['numbers', 'Number'], ['both', 'Both'], ['neither', 'Neither']], barText(s)) + '</td></tr>' +
+        '<tr><td>Xylophone hint</td><td>' + seg('glow', [['never', 'Never'], ['after2', 'After 2 slips'], ['always', 'Always']], s.glow) + '</td></tr>' +
+        '<tr><td>Grey out unused bars</td><td>' + seg('grey', [['true', 'On'], ['false', 'Off']], String(!!s.grey)) + '</td></tr>' +
+        '<tr><td>Text below the notes</td><td>' + seg('labels', [['letters', 'Letter Name'], ['solfege', 'Solfege Name'], ['none', 'Nothing']], s.labels) + '</td></tr>' +
+        '<tr><td>Practice</td><td>' + seg('practiceMode', [['on', 'On (default)'], ['off', 'Off (default)'], ['disabled', 'Disabled']], practiceMode(s)) + '</td></tr>' +
+        '<tr><td>Play button</td><td>' + seg('playMode', [['anim', 'Animates music and bars'], ['sound', 'Plays sounds only'], ['off', 'Disabled']], playMode(s)) + '</td></tr>' +
+        '<tr><td>Auto-Progress to next melody</td><td>' + seg('auto', [['true', 'On'], ['false', 'Off']], String(!!s.auto)) + '</td></tr>' +
+        '</tbody></table></div>';
     },
     points() {
       return '<div class="sec">' + swRow('Points', '@points', RR.device.points) +
@@ -217,7 +204,7 @@
         '<button type="button" class="pill-btn primary" data-act="leave">Leave the lesson</button></div>';
     }
   };
-  const TABS_ALL = [['level', 'Level'], ['notes', 'Notes'], ['rhythms', 'Rhythms'], ['play', 'How to play'], ['helps', 'Helps'], ['points', 'Points'], ['sound', 'Sound'], ['share', 'Share']];
+  const TABS_ALL = [['level', 'Level'], ['notes', 'Notes'], ['rhythms', 'Rhythm'], ['play', 'Format'], ['helps', 'Look & Feel'], ['points', 'Points'], ['sound', 'Sound'], ['share', 'Share']];
   const TABS_LESSON = [['leave', 'Lesson'], ['points', 'Points'], ['sound', 'Sound']];
   const TABS_SESSION = [['level', 'Level'], ['session', '✎ Session'], ['points', 'Points'], ['sound', 'Sound'], ['share', 'Share']];
   const TABS_BATTLE = [['level', 'Level'], ['session', '⚔️ Battle'], ['points', 'Points'], ['sound', 'Sound']];
@@ -245,11 +232,11 @@
     $('#settings').hidden = true;
     RR.windowClosed($('#settings'));
     if (G.roundChanged) { G.roundChanged = false; G.contentChanged = false; G.queue = []; G.newRound(); }
-    else if (G.contentChanged) { G.contentChanged = false; G.queue = []; G.nextCard(); }
+    else if (G.contentChanged) { G.contentChanged = false; G.queue = []; if (G.battle) G.replanBattle(); G.nextCard(); }
   }
 
   const CONTENT = ['notes', 'rhythms', 'time', 'bars', 'moves', 'endDo', 'endLong', 'from', 'tricky'];
-  const ROUND = ['game', 'clockSecs', 'song'];
+  const ROUND = ['game', 'clockSecs', 'song', 'songPicks'];
   function change(k, v) {
     const s = G.setup;
     // a round's length: the Round button keeps the length there was (or 5); − / + and the box set it
@@ -270,6 +257,14 @@
       }
       RR.saveDevice(); G.drawChips(); return;
     }
+    // Song: the songs to play, any number (at least one), in the order picked
+    if (k === 'songPick') {
+      const list = G.songPicks().slice(), i = list.indexOf(v);
+      if (i >= 0) { if (list.length > 1) list.splice(i, 1); } else list.push(v);
+      k = 'songPicks'; v = list;
+    }
+    // the Song format plays the songs picked — a My melodies set laid over the practice stops
+    if (k === 'game' && v === 'song' && (s.set || RR.device.set)) { RR.device.set = null; s.set = null; RR.saveDevice(); }
     if (k === 'from' && v === 'set') {
       const first = RR.Sets.list().find(x => x.melodies.length);
       if (first) change('@set', first.id);
@@ -290,19 +285,25 @@
       s.tempos = tp;
     }
     else if (k === 'auto') s.auto = v === 'true' || v === true;
-    else if (k === 'play') s.playHidden = v === 'hidden';
+    else if (k === 'grey') s.grey = v === 'true' || v === true;
+    else if (k === 'barText') { s.letters = v === 'letters' || v === 'both'; s.nums = v === 'numbers' || v === 'both'; }
+    else if (k === 'practiceMode') { s.practice = v !== 'disabled'; s.practiceStart = v === 'off' ? 'off' : 'on'; }
+    else if (k === 'playMode') { s.playHidden = v === 'off'; s.playLights = v === 'anim'; }
     else s[k] = v;
     // the game is how a practice is played, not part of it: it stays with this
     // browser and never makes a level Custom (a lesson link can still set it)
     if (ROUND.includes(k)) {
       G.roundChanged = true;
       if (G.mode.kind === 'session') G.markCustom();           // a session keeps its own game
-      else if (G.mode.kind !== 'lesson') { RR.device.game = s.game; RR.device.clockSecs = s.clockSecs; RR.device.song = s.song; RR.saveDevice(); }
+      else if (G.mode.kind !== 'lesson') { RR.device.game = s.game; RR.device.clockSecs = s.clockSecs; RR.device.song = s.song; RR.device.songPicks = s.songPicks; RR.saveDevice(); }
     } else if (k === 'tricky') {             // a personal help: kept with the browser, the level stays the level
       if (G.mode.kind !== 'lesson') { RR.device.tricky = s.tricky; RR.saveDevice(); }
     } else G.markCustom();
     if (CONTENT.includes(k)) G.contentChanged = true;
-    if (k === 'practice' || k === 'play' || k === 'labels' || k === 'oneGo') { RR.Beat.stop(); G.resetCard(k === 'practice' ? (s.practice && !G.clock ? 'practice' : 'game') : undefined); }
+    if (k === 'practiceMode' || k === 'playMode' || k === 'labels') {
+      RR.Beat.stop(); G.stopHear(true);
+      G.resetCard(k === 'practiceMode' ? (s.practice && !G.clock && s.practiceStart !== 'off' ? 'practice' : 'game') : undefined);
+    }
     G.applyInstrument();
     G.draw();
   }
@@ -358,8 +359,8 @@
     }
     const pk = t.closest('[data-pick]');
     if (pk) { change('notes', pk.dataset.pick.split(',')); render(); return; }
-    const so = t.closest('[data-song]');
-    if (so) { change('song', so.dataset.song); render(); return; }
+    const so = t.closest('[data-songpick]');
+    if (so) { change('songPick', so.dataset.songpick); render(); return; }
     const cl = t.closest('[data-cell]');
     if (cl) {
       const id = cl.dataset.cell, s = G.setup, CELL = C();

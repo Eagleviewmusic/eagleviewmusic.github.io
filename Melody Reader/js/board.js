@@ -133,8 +133,8 @@
     const isLevel = G.mode.kind === 'level';
     const ready = isLevel && !G.playingSet() && r.length >= 5 && twos >= Math.ceil(r.length * 0.8) && G.mode.n < RR.LEVELS.length;
     const set = G.playingSet();
-    const song = s.game === 'song' ? (s.song || s.songs[0] || 'hot-cross-buns') : null;
-    const whole = s.game === 'song' ? (set ? set.title : RR.SONGS[song].title) : null;
+    const items = s.game === 'song' && !set ? G.songItems() : [];
+    const whole = s.game === 'song' ? (set ? set.title : items.length === 1 ? items[0].title : 'your songs') : null;
     show('<div class="rd-card"><h3>' + (whole ? 'You played all of ' + RR.esc(whole) + '!' : 'Round done!') + '</h3>' +
       '<div class="rd-sub">' + RR.esc(G.modeLabel()) + (rank === 0 && RR.device.points ? ' · <b class="new-best">a new best!</b>' : '') + '</div>' +
       '<div class="rd-rows">' + r.map(c => '<div class="rd-c"><b>' + RR.esc(c.label) + '</b><span>' + RR.markHtml(c) + '</span>' + (RR.device.points ? '<i>' + c.pts + '</i>' : '') + '</div>').join('') + '</div>' +
@@ -142,7 +142,7 @@
       '<div><b>' + G.bestStreak + '</b>best streak</div></div>' +
       (tricky ? '<div class="rd-tricky">Your tricky note: <b class="lpill" style="--c:' + BAR[tricky].colour + '">' + tricky[0] + '</b> — it shows on the Score board</div>' : '<div class="rd-tricky">No tricky notes this round.</div>') +
       (ready ? '<div class="rd-ready">Ready for the next level!</div>' : '') +
-      '<div class="rd-btns">' + (whole ? '<button type="button" class="pill-btn go" data-rd="song" data-label="' + (set ? '▶ Hear the whole set' : '▶ Hear your song') + '">' + (set ? '▶ Hear the whole set' : '▶ Hear your song') + '</button>' : '') +
+      '<div class="rd-btns">' + (whole ? '<button type="button" class="pill-btn go" data-rd="song" data-label="' + (set ? '▶ Hear the whole set' : items.length > 1 ? '▶ Hear your songs' : '▶ Hear your song') + '">' + (set ? '▶ Hear the whole set' : items.length > 1 ? '▶ Hear your songs' : '▶ Hear your song') + '</button>' : '') +
       '<button type="button" class="pill-btn" data-rd="again">Play again</button>' +
       (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn" data-rd="settings">Settings</button>') +
       (ready ? '<button type="button" class="pill-btn go" data-rd="next">Level ' + (G.mode.n + 1) + ' ▸</button>' : '') + '</div></div>');
@@ -167,13 +167,13 @@
       if (G.songPlaying) { G.stopSong(); b.textContent = b.dataset.label; return; }
       const s = G.setup;
       b.textContent = '■ Stop';
-      G.hearSong(s.song || s.songs[0] || 'hot-cross-buns', () => { b.textContent = b.dataset.label; });
+      G.hearSong(() => { b.textContent = b.dataset.label; });
       return;
     }
     if (a === 'again') G.newRound();
     else if (a === 'next') G.selectLevel(G.mode.n + 1);
     else if (a === 'settings') { G.newRound(); RR.Settings.open('level'); }
-    else if (a === 'battle-go') { hideRound(); G.draw(); G.roll(); }
+    else if (a === 'battle-go') { hideRound(); G.draw(); }
     else if (a === 'battle-new') { G.clearBattle(); G.newRound(); }
     else if (a === 'battle-edit') { G.clearBattle(); G.newRound(); RR.Settings.open('session'); }
   });

@@ -171,7 +171,6 @@
     const f = el && el._returnFocus;
     if (el) el._returnFocus = null;
     if (f && document.contains(f) && f.focus && !f.closest('[hidden]')) f.focus();
-    if (RR.onWindowClosed) RR.onWindowClosed();   // a Test with the metronome on counts in again (game.js)
   };
 
   /* An explaining note that folds into its ⓘ (the user's rule, D25). */
