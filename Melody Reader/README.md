@@ -30,7 +30,9 @@ Through the Claude Apps server (`../.claude/serve.js`; python's
 
 `http://localhost:8816/tests/` runs the engine checks (generator, Songbook,
 levels, engraver, practices, lesson links, melody sets under the library
-rules, the points) — 60 of them, all passing as of 2026-10-04.
+rules, the points, My sessions, the gold star, round lengths, Battle
+Mode) — 68 of them, all passing
+as of 2026-10-05.
 
 The Teacher Library shelf reads `../Teacher Library/index.json`, which only
 exists on the live site; served from its own folder (8815/8816) it can't be
@@ -90,6 +92,61 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
     points taken back, the streak as it was). A card counts once in the
     round: tried again, the new try replaces its entry. One go: no starting a
     begun Test over.
+- **My sessions** (2026-10-05, the user's ask) — the top of the level list
+  (the level box opens it). Type a name, **+ New session**: a copy of what is
+  playing becomes a session and its page opens — every choice on one page:
+  the name, the notes (and how they move, End on Do), the rhythms (time,
+  length), how it looks and the helps (coloured notes, letters and numbers on
+  the bars, the glow, ghost notes, under the notes, Practice first, Listen),
+  the gold star, the metronome's tempos, One go, Flash, the game (Round of
+  5/10, Song, Beat the clock, Endless) and where the melodies come from. The
+  app makes up new melodies from it every time. A session saves as you go —
+  it never turns Custom — and keeps its own game (a level plays the
+  browser's). While one plays, Settings shows Level · ✎ Session · Points ·
+  Sound · Share. ✎ on a row opens its page, × deletes it (its scores too; if
+  it was playing, what it was carries on as Custom). Each session has its own
+  best scores. The old Mine band's practices became sessions the first time
+  this version opened (`rainbow_reader_sessions_v1`), their scores with them.
+- **Battle Mode** (2026-10-05, the user's ask) — a kind of session that teams
+  play in turns. **⚔️ + New battle** (beside + New session) names it and opens
+  its page with **the teams first**: 2–4, each a name and one of 8 colours (a
+  colour another team has swaps; a name still its colour's, "Blue team",
+  follows the colour), + Add a team, × to take one out. Then **Turns and
+  rounds**: 1, 2 or 3 melodies a turn, and 1–20 rounds (− / + or type) — the
+  sum shows ("3 teams × 2 melodies × 2 rounds = 12 melodies") — then the
+  usual notes, rhythms, look, gold star, metronome (no Game: the battle is
+  the game). New battles start with Practice first off (a Test for points;
+  it can be turned on). Playing: a card starts the battle (the teams, who
+  goes first) or offers to **Carry on** one left part-way (kept in
+  `device.battle`, so a reload resumes); each team's turn is a card in its
+  colour (*Blue team — Go ▸*; Enter works); between rounds the standings;
+  at the end *Battle over — the winner* 🏆, the table, Battle again · Change
+  the battle. **The metronome in a battle** (the user's, same day): a tap opens
+  a choice — Slow · Moderate · Fast (with Off while it is on), each with its
+  BPM — and picking one counts in at once. It goes back to Off at every
+  team's turn, so each team turns it on for itself; within a team's turn it
+  rolls on as usual. (Outside a battle it still cycles Off → Slow → Moderate
+  → Fast.) While it runs the music card wears the team's colour, its name
+  sits with the turn's dots at the top, the level box says "Round 2 of 5",
+  and the **score chip becomes the teams' scores** (the team playing
+  ringed; a phone shows dots and numbers). The **Score board** shows the
+  standings and each round's points per team, then tricky notes. Points go
+  to the team (not the player's total); with points off a battle counts
+  gold stars. Next skips (0 for that team); ↻ on an untouched melody asks
+  before starting the whole battle over. Listed with the sessions, marked
+  **Battle**, with the teams' colours. Changing the teams, melodies a turn
+  or rounds starts the battle again; names and colours change at once.
+- **After each melody: a check and a gold star** (2026-10-05) — no words: a
+  green check when the melody was played through (with the metronome: no
+  note missed), or — in its place, never both — a gold star when it scored
+  **over 10** of 20 —
+  a practice's own mark can be 8+, over 10, 13+ or 16+ (How to play → The
+  gold star). They float up and fade as the words did; the points still fly
+  to the score chip, and the words still go to a screen reader. Practice's
+  "Got it!" is a check too. The round's dots, Round done and the Score board
+  show each melody's check, star or a grey dash (missed notes, skipped); the
+  score chip's ★ counts the round's gold stars. The ladder (the level list's
+  ★★★ and Level n+1 ▸) still runs on the 1–3 stars inside (`starsFor`).
 - **Count me in** (the count-in run, `beat.js`) — the family count-in (*Get
   ready 1 2 3 4*), then the metronome through the melody at **Slow 60 ·
   Moderate 80 · Fast 100** (the three tempos are in How to play). Nothing
@@ -107,13 +164,15 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   note drops it to 1–8 (−½ a wrong bar). Stars: ★ 1–7 · ★★ 8–12 · ★★★ 13–20;
   next level at ★★ or better in 4 of 5. The streak counts 8+ in a row (no
   bonus). Points and stars can each be turned off.
-- **Games** — Round of 5 or 10, Song (card by card, then *Hear your song*),
+- **Games** — a round of any 1–99 melodies (− / + or type it; 2026-10-05 —
+  there were only 5 and 10; more than 12 show "3 of 30" and a bar instead of
+  dots; the ladder counts rounds of 5 or more), Song (card by card, then *Hear your song*),
   Beat the clock (30 s · 60 s · 2 min), Endless. The game belongs to the
   browser, not the practice, so changing it never makes a level Custom.
 - **Fifteen levels** in six rainbow bands, a Songbook of twelve songs, and
   made-up melodies for every card.
-- **Settings** — Level (with best stars, and a *Mine* band for saved
-  practices), Notes, Rhythms, How to play, Helps, Points, Sound, Share.
+- **Settings** — Level (My sessions on top, then the levels with their best
+  stars), Notes, Rhythms, How to play, Helps, Points, Sound, Share.
 - **Score board** — this round, best scores per practice and game, tricky
   notes on a little xylophone and the mix-ups (*You played F for E*),
   *Practise these*, totals, Reset.
@@ -190,7 +249,7 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 | `js/xylophone.js` | the bars and their input |
 | `js/engrave.js` | the staff |
 | `js/songbook.js`, `js/melody.js` | the Songbook; rhythm cells and the generator |
-| `js/levels.js` | the ladder, the defaults, `sanitize`, the Mine band |
+| `js/levels.js` | the ladder, the defaults, `sanitize`, the gold star's marks, My sessions |
 | `js/game.js` | the card, Find the notes / No slips, scoring, rounds, games, Play; `RR.Scores` |
 | `js/beat.js` | Count me in: the count-in, the metronome, judging a run |
 | `js/points.js` | what a try is worth (1–20), the stars, the paces' tempos |
@@ -208,7 +267,8 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 `rainbow_reader_device_v1` (sound, points/stars, folded notes, the current
 level or practice, the game), `rainbow_reader_scores_v1` (per player: best
 rounds, the ladder's stars, first-try counts per note, mix-ups, totals),
-`rainbow_reader_mine_v1` (saved practices), `rainbow_reader_sets_v1` (My
+`rainbow_reader_sessions_v1` (My sessions; `rainbow_reader_mine_v1`, the old
+Mine band, is read once into it and left alone), `rainbow_reader_sets_v1` (My
 melodies, an id map of EVM items). The device also keeps the set being
 played and the player names. Every read is checked and
 falls back to defaults; a change of shape gets a new `_v2` key.
@@ -272,3 +332,28 @@ falls back to defaults; a change of shape gets a new `_v2` key.
   Score board or My melodies counts in again; the Maker blocks it.
 - The scores became `v: 2`: loading a `v: 1` file clears the best rounds
   (old scale) and keeps the ladder's stars, tricky notes, mix-ups, totals.
+- **My sessions (2026-10-05).** The session page is the other tabs' renderers
+  joined (`TAB.notes() + rhythms() + helps() + play()`), so every control
+  goes through the one click handler. `G.markCustom()` is where a session
+  saves (`RR.Sessions.update`); the game keys save there too for a session,
+  to the browser for anything else. `usePractice` lays the browser's game
+  over a level but not over a session. Score keys are `session:<id>`, so a
+  rename keeps the scores; a Mine practice's old `mine:<name>` scores are
+  copied across once (`legacy`, game.js), then the marker is dropped.
+- **The check and the star** come from `finish()`: `made` = not a metronome
+  run with a Missed note; `gold` = made and points ≥ `setup.gold` (raw
+  points, before Points off zeroes them). Round entries carry `made`,
+  `gold`, `skip` beside the old `stars`.
+- **A round's length lives in the game's name** (`'round7'`, `RR.roundLen`):
+  the best scores are kept per game, so each length has its own, and the
+  old `round5` / `round10` (device, sessions, lesson links, bests) read on
+  unchanged. `sanitize` takes 1–99; anything else falls back to round5.
+- **Battle Mode (2026-10-05).** A battle is one long round (`G.roundN =
+  rounds × teams × per`) whose entries carry `team`; `RR.battleAt(b, k)`
+  says whose turn melody k is. `nextCard` shows the turn card
+  (`Board.battleCard`) before `roll()`, so the overlay holds a metronome
+  count-in back until Go. The battle's own `G.setup.game` is forced to a
+  round (never Song or the clock). Progress is saved after every finish or
+  skip and cleared at the end; `newRound` resumes it only when the session
+  id and the shape (teams-per-rounds) still match. Plain ⚔ draws as a thin
+  "x" in Fredoka — use the emoji form ⚔️ (with U+FE0F).

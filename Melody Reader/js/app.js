@@ -33,7 +33,8 @@
     const tag = e.target && e.target.tagName;
     if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
     if (e.key === 'Escape') {
-      if (RR.Maker.active && !anyWindow()) RR.Maker.cancel();
+      if (G.pickOpen()) { G.closePick(); $('#btn-metro').focus(); }
+      else if (RR.Maker.active && !anyWindow()) RR.Maker.cancel();
       else if (G.phase === 'countin' && !anyWindow()) G.stopCountIn();
       else closeWindows();
       return;
@@ -70,7 +71,12 @@
   $('#btn-play').addEventListener('click', () => G.hearIt());
   $('#btn-mode').addEventListener('click', () => G.toggleMode());
   // Off → Slow → Moderate → Fast: the player's, for this visit (it never makes a practice Custom)
-  $('#btn-metro').addEventListener('click', () => G.cycleMetro());
+  $('#btn-metro').addEventListener('click', () => G.metroTap());
+  // Battle Mode's choice of tempo: a pick counts in; a tap anywhere else closes it
+  $('#metro-pick').addEventListener('click', e => { const b = e.target.closest('[data-metro]'); if (b) G.setMetro(b.dataset.metro); });
+  document.addEventListener('pointerdown', e => {
+    if (G.pickOpen() && !e.target.closest('#metro-pick') && !e.target.closest('#btn-metro')) G.closePick();
+  }, true);
   $('#btn-restart').addEventListener('click', () => G.restart());
   $('#btn-next').addEventListener('click', () => G.next());
   // the Get ready card tapped while it counts: stop, back to Practice (the user's wish, 2026-10-05)
@@ -93,8 +99,11 @@
   /* the practice this browser was last on (or a lesson link's) */
   function restore() {
     const d = RR.device.practice;
-    if (d && d.practice && (d.kind === 'custom' || d.kind === 'mine')) {
-      G.usePractice(d.practice, d.kind === 'mine' ? { kind: 'mine', name: String(d.name || 'Mine') } : { kind: 'custom', from: d.from || null });
+    // a session: as it is saved now (an old Mine practice: the session it became)
+    const ses = d && (d.kind === 'session' ? RR.Sessions.get(d.id) : d.kind === 'mine' ? RR.Sessions.list().find(x => x.name === String(d.name || '').trim().slice(0, 40)) : null);
+    if (ses) G.selectSession(ses.id);
+    else if (d && d.practice && (d.kind === 'custom' || d.kind === 'mine' || d.kind === 'session')) {
+      G.usePractice(d.practice, { kind: 'custom', from: d.kind === 'custom' ? d.from || null : d.name || null });
     } else {
       G.selectLevel(Math.max(1, Math.min(RR.LEVELS.length, RR.device.level | 0 || 1)));
     }

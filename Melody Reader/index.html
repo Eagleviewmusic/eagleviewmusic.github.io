@@ -38,6 +38,7 @@
       <div class="topbar-right">
         <button class="chip score-chip" id="score-chip" type="button" aria-label="Score board">
           <span class="sc-player" id="sc-player" hidden></span>
+          <span class="sc-teams" id="sc-teams"></span>
           <span class="sc-stars"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.3L12 17.1l-5.7 3.1 1.2-6.3L2.8 9.5l6.4-.8z"/></svg><b id="sc-stars">0</b></span>
           <span class="sc-points"><b id="sc-points">0</b><small>pts</small></span>
           <span class="sc-streak"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.6 2c.4 3.2 3.9 5 4.9 8.6 1.2 4.3-1.6 9.4-5.6 9.4-3.7 0-6.4-3-5.9-6.8.3-2.3 1.7-3.6 2.6-4.9.2 1.5.9 2.7 2 3.2-.6-3.6.4-6.9 2-9.5z"/></svg><b id="sc-streak">0</b></span>
@@ -100,6 +101,8 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path class="body" d="M9.2 3.2h5.6l4 17.3H5.2z" stroke-width="2" stroke-linejoin="round"/><path d="M6.6 15.2h10.8" stroke-width="1.8"/><path class="arm" d="M12 15.2L17.6 3.6" stroke-width="2" stroke-linecap="round"/><rect class="mw" id="metro-weight" x="-2.2" y="-1.4" width="4.4" height="2.8" rx=".7" transform="translate(14.3 9.6) rotate(25.8)"/></svg>
               </button>
               <span class="ctl-label metro-label" id="metro-label">Off</span>
+              <!-- Battle Mode: the metronome opens a choice of tempo; picking one counts in at once (game.js metroTap) -->
+              <div class="metro-pick" id="metro-pick" role="group" aria-label="Pick a tempo" hidden></div>
             </div>
           </div>
         </div>

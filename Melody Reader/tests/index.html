@@ -212,6 +212,57 @@
       check('Slow · Moderate · Fast are 60 · 80 · 100 by default', ['slow', 'moderate', 'fast'].map(id => RR.paceTempo(RR.DEFAULTS, id)).join() === '60,80,100');
     })();
 
+    /* ---- My sessions and the gold star (2026-10-05) ---- */
+    (function () {
+      check('A round can be any 1–99 melodies; the old 5 and 10 still read', RR.sanitize({ game: 'round7' }).game === 'round7' &&
+        RR.sanitize({ game: 'round10' }).game === 'round10' && RR.sanitize({ game: 'round1' }).game === 'round1' && RR.sanitize({ game: 'round99' }).game === 'round99' &&
+        RR.sanitize({ game: 'round0' }).game === 'round5' && RR.sanitize({ game: 'round100' }).game === 'round5' && RR.sanitize({ game: 'round-3' }).game === 'round5' &&
+        RR.sanitize({ game: 'endless' }).game === 'endless' && RR.roundLen('song') === 0 && RR.roundLen('round12') === 12);
+      // Battle Mode
+      const b0 = RR.cleanBattle(null);
+      check('A battle is two to four teams, each its own colour; 1–3 melodies a turn; 1–20 rounds', b0.teams.length === 2 && b0.per === 1 && b0.rounds === 3 &&
+        b0.teams[0].colour !== b0.teams[1].colour && b0.teams[0].name === 'Red team' &&
+        RR.cleanBattle({ teams: [1, 2, 3, 4, 5, 6].map(i => ({ name: 'T' + i, colour: '#ef4444' })), per: 4, rounds: 99 }).teams.length === 4 &&
+        new Set(RR.cleanBattle({ teams: [{ colour: '#ef4444' }, { colour: '#ef4444' }, { colour: '#bad' }] }).teams.map(t => t.colour)).size === 3 &&
+        RR.cleanBattle({ per: 4, rounds: 99 }).per === 1 && RR.cleanBattle({ per: 3, rounds: 20 }).rounds === 20 &&
+        RR.cleanBattle({ teams: [{ name: '  Eagles  ', colour: '#3b82f6' }] }).teams[0].name === 'Eagles');
+      const b3 = RR.cleanBattle({ teams: [{}, {}, {}], per: 2, rounds: 2 });
+      const order = Array.from({ length: RR.battleTotal(b3) }, (_, k) => RR.battleAt(b3, k)).map(a => a.round + ':' + a.team + ':' + a.q).join(' ');
+      check('A battle takes turns: each team its melodies, every team a round', RR.battleTotal(b3) === 12 &&
+        order === '0:0:0 0:0:1 0:1:0 0:1:1 0:2:0 0:2:1 1:0:0 1:0:1 1:1:0 1:1:1 1:2:0 1:2:1');
+      check('The gold star comes from over 10 by default, and only from its marks', RR.DEFAULTS.gold === 11 &&
+        RR.sanitize({ gold: 13 }).gold === 13 && RR.sanitize({ gold: 12 }).gold === 11 && RR.sanitize({ gold: '16' }).gold === 11);
+      // run against this page's own storage, put back afterwards
+      const K = [RR.KEY.sessions, RR.KEY.mine], keep = K.map(k => localStorage.getItem(k));
+      try {
+        localStorage.removeItem(RR.KEY.sessions);
+        localStorage.setItem(RR.KEY.mine, JSON.stringify([{ name: 'Old one', practice: { notes: ['F4', 'A4'], set: 'set_x', tricky: true } }]));
+        const moved = RR.Sessions.list();
+        check('The old Mine practices become sessions, once (scores follow by their old key)', moved.length === 1 && moved[0].name === 'Old one' &&
+          moved[0].legacy === 'mine:Old one' && moved[0].practice.notes.join() === 'F4,A4' && moved[0].practice.set === null && moved[0].practice.tricky === false);
+        const a = RR.Sessions.add('  Week 3  ', Object.assign(RR.clone(RR.DEFAULTS), { notes: ['E4', 'G4'], colour: 'black', set: 'set_y', game: 'round10' }));
+        const b = RR.Sessions.add('Week 4', RR.DEFAULTS);
+        const got = RR.Sessions.get(a.id);
+        check('A session keeps its name, its choices and its game — never a melody set laid over it', got.name === 'Week 3' &&
+          got.practice.colour === 'black' && got.practice.game === 'round10' && got.practice.set === null && a.id !== b.id &&
+          RR.Sessions.list().map(x => x.name).slice(0, 3).join('|') === 'Old one|Week 3|Week 4');
+        RR.Sessions.update(a.id, Object.assign(RR.clone(got.practice), { gold: 16 }));
+        RR.Sessions.rename(a.id, 'Week 3 — lines');
+        const rn = RR.Sessions.rename(b.id, '   ');
+        RR.Sessions.remove(moved[0].id);
+        const bt = RR.Sessions.add('Friday', RR.DEFAULTS, { teams: [{ name: 'Eagles', colour: '#a855f7' }, {}], per: 2, rounds: 4 });
+        RR.Sessions.updateBattle(bt.id, Object.assign(RR.clone(RR.Sessions.get(bt.id).battle), { rounds: 5 }));
+        const btx = RR.Sessions.get(bt.id);
+        check('A battle is saved with the sessions, labelled, with its teams', btx.kind === 'battle' && btx.battle.teams[0].name === 'Eagles' &&
+          btx.battle.teams.length === 2 && btx.battle.per === 2 && btx.battle.rounds === 5 && !RR.Sessions.get(a.id).kind &&
+          RR.Sessions.updateBattle(a.id, { rounds: 2 }) === null);
+        check('Sessions change, rename (never to nothing) and delete', RR.Sessions.get(a.id).practice.gold === 16 &&
+          RR.Sessions.get(a.id).name === 'Week 3 — lines' && rn === false && RR.Sessions.get(b.id).name === 'Week 4' && !RR.Sessions.get(moved[0].id));
+      } finally {
+        K.forEach((k, i) => { if (keep[i] == null) localStorage.removeItem(k); else localStorage.setItem(k, keep[i]); });
+      }
+    })();
+
     document.getElementById('sum').innerHTML = '<span class="' + (fail ? 'fail' : 'pass') + '">' + pass + ' passed, ' + fail + ' failed</span>';
     document.title = (fail ? 'FAIL ' : 'PASS ') + document.title;
   })();

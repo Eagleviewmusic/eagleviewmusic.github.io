@@ -10,7 +10,9 @@
    RR.BANDS        Red … Violet
    RR.sanitize(p)  any practice from storage or a link, made safe: unknown
                    fields dropped, every value checked, defaults filled in
-   RR.Mine         the ladder's Mine band (saved practices)
+   RR.Sessions     My sessions — your own named practices, top of the
+                   level list (2026-10-05; were the Mine band); Battle Mode
+                   sessions among them (RR.cleanBattle, RR.battleAt)
    ========================================================================== */
 (function () {
   'use strict';
@@ -24,12 +26,13 @@
     { id: 'blue', name: 'Blue', title: 'Leaps and new times', colour: '#3b82f6', about: 'No letters on the bars; 3/4, dotted rhythms' },
     { id: 'violet', name: 'Violet', title: 'Sight-reader', colour: '#8b5cf6', about: 'Black notes, one go, no Practice; Flash' }
   ];
-  RR.MINE_COLOUR = '#8a7563';
+  RR.SESSION_COLOUR = '#0d9488';
 
   RR.DEFAULTS = {
     notes: ['C4', 'D4', 'E4', 'F4', 'G4'], moves: 'steps', endDo: true, tricky: false, grey: false,
     rhythms: ['q', 'h'], time: [4, 4], bars: 1, endLong: true,
     tempos: [60, 80, 100], practice: true, oneGo: false, flash: 0,     // the metronome: Slow · Moderate · Fast (POINTS-AND-COUNT-IN.md)
+    gold: 11,                                                          // a gold star from this many points (of 20): over 10
     game: 'round5', clockSecs: 60, song: null, from: 'both', auto: true,
     colour: 'always', letters: true, nums: true, glow: 'after2', ghost: true, labels: 'none',
     playHidden: false, playLights: true,
@@ -63,6 +66,25 @@
     return p;
   };
 
+  /* a round's length is in its game: 'round5', 'round12' … any 1–99 melodies
+     (2026-10-05; there were only 5 and 10). 0 = not a round (Song, Beat the
+     clock, Endless). Kept in the name, so the old rounds and their best
+     scores (kept per game) carry on as they were */
+  RR.ROUND_MAX = 99;
+  RR.roundLen = g => { const m = /^round(\d{1,3})$/.exec(typeof g === 'string' ? g : ''); return m && +m[1] >= 1 && +m[1] <= RR.ROUND_MAX ? +m[1] : 0; };
+  RR.gameText = p => {
+    const n = RR.roundLen(p.game);
+    return n ? n + (n === 1 ? ' melody' : ' melodies') : p.game === 'song' ? 'a Songbook song' : p.game === 'clock' ? 'Beat the clock' : 'Endless';
+  };
+
+  /* the gold star's marks: [points, the button, what it means] */
+  RR.GOLDS = [
+    [8, '8 or more', 'every note right first time'],
+    [11, 'Over 10', 'more than half the points'],
+    [13, '13 or more', 'in time with the metronome'],
+    [16, '16 or more', 'with the metronome at Moderate or Fast']
+  ];
+
   /* ---- making any practice safe ---- */
   const oneOf = (v, list, d) => list.includes(v) ? v : d;
   const bool = (v, d) => typeof v === 'boolean' ? v : d;
@@ -81,7 +103,8 @@
       p.tempos = raw.tempos.map(v => Math.max(40, Math.min(160, Math.round(v)))).sort((a, b) => a - b);
     }
     p.flash = oneOf(raw.flash, [0, 2, 3, 4, 6], D.flash);
-    p.game = oneOf(raw.game, ['round5', 'round10', 'song', 'clock', 'endless'], D.game);
+    p.gold = oneOf(raw.gold, RR.GOLDS.map(g => g[0]), D.gold);
+    p.game = RR.roundLen(raw.game) ? 'round' + RR.roundLen(raw.game) : oneOf(raw.game, ['song', 'clock', 'endless'], D.game);
     p.clockSecs = oneOf(raw.clockSecs, [30, 60, 120], D.clockSecs);
     p.song = RR.SONGS[raw.song] ? raw.song : null;
     p.set = typeof raw.set === 'string' && raw.set ? raw.set.slice(0, 80) : null;
@@ -115,20 +138,87 @@
     return RR.notesText(p.notes) + ' · ' + p.rhythms.filter(r => !C[r].rest).map(r => C[r].name).join(' ') +
       (p.rhythms.some(r => C[r].rest) ? ' · rests' : '') + (p.time[0] !== 4 ? ' · ' + p.time.join('/') : '') +
       (p.tempos.join() !== RR.DEFAULTS.tempos.join() ? ' · ' + p.tempos.join('/') + ' BPM' : '') +
-      (p.practice ? '' : ' · no Practice') + (p.flash ? ' · Flash' : '');
+      (p.practice ? '' : ' · no Practice') + (p.flash ? ' · Flash' : '') + (p.gold !== RR.DEFAULTS.gold ? ' · ★ ' + p.gold + '+' : '');
   };
 
-  /* ---- the Mine band ---- */
-  RR.Mine = {
-    list() {
-      const v = RR.load(RR.KEY.mine, []);
-      return Array.isArray(v) ? v.filter(m => m && typeof m.name === 'string').map(m => ({ name: m.name.slice(0, 40), practice: RR.sanitize(m.practice) })) : [];
+  /* ---- Battle Mode: the teams' colours, and a battle made safe ----
+     A battle (2026-10-05) is a session that teams play in turns: 2–4 teams,
+     each a name and a colour; each turn one team plays `per` melodies (1–3);
+     every team once is a round; `rounds` rounds (1–20) make the battle. */
+  RR.TEAM_COLOURS = [
+    ['#ef4444', 'Red'], ['#3b82f6', 'Blue'], ['#22c55e', 'Green'], ['#eab308', 'Gold'],
+    ['#a855f7', 'Purple'], ['#f97316', 'Orange'], ['#14b8a6', 'Teal'], ['#ec4899', 'Pink']
+  ];
+  RR.BATTLE_ROUNDS_MAX = 20;
+  const colourOk = c => RR.TEAM_COLOURS.some(x => x[0] === c);
+  RR.freeColour = teams => (RR.TEAM_COLOURS.find(c => !teams.some(t => t.colour === c[0])) || RR.TEAM_COLOURS[0]);
+  RR.cleanBattle = function (b) {
+    const teams = [];
+    (b && Array.isArray(b.teams) ? b.teams : []).slice(0, 4).forEach(t => {
+      if (!t || typeof t !== 'object') return;
+      const c = colourOk(t.colour) && !teams.some(x => x.colour === t.colour) ? t.colour : RR.freeColour(teams)[0];
+      const name = typeof t.name === 'string' && t.name.trim() ? t.name.trim().slice(0, 24) : RR.TEAM_COLOURS.find(x => x[0] === c)[1] + ' team';
+      teams.push({ name, colour: c });
+    });
+    while (teams.length < 2) { const c = RR.freeColour(teams); teams.push({ name: c[1] + ' team', colour: c[0] }); }
+    const per = [1, 2, 3].includes(b && b.per) ? b.per : 1;
+    const rounds = b && Number.isInteger(b.rounds) && b.rounds >= 1 && b.rounds <= RR.BATTLE_ROUNDS_MAX ? b.rounds : 3;
+    return { teams, per, rounds };
+  };
+  /* where melody k (from 0) falls: which round, whose turn, which of the turn's melodies */
+  RR.battleAt = function (b, k) {
+    const T = b.teams.length;
+    return { round: Math.floor(k / (b.per * T)), team: Math.floor(k / b.per) % T, q: k % b.per };
+  };
+  RR.battleTotal = b => b.rounds * b.teams.length * b.per;
+
+  /* ---- My sessions ----
+     A session is a named practice of your own — the notes, the rhythms, the
+     look, the helps, the game, the gold star — and every melody in it is
+     made up from those choices, new each time it is played. Kept as
+     [{ id, name, practice }] in rainbow_reader_sessions_v1, in the order they
+     were made; a Battle Mode session also has kind: 'battle' and its battle
+     (teams, per, rounds — its practice's game is not used). The first read
+     brings the old Mine band's practices across (`legacy` = their old score
+     key; game.js moves the scores, then drops it). A session never keeps the
+     browser's own things: a My melodies set laid over it, or Practise my
+     tricky notes. */
+  const newId = () => 'ses_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+  const own = p => { const c = RR.sanitize(p); c.set = null; c.tricky = false; return c; };
+  function readSessions() {
+    let v = RR.load(RR.KEY.sessions, null);
+    if (!Array.isArray(v)) {
+      const old = RR.load(RR.KEY.mine, []);
+      v = Array.isArray(old) ? old.filter(m => m && typeof m.name === 'string' && m.name.trim())
+        .map(m => ({ id: newId(), name: m.name.trim().slice(0, 40), practice: own(m.practice), legacy: 'mine:' + m.name })) : [];
+      RR.save(RR.KEY.sessions, v);
+    }
+    return v.filter(x => x && typeof x.id === 'string' && typeof x.name === 'string')
+      .map(x => Object.assign({ id: x.id, name: x.name.slice(0, 40) || 'My session', practice: own(x.practice) },
+        x.kind === 'battle' ? { kind: 'battle', battle: RR.cleanBattle(x.battle) } : {},
+        typeof x.legacy === 'string' ? { legacy: x.legacy } : {}));
+  }
+  const write = list => RR.save(RR.KEY.sessions, list);
+  RR.Sessions = {
+    list: readSessions,
+    get: id => readSessions().find(x => x.id === id) || null,
+    add(name, practice, battle) {
+      const list = readSessions(), rec = { id: newId(), name: String(name).trim().slice(0, 40), practice: own(practice) };
+      if (battle) { rec.kind = 'battle'; rec.battle = RR.cleanBattle(battle); }
+      list.push(rec); write(list); return rec;
     },
-    add(name, practice) {
-      const list = RR.Mine.list().filter(m => m.name !== name);
-      list.push({ name, practice: RR.clone(practice) });
-      RR.save(RR.KEY.mine, list);
+    update(id, practice) { const list = readSessions(), x = list.find(y => y.id === id); if (x) { x.practice = own(practice); write(list); } },
+    updateBattle(id, battle) {
+      const list = readSessions(), x = list.find(y => y.id === id);
+      if (x && x.kind === 'battle') { x.battle = RR.cleanBattle(battle); write(list); return x.battle; }
+      return null;
     },
-    remove(name) { RR.save(RR.KEY.mine, RR.Mine.list().filter(m => m.name !== name)); }
+    rename(id, name) {
+      const n = String(name).trim().slice(0, 40); if (!n) return false;
+      const list = readSessions(), x = list.find(y => y.id === id); if (!x) return false;
+      x.name = n; write(list); return true;
+    },
+    remove(id) { write(readSessions().filter(x => x.id !== id)); },
+    dropLegacy(id) { const list = readSessions(), x = list.find(y => y.id === id); if (x) { delete x.legacy; write(list); } }
   };
 })();

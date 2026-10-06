@@ -25,6 +25,15 @@
    again from the first melody, the round's points taken back. A card's
    try counts once in the round: trying it again replaces it.
 
+   Battle Mode (2026-10-05): a battle session's teams take turns — `per`
+   melodies a turn, every team once a round, `rounds` rounds; the whole
+   battle is one long round (G.roundN = rounds × teams × per) whose entries
+   carry their `team`. Board.js puts a card up at each turn (Go ▸), between
+   rounds (the standings) and at the end (the winner). Points go to the team,
+   not the player's session total; with points off a battle counts gold
+   stars. A battle in progress is kept in device.battle, so a reload can
+   carry on.
+
    The card: evs (the notes with their start ticks), states[i] ('todo' ·
    'lit' · 'missed'), judge[i] (a count-in run's Perfect … Missed — never
    shown), times[i] (when it was struck, s), tries[i] (slips before it was
@@ -76,7 +85,7 @@
       const m = G.mode;
       if (m.kind === 'lesson') return 'lesson:' + m.name;
       if (G.playingSet()) return 'set:' + G.setup.set;          // a melody set is its own score board
-      return m.kind === 'level' ? String(m.n) : m.kind === 'mine' ? 'mine:' + m.name : 'custom';
+      return m.kind === 'level' ? String(m.n) : m.kind === 'session' ? 'session:' + m.id : 'custom';
     },
     entry(key) {
       const L = this.me().levels;
@@ -89,6 +98,16 @@
     reset() { delete this.data.players[RR.device.player || '']; this.save(); }
   };
   Scores.load();
+  /* the old Mine band's scores follow their practices into My sessions (levels.js), once */
+  RR.Sessions.list().forEach(x => {
+    if (!x.legacy) return;
+    Object.keys(Scores.data.players).forEach(k => {
+      const L = Scores.data.players[k] && Scores.data.players[k].levels;
+      if (L && typeof L === 'object' && L[x.legacy] && !L['session:' + x.id]) L['session:' + x.id] = L[x.legacy];
+    });
+    Scores.save();
+    RR.Sessions.dropLegacy(x.id);
+  });
 
   /* ---------------- state ---------------- */
   const G = RR.Game = {
@@ -103,6 +122,7 @@
     dealt: [],                    // the round's cards so far, for starting it over
     phase: 'ready', justLit: -1, justAt: 0, ghosts: [], hearIdx: -1, hearing: false, hearTimers: [],
     hidden: false, rows: null,
+    battle: null, battleResume: false,   // Battle Mode: { teams, per, rounds } while a battle session plays
     round: [], roundN: 5, points: 0, streak: 0, bestStreak: 0, queue: [], recent: [], songPtr: 0, rstats: {},
     overlay: false, autoT: null, clock: null
   };
@@ -122,7 +142,7 @@
   /* ---------------- choosing what to play ---------------- */
   function modeLabel(m) {
     if (m.kind === 'level') return 'Level ' + m.n + ' · ' + RR.LEVELS[m.n - 1].name;
-    if (m.kind === 'mine') return 'Mine · ' + m.name;
+    if (m.kind === 'session') return (G.battle ? '⚔️ ' : '') + m.name;
     if (m.kind === 'lesson') return 'Lesson · ' + m.name;
     return 'Custom' + (m.from ? ' (from ' + m.from + ')' : '');
   }
@@ -133,14 +153,18 @@
     return rec && rec.melodies.length ? rec : null;
   };
   G.modeLabel = () => { const set = G.playingSet(); return (set && G.mode.kind !== 'lesson' ? set.title + ' · ' : '') + modeLabel(G.mode); };
-  G.modeColour = () => G.mode.kind === 'level' ? RR.bandOf(G.mode.n).colour : G.mode.kind === 'lesson' ? '#7c3aed' : RR.MINE_COLOUR;
+  G.modeColour = () => G.mode.kind === 'level' ? RR.bandOf(G.mode.n).colour : G.mode.kind === 'lesson' ? '#7c3aed' : G.mode.kind === 'session' ? RR.SESSION_COLOUR : '#8a7563';
 
-  function usePractice(practice, mode) {
+  function usePractice(practice, mode, battle) {
     G.mode = mode;
     G.setup = RR.sanitize(practice);
-    if (mode.kind !== 'lesson') {             // the game this browser plays (see settings.js)
-      const g = RR.sanitize({ game: RR.device.game, clockSecs: RR.device.clockSecs, song: RR.device.song });
-      G.setup.game = g.game; G.setup.clockSecs = g.clockSecs; G.setup.song = g.song;
+    G.battle = battle ? RR.cleanBattle(battle) : null;
+    if (G.battle) G.setup.game = 'round5';      // a battle's length is its own (newRound); never Song or the clock
+    if (mode.kind !== 'lesson') {
+      if (mode.kind !== 'session') {          // the game this browser plays (see settings.js); a session keeps its own
+        const g = RR.sanitize({ game: RR.device.game, clockSecs: RR.device.clockSecs, song: RR.device.song });
+        G.setup.game = g.game; G.setup.clockSecs = g.clockSecs; G.setup.song = g.song;
+      }
       G.setup.tricky = RR.device.tricky === true;
       // a melody set chosen to play (My melodies) is laid over the same way
       G.setup.set = RR.device.set && RR.Sets.get(RR.device.set) ? RR.device.set : null;
@@ -148,14 +172,26 @@
     G.queue = []; G.songPtr = 0; G.contentChanged = false; G.roundChanged = false;
     G.fresh = true;
     if (mode.kind === 'level') { RR.device.level = mode.n; RR.device.practice = null; RR.saveDevice(); }
-    else if (mode.kind === 'custom' || mode.kind === 'mine') { RR.device.practice = { kind: mode.kind, name: mode.name || null, from: mode.from || null, practice: G.setup }; RR.saveDevice(); }
+    else if (mode.kind === 'custom') { RR.device.practice = { kind: 'custom', from: mode.from || null, practice: G.setup }; RR.saveDevice(); }
+    else if (mode.kind === 'session') { RR.device.practice = { kind: 'session', id: mode.id, practice: G.setup }; RR.saveDevice(); }
     applyInstrument();
     newRound();
   }
   G.usePractice = usePractice;
   G.selectLevel = n => usePractice(RR.practiceOfLevel(n), { kind: 'level', n });
-  /* a change in the Settings tabs: the practice becomes Custom (from …) */
+  G.selectSession = function (id) {
+    const x = RR.Sessions.get(id);
+    if (x) usePractice(x.practice, { kind: 'session', id: x.id, name: x.name }, x.kind === 'battle' ? x.battle : null);
+    return !!x;
+  };
+  /* a change in the Settings tabs: a session keeps it (it saves as you go);
+     anything else becomes Custom (from …) */
   G.markCustom = function () {
+    if (G.mode.kind === 'session') {
+      RR.Sessions.update(G.mode.id, G.setup);
+      RR.device.practice = { kind: 'session', id: G.mode.id, practice: G.setup }; RR.saveDevice();
+      return;
+    }
     if (G.mode.kind === 'custom' || G.mode.kind === 'lesson') { if (G.mode.kind === 'custom') { RR.device.practice = { kind: 'custom', from: G.mode.from, practice: G.setup }; RR.saveDevice(); } return; }
     const from = G.mode.kind === 'level' ? 'Level ' + G.mode.n : G.mode.name;
     G.mode = { kind: 'custom', from };
@@ -216,23 +252,67 @@
     G.roundStreak = G.streak;
     if (RR.Board) RR.Board.hideRound();
     const s = G.setup;
+    const len = RR.roundLen(s.game);              // a round: 1–99 melodies
     if (s.game === 'song') { G.queue = []; refill(); G.roundN = G.queue.length; }
-    else if (G.playingSet() && (s.game === 'round5' || s.game === 'round10')) G.roundN = Math.min(s.game === 'round10' ? 10 : 5, G.playingSet().melodies.length) || 5;
-    else G.roundN = s.game === 'round10' ? 10 : (s.game === 'endless' || s.game === 'clock') ? Infinity : 5;
+    else if (G.playingSet() && len) G.roundN = Math.min(len, G.playingSet().melodies.length) || len;
+    else G.roundN = len || ((s.game === 'endless' || s.game === 'clock') ? Infinity : 5);
     G.clock = s.game === 'clock' ? { secs: s.clockSecs, started: null, notes: 0, melodies: 0, clean: 0, pts: 0, timer: null } : null;
+    G.battleResume = false;
+    if (G.battle) {
+      G.roundN = RR.battleTotal(G.battle);
+      // a battle left part-way (a reload, the row picked again): carry on from where it was
+      const saved = RR.device.battle;
+      if (saved && saved.id === G.mode.id && saved.shape === battleShape() && Array.isArray(saved.round) &&
+        saved.round.length > 0 && saved.round.length < G.roundN) {
+        G.round = saved.round.map(e => Object.assign({}, e));
+        G.battleResume = true;
+      } else clearBattle();
+    }
     nextCard();
   }
   G.newRound = newRound;
 
+  /* ---------------- Battle Mode ---------------- */
+  const battleShape = () => G.battle.teams.length + '-' + G.battle.per + '-' + G.battle.rounds;
+  function saveBattle() {
+    if (!G.battle || G.mode.kind !== 'session') return;
+    RR.device.battle = { id: G.mode.id, shape: battleShape(), round: G.round.map(e => ({ team: e.team, pts: e.pts, stars: e.stars, made: !!e.made, gold: !!e.gold, skip: !!e.skip, label: e.label })) };
+    RR.saveDevice();
+  }
+  function clearBattle() { if (RR.device.battle) { RR.device.battle = null; RR.saveDevice(); } }
+  G.clearBattle = clearBattle;
+  /* the slot being played (from 0), and where it falls */
+  G.slot = () => G.cardEntry >= 0 ? G.cardEntry : G.round.length;
+  G.battleNow = () => G.battle ? RR.battleAt(G.battle, Math.min(G.slot(), G.roundN - 1)) : null;
+  /* each team's score so far: points (with points off, gold stars) and gold stars */
+  G.teamScores = function () {
+    const b = G.battle; if (!b) return [];
+    return b.teams.map((t, i) => {
+      const mine = G.round.filter(e => e.team === i);
+      const pts = mine.reduce((a, e) => a + (e.pts | 0), 0), gold = mine.filter(e => e.gold).length;
+      return { i, name: t.name, colour: t.colour, pts, gold, score: RR.device.points ? pts : gold };
+    });
+  };
+  /* a battle's teams or shape changed in Settings: the names and colours at once; a new shape, a new battle */
+  G.setBattle = function (b) {
+    const old = G.battle && battleShape();
+    G.battle = RR.cleanBattle(b);
+    if (old !== battleShape()) G.roundChanged = true;
+    draw();
+  };
+
   function nextCard(card) {
     clearTimeout(G.autoT);
+    closePick();
     stopHear(true); if (RR.Beat) RR.Beat.stop();
     if (G.fresh) { G.fresh = false; G.openTest = false; } else leaveCard();
+    if (G.battle && RR.battleAt(G.battle, G.round.length).q === 0) { G.openTest = false; G.metro = 'off'; }   // each team's turn starts afresh: Practice (if any), the metronome off
     if (!card) { if (!G.queue.length) refill(); card = G.queue.shift(); }
     G.card = card; G.dealt.push(card);
     G.practisedHere = false; G.cardEntry = -1;
     resetCard(openingStage());
     draw();
+    if (G.battle && RR.Board) RR.Board.battleCard();       // whose turn: a card with Go ▸ (holds the count-in back)
     roll();
   }
   G.nextCard = nextCard;
@@ -324,14 +404,42 @@
   G.cycleMetro = function () {
     if (G.overlay || G.clock) return;
     const order = ['off', 'slow', 'moderate', 'fast'];
-    G.metro = order[(order.indexOf(G.metro) + 1) % order.length];
+    setMetro(order[(order.indexOf(G.metro) + 1) % order.length]);
+  };
+  /* Battle Mode (the user's, 2026-10-05): the metronome opens a choice — Slow ·
+     Moderate · Fast (and Off while it is on) — and picking a tempo counts in at
+     once. It goes back to Off at each team's turn (nextCard): every team turns
+     it on for itself. Anywhere else it cycles, as above */
+  G.metroTap = function () {
+    if (G.overlay || G.clock) return;
+    if (!G.battle) { G.cycleMetro(); return; }
+    if (pickOpen()) { closePick(); return; }
+    const s = G.setup, pick = $('#metro-pick');
+    pick.innerHTML = (metroOn() ? '<button type="button" data-metro="off" class="off">Off</button>' : '') +
+      RR.Points.PACES.map(p => '<button type="button" data-metro="' + p.id + '" class="' + (G.metro === p.id ? 'on' : '') + '">' +
+        '<b>' + p.name + '</b><small>' + RR.paceTempo(s, p.id) + ' BPM</small></button>').join('');
+    pick.hidden = false;
+    $('#btn-metro').setAttribute('aria-expanded', 'true');
+    const f = pick.querySelector('.on') || pick.querySelector('[data-metro]:not(.off)'); if (f) f.focus();
+  };
+  const pickOpen = () => !$('#metro-pick').hidden;
+  function closePick() {
+    const pick = $('#metro-pick'); if (pick.hidden) return;
+    pick.hidden = true;
+    $('#btn-metro').setAttribute('aria-expanded', 'false');
+  }
+  G.closePick = closePick; G.pickOpen = pickOpen;
+  G.setMetro = id => { closePick(); setMetro(id); };
+  function setMetro(id) {
+    if (G.overlay || G.clock) return;
+    G.metro = ['off', 'slow', 'moderate', 'fast'].includes(id) ? id : 'off';
     if (G.hearing) stopHear(true);
     if (G.stage === 'game' && G.phase !== 'done' && !(G.setup.oneGo && G.started)) {
       RR.Beat.stop(); resetCard(); draw();
       if (metroOn()) RR.Beat.start();
     } else drawSides();
     announce(metroOn() ? 'Metronome: ' + RR.Points.paceOf(G.metro).name : 'Metronome off');
-  };
+  }
 
   /* ↻ — a card with something played starts over; an untouched one starts
      the whole round over */
@@ -346,6 +454,14 @@
       resetCard(); draw();
       announce('From the top.');
       roll();
+    } else if (G.battle) {
+      // a battle: everything back to 0 — asked first
+      if (!G.round.length) return;
+      RR.ask('Start the whole battle over? Every team goes back to 0.', 'Start over').then(yes => {
+        if (!yes) return;
+        clearBattle(); G.queue = G.dealt.concat(G.queue); newRound();
+        announce('The battle starts over.');
+      });
     } else {
       // the round from its first melody: the same melodies, its points taken back
       G.points -= G.round.reduce((a, r) => a + r.pts, 0);
@@ -427,7 +543,8 @@
   /* Practice: the notes found — say so, then clear them to go again */
   function practiceFound() {
     G.phase = 'review';
-    showPraise('Got it!', 0, 0, 'Go again — or tap Practice for the Test');
+    showMark(true, false, 0);
+    announce('Got it! Go again, or tap Practice for the Test.');
     $('#btn-mode').classList.add('ready');
     practiceClear(1500);
   }
@@ -464,7 +581,11 @@
     } else r = scoreFree();
     G.result = r;
     let pts = r.pts;
-    const stars = RR.Points.starsFor(pts);
+    const stars = RR.Points.starsFor(pts);                 // 1–3: the ladder's (the level list, Level n+1)
+    // what the player sees: a green check — played through (with the metronome: no note missed) —
+    // and a gold star from the practice's mark (over 10 points of 20, unless it says otherwise)
+    const made = !G.run || noteIdx().every(i => G.judge[i] !== 'Missed');
+    const gold = made && pts >= (s.gold || 11);
     G.clean = pts >= 8;                         // every note first time
     // a card counts once in the round: tried again (Start over, or back to Practice), the new try replaces it
     const again = G.cardEntry >= 0;
@@ -474,21 +595,24 @@
     if (G.clock && !again) { G.clock.melodies++; if (G.clean) G.clock.clean++; }
     if (!RR.device.points) pts = 0;
     const c = G.card;
-    const entry = { stars, pts, label: c.set ? '#' + c.part : c.title ? c.title.split(/[ ,]/)[0] + ' ' + c.part : 'Made up' };
+    const entry = { stars, pts, made, gold, label: c.set ? '#' + c.part : c.title ? c.title.split(/[ ,]/)[0] + ' ' + c.part : 'Made up' };
+    if (G.battle) { entry.team = G.battleNow().team; pts = r.pts; entry.pts = pts; }   // a battle's points go to the team, even with points off
     if (again) {
       const old = G.round[G.cardEntry];
-      G.points -= old.pts; if (G.clock) G.clock.pts -= old.pts;
+      if (!G.battle) G.points -= old.pts;
+      if (G.clock) G.clock.pts -= old.pts;
       G.round[G.cardEntry] = entry;
     } else { G.cardEntry = G.round.length; G.round.push(entry); }
-    G.points += pts;
+    if (!G.battle) G.points += pts;
+    else saveBattle();
     if (G.clock) G.clock.pts += pts;
     const me = Scores.me();
     me.totals.melodies = (me.totals.melodies | 0) + 1;
     Scores.save();
     RR.Xylo.setGlow(null);
-    showPraise(r.word, stars, pts, r.detail);
-    announce(r.word + ' ' + (r.detail ? r.detail + '. ' : '') + (RR.device.stars ? stars + (stars === 1 ? ' star. ' : ' stars. ') : '') + (RR.device.points && pts ? pts + ' points.' : ''));
-    if (RR.device.celebrate) RR.Sound.celebrate(stars);
+    showMark(made, gold, pts);
+    announce(r.word + ' ' + (r.detail ? r.detail + '. ' : '') + (gold && RR.device.stars ? 'A gold star! ' : '') + (RR.device.points && pts ? pts + ' points.' : ''));
+    if (RR.device.celebrate && made) RR.Sound.celebrate(gold ? 3 : 2);
     draw();
     if (G.clock) { G.autoT = setTimeout(() => nextCard(), 700); return; }
     // a Test with the metronome rolls on: the next card, counted in again
@@ -502,8 +626,11 @@
   function next() {
     if (G.overlay) return;
     if (G.cardEntry < 0) {                       // never finished in a Test: skipped
-      G.round.push({ stars: 0, pts: 0, label: 'Skipped' });
+      const e = { stars: 0, pts: 0, made: false, gold: false, skip: true, label: 'Skipped' };
+      if (G.battle) e.team = G.battleNow().team;
+      G.round.push(e);
       G.streak = 0;
+      saveBattle();
     }
     if (G.round.length >= G.roundN) { stopHear(true); if (RR.Beat) RR.Beat.stop(); leaveCard(); RR.Board.roundDone(); return; }
     nextCard();
@@ -579,7 +706,7 @@
   /* a window opening over the music: Play stops, and a count-in run (which
      can't be played under a window) is called off — the card starts again */
   G.pause = function () {
-    stopHear(true);
+    stopHear(true); closePick();
     if (RR.Beat && (RR.Beat.running() || G.phase === 'countin' || G.phase === 'running')) { RR.Beat.stop(); resetCard(); draw(); }
   };
   G.hearIt = hearIt;
@@ -651,13 +778,29 @@
     // around the music
     drawSides();
     const c = G.card;
-    $('#tune-name').textContent = c.title ? c.title + ' · ' + (c.sub ? c.sub + ' · ' : '') + c.part + ' of ' + c.of : 'A made-up melody';
+    const bn = G.battleNow();
+    $('#tune-name').textContent = bn ? 'Round ' + (bn.round + 1) + ' of ' + G.battle.rounds :
+      c.title ? c.title + ' · ' + (c.sub ? c.sub + ' · ' : '') + c.part + ' of ' + c.of : 'A made-up melody';
     // the round's dots, top centre: the card being played rings (a counted one being tried again too)
     const dots = [], here = G.cardEntry >= 0 ? G.cardEntry : G.round.length;
-    if (isFinite(G.roundN)) {
+    // a battle: the team whose turn it is, and its melodies this turn; the music card wears its colour
+    const stand = $('#stand');
+    stand.classList.toggle('battle-on', !!bn);
+    if (bn) {
+      const t = G.battle.teams[bn.team], first = here - bn.q;
+      stand.style.setProperty('--tc', t.colour);
+      dots.push('<span class="turn-tag" style="--tc:' + t.colour + '">' + RR.esc(t.name) + '</span>');
+      for (let i = first; i < first + G.battle.per; i++) {
+        const r = G.round[i];
+        dots.push('<span class="dot' + (r ? ' done ' + (r.gold && RR.device.stars ? 'gold' : r.made ? 'made' : r.skip ? 'skip' : 'miss') : '') + (i === here ? ' now' : '') + '"></span>');
+      }
+    } else if (isFinite(G.roundN) && G.roundN > 12) {
+      // a long round: a count and a bar, not a row of dots
+      dots.push('<span class="dots-count">' + Math.min(here + 1, G.roundN) + ' of ' + G.roundN + '</span><span class="dots-bar"><i style="width:' + (100 * G.round.length / G.roundN) + '%"></i></span>');
+    } else if (isFinite(G.roundN)) {
       for (let i = 0; i < G.roundN; i++) {
         const r = G.round[i];
-        dots.push('<span class="dot' + (r ? ' done s' + r.stars : '') + (i === here ? ' now' : '') + '"></span>');
+        dots.push('<span class="dot' + (r ? ' done ' + (r.gold && RR.device.stars ? 'gold' : r.made ? 'made' : r.skip ? 'skip' : 'miss') : '') + (i === here ? ' now' : '') + '"></span>');
       }
     }
     $('#dots').innerHTML = dots.join('');
@@ -671,7 +814,8 @@
     const notes = G.evs.filter(e => !e.rest).length, lit = G.states.filter(x => x === 'lit').length;
     const bars = Math.round(total / (c.time[0] * 4));
     const name = c.title ? c.title + ', ' + (c.sub ? c.sub + ', ' : '') + c.part + ' of ' + c.of : 'A made-up melody';
-    return (G.stage === 'practice' ? 'Practice. ' : 'Test. ') + 'The music: ' + name + '. ' + c.time[0] + '/4, ' + bars + (bars === 1 ? ' bar' : ' bars') + ', ' + notes + ' notes' +
+    const bn = G.battleNow();
+    return (bn ? G.battle.teams[bn.team].name + '’s turn. ' : '') + (G.stage === 'practice' ? 'Practice. ' : 'Test. ') + 'The music: ' + name + '. ' + c.time[0] + '/4, ' + bars + (bars === 1 ? ' bar' : ' bars') + ', ' + notes + ' notes' +
       (lit ? ', ' + lit + ' played' : '') + (G.clean ? '' : ', with slips') + '.';
   }
 
@@ -707,9 +851,10 @@
     const on = metroOn(), pace = RR.Points.paceOf(G.metro), m = $('#btn-metro');
     m.classList.toggle('on', on);
     m.disabled = !!G.clock;
+    if (G.battle) m.setAttribute('aria-haspopup', 'true'); else { m.removeAttribute('aria-haspopup'); m.removeAttribute('aria-expanded'); }
     $('#metro-label').textContent = on ? pace.name : 'Off';
     m.title = on ? 'Metronome: ' + pace.name + ' (' + RR.paceTempo(s, pace.id) + ' BPM) — a Test counts you in, worth ' + pace.lo + '–' + pace.hi + ' points. Tap to change.' :
-      'Metronome off. Tap for Slow, Moderate or Fast';
+      G.battle ? 'Metronome off. Tap to pick a tempo — the count-in starts at once' : 'Metronome off. Tap for Slow, Moderate or Fast';
     m.setAttribute('aria-label', m.title);
     const w = WEIGHT[G.metro] || WEIGHT.off;
     $('#metro-weight').setAttribute('transform', 'translate(' + (12 + 5.6 * w).toFixed(2) + ' ' + (15.2 - 11.6 * w).toFixed(2) + ') rotate(25.8)');
@@ -728,11 +873,20 @@
     const who = RR.Players ? RR.Players.current() : '';
     $('#sc-player').textContent = who;
     $('#sc-player').hidden = !who;
-    $('#sc-stars').textContent = G.round.reduce((a, r) => a + r.stars, 0);
+    $('#sc-stars').textContent = G.round.filter(r => r.gold).length;     // the round's gold stars
     $('#sc-points').textContent = G.points;
     $('#sc-streak').textContent = G.streak;
     $('#score-chip').classList.toggle('no-points', !RR.device.points);
     $('#score-chip').classList.toggle('no-stars', !RR.device.stars);
+    // a battle: the score chip is the teams' scores, the team playing ringed
+    const sc = $('#score-chip'), teams = $('#sc-teams');
+    sc.classList.toggle('battle', !!G.battle);
+    if (G.battle) {
+      const bn = G.battleNow(), done = G.round.length >= G.roundN;
+      teams.innerHTML = G.teamScores().map(t => '<span class="team-pill' + (!done && bn && bn.team === t.i ? ' on' : '') + '" style="--tc:' + t.colour + '" title="' + RR.esc(t.name) + '">' +
+        '<i></i><b>' + RR.esc(t.name) + '</b><em>' + (RR.device.points ? t.pts : '★ ' + t.gold) + '</em></span>').join('');
+      sc.setAttribute('aria-label', 'Score board: ' + G.teamScores().map(t => t.name + ' ' + t.score).join(', '));
+    } else sc.setAttribute('aria-label', 'Score board');
   }
   G.drawChips = drawChips;
   new ResizeObserver(() => draw()).observe(music);
@@ -759,15 +913,18 @@
     sparkAt(r.left + ev.cx, r.top + row.geo.yOf(ev.step), BAR[ev.p].colour, 8);
   }
   G.sparkAtNote = sparkAtNote;
-  /* the word after a try (or a practice run: no stars, no points) */
-  function showPraise(word, stars, pts, detail) {
-    const el = $('#praise');
-    el.innerHTML = '<b>' + word + (detail ? '<small>' + RR.esc(detail) + '</small>' : '') + '</b>' +
-      (RR.device.stars && stars ? '<span class="p-stars">' + RR.starsHtml(stars, 3) + '</span>' : '') +
-      (RR.device.points && pts ? '<span class="p-pts">+' + pts + '</span>' : '');
-    el.className = 'praise'; void el.offsetWidth; el.className = 'praise show';
+  /* after a try: a gold star for a high score, or else a green check if it was
+     played through — one or the other, never both — floating up and fading
+     (2026-10-05; the words went to the screen reader). The points still fly
+     to the score chip */
+  function showMark(made, gold, pts) {
+    const el = $('#praise'), star = gold && RR.device.stars;
+    el.innerHTML = (star ? RR.STAR_SVG : made ? RR.CHECK_SVG : '') + (RR.device.points && pts ? '<span class="p-pts">+' + pts + '</span>' : '');
+    if (!el.innerHTML) return;
+    el.className = 'praise mark'; void el.offsetWidth; el.className = 'praise mark show';
     const r = el.getBoundingClientRect();
-    if (stars === 3 && RR.device.stars) sparkAt(r.left + r.width / 2, r.top + r.height / 2, '#fbbf24', 16, true);
+    if (star) { const st = el.querySelector('.mk-star').getBoundingClientRect(); sparkAt(st.left + st.width / 2, st.top + st.height / 2, '#fbbf24', 16, true); }
+    else if (made) sparkAt(r.left + r.width / 2, r.top + r.height / 2, '#22c55e', 8);
     if (RR.device.points && pts && !reduced()) {
       const from = (el.querySelector('.p-pts') || el).getBoundingClientRect();
       setTimeout(() => {

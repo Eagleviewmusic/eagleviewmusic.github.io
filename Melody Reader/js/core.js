@@ -50,7 +50,8 @@
   RR.KEY = {
     device: 'rainbow_reader_device_v1',
     scores: 'rainbow_reader_scores_v1',
-    mine: 'rainbow_reader_mine_v1'
+    mine: 'rainbow_reader_mine_v1',          // the old Mine band — read once, into sessions
+    sessions: 'rainbow_reader_sessions_v1'   // My sessions (levels.js)
   };
   RR.load = function (key, fallback) {
     try {
@@ -69,9 +70,9 @@
     v: 1, voice: 'vibraphone', volume: 0.8, points: true, stars: true, celebrate: true,
     folded: {},                 // ⓘ notes folded away, by id
     level: 1,                   // the level being played…
-    practice: null,             // …or a custom / Mine practice: { practice, from, mine }
+    practice: null,             // …or a custom practice or a session: { kind, practice, from | id }
     player: '',
-    game: 'round5', clockSecs: 60, song: null,  // how this browser plays: Round of 5 · 10 · Song · Beat the clock · Endless
+    game: 'round5', clockSecs: 60, song: null,  // how this browser plays: a round of 1–99 ('round7') · Song · Beat the clock · Endless
     tricky: false,                              // Practise my tricky notes — a personal help, kept with the browser
     set: null,                                  // a My melodies set being played (laid over the level)
     players: []                                 // first names on a shared computer (players.js)
@@ -100,6 +101,15 @@
   RR.pageBase = () => location.href.split(/[?#]/)[0];
 
   /* ---- small pieces of UI ---- */
+  /* after a melody (2026-10-05): a green check — played through; a gold star — a high score */
+  RR.CHECK_SVG = '<svg class="mk-check" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22" fill="#16a34a"/><path d="M13.5 24.5l7 7 14-15" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  RR.STAR_SVG = '<svg class="mk-star" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 3.5l6.2 13 14.2 1.8-10.4 9.8 2.7 14.1L24 35.3l-12.7 6.9 2.7-14.1L3.6 18.3l14.2-1.8z" fill="#fbbf24" stroke="#d97706" stroke-width="2.5" stroke-linejoin="round"/></svg>';
+  /* a melody in the round, small: its gold star, its check, or a grey dash (missed notes, skipped) */
+  RR.markHtml = function (r) {
+    if (r && r.gold && RR.device.stars) return '<span class="mk mk-g" title="Gold star">' + RR.STAR_SVG + '</span>';
+    if (r && r.made) return '<span class="mk mk-m" title="Played through">' + RR.CHECK_SVG + '</span>';
+    return '<span class="mk mk-x" title="' + (r && r.skip ? 'Skipped' : 'Notes missed') + '">–</span>';
+  };
   RR.starsHtml = function (n, of) {
     let h = '';
     for (let i = 0; i < (of || 3); i++) h += i < n ? '★' : '<span class="off">★</span>';
