@@ -1,0 +1,17 @@
+{
+  "name": "I Can Say · 我会说",
+  "short_name": "I Can Say",
+  "description": "A picture board that speaks each word in Mandarin, then English.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FFF7EC",
+  "theme_color": "#FFF7EC",
+  "lang": "en",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>I Can Say · 我会说</title>
+<meta name="description" content="A picture board that speaks each word in Mandarin, then English.">
+<meta name="theme-color" content="#FFF7EC">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="I Can Say">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preload" href="fonts/andika-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <h1 class="title">I Can Say <span class="title-zh" lang="zh-CN">我会说</span></h1>
+  <div class="grownup">
+    <span class="grownup-hint" id="grownupHint" aria-hidden="true">Hold for grown-ups</span>
+    <button class="grownup-btn" id="grownupBtn" type="button" aria-label="Grown-ups (press and hold)">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle class="ring" cx="12" cy="12" r="11" pathLength="100"/>
+        <g class="gear">
+          <circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.4"/>
+          <rect x="10.7" y="3.4" width="2.6" height="3.4" rx=".6"/>
+          <rect x="10.7" y="3.4" width="2.6" height="3.4" rx=".6" transform="rotate(45 12 12)"/>
+          <rect x="10.7" y="3.4" width="2.6" height="3.4" rx=".6" transform="rotate(90 12 12)"/>
+          <rect x="10.7" y="3.4" width="2.6" height="3.4" rx=".6" transform="rotate(135 12 12)"/>
+          <rect x="10.7" y="3.4" width="2.6" height="3.4" rx=".6" transform="rotate(180 12 12)"/>
+          <rect x="10.7" y="3.4" width="2.6" height="3.4" rx=".6" transform="rotate(225 12 12)"/>
+          <rect x="10.7" y="3.4" width="2.6" height="3.4" rx=".6" transform="rotate(270 12 12)"/>
+          <rect x="10.7" y="3.4" width="2.6" height="3.4" rx=".6" transform="rotate(315 12 12)"/>
+        </g>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main class="board" id="board" aria-label="Communication board"></main>
+
+<dialog class="panel" id="panel" aria-labelledby="panelTitle">
+  <form method="dialog" class="panel-inner">
+    <h2 id="panelTitle">For grown-ups <span lang="zh-CN">家长设置</span></h2>
+
+    <fieldset class="setting">
+      <legend>When a picture is pressed, say it in…</legend>
+      <div class="choices" id="orderChoices">
+        <label><input type="radio" name="order" value="zh-en"><span><b lang="zh-CN">中文</b> then English</span></label>
+        <label><input type="radio" name="order" value="en-zh"><span>English then <b lang="zh-CN">中文</b></span></label>
+        <label><input type="radio" name="order" value="zh"><span><b lang="zh-CN">中文</b> only</span></label>
+        <label><input type="radio" name="order" value="en"><span>English only</span></label>
+      </div>
+    </fieldset>
+
+    <label class="switch">
+      <input type="checkbox" id="showZh">
+      <span class="switch-track" aria-hidden="true"></span>
+      <span>Show the Chinese words on the board <span lang="zh-CN">显示中文</span></span>
+    </label>
+
+    <section class="words">
+      <h3>The words</h3>
+      <table>
+        <thead><tr><th>English</th><th lang="zh-CN">中文</th><th>Pinyin</th></tr></thead>
+        <tbody id="wordList"></tbody>
+      </table>
+    </section>
+
+    <section class="tips">
+      <h3>Tips</h3>
+      <ul>
+        <li><b>Put it on the home screen.</b> Open this page in Safari, tap Share, then <i>Add to Home Screen</i>. It opens full-screen and keeps working without Wi-Fi.</li>
+        <li><b>Keep her on the board.</b> Turn on Guided Access (Settings → Accessibility → Guided Access), then triple-click the side or Home button while the board is open.</li>
+        <li><b>No sound?</b> Turn the volume up. Older iPhones may also need the side switch off silent.</li>
+      </ul>
+    </section>
+
+    <p class="credits">
+      Pictures: Custom children's clip art illustrations. Voices: Natural neural speech (Xiaoyi and Ana). Lettering: Andika (SIL).
+    </p>
+
+    <button class="done" value="done">Done</button>
+  </form>
+</dialog>
+
+<script src="words.js"></script>
+<script src="audio-data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
