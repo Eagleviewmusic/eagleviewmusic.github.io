@@ -62,7 +62,7 @@ the system's light/dark setting.
   Z X C V B tabs go down the side or along the bottom — whichever leaves bigger buttons — then
   grow into the leftover space and are centred with the buttons. Positions depend only on the
   rows, sizes, the space and the tab count — never on label text, so holding a modifier (IV →
-  IV⁷) never moves a button. `fitRoundSide()` passes the last arrangement back in (`prev`): a
+  IV⁷) never moves a button. `keyboardLayout()` passes the last arrangement back in (`prev`): a
   resize keeps it while it is within 3% of the best, so the board doesn't jump; the other side's
   slant is matched when it costs little (`partner`). Typical cost 0.2 ms per side, 1.4 ms worst
   in a live resize.
@@ -115,6 +115,7 @@ applies.
 | `audio.js` | The synth: 13 voices, one master chain, a synthesized room. `play`/`stop` for keys held now; `schedule` for notes laid on the audio clock ahead of time (added for Song Writer). Copied byte-identical to `virtual-keyboard/audio.js` and `Song Writer 2.0/lib/audio.js` — change it here, then copy. |
 | `script.js` | State, layout building, key presets, the three views, playing, editing, library, share links. |
 | `standard-board.js` | The standard board: where the Buttons view puts every chord and note by default (designed in Accordion Builder; see "The standard board"). |
+| `fill.js` | The touch layout of the Buttons view (`window.fillRound`, "Fill the screen"): rows in musical order that fill a side, for phones, tablets and small windows. Pure — no DOM. Tested by `../Digital Accordion Packing Lab/tests/fill.cjs`. See "Filling the screen". |
 | `pack.js` | The fallback packer for the Buttons view (`window.packRound`), for a side the standard board or a designed board cannot place: rows nested on diagonals, tab placement, hysteresis. Pure — no DOM. Tested by `../Digital Accordion Packing Lab/`. |
 
 ## The model
@@ -137,7 +138,9 @@ Three views draw the same blocks:
 
 - **Buttons** — round buttons where the standard board puts them (`standard-board.js`, designed
   in Accordion Builder), or where a layout's own board puts them; `pack.js` packs a side the
-  boards cannot place. See "The standard board" and "Designed boards" below.
+  boards cannot place. See "The standard board" and "Designed boards" below. On a phone or a
+  tablet (and in any window too small for the keyboard board) the buttons fill the screen
+  instead, in rows in musical order — see "Filling the screen".
 - **Panels** — the blocks stretched to fill the side, for thumbs on a phone: rows share the
   height evenly, and a block's width weight still counts. The chord side takes one shape in
   every scale and key (`panelChordRows`): F (3/4 wide) beside G at the bottom, then A S D, then
@@ -367,7 +370,8 @@ Chromium). Smallest targets: the key arrows (26×34 px) and lock switches (22×5
 In the Buttons view the round buttons no longer come from the packer by default: they go where
 **`standard-board.js`** puts them — a board designed by hand in Accordion Builder ("Accordion
 Layout 4", the user's, for the space each side gets on a 1440 × 900 laptop) and scaled to fit any
-screen by `placeBoard()`, rings kept. To make a new one the default: export it from the builder
+screen by `placeBoard()` (since 2026-10-06 by the buttons' own outline, faces grown until the
+closest two are 6 px apart — see "Designed boards"). To make a new one the default: export it from the builder
 and run `node "../Digital Accordion Packing Lab/standard-from-file.mjs" <that file>`, which
 rewrites this file and the builder's copy. A chord finds its place by which of the preset's fourteen it
 is (`standardBoardFor()`: `scale.chords[i]` → the key it sits on, F D S A G R E Q W; `top[i]` → 1–5),
@@ -379,6 +383,79 @@ packer (`pack.js`) is now the fallback: a side with a block the standard does no
 or duplicated chord, a note off the seven steps, an eight-note scale — is packed as before, and so
 is anything the Packing Lab still measures. `standard-board.js` is copied byte-identical into
 `../Accordion Builder/` (its Standard presets): change it here, then copy.
+
+## Filling the screen (phones and tablets, 2026-10-06)
+
+The user's ask: the Buttons view was *"a nice layout for the circles when it's full screen, but a
+totally unusable layout on the phone or smaller screens"*: the standard board kept its laptop
+shape on every screen, so on a phone in portrait each side was a tall strip with a small square
+board in it (24 px chords, 22 px notes; an iPhone SE on its side, 14 px). The board's places
+mirror the computer keyboard, which a phone doesn't have, so there the buttons are free to fill
+the space; and they must not get too small to play.
+
+**Settings → Layout → Buttons** (this device only, `localStorage` `key_blocks_buttons_fit_v1`;
+not part of a layout, so a shared layout does not force a phone into the keyboard board):
+
+- **Auto** (the default) — fills the screen on a touch screen (`(hover: none), (pointer: coarse)`:
+  phones, tablets; a touch laptop has a trackpad, so it keeps the keyboard board) — unless every
+  side shown has its own board from Accordion Builder, which is kept — and wherever the
+  keyboard board's smallest button would be under 56 px (it comes back at 60, so a resize near the
+  line does not flicker); the keyboard board everywhere else.
+- **Like the keyboard** — always the standard (or designed) board.
+- **Fill the screen** — always the touch layout.
+
+**The touch layout** (`fill.js`, `window.fillRound`; `fitRound()` → `fillLayout()` in script.js):
+
+- The notes go **by pitch**, the chords **by importance** (the presets' rank: I V IV vi ii iii, then
+  V/V V/vi IV/IV, ♭VI iv vii°7/V V/iii V/ii; a chord the presets don't know comes last). They are
+  cut into rows, bottom to top, and each row reads left to right — a chord row in the standard
+  board's left-to-right order (a designed board's, if the side has one), with the six everyday
+  chords before the others (vi ii iii V/V, not vi V/V ii iii). So the bottom row is I with its
+  neighbours (IV I V, or vi IV I V ii), and the low notes are at the bottom.
+- Every way of cutting the rows is tried — 1 to 9 a row, equal or alternating k / k−1 (which nest
+  centred: 4 / 3 gives an octave every two rows, with the same notes in columns), the tonic chord
+  alone at the bottom — flat or rising at 30°, tight or a little spread; each row drops into the
+  dimples of the rows below. The one with the biggest buttons wins (flat rows preferred by 4%). All
+  of them are built once per side in units and cached, so fitting a box (a resize, or trying a
+  split of the screen) is a scan: ~0.02 ms; a new side costs ~30 ms (chords) / 13 ms (notes) once.
+- **The chord I may be 1.3× the others** when it costs them under about 9%; **Do stays the same
+  size** as the other notes (a bigger Do cost 8–11% everywhere and broke the rows).
+- Slack in the free direction spreads the rows (or the columns) up to 22%, then the board is centred.
+- The Z X C V B tabs go down the side or along the bottom, whichever leaves bigger buttons; along
+  a narrow side's bottom they squeeze to 32 px each (`.round-mods.tight`, smaller label).
+- **On a tall screen the two sides may sit one above the other**, chords on top (the side order
+  setting decides; melody-left puts the melody on top): `fitRound()` tries it when the stage is
+  taller than 0.8 × its width, splits the height so both sides get the same size of button
+  (`stackSides()`), and keeps it when that is at least 6% bigger than side by side (5% to switch
+  back). `.stage.stacked` (no bellows; one slim header row each).
+- On a touch screen the key letters are hidden in this layout (`.stage.touch-keys-off`): they
+  no longer say where your fingers go.
+- A chord set below Extreme gives fewer, bigger chords here (the keyboard board keeps its gaps).
+
+Phone chrome, for the same reason: a narrow side's header hides the register's name and the word
+"notes" (container ≤ 340 px), so it stays one row; on a phone ≤ 440 px wide the view switches
+tighten so Library and Settings stay on the first row of the top bar (a 360 px phone had three
+rows); on a phone on its side the logo goes (the way home stands in) and the top bar keeps to one row.
+
+Regular face (chords / notes), before → after, headless Chrome, touch emulated for phones and tablets:
+
+| Screen | Before | After |
+| --- | --- | --- |
+| Phone 390 × 844 | 24 / 22 | 67 / 67 (stacked; I 90) |
+| Phone 844 × 390 | 28 / 31 | 57 / 61 (I 78) |
+| Phone 360 × 740 | 21 / 19 | 55 / 58 (stacked) |
+| iPhone SE 375 × 667 | 22 / 20 | 55 / 55 (stacked) |
+| iPhone SE 667 × 375 | 14 / 22 | 46 / 47 |
+| iPad 768 × 1024 | 53 / 49 | 114 / 114 (stacked; I 151) |
+| iPad 1024 × 768 | 79 / 73 | 111 / 108 (I 147) |
+| Laptop window 800 × 600 (auto → fill) | 56 / 52 (smallest chord 46) | 77 / 77 |
+
+Tested: `../Digital Accordion Packing Lab/tests/fill.cjs` (random boxes and sizes plus the app's
+real sides: every button placed, inside the box, rings ≥ 2 px apart, tabs clear, rows in order and
+climbing — 0 failures); in the app, chord sets on both layouts (the keyboard board moves nothing),
+Settings switching both ways, Keys / Panels (the classes go), solo sides, an added chord (packer in
+the keyboard layout, last in the touch layout), a designed board (outline fit, 1.3× cap), no
+console errors.
 
 ## Designed boards (from Accordion Builder, 2026-09-27)
 
@@ -400,11 +477,18 @@ backup → Open a backup…). `normalizeLayout` validates it (numbers only, circ
 blocks that exist) and drops it if it is unusable; the library card says "designed board".
 
 In the Buttons view a side with a board (either side) is placed by `placeBoard()` instead of `pack.js`
-(`fitRoundSide` checks that every block in the rows has a circle): the area is scaled to fit
-the side's body as a whole and centred, so the design keeps its proportions on every screen
-(the 4 px rings and the 2 px air between them keep their pixels, so faces scale a little more
-than centres do and buttons that touched still touch, never overlap), and the tabs take the strip the board reserved (bottom or side; at least 40 px, growing into
-the slack up to 52 / 60 px, as the packer's do; `'none'` means the five slots are empty).
+(`keyboardLayout()` checks that every block in the rows has a circle). The tabs take the strip the
+board reserved (bottom or side; at least 40 px, growing into the slack up to 52 / 60 px, as the
+packer's do; `'none'` means the five slots are empty). **Since 2026-10-06 (the user: "the circles
+could be a little bigger to fill the space more on a full screen")** the buttons are fitted by
+their own outline, rings included — all the board's places, so a chord set still leaves its gaps
+and nothing moves when it changes — not by the area they were drawn in; then every face grows by
+the same factor until the two closest buttons are `BOARD_GAP` (6 px) apart, `BOARD_GROW` (1.3×) at
+most. The design keeps its shape and proportions (the tonic stays as much bigger as it was
+drawn); the 4 px rings keep their pixels. On the standard board this gave (regular chord / note
+face): 1920 × 1080 154 → 181 / 141 → 147 px, 1440 × 900 120 → 130 / 112 → 116, 1280 × 800 103 →
+113 / 96 → 99. The notes grow less because the design already sets them close (the nearest two
+are 18 board units apart, face to face) and the board fills its side's height.
 Panels and Keys views use the rows as usual (the builder derives them from the positions).
 
 Editing a side that has a board: **moving a block to another row, adding a block or duplicating

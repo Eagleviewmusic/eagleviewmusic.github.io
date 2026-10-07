@@ -988,7 +988,7 @@ function renderSide(side, pos) {
   }
   if (side === 'chords') {
     const tonesBtn = document.createElement('button'); tonesBtn.className = 'mini-btn lamp' + (layout.chordTones ? ' on' : '');
-    tonesBtn.title = 'Show the notes inside each chord'; tonesBtn.textContent = '♪ notes';
+    tonesBtn.title = 'Show the notes inside each chord'; tonesBtn.innerHTML = '♪<span class="btn-word"> notes</span>';
     tonesBtn.addEventListener('click', () => { layout.chordTones = !layout.chordTones; touch(); renderAll(); });
     tools.appendChild(tonesBtn);
     const setBtn = document.createElement('button'); setBtn.className = 'mini-btn set-btn';
@@ -1031,7 +1031,7 @@ function renderSide(side, pos) {
     ? (side === 'melody' ? ((layout.melodyDesign || 'grid') === 'grid' ? panelMelodyRows() : S.rows) : panelChordRows())
     : side === 'chords' ? chordRowsInSet() : S.rows;
   if (isRound()) {
-    // round buttons: the blocks sit loose in the body and fitRoundSide() packs them (and the tabs)
+    // round buttons: the blocks sit loose in the body and fitRound() places them (and the tabs)
     body.classList.add('round');
     tower.classList.add('round-tower');
     rowsToRender.flat(2).forEach(id => tower.appendChild(renderBlock(side, id)));
@@ -1230,6 +1230,7 @@ function fitStage() {
   if (!stage) return;
   const rect = stage.getBoundingClientRect();
   document.documentElement.style.setProperty('--stage-h', rect.height + 'px');
+  if (!isRound()) { stage.classList.remove('fill', 'stacked', 'touch-keys-off'); $$('.side', stage).forEach(s => { s.style.flex = ''; }); }
   const kbd = $('.kbd', stage);
   if (kbd) {
     const wrap = $('.kbd-wrap', stage).getBoundingClientRect();
@@ -1239,7 +1240,7 @@ function fitStage() {
     return;
   }
   placeDrawers();
-  if (isRound()) { $$('.side', stage).forEach(fitRoundSide); return; }
+  if (isRound()) { fitRound(stage); placeDrawers(); return; }
   $$('.block', stage).forEach(el => {
     const w = el.clientWidth, h = el.clientHeight;
     const main = $('.main', el); if (!main) return;
@@ -1266,30 +1267,135 @@ function fitStage() {
 }
 
 /* ---------- round buttons (Accordion style, Tower view) ----------
-   The blocks of a side are packed as circles by packRound() — rows of buttons that nest
-   diagonally, like an accordion's — and the Z X C V B tabs go down the side or along the
-   bottom, whichever leaves the bigger buttons. Only rows, sizes and the space count: a label
+   The blocks of a side sit as circles on the keyboard board — the standard board, a designed one, or
+   failing those packRound()'s rows of buttons that nest diagonally, like an accordion's — or, on a
+   phone or tablet, on fill.js's rows that fill the side. The Z X C V B tabs go down the side or along
+   the bottom, whichever leaves the bigger buttons. Only rows, sizes and the space count: a label
    changing while a modifier is held never moves a button. */
 const packPrev = { chords: undefined, melody: undefined };
+const fillPrev = { chords: undefined, melody: undefined };
 function isRound() { return !!layout && layout.view === 'tower'; }
-function fitRoundSide(sideEl) {
-  const side = sideEl.dataset.side, body = $('.side-body.round', sideEl), rows = sideEl._rows;
-  if (!body || !rows) return;
-  const W = body.clientWidth, H = body.clientHeight;
-  if (!W || !H) return;
-  const mods = $('.round-mods', body);
-  const blocks = {};
-  rows.flat(2).forEach(id => { const b = getBlock(side, id); if (b) blocks[id] = { size: b.size || 1, w: b.w || 1 }; });
-  // the last arrangement is passed back in, so a resize keeps it unless another is clearly bigger
-  const other = side === 'chords' ? 'melody' : 'chords';
-  const S = layout[side], nMods = mods ? mods.children.length : 0;
-  // a board designed in Accordion Builder places every button itself, as long as it knows them all;
-  // failing that, the standard board does, as long as every block is one it knows; failing that, the packer
+
+/* How the round buttons are placed, on this device (Settings → Layout → Buttons; 2026-10-06):
+     keyboard  where the keys are on a computer keyboard — the standard board (or a board designed in
+               Accordion Builder), so what you see is where your fingers go;
+     fill      cut into rows in musical order (notes by pitch, chords by importance) that fill the side
+               — fill.js; for a phone or a tablet, which has no keyboard, and for any screen too small
+               for the keyboard board;
+     auto      fill on a touch screen (no mouse, so most likely no keyboard either) — unless every side
+               shown has its own board from Accordion Builder, a design to respect — and wherever the
+               keyboard board's smallest button would be under 56 px; the keyboard board everywhere else. */
+const FIT_KEY = 'key_blocks_buttons_fit_v1';
+const FIT_MIN = 56, FIT_BACK = 60;   // auto: below 56 px the keyboard board gives way; it comes back at 60 (no flicker on a resize)
+function fitPref() { try { const v = localStorage.getItem(FIT_KEY); return v === 'keyboard' || v === 'fill' ? v : 'auto'; } catch (e) { return 'auto'; } }
+function setFitPref(v) { try { if (v === 'auto') localStorage.removeItem(FIT_KEY); else localStorage.setItem(FIT_KEY, v); } catch (e) {} fitStage(); }
+function touchOnly() { return !!(window.matchMedia && matchMedia('(hover: none), (pointer: coarse)').matches); }
+let fillOn = false, stackedOn = false;
+
+/* the Buttons view: choose keyboard or fill, and with fill on a tall screen, whether the two sides
+   sit side by side or one above the other (chords on top), whichever gives the bigger buttons */
+function fitRound(stage) {
+  const sides = $$('.side', stage);
+  stage.classList.remove('stacked'); sides.forEach(s => { s.style.flex = ''; });
+  const pref = fitPref(), touch = touchOnly();
+  // (on a touch screen, a board designed in Accordion Builder for every side shown is kept, as long as it is playable)
+  const designedAll = sides.every(s => { const S = layout[s.dataset.side], rows = s._rows; return S.board && rows && rows.flat(2).every(id => S.board.buttons[id]); });
+  const plans = pref === 'fill' || (pref === 'auto' && touch && !designedAll) ? null : sides.map(s => ({ el: s, kb: keyboardLayout(s) }));
+  let fill = !plans;
+  if (plans && pref === 'auto') fill = Math.min(...plans.map(p => p.kb ? p.kb.small : Infinity)) < (fillOn ? FIT_BACK : FIT_MIN);
+  fillOn = fill;
+  stage.classList.toggle('fill', fill);
+  stage.classList.toggle('touch-keys-off', fill && touch);   // on a touch screen the keys say nothing
+  if (!fill) { stackedOn = false; plans.forEach(p => p.kb && applyRound(p.el, p.kb.out)); return; }
+  if (sides.length === 2 && stage.clientHeight > stage.clientWidth * 0.8) {
+    const beside = Math.min(...sides.map(s => fillFace(s)));
+    const stacked = stackSides(stage, sides);
+    if (stacked && stacked.face > beside * (stackedOn ? 0.95 : 1.06)) {
+      sides.forEach((s, i) => { s.style.flex = '0 0 ' + stacked.heights[i] + 'px'; });
+      stackedOn = true;
+    } else {
+      stage.classList.remove('stacked'); sides.forEach(s => { s.style.flex = ''; });
+      stackedOn = false;
+    }
+  } else stackedOn = false;
+  sides.forEach(s => applyRound(s, fillLayout(s)));
+}
+/* one above the other: share the height so both sides get the same size of button */
+function stackSides(stage, sides) {
+  stage.classList.add('stacked');
+  const info = sides.map(s => { const body = $('.side-body.round', s); return { s, body, chrome: s.offsetHeight - body.clientHeight, W: body.clientWidth }; });
+  const total = info.reduce((t, x) => t + x.body.clientHeight, 0);
+  if (!(total > 0) || info.some(x => !x.W)) return null;
+  // the first side's share: its buttons grow with it, the other side's shrink — find where they meet
+  let lo = 0.2 * total, hi = 0.8 * total;
+  const f = (i, h) => fillFace(info[i].s, info[i].W, h);
+  for (let it = 0; it < 22; it++) { const m = (lo + hi) / 2; if (f(0, m) < f(1, total - m)) lo = m; else hi = m; }
+  const h0 = Math.round((lo + hi) / 2), h1 = Math.floor(total - h0);
+  return { face: Math.min(f(0, h0), f(1, h1)), heights: [h0 + info[0].chrome, h1 + info[1].chrome] };
+}
+function sideBox(sideEl) {
+  const body = $('.side-body.round', sideEl);
+  return body ? { body, W: body.clientWidth, H: body.clientHeight, mods: $('.round-mods', body) } : null;
+}
+/* the keyboard board for a side: a board designed in Accordion Builder places every button itself, as
+   long as it knows them all; failing that, the standard board does, as long as every block is one it
+   knows; failing that, the packer. small = its smallest face. */
+function keyboardLayout(sideEl) {
+  const side = sideEl.dataset.side, rows = sideEl._rows, box = sideBox(sideEl);
+  if (!box || !rows || !box.W || !box.H) return null;
+  const S = layout[side], nMods = box.mods ? box.mods.children.length : 0;
   const B = (S.board && rows.flat(2).every(id => S.board.buttons[id])) ? S.board : standardBoardFor(side, rows);
-  const designed = !!B;
-  const out = designed ? placeBoard(B, rows, W, H, nMods) : window.packRound({ side, rows, blocks, W, H, mods: { count: nMods }, RING: 4, MIN_GAP: 2,
-    prev: packPrev[side], partner: layout.show === 'both' ? packPrev[other] : undefined });   // (the other side's slant, matched when it costs little)
-  packPrev[side] = designed ? undefined : out.variant;
+  let out;
+  if (B) { out = placeBoard(B, rows, box.W, box.H, nMods); packPrev[side] = undefined; }
+  else {
+    const blocks = {};
+    rows.flat(2).forEach(id => { const b = getBlock(side, id); if (b) blocks[id] = { size: b.size || 1, w: b.w || 1 }; });
+    // the last arrangement is passed back in, so a resize keeps it unless another is clearly bigger
+    const other = side === 'chords' ? 'melody' : 'chords';
+    out = window.packRound({ side, rows, blocks, W: box.W, H: box.H, mods: { count: nMods }, RING: 4, MIN_GAP: 2,
+      prev: packPrev[side], partner: layout.show === 'both' ? packPrev[other] : undefined });   // (the other side's slant, matched when it costs little)
+    packPrev[side] = out.variant;
+  }
+  return { out, small: out.circles.length ? Math.min(...out.circles.map(c => c.d)) : Infinity };
+}
+/* fill.js's input for a side: the notes by pitch; the chords by importance (I, V, IV, vi, ii, iii, then the
+   borrowed and secondary chords, as the presets rank them), each row read left to right as the
+   standard board (or the side's own designed board) has them; the chord I may be a little bigger */
+function fillInput(sideEl, W, H) {
+  const side = sideEl.dataset.side, rows = sideEl._rows || [], box = sideBox(sideEl);
+  const ids = rows.flat(2).filter(id => getBlock(side, id));
+  const nMods = box && box.mods ? box.mods.children.length : 0;
+  if (side === 'melody') {
+    const items = ids.map((id, i) => ({ id, i, m: melodyMidiOf(layout, getBlock(side, id)) })).sort((a, b) => a.m - b.m || a.i - b.i).map(o => ({ id: o.id }));
+    return { items, W, H, mods: { count: 0 }, RING: 4, MIN_GAP: 2 };
+  }
+  const S = layout[side], scale = T.SCALE_BY_ID[sc()], std = window.StandardBoard && window.StandardBoard.chords;
+  const refX = {};
+  const items = ids.map((id, i) => {
+    const b = S.blocks[id], role = b ? chordRole(b, scale) : null, r = role ? CHORD_RANK.indexOf(role) : -1;
+    // (the six everyday chords first in a row they share with others: vi ii iii V/V, not vi V/V ii iii)
+    const own = S.board && S.board.buttons[id], x = own ? own.cx : role && std && std.slots[role] ? std.slots[role].cx : null;
+    if (x !== null) refX[id] = (r >= 0 && r < 6 ? 0 : 1e5) + x;
+    return { id, big: role === 'f', rank: r >= 0 ? r : 100 + i };
+  }).sort((a, b) => a.rank - b.rank).map(o => ({ id: o.id, big: o.big }));
+  return { items, refX, bigK: [1.3, 1], W, H, mods: { count: nMods }, RING: 4, MIN_GAP: 2 };
+}
+function fillFace(sideEl, W, H) {
+  const box = sideBox(sideEl);
+  if (W === undefined && box) { W = box.W; H = box.H; }
+  return W && H ? window.fillRound(fillInput(sideEl, W, H)).face : 0;
+}
+function fillLayout(sideEl) {
+  const side = sideEl.dataset.side, box = sideBox(sideEl);
+  if (!box || !box.W || !box.H) return null;
+  const out = window.fillRound(Object.assign(fillInput(sideEl, box.W, box.H), { prev: fillPrev[side] }));
+  fillPrev[side] = out.variant;
+  return out;
+}
+function applyRound(sideEl, out) {
+  const body = $('.side-body.round', sideEl);
+  if (!body || !out) return;
+  const mods = $('.round-mods', body);
   const els = {};
   $$('.block', body).forEach(e => { els[e.dataset.block] = e; });
   out.circles.forEach(c => {
@@ -1305,6 +1411,7 @@ function fitRoundSide(sideEl) {
     if (R) {
       const side = out.mods.placement === 'side';
       mods.classList.toggle('mod-col', side); mods.classList.toggle('mod-row', !side);
+      mods.classList.toggle('tight', !side && R.w / Math.max(1, mods.children.length) < 46);
       Object.assign(mods.style, { left: R.x + 'px', top: R.y + 'px', width: R.w + 'px', height: R.h + 'px' });
     }
   }
@@ -1331,19 +1438,39 @@ function standardBoardFor(side, rows) {
     if (!slot || used.has(key)) return null;
     used.add(key); buttons[id] = slot;
   }
-  return { w: std.w, h: std.h, tabs: std.tabs || 'none', buttons };
+  return { w: std.w, h: std.h, tabs: std.tabs || 'none', buttons, all: Object.values(std.slots) };
 }
-/* A board designed in Accordion Builder (layout.<side>.board): every button's centre and face in
-   the builder's own units, for the area beside the tabs. It is scaled to fit the space here as a
-   whole and centred, so the design keeps its proportions on every screen; the tabs keep the strip
-   the builder reserved for them (bottom, side or none) and grow into the slack the way the
-   packer's do (40 px at least, 52 / 60 px at most). */
+/* A board designed in Accordion Builder (layout.<side>.board), or the standard board: every button's
+   centre and face in the builder's own units. The tabs keep the strip the builder reserved for them
+   (bottom, side or none) and grow into the slack the way the packer's do (40 px at least, 52 / 60 px at
+   most). The buttons — all the board's places, so a chord set leaves its gaps and nothing moves when it
+   changes — are fitted by their own outline, rings included, rather than by the area they were drawn
+   in, and then every face grows by the same factor until the two closest buttons are BOARD_GAP apart
+   (by BOARD_GROW at most): the design keeps its shape and proportions, and fills its side (2026-10-06). */
+const BOARD_GAP = 6, BOARD_GROW = 1.3, RING_PX = 4;
 function placeBoard(B, rows, W, H, nMods) {
   const tabs = nMods ? (B.tabs || 'bottom') : 'none', TG = 8;
   let aw = W, ah = H;
   if (tabs === 'side') aw = W - TG - 40; else if (tabs === 'bottom') ah = H - TG - 40;
-  const s = Math.max(0.01, Math.min(aw / B.w, ah / B.h));
-  const bw = B.w * s, bh = B.h * s;
+  aw = Math.max(1, aw); ah = Math.max(1, ah);
+  const all = (B.all || Object.values(B.buttons)).filter(c => c && isFinite(c.cx) && isFinite(c.cy) && c.d > 0);
+  // the outline with every face grown by k, and the scale that fits it (rings outside, in px)
+  const fit = k => {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    all.forEach(c => { const r = k * c.d / 2; x0 = Math.min(x0, c.cx - r); x1 = Math.max(x1, c.cx + r); y0 = Math.min(y0, c.cy - r); y1 = Math.max(y1, c.cy + r); });
+    return { x0, y0, s: Math.max(0.001, Math.min((aw - 2 * RING_PX) / Math.max(1e-6, x1 - x0), (ah - 2 * RING_PX) / Math.max(1e-6, y1 - y0))), w: x1 - x0, h: y1 - y0 };
+  };
+  const pairs = [];
+  for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) pairs.push([Math.hypot(all[i].cx - all[j].cx, all[i].cy - all[j].cy), (all[i].d + all[j].d) / 2]);
+  const clear = k => { const need = (2 * RING_PX + BOARD_GAP) / fit(k).s; return pairs.every(([dist, r]) => dist - k * r >= need - 1e-9); };
+  let k = BOARD_GROW;
+  if (!clear(k)) {
+    let lo = 0.05, hi = BOARD_GROW;
+    for (let it = 0; it < 30; it++) { const m = (lo + hi) / 2; if (clear(m)) lo = m; else hi = m; }
+    k = lo;
+  }
+  const F = fit(k), s = F.s;
+  const bw = F.w * s + 2 * RING_PX, bh = F.h * s + 2 * RING_PX;   // what shows, rings included
   let fx = (aw - bw) / 2, fy = (ah - bh) / 2, rect = null;
   if (tabs === 'side') {
     const slack = Math.max(0, W - bw - TG - 40), tw = Math.max(40, Math.min(60, 40 + slack / 2));
@@ -1356,10 +1483,7 @@ function placeBoard(B, rows, W, H, nMods) {
     const tw = Math.min(W, Math.max(56 * nMods, Math.min(120 * nMods, bw))), tx = Math.max(0, Math.min(W - tw, fx + bw / 2 - tw / 2));
     rect = { x: tx, y: Math.min(H - th, fy + bh + TG), w: tw, h: th };
   }
-  // the rings and the air between them keep their pixels, so the faces scale a little more than the
-  // centres do: buttons that touched still touch and never overlap (Accordion Builder's rescale does the same)
-  const pad = 2 * 4 + 2;
-  const circles = rows.flat(2).map(id => { const c = B.buttons[id]; return { id, cx: fx + c.cx * s, cy: fy + c.cy * s, d: Math.max(2, (c.d + pad) * s - pad) }; });
+  const circles = rows.flat(2).map(id => { const c = B.buttons[id]; return { id, cx: fx + RING_PX + (c.cx - F.x0) * s, cy: fy + RING_PX + (c.cy - F.y0) * s, d: Math.max(2, k * c.d * s) }; });
   return { circles, mods: rect ? { placement: tabs, rect } : { placement: 'none' } };
 }
 /* A line's width at a size. Fraunces changes its letter shapes with the size (optical sizing),
@@ -2306,6 +2430,7 @@ function fillSettings() {
   const kp = $('#key-preset'); kp.innerHTML = ''; KEY_PRESETS.forEach(p => { const o = document.createElement('option'); o.value = p.id; o.textContent = p.name; kp.appendChild(o); });
   kp.value = layout.keyPreset;
   $('#show-keys-check').checked = layout.showKeys;
+  $('#fit-select').value = fitPref();
   $('#chord-tones-check').checked = layout.chordTones;
   $('#chord-bend-check').checked = layout.chordBend;
   const md = $('#melody-design'); md.innerHTML = ''; MELODY_DESIGNS.forEach(d => { const o = document.createElement('option'); o.value = d.id; o.textContent = d.name; md.appendChild(o); }); md.value = layout.melodyDesign || 'A';
@@ -2324,6 +2449,7 @@ function wireSettings() {
   $('#reverb-level').addEventListener('input', e => { layout.sound.reverb = +e.target.value; applySound(); touch(); });
   $('#key-preset').addEventListener('change', e => { layout.keyPreset = e.target.value; applyKeyPreset(layout); touch(); renderAll(); });
   $('#show-keys-check').addEventListener('change', e => { layout.showKeys = e.target.checked; touch(); renderAll(); });
+  $('#fit-select').addEventListener('change', e => setFitPref(e.target.value));
   $('#chord-tones-check').addEventListener('change', e => { layout.chordTones = e.target.checked; touch(); renderAll(); });
   $('#chord-bend-check').addEventListener('change', e => { layout.chordBend = e.target.checked; touch(); updateBend(); renderAll(); });
   $('#melody-design').addEventListener('change', e => setMelodyDesign(e.target.value));

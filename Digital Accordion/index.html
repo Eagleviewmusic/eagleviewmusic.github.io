@@ -181,6 +181,15 @@
       <section class="panel-section">
         <h3>Layout</h3>
         <div class="field-row">
+          <label for="fit-select">Buttons</label>
+          <select id="fit-select" class="select">
+            <option value="auto">Auto — like the keyboard on a computer, filling the screen on a phone or tablet</option>
+            <option value="keyboard">Like the keyboard — where your fingers go</option>
+            <option value="fill">Fill the screen — rows in musical order, as big as they fit</option>
+          </select>
+        </div>
+        <p class="panel-note">For the round buttons in the Buttons view, on this device. Like the keyboard, each button sits where its key is on a computer keyboard. Filling the screen, the notes run in rows by pitch, low to high, and the chords by how often they are used, I first; on a tall screen the two sides may sit one above the other. Auto fills the screen on a touch screen, and wherever the keyboard layout's buttons would be too small to play.</p>
+        <div class="field-row">
           <label for="melody-design">Panels: notes</label>
           <select id="melody-design" class="select"></select>
         </div>
@@ -286,6 +295,7 @@
 <script src="theory.js"></script>
 <script src="audio.js"></script>
 <script src="pack.js"></script>
+<script src="fill.js"></script>
 <script src="standard-board.js"></script>
 <script src="script.js"></script>
 </body>

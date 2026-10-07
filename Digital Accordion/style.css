@@ -1594,3 +1594,46 @@ input[type="range"]:focus-visible { outline: 2px solid var(--amber); outline-off
 @media (max-height: 520px) {
   [data-style="accordion"] .reg-foot { bottom: -9px; margin: 0 -10px -9px; padding: 6px 12px 8px; }
 }
+
+/* ---- Buttons view filling the screen (fill.js; phones and tablets, Settings → Layout → Buttons) ----
+   On a tall screen the two sides may sit one above the other, chords on top (fitRound() chooses, and
+   sets each side's height so both get the same size of button); the bellows have no room there. */
+.stage.stacked { flex-direction: column; }
+.stage.stacked .bellows { display: none; }
+.stage.stacked .side { min-height: 0; }
+/* on a touch screen the computer keys say nothing: the faces get the room */
+.stage.touch-keys-off .block .keys, .stage.touch-keys-off .mod-btn .mod-key { display: none; }
+/* stacked, each side's header is one slim row */
+[data-style="accordion"] .stage.stacked .side-head { min-height: 32px; }
+[data-style="accordion"] .stage.stacked .lock-sw { height: 38px; margin: -3px 0; padding: 3px 0; }
+[data-style="accordion"] .stage.stacked .lock-sw .lk svg { width: 8px; height: 8px; }
+[data-style="accordion"] .stage.stacked .side { gap: 4px; }
+/* a narrow side (a phone): the register button keeps its mark, ♪ notes its note, so the header stays one row */
+@container side (max-width: 340px) {
+  [data-style="accordion"] .reg-btn .reg-name, [data-style="accordion"] .mini-btn .btn-word { display: none; }
+  [data-style="accordion"] .reg-btn { padding-right: 9px; }
+  [data-style="accordion"] .side-head { gap: 6px; }
+  [data-style="accordion"] .head-main { gap: 5px; }
+  [data-style="accordion"] .side-tools { gap: 3px; }
+  [data-style="accordion"] .mini-btn { padding: 0 6px; }
+}
+/* a narrow phone: the view switches tighten so the first row holds ‹, the views, Library and Settings */
+@media (max-width: 440px) {
+  [data-style="accordion"] .view-seg { gap: 3px; padding: 5px 4px 4px; }
+  [data-style="accordion"] .seg-btn { padding: 0 7px; letter-spacing: 0.06em; }
+}
+/* a phone on its side: the top bar keeps to one row (the way home stands in for the logo) */
+@media (max-height: 520px) and (max-width: 900px) {
+  html:not(.in-iframe)[data-style="accordion"] .brand { display: none; }
+  [data-style="accordion"] .seg-btn { padding: 0 8px; letter-spacing: 0.06em; }
+  [data-style="accordion"] .scale-select { max-width: 130px; }
+  .topbar { gap: 7px; }
+}
+/* tabs squeezed along the bottom of a narrow side */
+[data-style="accordion"] .round-mods.tight .mod-btn { font-size: 10px; letter-spacing: -0.02em; padding-left: 1px; padding-right: 1px; }
+@media (max-width: 359px) {
+  [data-style="accordion"] .seg-btn { padding: 0 5px; font-size: 10px; letter-spacing: 0.02em; }
+  [data-style="accordion"] .view-seg { gap: 2px; padding: 5px 3px 4px; }
+  .tb-btn { width: 30px; }
+  .topbar { gap: 5px; }
+}
