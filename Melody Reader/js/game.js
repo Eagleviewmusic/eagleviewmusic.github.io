@@ -90,8 +90,9 @@
     key() {
       const m = G.mode;
       if (m.kind === 'lesson') return 'lesson:' + m.name;
-      if (G.playingSet()) return 'set:' + G.setup.set;          // a melody set is its own score board
-      return m.kind === 'level' ? RR.levelKey(m.n) : m.kind === 'session' ? 'session:' + m.id : 'custom';
+      // a melody set played just this time — or on its own, from the home page — is its own score board (a session's own set is the session's)
+      if ((G.over.set || m.kind === 'custom') && G.playingSet()) return 'set:' + G.setup.set;
+      return m.kind === 'level' ? RR.levelKey(m.n) : m.kind === 'session' ? 'session:' + m.id : m.gen ? 'gen' : 'custom';
     },
     entry(key) {
       const L = this.me().levels;
@@ -117,7 +118,11 @@
 
   /* ---------------- state ---------------- */
   const G = RR.Game = {
-    mode: { kind: 'level', n: 1 }, setup: null, contentChanged: false, roundChanged: false,
+    mode: { kind: 'level', n: 1 },
+    base: null,                   // the level's, session's (…) own settings: what its ✎ page shows and saves
+    over: {},                     // just this time, on top: { set, game: { game, clockSecs, songPicks }, tricky }
+    setup: null,                  // what is played: base + over (compose)
+    contentChanged: false, roundChanged: false,
     card: null, evs: [], states: [], judge: [], times: [], tries: [], idx: -1, clean: true, slips: 0, slipsHere: 0,
     stage: 'practice', started: false, run: null, result: null, practiceT: null,
     metro: 'off',                 // the metronome: off · slow · moderate · fast (for this visit; Off when the page opens)
@@ -150,6 +155,7 @@
     if (m.kind === 'level') return 'Level ' + m.n + ' · ' + RR.LEVELS[m.n - 1].name;
     if (m.kind === 'session') return (G.battle ? '⚔️ ' : '') + m.name;
     if (m.kind === 'lesson') return 'Lesson · ' + m.name;
+    if (m.label) return m.label;                          // the home page's Generated, or a set of My melodies (2026-10-08)
     return 'Custom' + (m.from ? ' (from ' + m.from + ')' : '');
   }
   /* the melody set being played, if there is one (My melodies, or a lesson's) */
@@ -158,66 +164,166 @@
     const rec = id ? RR.Sets.get(id) : null;
     return rec && rec.melodies.length ? rec : null;
   };
-  G.modeLabel = () => { const set = G.playingSet(); return (set && G.mode.kind !== 'lesson' ? set.title + ' · ' : '') + modeLabel(G.mode); };
+  // a set played just this time is named first ("Week 3 · Level 4"); a session's own set is the session's
+  G.modeLabel = () => { const set = G.over.set ? G.playingSet() : null; return (set && G.mode.kind !== 'lesson' ? set.title + ' · ' : '') + modeLabel(G.mode); };
   G.modeColour = () => G.mode.kind === 'level' ? RR.bandOf(G.mode.n).colour : G.mode.kind === 'lesson' ? '#7c3aed' : G.mode.kind === 'session' ? RR.SESSION_COLOUR : '#8a7563';
 
-  function usePractice(practice, mode, battle) {
+  /* ---------------- choosing what to play (2026-10-08) ----------------
+     The user's rule: "all the session's rules apply to that session, and
+     then the new rules apply to the new session". Picking a level, a
+     session, a battle or a lesson starts from nothing: its own settings
+     (G.base) exactly as saved, a new round, the score chip at 0, no battle
+     unless it is one, the metronome Off, Practice as it says. Nothing that
+     was playing before comes along — that used to leak (a battle's score,
+     a set of My melodies, the browser's game).
+
+     What is played "just this time" (G.over) sits on top and is never
+     saved into the level or session: a My melodies set played from the ♫
+     window, a format card on the home page (Rounds · Songs · Beat the
+     Clock · Endless), Practise my tricky notes. It stays through a reload
+     (device.practice.over) and ends the moment something else is picked. */
+  const OVER_GAME = ['game', 'clockSecs', 'songPicks'];
+  function cleanOver(o) {
+    const out = {};
+    if (!o || typeof o !== 'object') return out;
+    if (typeof o.set === 'string' && RR.Sets.get(o.set)) out.set = o.set;
+    if (o.game && typeof o.game === 'object') { const g = RR.sanitize(o.game); out.game = { game: g.game, clockSecs: g.clockSecs, songPicks: g.songPicks }; }
+    if (o.tricky === true) out.tricky = true;
+    return out;
+  }
+  /* base + just this time = what is played */
+  function compose() {
+    const s = RR.clone(G.base), o = G.over;
+    if (o.game) OVER_GAME.forEach(k => { s[k] = RR.clone(o.game[k]); });
+    // the melody set played: one picked just this time — or the practice's own My Melodies source
+    // (not for a Song, which plays the songs picked)
+    if (o.set) { s.from = 'set'; s.set = o.set; }
+    else if (!(s.from === 'set' && s.game !== 'song' && s.set && RR.Sets.get(s.set))) s.set = null;
+    s.tricky = !!o.tricky;
+    if (G.battle) s.game = 'round5';            // a battle's length is its own (newRound); never Song or the clock
+    return s;
+  }
+  G.compose = () => { G.setup = compose(); };
+  /* where this browser keeps what is playing, for the next visit (a lesson is never kept) */
+  function remember() {
+    const m = G.mode, over = Object.keys(G.over).length ? RR.clone(G.over) : undefined;
+    if (m.kind === 'level') { RR.device.level = m.n; RR.device.practice = { kind: 'level', n: m.n, over }; }
+    else if (m.kind === 'session') RR.device.practice = { kind: 'session', id: m.id, over };
+    else if (m.kind === 'custom') RR.device.practice = { kind: 'custom', from: m.from || null, label: m.label || undefined, gen: m.gen || undefined, practice: G.base, over };
+    else return;
+    RR.saveDevice();
+  }
+  G.remember = remember;
+
+  function usePractice(practice, mode, battle, over) {
+    // whatever was going on stops
+    clearTimeout(G.autoT); clearTimeout(G.practiceT);
+    closePick(); stopHear(true); G.stopSong();
+    if (RR.Beat) { RR.Beat.stop(); if (RR.Beat.tickStop) RR.Beat.tickStop(); }
     G.mode = mode;
-    G.setup = RR.sanitize(practice);
+    G.base = RR.sanitize(practice);
+    if (mode.kind !== 'lesson') G.base.tricky = false;
     G.battle = battle ? RR.cleanBattle(battle) : null;
-    if (G.battle) G.setup.game = 'round5';      // a battle's length is its own (newRound); never Song or the clock
-    if (mode.kind !== 'lesson') {
-      if (mode.kind !== 'session') {          // the game this browser plays (see settings.js); a session keeps its own
-        const g = RR.sanitize({ game: RR.device.game, clockSecs: RR.device.clockSecs, song: RR.device.song, songPicks: RR.device.songPicks });
-        G.setup.game = g.game; G.setup.clockSecs = g.clockSecs; G.setup.song = g.song; G.setup.songPicks = g.songPicks;
-      }
-      G.setup.tricky = RR.device.tricky === true;
-      // a melody set chosen to play (My melodies) is laid over the same way
-      G.setup.set = RR.device.set && RR.Sets.get(RR.device.set) ? RR.device.set : null;
-    }
-    G.queue = []; G.songPtr = 0; G.contentChanged = false; G.roundChanged = false;
-    G.fresh = true;
-    if (mode.kind === 'level') { RR.device.level = mode.n; RR.device.practice = null; RR.saveDevice(); }
-    else if (mode.kind === 'custom') { RR.device.practice = { kind: 'custom', from: mode.from || null, practice: G.setup }; RR.saveDevice(); }
-    else if (mode.kind === 'session') { RR.device.practice = { kind: 'session', id: mode.id, practice: G.setup }; RR.saveDevice(); }
+    G.battlePlan = null; G.battleResume = false;
+    G.over = mode.kind === 'lesson' ? {} : cleanOver(over);
+    if (G.over.game && OVER_GAME.every(k => JSON.stringify(G.over.game[k]) === JSON.stringify(G.base[k]))) delete G.over.game;   // its own format: nothing on top
+    G.setup = compose();
+    // a clean slate: this choice's own score, streak and melodies
+    G.points = 0; G.streak = 0; G.bestStreak = 0; G.sessions = {};
+    G.queue = []; G.recent = []; G.songPtr = 0; G.contentChanged = false; G.roundChanged = false;
+    G.fresh = true; G.openTest = false; G.metro = 'off'; G.needNew = false;
+    remember();
     applyInstrument();
     newRound();
   }
   G.usePractice = usePractice;
-  G.selectLevel = n => usePractice(RR.practiceOfLevel(n), { kind: 'level', n });
-  G.selectSession = function (id) {
+  G.selectLevel = (n, over) => usePractice(RR.practiceOfLevel(n), { kind: 'level', n }, null, over);
+  G.selectSession = function (id, over) {
     const x = RR.Sessions.get(id);
-    if (x) usePractice(x.practice, { kind: 'session', id: x.id, name: x.name }, x.kind === 'battle' ? x.battle : null);
+    if (x) usePractice(x.practice, { kind: 'session', id: x.id, name: x.name }, x.kind === 'battle' ? x.battle : null, over);
     return !!x;
   };
-  /* a change in the Settings tabs: a session keeps it (it saves as you go);
-     anything else becomes Custom (from …) */
-  G.markCustom = function () {
-    if (G.mode.kind === 'session') {
-      RR.Sessions.update(G.mode.id, G.setup);
-      RR.device.practice = { kind: 'session', id: G.mode.id, practice: G.setup }; RR.saveDevice();
-      return;
-    }
-    if (G.mode.kind === 'custom' || G.mode.kind === 'lesson') { if (G.mode.kind === 'custom') { RR.device.practice = { kind: 'custom', from: G.mode.from, practice: G.setup }; RR.saveDevice(); } return; }
-    const from = G.mode.kind === 'level' ? 'Level ' + G.mode.n : G.mode.name;
-    G.mode = { kind: 'custom', from };
-    RR.device.practice = { kind: 'custom', from, practice: G.setup };
-    RR.saveDevice();
+  /* what a new session or battle starts as: the settings of what is chosen (never "just this time") —
+     a battle's are a battle's (Practice off), so from a battle the level last played */
+  G.readingPractice = () => G.battle ? RR.practiceOfLevel(RR.device.level || 1) : RR.clone(G.base);
+
+  /* a change on the ✎ page: saved into what is chosen — a level's own changes (Reset gives the level back),
+     the session, a Custom practice. A lesson's settings are the lesson's */
+  G.saveSetup = function () {
+    const m = G.mode;
+    if (m.kind === 'level') RR.LevelEdits.save(m.n, G.base);
+    else if (m.kind === 'session') RR.Sessions.update(m.id, G.base);
+    else if (m.gen) RR.device.gen = RR.clone(G.base);      // the next Generate starts from it
+    remember();
+  };
+  /* a level back as it was made */
+  G.resetLevel = function () {
+    if (G.mode.kind !== 'level') return;
+    RR.LevelEdits.reset(G.mode.n);
+    G.selectLevel(G.mode.n, G.over);
+  };
+
+  /* just this time: a My melodies set (or none), a format (or none), tricky notes — a new round */
+  G.playOnce = function (kind, value) {
+    if (kind === 'set') { if (value) G.over.set = value; else delete G.over.set; }
+    else if (kind === 'game') {
+      if (value) {
+        const g = { game: G.base.game, clockSecs: G.base.clockSecs, songPicks: G.base.songPicks.slice() };
+        Object.keys(value).forEach(k => { if (OVER_GAME.includes(k)) g[k] = RR.clone(value[k]); });
+        const same = OVER_GAME.every(k => JSON.stringify(g[k]) === JSON.stringify(G.base[k]));
+        if (same) delete G.over.game; else G.over.game = g;      // the choice's own format: nothing on top
+        if (g.game === 'song') delete G.over.set;                 // a Song plays the songs picked
+      } else delete G.over.game;
+    } else if (kind === 'tricky') { if (value) G.over.tricky = true; else delete G.over.tricky; }
+    G.setup = compose();
+    remember();
+    if (kind === 'tricky') { G.queue = []; return; }               // from the next melody
+    G.queue = []; G.fresh = true;
+    applyInstrument(); newRound();
+  };
+  /* the top drop-down (drop.js, 2026-10-08) changes an aspect of what is playing, not what is played:
+     the songs of a Song — the ones played just this time, or the practice's own — a new round when it closes */
+  G.setSongPicks = function (list) {
+    if (G.over.game && G.over.game.game === 'song') G.over.game.songPicks = list.slice();
+    else { G.base.songPicks = list.slice(); G.saveSetup(); }
+    G.setup = compose(); remember();
+    G.roundChanged = true;
+  };
+  /* …and the melody set played: one played just this time, a set played on its own, or the practice's own
+     My Melodies (saved into the level or session) — a new round at once */
+  G.switchSet = function (id) {
+    const set = RR.Sets.get(id); if (!set) return;
+    if (G.over.set) { G.playOnce('set', id); return; }
+    G.base.from = 'set'; G.base.set = id;
+    if (G.mode.kind === 'custom' && G.mode.label) G.mode.label = '♫ ' + set.title;
+    G.saveSetup();
+    G.setup = compose();
+    G.queue = []; G.fresh = true;
+    applyInstrument(); newRound();
+  };
+
+  /* the just-this-time things, in words (the home page and the ✎ page say what is on top) */
+  G.overWords = function () {
+    const o = G.over, out = [];
+    if (o.game) out.push({ kind: 'game', text: RR.gameText(o.game) === 'Beat the clock' ? 'Beat the clock · ' + (o.game.clockSecs === 120 ? '2 min' : o.game.clockSecs + ' s') : RR.gameText(o.game) });
+    if (o.set && RR.Sets.get(o.set)) out.push({ kind: 'set', text: '♫ ' + RR.Sets.get(o.set).title });
+    if (o.tricky) out.push({ kind: 'tricky', text: 'Your tricky notes' });
+    return out;
   };
 
   /* the practice's songs that can be mixed in: only those whose every note
      is in the practice (a Custom practice of line notes doesn't get Ode to Joy) */
   function mixedSongs() {
     const s = G.setup;
-    if (s.from === 'made') return [];
+    if (s.from === 'made' || s.from === 'set') return [];
     // Songbook as the Melody Source with no songs of its own (a session): every song that fits
     const list = s.songs.length || s.from !== 'songbook' ? s.songs : Object.keys(RR.SONGS);
     return list.filter(id => RR.SONGS[id] && Array.from(RR.Melody.songNotes(id)).every(n => s.notes.includes(n)));
   }
   /* the Song format's songs, in order: Songbook songs and My melodies sets ('set:<id>'), any number —
      or the one song an older practice had */
-  G.songPicks = function () {
-    const s = G.setup;
+  G.songPicks = function (practice) {
+    const s = practice || G.setup;
     const ok = id => RR.SONGS[id] || (id.indexOf('set:') === 0 && RR.Sets.get(id.slice(4)) && RR.Sets.get(id.slice(4)).melodies.length);
     const list = (s.songPicks || []).filter(ok);
     return list.length ? list : [s.song || s.songs[0] || 'hot-cross-buns'];
@@ -396,7 +502,8 @@
   G.roll = roll;
 
   /* the card from the top; a stage given = a new start (else the stage stays) */
-  function resetCard(stage) {
+  /* keepMark: the check (or star) floating up after a melody goes on to its end */
+  function resetCard(stage, keepMark) {
     if (stage) G.stage = stage;
     $('#btn-mode').classList.remove('ready');
     clearTimeout(G.practiceT);
@@ -409,7 +516,7 @@
     G.clean = true; G.slips = 0; G.slipsHere = 0; G.started = false; G.run = null; G.result = null;
     G.phase = 'ready';
     G.ghosts = []; G.justLit = -1; G.hidden = false; G.hearIdx = -1;
-    $('#praise').className = 'praise';
+    if (!keepMark) $('#praise').className = 'praise';
     RR.Xylo.setGlow(G.setup.glow === 'always' && G.idx >= 0 ? G.evs[G.idx].p : null);
     $('#btn-next').classList.remove('ready');
   }
@@ -541,6 +648,10 @@
   /* ---------------- a bar is struck ---------------- */
   function strike(id, e) {
     if (G.overlay) return;
+    // Practice, the melody just found: the next bar struck starts it again at once, as its first note —
+    // the check floats on over the music. (The user, 2026-10-08: with the practice metronome clicking,
+    // strikes were ignored for 1.5 s, so the next downbeat was lost and the clear landed mid-melody.)
+    if (G.phase === 'review' && G.stage === 'practice') resetCard(undefined, true);
     if (G.phase === 'done' || G.phase === 'countin' || G.phase === 'review') return;
     if (G.phase === 'running') { RR.Beat.strike(id, e); return; }
     if (G.clock && !G.clock.started) startClock();
@@ -607,7 +718,8 @@
     }
   }
 
-  /* Practice: the notes found — say so, then clear them to go again */
+  /* Practice: the notes found — say so (the check floats up), then clear them to go again. The next
+     bar struck clears them at once (strike), so a player keeping the beat goes straight round again */
   function practiceFound() {
     G.phase = 'review';
     showMark(true, false, 0);
@@ -620,7 +732,7 @@
     clearTimeout(G.practiceT);
     G.practiceT = setTimeout(() => {
       if (G.card !== card || G.stage !== 'practice' || G.phase !== 'review') return;
-      resetCard(); draw();
+      resetCard(undefined, true); draw();
     }, ms);
   }
 
@@ -961,7 +1073,7 @@
       teams.innerHTML = G.teamScores().map(t => '<span class="team-pill' + (!done && bn && bn.team === t.i ? ' on' : '') + '" style="--tc:' + t.colour + '" title="' + RR.esc(t.name) + '">' +
         '<i></i><b>' + RR.esc(t.name) + '</b><em>' + (RR.device.points ? t.pts : '★ ' + t.gold) + '</em></span>').join('');
       sc.setAttribute('aria-label', 'Score board: ' + G.teamScores().map(t => t.name + ' ' + t.score).join(', '));
-    } else sc.setAttribute('aria-label', 'Score board');
+    } else { teams.innerHTML = ''; sc.setAttribute('aria-label', 'Score board'); }   // no battle: no teams left behind
   }
   G.drawChips = drawChips;
   new ResizeObserver(() => draw()).observe(music);

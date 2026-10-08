@@ -309,7 +309,7 @@
     if (k.indexOf('session:') === 0) { const x = RR.Sessions.get(k.slice(8)); return x ? x.name : null; }
     if (k.indexOf('set:') === 0) { const x = RR.Sets.get(k.slice(4)); return x ? x.title : null; }
     if (k.indexOf('lesson:') === 0) return 'Lesson · ' + k.slice(7);
-    return k === 'custom' ? 'Custom' : null;
+    return k === 'custom' ? 'Custom' : k === 'gen' ? 'Generated' : null;
   }
   function bestsHtml(me) {
     const pts = RR.device.points, all = [];

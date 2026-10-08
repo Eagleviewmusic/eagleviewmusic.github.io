@@ -21,6 +21,9 @@
    RR.levelKey(n)  where a level's scores are kept: 'lv2:n' — the ladder
                    started fresh with the new levels (the old '1'…'15'
                    stay in storage, unused)
+   RR.LevelEdits   your own changes to a level, kept and played every time
+                   (2026-10-08); RR.originalLevel(n) is the level as made,
+                   RR.practiceOfLevel(n) the level as it plays
    RR.Sessions     My sessions — your own named practices, top of the
                    level list (2026-10-05; were the Mine band); Battle Mode
                    sessions among them (RR.cleanBattle, RR.battleAt)
@@ -82,11 +85,14 @@
   ];
   RR.levelKey = n => 'lv2:' + n;
   RR.bandOf = n => RR.BANDS.find(b => b.id === RR.LEVELS[n - 1].band);
-  RR.practiceOfLevel = n => {
-    const l = RR.LEVELS[Math.max(1, Math.min(RR.LEVELS.length, n | 0)) - 1];
-    const p = RR.clone(l); delete p.n; delete p.band; delete p.name;
+  const levelN = n => Math.max(1, Math.min(RR.LEVELS.length, n | 0));
+  /* the level as it was made */
+  RR.originalLevel = n => {
+    const p = RR.clone(RR.LEVELS[levelN(n) - 1]); delete p.n; delete p.band; delete p.name;
     return p;
   };
+  /* the level as it plays: your own changes to it, if you made any (LevelEdits below) */
+  RR.practiceOfLevel = n => RR.LevelEdits.get(levelN(n)) || RR.originalLevel(n);
 
   /* a round's length is in its game: 'round5', 'round12' … any 1–99 melodies
      (2026-10-05; there were only 5 and 10). 0 = not a round (Song, Beat the
@@ -140,7 +146,8 @@
     p.song = RR.SONGS[raw.song] ? raw.song : null;
     if (Array.isArray(raw.songPicks)) p.songPicks = Array.from(new Set(raw.songPicks.filter(id => typeof id === 'string' && (RR.SONGS[id] || /^set:[\w-]{1,80}$/.test(id))))).slice(0, 40);
     p.set = typeof raw.set === 'string' && raw.set ? raw.set.slice(0, 80) : null;
-    p.from = oneOf(raw.from, ['both', 'made', 'songbook'], D.from);
+    // the Melody Source: 'set' = My Melodies, the set in `set` (2026-10-08: a session's or level's own)
+    p.from = oneOf(raw.from, ['both', 'made', 'songbook', 'set'], D.from);
     p.colour = oneOf(raw.colour, ['always', 'lit', 'black'], D.colour);
     p.glow = oneOf(raw.glow, ['never', 'after2', 'always'], D.glow);
     p.labels = oneOf(raw.labels, ['none', 'letters', 'solfege'], D.labels);   // rhythm syllables were retired 2026-10-06
@@ -213,19 +220,44 @@
   };
   RR.battleTotal = b => b.rounds * b.teams.length * b.per;
 
+  /* ---- your own changes to the levels (2026-10-08, the user's ask) ----
+     Each of the fifteen levels can be changed like a session (its ✎ page);
+     the change is kept here, { n: practice }, and the level plays it every
+     time it is picked, until Reset gives back the level as it was made. A
+     change that leaves the level as it was made is no change: it's dropped.
+     The level keeps its number, name, place on the ladder and scores. */
+  const keepSet = c => { if (c.from !== 'set') c.set = null; c.tricky = false; return c; };   // tricky notes are "just this time"
+  function readEdits() {
+    const v = RR.load(RR.KEY.levels, {});
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  }
+  RR.LevelEdits = {
+    get(n) {
+      const raw = readEdits()[n];
+      return raw && typeof raw === 'object' ? keepSet(RR.sanitize(raw)) : null;
+    },
+    edited: n => !!RR.LevelEdits.get(n),
+    save(n, practice) {
+      const all = readEdits(), c = keepSet(RR.sanitize(practice));
+      if (JSON.stringify(c) === JSON.stringify(keepSet(RR.sanitize(RR.originalLevel(n))))) delete all[n]; else all[n] = c;
+      RR.save(RR.KEY.levels, all);
+    },
+    reset(n) { const all = readEdits(); delete all[n]; RR.save(RR.KEY.levels, all); }
+  };
+
   /* ---- My sessions ----
      A session is a named practice of your own — the notes, the rhythms, the
-     look, the helps, the game, the gold star — and every melody in it is
-     made up from those choices, new each time it is played. Kept as
+     look, the helps, the game, the gold star, where its melodies come from
+     (made up, a My melodies set of yours, or the Songbook) — kept exactly as
+     you left it and played that way every time it is picked. Kept as
      [{ id, name, practice }] in rainbow_reader_sessions_v1, in the order they
      were made; a Battle Mode session also has kind: 'battle' and its battle
      (teams, per, rounds — its practice's game is not used). The first read
      brings the old Mine band's practices across (`legacy` = their old score
-     key; game.js moves the scores, then drops it). A session never keeps the
-     browser's own things: a My melodies set laid over it, or Practise my
-     tricky notes. */
+     key; game.js moves the scores, then drops it). Practise my tricky notes
+     is never kept: it is "just this time". */
   const newId = () => 'ses_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
-  const own = p => { const c = RR.sanitize(p); c.set = null; c.tricky = false; c.endDo = false; c.endLa = false; c.focus = []; if (c.from === 'both') c.from = 'made'; return c; };
+  const own = p => { const c = RR.sanitize(p); c.endDo = false; c.endLa = false; c.focus = []; if (c.from === 'both') c.from = 'made'; return keepSet(c); };
   function readSessions() {
     let v = RR.load(RR.KEY.sessions, null);
     if (!Array.isArray(v)) {

@@ -64,7 +64,8 @@
     device: 'rainbow_reader_device_v1',
     scores: 'rainbow_reader_scores_v1',
     mine: 'rainbow_reader_mine_v1',          // the old Mine band — read once, into sessions
-    sessions: 'rainbow_reader_sessions_v1'   // My sessions (levels.js)
+    sessions: 'rainbow_reader_sessions_v1',  // My sessions (levels.js)
+    levels: 'rainbow_reader_levels_v1'       // your own changes to the fifteen levels (levels.js, 2026-10-08)
   };
   RR.load = function (key, fallback) {
     try {
@@ -78,17 +79,19 @@
     try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (_) { return false; }
   };
 
-  /* ---- the device: what belongs to this browser, not to a practice ---- */
+  /* ---- the device: what belongs to this browser, not to a practice ----
+     Since 2026-10-08 nothing here shapes what is played: the game, a My
+     melodies set and tricky notes used to be the browser's, laid over every
+     level and session, and leaked from one into the next. Now each level and
+     session has its own, and what is played "just this time" lives with the
+     choice (practice.over) and ends when something else is chosen. */
   const DEVICE = {
     v: 1, voice: 'vibraphone', volume: 0.8, points: true, stars: true, celebrate: true,
     folded: {},                 // ⓘ notes folded away, by id
-    level: 1,                   // the level being played…
-    practice: null,             // …or a custom practice or a session: { kind, practice, from | id }
+    level: 1,                   // the level last played (a battle's format cards fall back to it)
+    practice: null,             // what is playing: { kind: 'level', n | 'session', id | 'custom', practice, from, over }
     player: '',
-    game: 'round5', clockSecs: 60, song: null,  // how this browser plays: a round of 1–99 ('round7') · Song · Beat the clock · Endless
-    tricky: false,                              // Practise my tricky notes — a personal help, kept with the browser
-    set: null,                                  // a My melodies set being played (laid over the level)
-    players: []                                 // first names on a shared computer (players.js)
+    players: []                 // first names on a shared computer (players.js)
   };
   RR.device = Object.assign(RR.clone(DEVICE), (function () {
     const d = RR.load(RR.KEY.device, {});
@@ -96,6 +99,10 @@
   })());
   if (!RR.device.folded || typeof RR.device.folded !== 'object') RR.device.folded = {};
   delete RR.device.pace;       // the pace pill's (retired 2026-10-05: the metronome is Off each time the page opens)
+  // the browser's game, set and tricky notes (retired 2026-10-08): a set being played is carried over
+  // once, as "just this time" on what was playing (app.js restore); the rest is dropped
+  RR.oldDeviceSet = typeof RR.device.set === 'string' && RR.device.set ? RR.device.set : null;
+  ['game', 'clockSecs', 'song', 'songPicks', 'tricky', 'set'].forEach(k => { delete RR.device[k]; });
   RR.saveDevice = () => RR.save(RR.KEY.device, RR.device);
 
   /* ---- links: JSON as base64url, UTF-8 safe (lesson and melody-set links) ---- */

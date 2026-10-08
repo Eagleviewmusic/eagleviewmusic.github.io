@@ -25,12 +25,13 @@
   const RR = window.RR, $ = RR.$, G = RR.Game;
 
   const shelfOpen = () => !!document.querySelector('.evm-shelf.show');
-  function anyWindow() { return RR.Settings.isOpen() || RR.Board.isOpen() || RR.Melodies.isOpen() || RR.View.songsOpen() || shelfOpen() || !!document.querySelector('.modal.ask'); }
+  function anyWindow() { return RR.Settings.isOpen() || RR.Board.isOpen() || RR.Melodies.isOpen() || RR.Drop.isOpen() || RR.View.songsOpen() || shelfOpen() || !!document.querySelector('.modal.ask'); }
   function closeWindows() {
     if (shelfOpen()) return;                     // the shelf closes itself on Escape
     if (RR.Settings.isOpen()) RR.Settings.close();
     if (RR.Board.isOpen()) RR.Board.close();
     if (RR.Melodies.isOpen()) RR.Melodies.close();
+    if (RR.Drop.isOpen()) RR.Drop.close();
   }
 
   document.addEventListener('keydown', e => {
@@ -91,7 +92,8 @@
   });
   $('#gear').addEventListener('click', () => { if (!RR.Maker.active) RR.Settings.open(); });
   $('#mel-btn').addEventListener('click', () => { if (!RR.Maker.active) RR.Melodies.open(); });
-  $('#level-chip').addEventListener('click', () => { if (!RR.Maker.active) RR.Settings.open(G.mode.kind === 'lesson' ? 'leave' : 'level'); });
+  // the level box: a drop-down to change how this is played (drop.js, 2026-10-08); the gear has everything
+  $('#level-chip').addEventListener('click', () => { if (RR.Maker.active) return; if (RR.Drop.isOpen()) RR.Drop.close(); else RR.Drop.open(); });
   $('#score-chip').addEventListener('click', () => { if (!RR.Maker.active) RR.Board.open(); });
   $('#settings').addEventListener('click', e => {
     if (e.target === $('#settings') || e.target.closest('[data-close]')) RR.Settings.close();
@@ -113,16 +115,21 @@
   document.addEventListener('pointerdown', wake, { capture: true });
   document.addEventListener('keydown', wake, { capture: true });
 
-  /* the practice this browser was last on (or a lesson link's) */
+  /* what this browser was last on, as it is saved now, with what was played just this time on top */
   function restore() {
-    const d = RR.device.practice;
-    // a session: as it is saved now (an old Mine practice: the session it became)
+    const d = RR.device.practice && typeof RR.device.practice === 'object' ? RR.device.practice : null;
+    const over = d && d.over && typeof d.over === 'object' ? RR.clone(d.over) : {};
+    // before 2026-10-08 a set from My melodies was the browser's, laid over everything: it carries on
+    // over what was playing — once, just this time
+    if (RR.oldDeviceSet) { if (!over.set) over.set = RR.oldDeviceSet; RR.oldDeviceSet = null; }
+    // a session (an old Mine practice: the session it became)
     const ses = d && (d.kind === 'session' ? RR.Sessions.get(d.id) : d.kind === 'mine' ? RR.Sessions.list().find(x => x.name === String(d.name || '').trim().slice(0, 40)) : null);
-    if (ses) G.selectSession(ses.id);
+    if (ses) G.selectSession(ses.id, over);
     else if (d && d.practice && (d.kind === 'custom' || d.kind === 'mine' || d.kind === 'session')) {
-      G.usePractice(d.practice, { kind: 'custom', from: d.kind === 'custom' ? d.from || null : d.name || null });
+      G.usePractice(d.practice, { kind: 'custom', from: d.kind === 'custom' ? d.from || null : d.name || null,
+        label: typeof d.label === 'string' ? d.label.slice(0, 60) : undefined, gen: d.gen === true || undefined }, null, over);
     } else {
-      G.selectLevel(Math.max(1, Math.min(RR.LEVELS.length, RR.device.level | 0 || 1)));
+      G.selectLevel(Math.max(1, Math.min(RR.LEVELS.length, (d && d.kind === 'level' ? d.n : RR.device.level) | 0 || 1)), over);
     }
   }
   RR.App = { restore };
@@ -138,9 +145,7 @@
   }
   /* the shelf took a set away (a book put back) that was being played: play the level again */
   function shelfChanged() {
-    if (G.setup.set && G.setup.set !== 'lesson' && !RR.Sets.get(G.setup.set)) {
-      RR.device.set = null; RR.saveDevice(); G.setup.set = null; G.queue = []; G.applyInstrument(); G.newRound();
-    }
+    if (G.setup.set && G.mode.kind !== 'lesson' && !RR.Sets.get(G.setup.set)) G.playOnce('set', null);
     RR.Melodies.render(); G.drawChips(); RR.View.render();
   }
 
@@ -149,7 +154,7 @@
     const lesson = RR.Lesson.fromUrl();
     let got = null;
     if (lesson) {
-      G.usePractice(lesson.practice, { kind: 'lesson', name: lesson.name });
+      G.usePractice(lesson.practice, { kind: 'lesson', name: lesson.name }, lesson.battle);
       document.title = lesson.name + ' · Melody Reader';
     } else {
       got = RR.Sets.receiveFromUrl();

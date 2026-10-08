@@ -82,6 +82,9 @@
   function save(lib) { RR.save(KEY, lib); }
   function get(id) {
     if (id === 'lesson') return RR.Lesson && RR.Lesson.set;
+    // a lesson's Song sets (2026-10-08): 'lesson_1', 'lesson_2' … in memory, from the link
+    const m = /^lesson_(\d{1,2})$/.exec(id || '');
+    if (m) return (RR.Lesson && RR.Lesson.sets && RR.Lesson.sets[+m[1] - 1]) || null;
     return id ? load()[id] || null : null;
   }
 
@@ -123,7 +126,7 @@
 
   /* ---------------- links ---------------- */
   function shareLink(id) {
-    const rec = get(id); if (!rec || id === 'lesson') return '';
+    const rec = get(id); if (!rec || /^lesson(_\d+)?$/.test(id)) return '';
     const data = Object.assign({ title: rec.title, melodies: rec.melodies }, EVM.shareHeader(rec, key));
     return RR.pageBase() + '?set=' + RR.b64enc(data);
   }
@@ -132,7 +135,7 @@
      "now" for a stamp and writes it over a set that is here. */
   function incoming(src, fallbackTitle) {
     const rec = normalize(Object.assign({}, src, { title: src.title || fallbackTitle }), src.id || 'incoming');
-    if (!src.id || src.id === 'lesson') delete rec.id;
+    if (!src.id || /^lesson(_\d+)?$/.test(src.id)) delete rec.id;
     if (!src.createdAt) delete rec.createdAt;
     if (!src.updatedAt) delete rec.updatedAt;
     return rec;

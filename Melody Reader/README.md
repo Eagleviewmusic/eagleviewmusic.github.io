@@ -34,8 +34,9 @@ rules, the points, My sessions, the gold star, round lengths, Battle
 Mode and its fair plan, the Helps' choices, the session page's rules, My
 stats' history and charts, the new ladder: 300 melodies a level against
 its notes, moves, leaps, meters and pick-ups; metronome runs played in
-time, slow, fast, late in, with a note skipped or a wrong bar) — 101 of them, all passing as
-of 2026-10-07.
+time, slow, fast, late in, with a note skipped or a wrong bar; level changes kept and reset, a
+session's own melody set, lesson links carrying every setting, Song sets and a battle) — 107 of
+them, all passing as of 2026-10-08.
 
 The Teacher Library shelf reads `../Teacher Library/index.json`, which only
 exists on the live site; served from its own folder (8815/8816) it can't be
@@ -47,6 +48,51 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 
 ## What's built (all six phases)
 
+- **Each level and session is its own** (2026-10-08, the user's report:
+  settings "over lapping each other", a battle's score carrying into a
+  session until a refresh, a My melodies session playing generated
+  melodies and the other way round). The rule: *all of a session's rules
+  apply to that session, and the new rules to the new one.*
+  - **Picking anything starts clean** (`G.usePractice`): a level, a
+    session, a battle or a lesson plays its own saved settings exactly —
+    a new round, the score chip and streak at 0, no battle unless it is
+    one, the metronome Off, Practice as it says. Nothing from what played
+    before comes along.
+  - **The levels can be changed** — ✎ on a level's row (Settings → Level)
+    or ✎ Edit Level n on the home page opens its page (the session page:
+    notes, rhythm, look and feel, format, melody source). It saves as you
+    go into *your* Level n (`rainbow_reader_levels_v1`, `RR.LevelEdits`),
+    which plays that way every time it is picked; **↺ Reset to the
+    original Level n** gives it back. Its badge gets a little ✎ and its
+    row a YOURS tag; its scores and place on the ladder stay. "Custom" is
+    no longer made by changing a level (an old Custom, or a deleted
+    session that was playing, still plays as Custom with its own page).
+  - **Melody Source is saved with the session or level**, the set too
+    (`from: 'set'`, `set: <id>`): a session made for My melodies always
+    plays them; a Generated one never does. A set deleted or not on this
+    computer: the page says so and the melodies are made up until one is
+    picked.
+  - **Just this time** (`G.over`) — things played on top that are never
+    saved into the level or session: the home page's **format cards**
+    (Rounds · Songs · Beat the Clock · Endless — "Level 3, just this time
+    — its own way stays as it is"), **▶ Play this set** in My melodies,
+    and **Practise these** (tricky notes) on the Score board. The home
+    page lists them under what is chosen, *Just this time:* chips with ×;
+    the ✎ page says so at its top, with **Play its own**. A reload keeps
+    them; picking anything ends them. Changing the format on the page
+    ends a format played just this time; changing the source ends a set
+    played just this time.
+  - **The browser no longer shapes what is played**: the old browser-wide
+    game, set and tricky notes are gone from the device (a set that was
+    playing carries on once, just this time, over what was playing).
+    The browser keeps only its own: the sound, the volume, Points / Gold
+    stars / celebrations shown, the players.
+  - **Lesson links carry everything** — the whole practice (every field,
+    so a default changed later can't change an old link), the source set
+    (`&m=`), the Song format's My melodies sets (`&ss=`, played as
+    `set:lesson_1` …) and a battle's teams, turns and rounds (`&b=`; a
+    battle has a Share tab now). Older links still open as before.
+
 - **The home page** (2026-10-07, the user's ask: "a neutral page", not
   always mid-game) — the app opens here (a lesson link still opens on the
   music). From the top:
@@ -55,18 +101,31 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
     and gold stars (all time) and days in a row; the players' names to
     switch, when there are any. A round that is over, or a Beat the clock
     left part-way, starts afresh.
-  - **What to read** — the fifteen levels as rainbow badges with their
-    stars, My sessions as chips (+ New session), and what the chosen one
-    is ("C to G · ta ta-a · 1 bar"; a My melodies set laid over it, with ×
-    to stop it). ✎ Choose the notes and rhythms opens Settings.
-  - **How to play** — a card each: **Rounds** (− n +, the best for this
-    level and length), **Songs** (Choose… the Songbook songs and My
-    melodies sets, in order), **Beat the Clock** (30 s · 60 s · 2 min, the
-    record), **Endless** (the longest run), **Battle** (the battles, +
-    New battle). The card's choices are kept on the page until ▶ Play,
-    then saved as the Format tab saves them (`RR.Settings.setFormat`: the
-    browser's for a level, the session's own for a session). With a
-    battle chosen, the other cards play the level this browser was last on.
+  - **How to play** — straight after the top since 2026-10-08 (the
+    *What to read* section — the ladder, the session chips — was taken
+    out at the user's ask; sessions are in Settings → Level). A card each:
+    **Rounds** (− n +, the best), **Songs** (the songs picked, in order),
+    **Beat the Clock** (30 s · 60 s · 2 min, the record), **Endless** (the
+    longest run), **Battle** (the battles, + New battle — as before).
+    **A card's ▶ Play never starts anything** (the user: "ask first"): it
+    opens a window with its own ▶ Play. **Songs** — the song chooser (the
+    card's Choose… is gone). **Rounds, Beat the Clock, Endless** — the
+    round's length or the clock's (in step with the card), then *What do
+    you want to read?*:
+    - **Generate** — only Choose the Notes and Choose the Rhythm (the ✎
+      page's two sections, `RR.Settings.draftHtml/draftClick` on a draft);
+      it starts from the last one played (`device.gen`). Plays as Custom
+      "Generated" (scores under `gen`; its ✎ page changes `device.gen`).
+    - **Leveled Challenges** — the fifteen badges with their stars (✎ on
+      your own), the one picked described, **✎ Change Level n** (its page,
+      then back to the window). Plays the level with that format just this
+      time.
+    - **My Melodies** — your sets (Teacher Library and shared ones too),
+      **+ Write a new set** / Open My Melodies… (then back to the window).
+      Plays the set as Custom "♫ Week 3" with Generate's helps (scores
+      under `set:<id>`). ▶ Play is greyed until there is a set.
+    The window opens on what was picked there last (`device.homePick`) —
+    still asked, never started.
   - **Make your own** — My melodies, a new session ("My session 2", its
     page opens to name it), a lesson link (Settings → Share).
   - **My stats, in brief** — the last 7 days as columns, today's and this
@@ -80,6 +139,25 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
     home and Back from home leaves. Leaving the music pauses it (a
     count-in stops; Beat the clock is over). Settings' ▶ Play goes to the
     music from anywhere.
+- **The level box at the top: a drop-down for *how*** (2026-10-08, the
+  user's design — "when the user clicks the drop down, they want to change
+  an aspect of what they are already doing, not to do something
+  different"; the Melody Reader name is for choosing something else). The
+  box sits at the centre of the top bar (three columns from 481 px: the
+  way home · the box · the scores; on a narrow phone it fills the room
+  between them). A tap drops a panel under it (`js/drop.js`, `RR.Drop`)
+  showing only what fits what is playing: **a level** — the other levels
+  (the same format: a round of 7 stays a round of 7) · **a session** — the
+  other sessions · **Generated** — Choose the Notes and Choose the Rhythm,
+  changed in place · **a Song** — the songs, in order · **My melodies** —
+  the other sets, ✎ Edit this set, + Write a new set · **a battle** — its
+  teams, turns and rounds · a lesson — the Lesson tab, as before. Its foot
+  opens the ✎ page of what is playing (✎ Change Level n, ✎ Change <the
+  session>, ✎ Look & Feel and more, ✎ Notes, rhythms and more); the gear
+  still has everything. Picking another level, session or set starts it;
+  the rest takes effect when it closes (`RR.Settings.settle`). The panel
+  uses Settings' own sections and controls (`sectionHtml`, `liveClick`,
+  `battleClick/Input/Change`).
 - **My stats** (2026-10-07, the user's ask: "beef up the statistics") — a
   page of its own (the home page, or 📊 All my stats on the Score board,
   which then has ‹ Back), for the player playing:
@@ -268,8 +346,9 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 - **Games** — a round of any 1–99 melodies (− / + or type it; 2026-10-05 —
   there were only 5 and 10; more than 12 show "3 of 30" and a bar instead of
   dots; the ladder counts rounds of 5 or more), Song (card by card, then *Hear your song*),
-  Beat the clock (30 s · 60 s · 2 min), Endless. The game belongs to the
-  browser, not the practice, so changing it never makes a level Custom.
+  Beat the clock (30 s · 60 s · 2 min), Endless. Since 2026-10-08 the
+  game belongs to each level and session (its page's Format); it used to
+  be the browser's, laid over every level.
 - **Fifteen levels** in six rainbow bands — **redone 2026-10-07 in a music
   teacher's order** (the user's two sequences; this supersedes the design
   folder's LEVELS.md). Every level is made-up melodies only (no Songbook
@@ -321,7 +400,9 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   up to an octave). The rhythm names are the Kodály ones (ti-ri-ti-ri,
   tam-ti, ti-ti-ri, ti-ri-ti, syn-co-pa).
 - **Settings** — Level (My sessions on top, then the levels with their best
-  stars), Notes, Rhythms, How to play, Helps, Points, Sound, Share.
+  stars and ✎), ✎ the page of what is chosen (✎ Level n · ✎ Session ·
+  ⚔️ Battle · ✎ Custom), Points, Sound, Share (2026-10-08: the levels'
+  Notes · Rhythm · Format · Look & Feel tabs became their ✎ page).
 - **The session page, laid out by the user** (2026-10-06; a battle's the
   same, with its teams first): **Session Name:** [the name] **▶ Play
   Session** on one row (Battle Name / Play Battle) · **Choose the Notes** —
@@ -360,8 +441,9 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 - **Score board** — this round, best scores per practice and game, tricky
   notes on a little xylophone and the mix-ups (*You played F for E*),
   *Practise these*, totals, Reset.
-- **Lesson links** — Share → a link that opens the practice as a lesson; a
-  lesson playing a melody set carries the melodies with it.
+- **Lesson links** — Share → a link that opens the practice as a lesson,
+  with every setting, its melody sets (as melodies) and a battle's teams
+  (2026-10-08).
 - **My melodies** (the ♫ button) — melody **sets** kept by the family's EVM
   Library rules: + New set, rename, reorder, delete; ▶ Play this set (with
   the chosen level's judging, helps and tempo — the chip reads "Week 3 ·
@@ -446,14 +528,18 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 | `js/charts.js` | the SVG charts (columns, line, calendar, one split bar) and their tooltip |
 | `js/stats.js` | the My stats page |
 | `js/home.js` | the home page, and the three views (`RR.View`: home · play · stats) with the browser's Back |
+| `js/drop.js` | the level box's drop-down: what can be changed about what is playing (2026-10-08) |
 | `lib/` | vendored copies — see `lib/README.md` |
 | `assets/MA4A-rainbow-reader-cover.jpg` | the hub card's cover (400×400) |
 | `tests/index.html` | the engine checks |
 
 ## Storage
 
-`rainbow_reader_device_v1` (sound, points/stars, folded notes, the current
-level or practice, the game), `rainbow_reader_scores_v1` (per player: best
+`rainbow_reader_device_v1` (sound, points/stars, folded notes, what is
+playing — `practice: { kind: 'level', n | 'session', id | 'custom', practice,
+from, over }` with `over` = what is played just this time; since 2026-10-08
+no game, set or tricky notes of its own), `rainbow_reader_levels_v1` (your
+changes to the levels, `{ n: practice }`, 2026-10-08), `rainbow_reader_scores_v1` (per player: best
 rounds, the ladder's stars, first-try counts per note, mix-ups, totals —
 and since 2026-10-07 My stats' `days`, `log`, `games`, `rec`, `since`, with
 totals `points` `gold` `made` `rounds` `secs` beside the old three; an
@@ -465,6 +551,41 @@ played and the player names. Every read is checked and
 falls back to defaults; a change of shape gets a new `_v2` key.
 
 ## Traps (found while building)
+
+- **Each level and session is its own (2026-10-08).** `G.base` is the
+  saved settings (the ✎ page reads and changes it, through `P()` in
+  settings.js), `G.over` what is played just this time, `G.setup =
+  compose()` what is played. Never write into `G.setup` from a page —
+  change `G.base`, then `G.compose()` and `G.saveSetup()`. Anything new
+  that is per-visit state (scores, a battle, a plan, the metronome) must
+  be reset in `usePractice`, or it leaks into the next choice — that was
+  the bug. A session's own set scores as the session; only a set played
+  just this time keeps `set:<id>` scores. The staff picker on the ✎ page
+  also carries `data-note` (SVG): a test clicking a bar must select
+  `button[data-note]`.
+- **Practice goes straight round again (2026-10-08, the user's report).**
+  After a melody is found in Practice the card shows it (phase `review`)
+  and clears 1.5 s later — but strikes used to be ignored until then, so a
+  player keeping the beat with the practice metronome lost the next
+  downbeat and the clear landed mid-melody. Now the first bar struck in
+  `review` clears the card at once and counts as note 1 (`strike`), and
+  the floating check carries on to its end (`resetCard(stage, keepMark)`).
+  Nothing here may restart the practice metronome: it keeps its own grid.
+- **The top bar's three columns (2026-10-08).** Each part has its own
+  `grid-column`: with the level box hidden (the home page, My stats) the
+  icons otherwise slid into the empty middle column. **The home page's
+  cards** are flex rows, centred (the user's: a short row sits in the
+  middle), each card one column of a container-query grid (`@container`
+  on `.mode-grid`: columns of at least 205 px, 158 on a phone, five across
+  a computer); Make your own's three take the same width, under the middle
+  three. Its phone rule uses `:where(.make)` so it adds no weight — a
+  heavier selector there kept every row at two.
+- **The battle's team scores stayed in the score chip after a battle**
+  (the user's screenshots, 2026-10-08): `.score-chip > span` sets
+  `inline-flex`, which outranks a plain `.sc-teams { display: none }`, so
+  the last battle's teams showed beside the points until a reload. Now
+  `.score-chip:not(.battle) .sc-teams` hides them and `drawChips` empties
+  them. Check what is *visible* (computed display), not just the state.
 
 - **A metronome run follows the player (2026-10-07).** Don't go back to
   matching strikes to notes by the click alone: drift is cumulative, so
@@ -553,10 +674,10 @@ falls back to defaults; a change of shape gets a new `_v2` key.
   (old scale) and keeps the ladder's stars, tricky notes, mix-ups, totals.
 - **My sessions (2026-10-05).** The session page is the other tabs' renderers
   joined (`TAB.notes() + rhythms() + helps() + play()`), so every control
-  goes through the one click handler. `G.markCustom()` is where a session
-  saves (`RR.Sessions.update`); the game keys save there too for a session,
-  to the browser for anything else. `usePractice` lays the browser's game
-  over a level but not over a session. Score keys are `session:<id>`, so a
+  goes through the one click handler. `G.saveSetup()` is where a session
+  (or, since 2026-10-08, a level) saves (`RR.Sessions.update`,
+  `RR.LevelEdits.save`); nothing is laid over either by the browser any
+  more. Score keys are `session:<id>`, so a
   rename keeps the scores; a Mine practice's old `mine:<name>` scores are
   copied across once (`legacy`, game.js), then the marker is dropped.
 - **The check and the star** come from `finish()`: `made` = not a metronome

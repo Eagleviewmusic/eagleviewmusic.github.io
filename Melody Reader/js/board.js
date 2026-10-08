@@ -98,7 +98,7 @@
       show('<div class="rd-card bt-card"><div class="bt-kicker">⚔️ Battle</div><h3>' + RR.esc(G.mode.name) + '</h3>' +
         '<div class="rd-sub">' + b.rounds + (b.rounds === 1 ? ' round' : ' rounds') + ' · ' + each + ' a turn · ' + b.teams.length + ' teams</div>' +
         '<div class="bt-teams">' + b.teams.map(teamName).join('') + '</div>' +
-        '<div class="rd-btns">' + go.replace('— Go ▸', 'first — Go ▸') + '<button type="button" class="pill-btn" data-rd="battle-edit">Change the teams</button></div></div>');
+        '<div class="rd-btns">' + go.replace('— Go ▸', 'first — Go ▸') + (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn" data-rd="battle-edit">Change the teams</button>') + '</div></div>');
       G.announce('Battle! ' + b.teams.map(x => x.name).join(', ') + '. ' + t.name + ' goes first.');
     } else if (at.team === 0) {
       show('<div class="rd-card bt-card"><div class="bt-kicker">⚔️ Round ' + at.round + ' of ' + b.rounds + ' done</div><h3>Round ' + (at.round + 1) + '</h3>' +
@@ -119,7 +119,7 @@
     show('<div class="rd-card bt-card bt-over"><div class="bt-kicker">⚔️ Battle over — ' + (top.length === 1 ? 'the winner' : 'a tie!') + '</div>' +
       (top.length === 1 ? '<h3 class="bt-who" style="--tc:' + top[0].colour + '">🏆 ' + RR.esc(top[0].name) + '</h3>' : '<h3>🏆 ' + top.map(t => RR.esc(t.name)).join(' and ') + '</h3>') +
       '<div class="rd-sub">' + RR.esc(G.mode.name) + ' · ' + b.rounds + (b.rounds === 1 ? ' round' : ' rounds') + '</div>' + tableHtml(list) +
-      '<div class="rd-btns"><button type="button" class="pill-btn go" data-rd="battle-new">Battle again</button><button type="button" class="pill-btn" data-rd="battle-edit">Change the battle</button>' + HOME_BTN + '</div></div>');
+      '<div class="rd-btns"><button type="button" class="pill-btn go" data-rd="battle-new">Battle again</button>' + (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn" data-rd="battle-edit">Change the battle</button>') + HOME_BTN + '</div></div>');
     G.announce('Battle over. ' + (top.length === 1 ? 'The winner: ' + top[0].name + '. ' : 'A tie: ' + top.map(t => t.name).join(' and ') + '. ') + list.map(t => t.name + ' ' + scoreText(t)).join(', ') + '.');
     if (RR.device.celebrate) RR.Sound.celebrate(3);
   }
@@ -245,10 +245,10 @@
     if (pl) { RR.Players.use(pl.dataset.player); open(); return; }
     const b = e.target.closest('[data-board]'); if (!b) return;
     if (b.dataset.board === 'tricky') {
-      G.setup.tricky = !G.setup.tricky;
-      RR.device.tricky = G.setup.tricky; RR.saveDevice();
-      G.queue = []; G.drawChips();
-      RR.toast(G.setup.tricky ? 'Made-up melodies will use your tricky notes more' : 'Tricky notes: back to normal');
+      // just this time (2026-10-08): it ends when another level or session is picked
+      G.playOnce('tricky', !G.setup.tricky);
+      G.drawChips();
+      RR.toast(G.setup.tricky ? 'Made-up melodies will use your tricky notes more — until you pick something else' : 'Tricky notes: back to normal');
     }
     if (b.dataset.board === 'stats') { close(); RR.View.go('stats'); return; }
     if (b.dataset.board === 'reset') {

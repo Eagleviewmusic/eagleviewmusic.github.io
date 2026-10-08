@@ -13,10 +13,12 @@
               read-only: play it as it is, or Save my copy. A Teacher
               Library set leaves with Put back (on the shelf).
 
-   Play this set makes the set the melodies played (RR.device.set), laid
-   over whatever level is chosen — its helps and tempos — and the
-   chip reads "Week 3 · Level 4". Choosing other melodies in Settings → How
-   to play, or Stop here, ends it.
+   Play this set plays the set just this time (G.over.set, 2026-10-08)
+   over whatever level or session is chosen — its helps and tempos — and
+   the chip reads "Week 3 · Level 4". Stop here, or picking another level
+   or session, ends it; it is never saved into the level or session. (To
+   make a session always play a set: its ✎ page → Melody Source → My
+   Melodies.)
    ========================================================================== */
 (function () {
   'use strict';
@@ -30,7 +32,7 @@
     return n + (n === 1 ? ' melody' : ' melodies') + (times.length ? ' · ' + times.join(', ') : '');
   };
   const isOwn = set => !set.received;
-  const playing = id => G.setup && G.setup.set === id && G.mode.kind !== 'lesson';
+  const playing = id => G.over && G.over.set === id && G.mode.kind !== 'lesson';   // played just this time (Stop ends it)
 
   function pic(m) {
     const card = { time: m.time, notes: m.notes };
@@ -115,17 +117,13 @@
 
   /* ---------------- playing a set ---------------- */
   function play(id) {
-    RR.device.set = id; RR.saveDevice();
-    G.setup.set = id; G.queue = []; G.fresh = true;     // a new set starts with Practice on
-    G.applyInstrument(); G.newRound();
+    G.playOnce('set', id);                              // a new round: a new set starts with Practice on
     close();
     if (RR.View) RR.View.go('play');
     RR.toast('Playing ' + RR.Sets.get(id).title);
   }
   function stop() {
-    RR.device.set = null; RR.saveDevice();
-    G.setup.set = null; G.queue = []; G.fresh = true;
-    G.applyInstrument(); G.newRound();
+    G.playOnce('set', null);
     render();
   }
   function hear(m) {
@@ -185,8 +183,10 @@
       }
     } else if (act === 'delete' && set) {
       if (!(await RR.ask('Delete “' + set.title + '” and its ' + set.melodies.length + (set.melodies.length === 1 ? ' melody?' : ' melodies?'), 'Delete'))) return;
-      if (playing(set.id)) { RR.device.set = null; RR.saveDevice(); G.setup.set = null; G.queue = []; G.applyInstrument(); G.newRound(); }
-      RR.Sets.remove(set.id); view = null; render();
+      const was = G.setup.set === set.id;                 // playing now (just this time, or a session's own source)
+      RR.Sets.remove(set.id);
+      if (was) G.playOnce('set', null);                   // made-up melodies from here
+      view = null; render();
     }
   });
   body.addEventListener('keydown', e => {

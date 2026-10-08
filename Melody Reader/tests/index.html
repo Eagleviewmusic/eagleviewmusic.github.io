@@ -417,6 +417,53 @@
       }
     })();
 
+    // 8b. each level and session is its own (2026-10-08): level changes kept, a session's own set, links carry everything
+    (function () {
+      const K = [RR.KEY.sessions, RR.KEY.levels, RR.Sets.KEY], keep = K.map(k => localStorage.getItem(k));
+      try {
+        K.forEach(k => localStorage.removeItem(k));
+        const orig = RR.originalLevel(3);
+        RR.LevelEdits.save(3, Object.assign(RR.clone(orig), { game: 'endless', colour: 'black', tricky: true }));
+        const ed = RR.practiceOfLevel(3);
+        RR.LevelEdits.save(4, RR.originalLevel(4));
+        check('A level keeps your changes and plays them every time; a change back to how it was made is no change',
+          RR.LevelEdits.edited(3) && ed.game === 'endless' && ed.colour === 'black' && ed.tricky === false &&
+          !RR.LevelEdits.edited(4) && JSON.stringify(RR.practiceOfLevel(4)) === JSON.stringify(RR.originalLevel(4)) &&
+          RR.LEVELS[2].colour !== 'black');
+        RR.LevelEdits.reset(3);
+        check('Reset gives a level back as it was made', !RR.LevelEdits.edited(3) && JSON.stringify(RR.practiceOfLevel(3)) === JSON.stringify(orig));
+
+        const mel = { title: '', time: [4, 4], notes: [{ p: 'E4', t: 4 }, { p: 'G4', t: 4 }, { p: 'E4', t: 8 }] };
+        const set = RR.Sets.create('Week 3', [mel, mel]);
+        const a = RR.Sessions.add('Mine', Object.assign(RR.clone(RR.DEFAULTS), { from: 'set', set: set.id }));
+        const b = RR.Sessions.add('Made', Object.assign(RR.clone(RR.DEFAULTS), { from: 'made', set: set.id }));
+        check('A session with My Melodies as its source keeps its set; one with Generated keeps none',
+          RR.Sessions.get(a.id).practice.from === 'set' && RR.Sessions.get(a.id).practice.set === set.id &&
+          RR.Sessions.get(b.id).practice.from === 'made' && RR.Sessions.get(b.id).practice.set === null &&
+          RR.sanitize({ from: 'set' }).from === 'set');
+
+        // a link: every field, the source set, the Song format's sets, a battle
+        const p = Object.assign(RR.clone(RR.DEFAULTS), { from: 'set', set: set.id, colour: 'black', labels: 'solfege', tempos: [50, 70, 90], gold: 13, auto: false,
+          game: 'song', songPicks: ['ode', 'set:' + set.id, 'set:set_gone_x'] });
+        const link = RR.Lesson.link('Week 3', p, set, { teams: [{ name: 'Eagles', colour: '#a855f7' }, {}], per: 2, rounds: 4 });
+        const back = RR.Lesson.parse(link);
+        const same = Object.keys(p).filter(k => !['set', 'songPicks'].includes(k)).every(k => JSON.stringify(p[k]) === JSON.stringify(back.practice[k]));
+        check('A lesson link carries every setting, its set and its Song sets as melodies (never ids), and a battle',
+          same && !link.includes(set.id) && back.practice.set === 'lesson' && back.set.melodies.length === 2 &&
+          JSON.stringify(back.practice.songPicks) === JSON.stringify(['ode', 'set:lesson_1']) && back.sets[0].title === 'Week 3' && back.sets[0].melodies.length === 2 &&
+          back.battle.teams[0].name === 'Eagles' && back.battle.per === 2 && back.battle.rounds === 4, link.length + ' characters');
+        // the whole practice travels: a default that changes later can't change an old link
+        const raw = RR.b64dec(new URL(link).searchParams.get('p'));
+        check('A lesson link holds the whole practice, not just what differs from today’s defaults', Object.keys(RR.DEFAULTS).filter(k => k !== 'set').every(k => k in raw));
+        // a link made before 2026-10-08: its set was laid over the practice (and, with Song, was the song)
+        const old = location.href.split('?')[0] + '?lesson=Old&p=' + RR.b64enc({ game: 'song' }) + '&m=' + RR.b64enc({ title: 'Week 3', melodies: [mel] });
+        const ob = RR.Lesson.parse(old);
+        check('An older lesson link with a set still plays it (as the song, with Song)', ob.practice.from === 'set' && ob.practice.set === 'lesson' && JSON.stringify(ob.practice.songPicks) === '["set:lesson"]');
+      } finally {
+        K.forEach((k, i) => { if (keep[i] == null) localStorage.removeItem(k); else localStorage.setItem(k, keep[i]); });
+      }
+    })();
+
     // 9. My stats: the history kept per player, and the charts (2026-10-07)
     (function () {
       const H = RR.History, t = H.today(), at = k => H.parseDay(k).getTime();
