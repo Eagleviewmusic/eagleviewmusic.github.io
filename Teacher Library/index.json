@@ -1,7 +1,7 @@
 {
   "format": "evm-index",
   "formatVersion": 1,
-  "generatedAt": "2026-10-05T16:04:24.994Z",
+  "generatedAt": "2026-10-08T00:09:38.707Z",
   "items": [
     {
       "app": "music-stand",
@@ -73,6 +73,15 @@
       "title": "Days of the Week",
       "updatedAt": 1788830441816,
       "path": "song-writer--song_1788830441816.json",
+      "book": "More songs"
+    },
+    {
+      "app": "song-writer",
+      "kind": "song",
+      "id": "song_1791416728886_4hs1",
+      "title": "Do Re Mi Song (with Xylophone part)",
+      "updatedAt": 1791418165009,
+      "path": "song-writer--song_1791416728886_4hs1.json",
       "book": "More songs"
     },
     {
