@@ -69,6 +69,7 @@
     const set = RR.Sets.get(setId);
     if (!set || set.received) return;
     if (RR.Melodies) RR.Melodies.close();
+    if (RR.View) RR.View.go('play');                // the music card is the editor (from the home page too)
     G.pause(); clearTimeout(G.autoT);
     M.active = true; M.setId = setId; M.index = (index === null || index === undefined) ? null : index;
     const src = M.index !== null && set.melodies[M.index];

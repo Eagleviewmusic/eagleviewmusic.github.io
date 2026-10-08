@@ -551,7 +551,8 @@ Each file's header comment is the full contract.
   (staff notation, section colours, chord rhythm) · Scale (Justify width / Fixed) · Text size ·
   Lyric font · Keyboard & strip (**Key colours** — Rainbow /
   Colours when played / One colour + 10 swatches and a colour picker; `kbColors`,
-  `kbColor` — Chord panel S/M/L) · While it plays (Light up: Note · Box · Both · Off — behind the note, staff.js draws it under the staff on written lines;
+  `kbColor` — **Chords light the keys**, `kbChordLights`, default on: off, a sounding chord no
+  longer washes its keys, only the melody lights them — Chord panel S/M/L) · While it plays (Light up: Note · Box · Both · Off — behind the note, staff.js draws it under the staff on written lines;
   Follow along) · Layout settings… · How this works. Also remembered, set from
   the panel itself: `chordSet`, `modSlots`, `chordNames` and `chordTones`.
 - **Sound**: see Playing.

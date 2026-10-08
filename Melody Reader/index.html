@@ -26,11 +26,18 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
         <span>Eagle View</span>
       </a>
-      <div class="brand">
+      <!-- the music and My stats: back to Melody Reader's own home page (home.js) -->
+      <button type="button" class="app-home" id="app-home" title="Melody Reader home" aria-label="Home">
+        <svg class="i-back" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        <svg class="i-house" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.2L12 3.8l8.5 7.4M6 9.6V20h4.6v-5.6h2.8V20H18V9.6"/></svg>
+        <span>Home</span>
+      </button>
+      <!-- the name (and the logo): back to the home page, from anywhere (2026-10-07) -->
+      <h1 class="brand-h1"><button type="button" class="brand" id="brand" title="Melody Reader home" aria-label="Melody Reader — home">
         <!-- a treble clef on five lines coloured as the xylophone's E G B D F (bottom to top) -->
         <svg class="brand-logo" viewBox="0 0 40 40" aria-hidden="true"><g stroke-width="2.4" stroke-linecap="round"><line x1="2" x2="38" y1="29.8" y2="29.8" stroke="#facc15"/><line x1="2" x2="38" y1="24.6" y2="24.6" stroke="#2dd4bf"/><line x1="2" x2="38" y1="19.4" y2="19.4" stroke="#a855f7"/><line x1="2" x2="38" y1="14.2" y2="14.2" stroke="#f97316"/><line x1="2" x2="38" y1="9" y2="9" stroke="#22c55e"/></g><path transform="translate(13.34 24.6) scale(0.01444)" fill="#2b1d16" stroke="#fff" stroke-width="150" stroke-linejoin="round" paint-order="stroke" d="M 809 30 C 809 132 768 238 665 279 C 635 107 596 -122 586 -186 C 716 -186 809 -98 809 30 Z M 605 297 C 576 302 549 305 521 305 C 315 305 140 161 140 -56 C 140 -232 264 -389 390 -498 C 415 -520 438 -540 459 -562 C 472 -484 482 -416 492 -357 C 361 -318 272 -180 272 -45 C 272 56 351 194 467 194 C 478 194 491 189 491 176 C 491 163 477 156 459 144 C 403 109 372 72 372 1 C 372 -86 436 -157 521 -177 Z M 478 -1184 C 491 -1241 557 -1392 632 -1392 C 654 -1392 688 -1322 688 -1223 C 688 -1073 577 -960 478 -863 C 469 -920 462 -976 462 -1037 C 462 -1090 467 -1139 478 -1184 Z M 176 739 C 176 834 249 959 444 959 C 511 959 570 942 622 910 C 700 855 720 760 720 670 C 720 613 711 549 697 467 C 693 438 684 395 675 338 C 816 292 922 145 922 -3 C 922 -220 768 -367 557 -367 C 543 -454 528 -539 516 -619 C 668 -779 773 -959 773 -1188 C 773 -1319 733 -1426 710 -1477 C 675 -1551 634 -1601 608 -1601 C 598 -1601 553 -1584 505 -1528 C 413 -1418 387 -1234 387 -1113 C 387 -1035 395 -965 419 -804 C 418 -802 343 -726 312 -701 C 181 -579 0 -405 0 -117 C 0 153 235 364 503 364 C 544 364 583 360 616 354 C 644 492 660 593 660 670 C 660 819 583 899 438 899 C 403 899 373 891 370 891 C 369 890 366 888 366 887 C 366 884 369 883 373 881 C 441 871 508 814 508 721 C 508 644 449 562 341 562 C 240 562 176 644 176 739 Z"/></svg>
-        <h1 class="brand-name">Melody Reader</h1>
-      </div>
+        <span class="brand-name">Melody Reader</span>
+      </button></h1>
       <button class="chip level-chip" id="level-chip" type="button" aria-label="Choose a level">
         <span class="band-dot"></span><span class="chip-text"><span class="level-text">Level 1 · Mi Re Do</span><span class="tune-name" id="tune-name"></span></span>
         <svg class="caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -51,6 +58,11 @@
         </button>
       </div>
     </header>
+
+    <!-- the home page (home.js): where the app opens -->
+    <main class="home" id="home" aria-label="Home"></main>
+    <!-- My stats (stats.js) -->
+    <main class="statspage" id="stats" aria-label="My stats"></main>
 
     <main class="stage">
       <section class="stand" id="stand" aria-label="The music">
@@ -139,7 +151,7 @@
         <div class="tab-body" id="tab-body"></div>
       </div>
       <footer class="sheet-foot">
-        <button class="pill-btn primary" data-close type="button">Play</button>
+        <button class="pill-btn primary" data-close data-play type="button">▶ Play</button>
       </footer>
     </div>
   </div>
@@ -184,6 +196,7 @@
   <script src="js/melody.js"></script>
   <script src="js/levels.js"></script>
   <script src="js/sets.js"></script>
+  <script src="js/history.js"></script>
   <script src="js/game.js"></script>
   <script src="js/players.js"></script>
   <script src="js/beat.js"></script>
@@ -192,6 +205,9 @@
   <script src="js/lesson.js"></script>
   <script src="js/melodies.js"></script>
   <script src="js/maker.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/home.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

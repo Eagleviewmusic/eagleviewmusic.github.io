@@ -27,6 +27,22 @@
      Early / Late  ≤ max(260 ms, 0.38 beat)    beyond that: Missed
 
    Any other strike is a wrong bar.
+
+   Meters and pick-ups (2026-10-07): the clicks are the meter's beats — a
+   quarter, or in 6/8 a dotted quarter (two to the bar, so the count is
+   1 2 · 1 2). The tempos are quarter notes; in 6/8 the eighths move as
+   fast as they do in 4/4 at the same pace (a dotted quarter = 2/3 of the
+   BPM). A melody with a pick-up comes in that much before the count's
+   last bar line: a beat's pick-up in 4/4 is counted 1 2 3 and played on
+   4; an eighth's in 6/8 lands on the last eighth of the count. The
+   windows are measured in quarter notes, whatever the meter.
+
+   The practice metronome (2026-10-07, the user's): in Practice, a tempo
+   picked starts the click at once — no count-in — on the card's beats, the
+   first of each bar higher, and it keeps going while the card is in
+   Practice with the metronome on (game.js syncTick decides). Listen joins
+   it, coming in on its next bar line. A Test still counts in (above). It
+   runs on the same 25 ms timer, each click placed 120 ms ahead.
    ========================================================================== */
 (function () {
   'use strict';
@@ -48,8 +64,11 @@
     RR.Xylo.setGlow(null);
     const my = ++token;
     const CI = window.EVMCountIn;
-    const n = CI ? CI.beats(s.time[0]) : Math.max(4, s.time[0]);
-    if (CI) CI.open(n, s.time[0]);
+    const M = RR.meter(G.card.time), pick = G.card.pickup || 0;
+    const n = CI ? CI.beats(M.beats) : Math.max(4, M.beats);        // the count: a bar (two of 2/4 or 6/8)
+    const lead = n * M.beatTicks - pick;                           // ticks of count before the music
+    const shown = Math.ceil(lead / M.beatTicks);                    // the count's numbers that come before it
+    if (CI) CI.open(shown, M.beats);
     G.draw();
     const ok = await RR.Sound.prime(0.35);
     if (my !== token) return;                             // stopped while the sound woke
@@ -60,21 +79,21 @@
       return;
     }
     const total = G.evs.reduce((a, e) => a + e.t, 0);
-    const beat = 60 / tempo, spt = beat / 4;
-    const t0 = RR.Sound.now() + 0.12, startT = t0 + n * beat;
+    const spt = 60 / tempo / 4, beat = M.beatTicks * spt, quarter = 4 * spt;
+    const t0 = RR.Sound.now() + 0.12, startT = t0 + lead * spt;
+    // every beat from the count's first to the melody's end, on the bar's grid; the first of each bar higher
     const clicks = [];
-    for (let b = 0; b < n; b++) clicks.push({ t: t0 + b * beat, accent: b % s.time[0] === 0 });
-    for (let b = 0; b < total / 4; b++) clicks.push({ t: startT + b * beat, accent: b % s.time[0] === 0 });   // the metronome
-    const okW = Math.max(0.26, 0.38 * beat);
+    for (let b = 0; t0 + b * beat < startT + total * spt - 1e-6; b++) clicks.push({ t: t0 + b * beat, accent: b % M.beats === 0 });
+    const okW = Math.max(0.26, 0.38 * quarter);
     const last = G.evs.reduce((a, e) => e.rest ? a : Math.max(a, e.start), 0);
     B = {
       my, n, beat, spt, t0, startT, clicks, ci: 0, timer: null,
-      perfect: Math.max(0.075, 0.11 * beat), good: Math.max(0.15, 0.22 * beat), ok: okW,
+      perfect: Math.max(0.075, 0.11 * quarter), good: Math.max(0.15, 0.22 * quarter), ok: okW,
       // the end: the last note's length, or its window if that is longer (a short last note)
       end: Math.max(startT + total * spt, startT + last * spt + okW) + 0.12,
       flashAt: s.flash ? RR.now() + s.flash * 1000 : null
     };
-    if (CI) CI.run(clicks.slice(0, n).map(c => RR.Sound.heardAt(c.t)), RR.Sound.heardAt(startT));
+    if (CI) CI.run(clicks.slice(0, shown).map(c => RR.Sound.heardAt(c.t)), RR.Sound.heardAt(startT));
     B.timer = setInterval(tick, 25);
     tick();
   }
@@ -87,7 +106,7 @@
       RR.Sound.click(c.t, c.accent, false);
     }
     const heard = RR.Sound.heardNow();
-    if (G.phase === 'countin' && heard >= B.startT - B.beat * 0.45) { G.phase = 'running'; G.drawSides(); }
+    if (G.phase === 'countin' && heard >= B.startT - Math.min(B.beat, 4 * B.spt) * 0.45) { G.phase = 'running'; G.drawSides(); }
     if (B.flashAt && RR.now() >= B.flashAt && !G.hidden) { G.hidden = true; B.flashAt = null; G.draw(); }
     // missed notes are only noted — nothing shows until the end
     G.evs.forEach((ev, i) => {
@@ -134,8 +153,44 @@
     if (was && !finishing && (G.phase === 'countin' || G.phase === 'running')) G.phase = 'ready';
   }
 
+  /* ---------------- the practice metronome ---------------- */
+  let T = null, tPending = null, tToken = 0;
+  async function tickStart() {
+    tickStop();
+    const my = ++tToken, pace = G.metro;
+    tPending = pace;
+    const ok = await RR.Sound.prime(0.3);
+    if (my !== tToken) return;
+    tPending = null;
+    if (!ok || !G.card) return;
+    const M = RR.meter(G.card.time), spt = 60 / RR.paceTempo(G.setup, pace) / 4;
+    T = { pace, t0: RR.Sound.now() + 0.08, beat: M.beatTicks * spt, beats: M.beats, n: 0, timer: null };
+    T.timer = setInterval(tickRun, 25);
+    tickRun();
+  }
+  function tickRun() {
+    if (!T) return;
+    const now = RR.Sound.now();
+    while (T.t0 + T.n * T.beat < now + 0.12) {
+      const t = T.t0 + T.n * T.beat, accent = T.n % T.beats === 0;
+      T.n++;
+      if (t < now - 0.03) continue;                         // a throttled timer fell behind: skip, never a burst
+      RR.Sound.click(t, accent, false);
+      const at = RR.Sound.heardAt(t) - performance.now();
+      setTimeout(() => { if (T && G.metroBeat) G.metroBeat(accent); }, Math.max(0, at));
+    }
+  }
+  function tickStop() { tToken++; tPending = null; if (T) { clearInterval(T.timer); T = null; } }
+  /* the audio time of the click's next bar line at least `lead` seconds from now (null when it isn't running) */
+  function tickNextBar(lead) {
+    if (!T) return null;
+    const bar = T.beat * T.beats, at = RR.Sound.now() + (lead || 0);
+    return T.t0 + Math.max(0, Math.ceil((at - T.t0) / bar - 1e-9)) * bar;
+  }
+
   RR.Beat = {
     start, stop, strike, running: () => !!B,
+    tickStart, tickStop, tickNextBar, ticking: () => (T ? T.pace : tPending),
     /* for tests: when the music starts (audio time) and how long a tick is */
     info: () => B && { startT: B.startT, spt: B.spt, beat: B.beat, windows: [B.perfect, B.good, B.ok] }
   };

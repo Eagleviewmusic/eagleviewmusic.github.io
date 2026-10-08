@@ -15,8 +15,9 @@
 <body>
   <!-- The engine's own checks (IMPLEMENTATION.md, phases 2 and 5): the
        generator, the Songbook, the levels, the engraver, practices, lesson
-       links, melody sets under the family library rules, and the points
-       (1–20 a melody, POINTS-AND-COUNT-IN.md).
+       links, melody sets under the family library rules, the points
+       (1–20 a melody, POINTS-AND-COUNT-IN.md), and My stats' history
+       and charts (2026-10-07).
        Open through the server: http://localhost:8816/tests/  -->
   <h1>Melody Reader — tests</h1>
   <div class="sum" id="sum">Running…</div>
@@ -32,6 +33,8 @@
   <script src="../lib/evm-library.js"></script>
   <script src="../js/sets.js"></script>
   <script src="../js/lesson.js"></script>
+  <script src="../js/history.js"></script>
+  <script src="../js/charts.js"></script>
   <script>
   (function () {
     const out = document.getElementById('out');
@@ -45,36 +48,80 @@
     }
     const RUNS = 300;
 
-    // 1. the generator, every level
+    // 1. the generator, every level (the ladder redone 2026-10-07: meters, pick-ups, leaps by interval)
+    const DRAWN = [1, 2, 3, 4, 6, 8, 12, 16];
     RR.LEVELS.forEach(l => {
       const s = RR.practiceOfLevel(l.n), recent = [];
-      const barTicks = s.time[0] * 4;
       const problems = [];
-      let minNotes = 99, maxNotes = 0;
-      const melodies = new Set();
+      let minNotes = 99, maxNotes = 0, picks = 0, laBased = 0, noLeap = 0;
+      const melodies = new Set(), meters = new Set(), pool = s.notes.slice().sort((a, b) => RR.BAR[a].step - RR.BAR[b].step);
       for (let i = 0; i < RUNS; i++) {
         const m = RR.Melody.make(s, { recent });
         if (!m) { problems.push('no melody'); continue; }
+        const barTicks = RR.meter(m.time).barTicks, p = m.pickup || 0;
+        meters.add(RR.meterText(m.time)); if (p) picks++; if (m.la) laBased++;
+        if (!s.times.some(t => t[0] === m.time[0] && t[1] === m.time[1])) problems.push('a meter outside the practice');
+        if (p && !s.pickup) problems.push('a pick-up the practice has not');
         const sum = m.notes.reduce((a, n) => a + n.t, 0);
         if (sum !== s.bars * barTicks) problems.push('ticks ' + sum);
+        if (m.notes.some(n => !DRAWN.includes(n.t))) problems.push('a length that can’t be drawn');
         if (m.notes.some(n => n.p && !s.notes.includes(n.p))) problems.push('a note outside the practice');
         if (!m.notes[0].p) problems.push('starts on a rest');
         if (!m.notes[m.notes.length - 1].p) problems.push('ends on a rest');
         for (let j = 1; j < m.notes.length; j++) if (!m.notes[j].p && !m.notes[j - 1].p) problems.push('two rests running');
-        // nothing crosses a bar line
-        let t = 0; m.notes.forEach(n => { if (Math.floor(t / barTicks) !== Math.floor((t + n.t - 1) / barTicks)) problems.push('crosses a bar line'); t += n.t; });
-        if (s.endDo && (s.notes.includes('C4') || s.notes.includes('C5'))) { const last = m.notes[m.notes.length - 1].p; if (last && last[0] !== 'C') problems.push('ends on ' + last + ', not Do'); }
+        // nothing crosses a bar line (they come after the pick-up)
+        let t = 0; m.notes.forEach(n => { if (Math.floor((t - p) / barTicks) !== Math.floor((t + n.t - 1 - p) / barTicks)) problems.push('crosses a bar line'); t += n.t; });
+        const last = m.notes[m.notes.length - 1].p;
+        if (m.la && last && last[0] !== 'A') problems.push('La-based, but ends on ' + last);
+        else if (!m.la && s.endDo && (s.notes.includes('C4') || s.notes.includes('C5')) && last && last[0] !== 'C') problems.push('ends on ' + last + ', not Do');
+        // the moves: Steps and Steps and skips by the practice's own notes; Leaps only the practice's, two kinds at most, one at least
+        const ps = m.notes.filter(n => n.p).map(n => n.p), kinds = new Set();
+        const home = ps.length;                                                  // the way home too: by an allowed move (2026-10-07)
+        for (let j = 1; j < ps.length; j++) {
+          const a = RR.BAR[ps[j - 1]], b = RR.BAR[ps[j]], di = Math.abs(pool.indexOf(ps[j]) - pool.indexOf(ps[j - 1]));
+          if (s.moves === 'steps' && j < home && di > 1) problems.push('a skip in a Steps level');
+          if (s.moves === 'skips' && j < home && di > 2) problems.push('a leap in a Skips level');
+          if (s.moves === 'leaps' && Math.abs(b.step - a.step) >= 3 && di > 1) {
+            const k = Object.keys(RR.Melody.LEAPS).find(x => RR.Melody.LEAPS[x] === Math.abs(b.midi - a.midi));
+            if (!k || !s.leaps.includes(k)) problems.push('a leap of ' + Math.abs(b.midi - a.midi) + ' semitones'); else kinds.add(k);
+          }
+        }
+        if (kinds.size > 2) problems.push('three kinds of leap in one melody');
+        if (s.moves === 'leaps' && !kinds.size) noLeap++;
         const c = m.notes.filter(n => n.p).length;
         minNotes = Math.min(minNotes, c); maxNotes = Math.max(maxNotes, c);
         melodies.add(m.notes.map(n => (n.p || 'r') + n.t).join(' '));
         try { const g = RR.Eng.render(m, { ss: 20, maxW: 900, colour: s.colour, labels: 'syllables', judgeRow: true }); if (!(g.W > 0 && g.H > 0)) problems.push('drew nothing'); }
         catch (e) { problems.push('engraver: ' + e.message); }
       }
-      const need = s.bars === 1 ? 3 : 4;
+      const need = s.bars === 1 ? Math.min(3, s.time[0]) : 4;
       if (minNotes < need) problems.push('only ' + minNotes + ' notes');
+      if (noLeap > RUNS * 0.02) problems.push(noLeap + ' melodies without a leap');
+      if (s.pickup && (picks < RUNS * 0.3 || picks > RUNS * 0.7)) problems.push(picks + ' pick-ups in ' + RUNS);
+      if (s.endLa && (laBased < RUNS * 0.3 || laBased > RUNS * 0.7)) problems.push(laBased + ' La-based in ' + RUNS);
+      if (meters.size !== s.times.length) problems.push('meters seen: ' + Array.from(meters).join(' '));
       check('Level ' + l.n + ' · ' + l.name + ': ' + RUNS + ' made-up melodies', !problems.length,
-        problems.length ? Array.from(new Set(problems)).slice(0, 4).join('; ') : minNotes + '–' + maxNotes + ' notes, ' + melodies.size + ' different');
+        problems.length ? Array.from(new Set(problems)).slice(0, 4).join('; ') : minNotes + '–' + maxNotes + ' notes, ' + melodies.size + ' different' +
+          (s.times.length > 1 ? ' · ' + Array.from(meters).join(' & ') : s.time[1] === 8 ? ' · 6/8' : '') + (s.pickup ? ' · ' + picks + ' with a pick-up' : '') + (s.endLa ? ' · ' + laBased + ' La-based' : ''));
     });
+    // the ladder's shape (the user's sequences, 2026-10-07)
+    const L = n => RR.LEVELS[n - 1];
+    check('The notes come in a music teacher’s order: Mi So · La · Do · Re · high Do · Fa · Ti · the octave · D E · F · G',
+      L(1).notes.join() === 'E4,G4' && L(2).notes.join() === 'E4,G4,A4' && L(3).notes.includes('C4') && L(4).notes.length === 5 && L(4).notes.includes('D4') &&
+      L(5).notes.includes('C5') && !L(5).notes.includes('F4') && L(6).notes.includes('F4') && !L(6).notes.includes('B4') && L(7).notes.length === 8 && L(8).endLa &&
+      !L(8).notes.some(id => RR.BAR[id].i > 7) && L(9).notes.includes('E5') && !L(9).notes.includes('F5') && L(10).notes.includes('F5') && L(11).notes.includes('G5'));
+    check('Every level is made-up melodies only (no Songbook cards)', RR.LEVELS.every(l => !l.songs.length && l.from === 'made'));
+    check('Every level before 15 leaves some bars out; Level 15 uses all twelve', RR.LEVELS.every(l => l.n === 15 ? l.notes.length === 12 : l.notes.length < 12));
+    check('Leaps from Level 12: a 4th, a 5th, both — major 6ths only at Level 15', RR.LEVELS.every(l => (l.moves === 'leaps') === (l.n >= 12)) &&
+      L(12).leaps.join() === 'P4' && L(13).leaps.join() === 'P5' && L(14).leaps.join() === 'P4,P5' && L(15).leaps.join() === 'P4,P5,M6');
+    const firstAt = id => RR.LEVELS.find(l => l.rhythms.includes(id)).n;
+    check('The rhythms come in the user’s order, ending with 6/8 and pick-ups at 14–15',
+      firstAt('q') === 1 && firstAt('ee') === 1 && firstAt('qr') === 3 && firstAt('h') === 5 && firstAt('ssss') === 7 && firstAt('hr') === 9 && firstAt('w') === 9 &&
+      firstAt('eqe') === 11 && firstAt('dqe') === 11 && firstAt('ess') === 13 && firstAt('c3') === 14 &&
+      L(14).time.join('/') === '6/8' && L(14).pickup && L(15).times.length === 2 && L(15).pickup && RR.LEVELS.every(l => l.n >= 14 || (!l.pickup && l.time.join('/') === '4/4')),
+      [3, 5, 7, 9, 11, 13].map(n => n + ': ' + RR.LEVELS[n - 1].rhythms.slice(-2).join(' ')).join(' · '));
+    check('Each level’s focus is in the level', RR.LEVELS.every(l => l.focus.every(id => l.notes.includes(id) || l.rhythms.includes(id))));
+    check('The ladder starts fresh: level scores live under new keys', RR.levelKey(7) === 'lv2:7');
 
     // 2. the Songbook
     Object.keys(RR.SONGS).forEach(id => {
@@ -103,7 +150,11 @@
       junk.tempos.join() === '60,80,100' && !('judge' in junk) && !('tempo' in junk) && junk.practice === true &&
       junk.time[0] === 4 && junk.colour === 'always' && junk.flash === 0 && junk.bars === 1 && junk.endDo === true, JSON.stringify(junk).slice(0, 120));
     check('sanitize: three tempos are kept in range and in order', RR.sanitize({ tempos: [200, 30, 90] }).tempos.join() === '40,90,160');
-    check('Practice on every level but the two sight-reading ones', RR.LEVELS.every(l => l.practice === !(l.n === 14 || l.n === 15)));
+    check('Practice on every level but the last (sight-reading)', RR.LEVELS.every(l => l.practice === (l.n !== 15)));
+    const six = RR.sanitize({ time: [6, 8] }), both = RR.sanitize({ times: [[6, 8], [4, 4], [5, 4]], leaps: ['M6', 'x'], pickup: true }), none = RR.sanitize({ leaps: [], times: [[9, 8]] });
+    check('sanitize: 6/8, more than one meter, pick-ups and leaps', six.time.join('/') === '6/8' && six.times.length === 1 &&
+      both.time.join('/') === '4/4' && both.times.map(t => t.join('/')).join() === '4/4,6/8' && both.leaps.join() === 'M6' && both.pickup === true &&
+      none.leaps.join() === 'P4,P5' && none.times.map(t => t.join('/')).join() === '4/4' && RR.sanitize({ time: [3, 4] }).times[0].join('/') === '3/4');
     check('sanitize: nothing gives the defaults', JSON.stringify(RR.sanitize(null)) === JSON.stringify(RR.DEFAULTS));
     check('trimPractice of the defaults is empty', Object.keys(RR.trimPractice(RR.clone(RR.DEFAULTS))).length === 0);
     RR.LEVELS.forEach(l => {
@@ -128,6 +179,13 @@
     let ok = true; try { RR.Eng.render(hard, { ss: 22, maxW: 300, colour: 'black', labels: 'letters', judgeRow: true, ghosts: [{ id: 'A5', col: 0 }], playTick: 3 }); } catch (e) { ok = false; }
     check('Engraver: sixteenths, a dot, a rest, a whole note, a ghost, the playhead, squeezed', ok);
     check('Glyphs are loaded', RR.Eng.available);
+    // 6/8 with a pick-up: the eighths beamed in threes, the pick-up's eighth alone, a dotted rest, a bar line after the pick-up
+    const six8 = { time: [6, 8], pickup: 2, notes: [{ p: 'C4', t: 2 }, { p: 'E4', t: 2 }, { p: 'F4', t: 2 }, { p: 'G4', t: 2 }, { p: 'A4', t: 6 }, { p: null, t: 6 }, { p: 'B4', t: 4 }] };
+    let g68 = null; try { g68 = RR.Eng.render(six8, { ss: 20, maxW: 700, colour: 'always' }); } catch (e) { g68 = null; }
+    check('Engraver: 6/8 beams in threes; a pick-up stands before the first bar line; a dotted rest',
+      g68 && g68.evs[0].beam === null && g68.evs[1].beam !== null && g68.evs[1].beam === g68.evs[3].beam &&
+      g68.svg.split(GLYPHS_LELAND.augmentationDot.d).length - 1 === 2 &&                       // the dotted quarter's dot and the rest's
+      RR.Eng.measure(six8).fixed > RR.Eng.measure({ time: [6, 8], notes: six8.notes.slice(1).concat({ p: 'C5', t: 2 }) }).fixed);
 
     // 7. My melodies: melody sets by the family library rules (phase 5)
     (function () {
@@ -235,17 +293,17 @@
         const M = RR.Melody, cellsKey = c => (c.cells || []).flat().slice().sort().join(',');
         const hard = RR.sanitize(Object.assign(RR.clone(RR.DEFAULTS), { notes: RR.TEN, rhythms: ['q', 'h', 'ee', 'dqe', 'ssss', 'ess', 'sse', 'qr'], moves: 'leaps', bars: 2 }));
         let fair = true, spread = 0, rising = 0, trials = 0, ok = true;
-        [[hard, { teams: [{}, {}, {}, {}], per: 1, rounds: 6 }], [RR.practiceOfLevel(8), { teams: [{}, {}], per: 3, rounds: 4 }], [RR.practiceOfLevel(1), { teams: [{}, {}, {}], per: 2, rounds: 3 }]].forEach(([s, raw]) => {
+        [[hard, { teams: [{}, {}, {}, {}], per: 1, rounds: 6 }], [RR.practiceOfLevel(8), { teams: [{}, {}], per: 3, rounds: 4 }], [RR.practiceOfLevel(1), { teams: [{}, {}, {}], per: 2, rounds: 3 }], [RR.practiceOfLevel(15), { teams: [{}, {}], per: 1, rounds: 4 }]].forEach(([s, raw]) => {
           const b = RR.cleanBattle(raw), T = b.teams.length * b.per;
           for (let n = 0; n < 8; n++) {
             const plan = M.battlePlan(s, b);
-            if (plan.length !== RR.battleTotal(b) || plan.some(c => !c || c.notes.reduce((a, x) => a + x.t, 0) !== s.time[0] * 4 * s.bars)) ok = false;
+            if (plan.length !== RR.battleTotal(b) || plan.some(c => !c || c.notes.reduce((a, x) => a + x.t, 0) !== RR.meter(c.time).barTicks * s.bars)) ok = false;
             const means = [];
             for (let rd = 0; rd < b.rounds; rd++) {
               let m = 0;
               for (let q = 0; q < b.per; q++) {
                 const cards = b.teams.map((_, t) => plan[rd * T + t * b.per + q]), d = cards.map(c => M.difficulty(c).total);
-                if (new Set(cards.map(cellsKey)).size !== 1) fair = false;
+                if (new Set(cards.map(cellsKey)).size !== 1 || new Set(cards.map(c => RR.meterText(c.time) + (c.pickup || 0))).size !== 1) fair = false;
                 spread = Math.max(spread, Math.max.apply(null, d) - Math.min.apply(null, d));
                 m += d.reduce((a, x) => a + x, 0);
               }
@@ -310,6 +368,68 @@
       } finally {
         K.forEach((k, i) => { if (keep[i] == null) localStorage.removeItem(k); else localStorage.setItem(k, keep[i]); });
       }
+    })();
+
+    // 9. My stats: the history kept per player, and the charts (2026-10-07)
+    (function () {
+      const H = RR.History, t = H.today(), at = k => H.parseDay(k).getTime();
+      const me = H.ready({ totals: { melodies: 40, notes: 300, first: 250 } });
+      check('History is added to an old player’s record without losing what was there', me.totals.melodies === 40 && me.totals.notes === 300 &&
+        me.totals.points === 0 && me.since === t && Array.isArray(me.log) && typeof me.days === 'object');
+      const h1 = H.addMelody(me, { pts: 15, tier: 3, gold: true, made: true, pace: 'slow' }, at(t));
+      const h2 = H.addMelody(me, { pts: 6, tier: 1, gold: false, made: true }, at(t) + 1000);
+      let d = me.days[t];
+      const ok1 = d.m === 2 && d.p === 21 && d.g === 1 && d.k === 2 && d.t.join() === '1,0,1' && d.pc.join() === '1,0,0' && d.pk.join() === '1,0,0' && me.totals.points === 21 && me.log.length === 2;
+      H.removeMelody(me, h2);
+      H.addMelody(me, { pts: 10, tier: 2, gold: false, made: true }, at(t) + 2000);
+      d = me.days[t];
+      check('A melody counts once: a try again takes the old one back, as in the round', ok1 && d.m === 2 && d.p === 25 && d.t.join() === '0,1,1' &&
+        me.totals.points === 25 && me.log.length === 2 && me.log.every(x => x.at !== h2.at));
+      H.addNote(me, 'E4', true, at(t)); H.addNote(me, 'E4', false, at(t)); H.addNote(me, 'C4', true, at(t));
+      check('Notes are kept by the day, each bar with its first-try count', d.n === 3 && d.f === 2 && d.nt.E4.join() === '2,1' && d.nt.C4.join() === '1,1');
+      void h1;
+
+      const days = {}; [0, 1, 2, 5, 6, 7, 8].forEach(n => { days[H.addDays(t, -n)] = { m: 1 }; });
+      const s1 = H.dayStreak(days, t);
+      delete days[t];
+      const s2 = H.dayStreak(days, t);
+      days[H.addDays(t, -3)] = { m: 0, s: 90 };
+      const s3 = H.dayStreak(days, t);
+      check('Days in a row: up to today (or yesterday, today not played yet), and the longest run', s1.current === 3 && s1.best === 4 &&
+        s2.current === 2 && s2.best === 4 && s3.current === 3 && s3.best === 4, [s1, s2, s3].map(x => x.current + '/' + x.best).join(' '));
+
+      const long = {}; for (let n = 0; n < 200; n += 3) long[H.addDays(t, -n)] = { m: 2, p: 20, n: 10, f: 7, s: 120, t: [1, 1, 0], pc: [0, 0, 0], pk: [0, 0, 0], nt: { D4: [10, 7] } };
+      const allM = Object.keys(long).length * 2;
+      const w7 = H.series(long, '7d', t), w30 = H.series(long, '30d', t), w12 = H.series(long, '12w', t), all = H.series(long, 'all', t);
+      const sumM = b => b.reduce((a, x) => a + x.m, 0);
+      check('Ranges: 7 days, 30 days, 12 weeks (from Mondays), and All time by the week once it is long',
+        w7.length === 7 && w7[6].key === t && w30.length === 30 && w12.length === 12 && w12.every(b => H.parseDay(b.key).getDay() === 1) && w12[11].to >= t &&
+        all[0].unit === 'week' && sumM(all) === allM && H.total(all).nt.D4[0] === allM * 5,
+        w12[0].key + ' · ' + all.length + ' weeks');
+      const old = { [H.addDays(t, -900)]: { m: 1 }, [t]: { m: 1 } };
+      const months = H.series(old, 'all', t);
+      check('All time longer than two years goes by the month', months[0].unit === 'month' && sumM(months) === 2 && months.length >= 29 && months.length <= 31, months.length + ' months');
+      check('Sums between two days count both ends', H.between(long, H.addDays(t, -6), t).m === sumM(w7));
+
+      const r = H.ready({});
+      H.addGame(r, { game: 'round5', pts: 60, n: 5, label: 'Level 2' }); H.addGame(r, { game: 'round5', pts: 45, n: 5 });
+      H.addGame(r, { game: 'clock', secs: 60, notes: 20, n: 3 }); H.addGame(r, { game: 'clock', secs: 60, notes: 14, n: 3 }); H.addGame(r, { game: 'clock', secs: 30, notes: 9, n: 2 });
+      H.addEndless(r, { n: 12, pts: 90 }); H.addEndless(r, { n: 8, pts: 99 }); H.addStreak(r, 6); H.addStreak(r, 4);
+      check('Records keep the best: a round’s points, Beat the clock’s notes for each length, the longest Endless run, the longest streak',
+        r.rec.round.pts === 60 && r.rec.round.label === 'Level 2' && r.rec.clock[60].notes === 20 && r.rec.clock[30].notes === 9 &&
+        r.rec.endless.n === 12 && r.rec.streak === 6 && r.totals.rounds === 5 && r.games.length === 5);
+      for (let i = 0; i < 260; i++) H.addMelody(r, { pts: 5, tier: 1 }, Date.now() + i);
+      for (let i = 0; i < 70; i++) H.addGame(r, { game: 'round5', pts: 1 });
+      check('The melody log keeps the last 200, the game list the last 60', r.log.length === 200 && r.games.length === 60 && r.totals.points === 1300);
+
+      const C = RR.Charts, data = [3, 0, 7, 12].map((v, i) => ({ v, x: 'd' + i, tv: v + ' points', tl: 'Day ' + i }));
+      const svg = C.bars(400, data);
+      const line = C.line(400, [{ v: 50 }, { v: null }, { v: 80 }]);
+      const st = C.stack(300, [{ v: 2, name: 'a', c: '#000' }, { v: 0, name: 'b', c: '#111' }, { v: 6, name: 'c', c: '#222' }]);
+      check('Charts: a column per value (an empty one draws nothing), every one a hover target; the line skips the gaps; the stack its empty parts',
+        (svg.match(/class="hit"/g) || []).length === 4 && (svg.match(/class="mark"/g) || []).length === 3 && /data-tl="Day 3"/.test(svg) &&
+        (line.match(/class="mark dot"/g) || []).length === 2 && (st.match(/class="mark"/g) || []).length === 2 && /75%/.test(st) &&
+        C.niceMax(13) === 20 && C.niceMax(201) === 250 && C.niceMax(0) === 1);
     })();
 
     document.getElementById('sum').innerHTML = '<span class="' + (fail ? 'fail' : 'pass') + '">' + pass + ' passed, ' + fail + ' failed</span>';

@@ -58,6 +58,7 @@
     kbFocus: false,         // the keyboard: keys outside the key (and the song) greyed and silent
     kbColors: 'rainbow',    // the keyboard's key colours: 'rainbow' | 'played' | 'single'
     kbColor: '#9C168E',     //   the one colour, for 'single' (Song Writer's plum to start)
+    kbChordLights: true,    // the keyboard: a chord that sounds lights its keys (the pale wash); off, only the melody lights them
     dockHeight: 'md',       // the keyboard: 'sm' | 'md' | 'lg', or px from its grip
     stripSize: 'md',
     chordSet: 'extreme',    // the chord panel: 'core' | 'full' | 'extended' | 'extreme' (js/chords.js)
@@ -141,7 +142,7 @@
     }
     if (typeof view.dockHeight === 'number') view.dockHeight = ui.clamp(Math.round(view.dockHeight) || 100, 52, 600);
     else if (!DOCK_HEIGHTS.includes(view.dockHeight)) view.dockHeight = 'md';
-    ['showStrip', 'showLane', 'showDock', 'showStaff', 'colours', 'kbFocus', 'laneChordsPlay', 'followScroll', 'colourPictures', 'tapDetail', 'showBeats']
+    ['showStrip', 'showLane', 'showDock', 'showStaff', 'colours', 'kbFocus', 'kbChordLights', 'laneChordsPlay', 'followScroll', 'colourPictures', 'tapDetail', 'showBeats']
       .forEach(k => { view[k] = !!view[k]; });
     if (PLAY_LIGHTS.indexOf(view.playLight) === -1) view.playLight = VIEW_DEFAULTS.playLight;
   }
@@ -300,6 +301,10 @@
     { key: 'colours', name: 'Section colours', desc: 'A pastel band behind each line' },
     { key: 'chordRhythm', name: 'Chord rhythm', desc: 'Dots on the chord track where each chord is played', part: 'strip' }
   ];
+  /* a keyboard preference: set as one (setKeyboard), so only the keyboard repaints */
+  const KBD_SWITCHES = [
+    { key: 'kbChordLights', name: 'Chords light the keys', desc: 'A chord that sounds washes its keys in colour, under the melody', part: 'dock', keyboard: true }
+  ];
   const PLAY_SWITCHES = [
     { key: 'followScroll', name: 'Follow along', desc: 'Scroll to keep the sounding note in view' }
   ];
@@ -309,7 +314,8 @@
     list.innerHTML = '';
     rows.forEach(s => {
       if (s.part && SW.lessons && !SW.lessons.shellAllows(s.part)) return;
-      list.appendChild(ui.switchRow(s.name, s.desc, !!view[s.key], () => setView({ [s.key]: !view[s.key] })));
+      const set = s.keyboard ? setKeyboard : setView;
+      list.appendChild(ui.switchRow(s.name, s.desc, !!view[s.key], () => set({ [s.key]: !view[s.key] })));
     });
   }
 
@@ -320,6 +326,7 @@
     showHide($('stage-switches') && $('stage-switches').previousElementSibling, stageCount > 0);
     showHide($('stage-note'), allow('strip') && allow('dock'));
     fillSwitches('page-switches', PAGE_SWITCHES);
+    fillSwitches('kbd-switches', KBD_SWITCHES);
     fillSwitches('play-switches', PLAY_SWITCHES);
     $('block-auto-btn').classList.toggle('active', view.blockSize === 'auto');
     $('block-fixed-btn').classList.toggle('active', view.blockSize === 'fixed');

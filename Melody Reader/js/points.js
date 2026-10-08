@@ -93,5 +93,9 @@
     return t[Math.max(0, PACES.findIndex(p => p.id === id))] || 80;
   };
 
+  /* the click's own BPM for a meter: a quarter's — or in 6/8 a dotted quarter's, 2/3 of it (the eighths move as
+     fast as in 4/4 at the same pace) */
+  RR.beatTempo = (s, id, time) => Math.round(RR.paceTempo(s, id) * 4 / RR.meter(time).beatTicks);
+
   RR.Points = { PACES, paceOf, reading, rhythm, free, countIn, starsFor };
 })();

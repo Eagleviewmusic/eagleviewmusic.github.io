@@ -61,6 +61,9 @@
   }
   function hideRound() { G.stopSong(); $('#rounddone').hidden = true; G.overlay = false; }
 
+  // the way back to the home page (a drawn house: Fredoka has no ⌂)
+  const HOME_BTN = '<button type="button" class="pill-btn" data-rd="home">' + RR.HOME_SVG + 'Home</button>';
+
   /* ---------------- Battle Mode ---------------- */
   const teamName = t => '<b class="tm" style="--tc:' + t.colour + '"><i></i>' + RR.esc(t.name) + '</b>';
   const scoreText = t => RR.device.points ? t.pts + (t.pts === 1 ? ' point' : ' points') : '★ ' + t.gold;
@@ -116,7 +119,7 @@
     show('<div class="rd-card bt-card bt-over"><div class="bt-kicker">⚔️ Battle over — ' + (top.length === 1 ? 'the winner' : 'a tie!') + '</div>' +
       (top.length === 1 ? '<h3 class="bt-who" style="--tc:' + top[0].colour + '">🏆 ' + RR.esc(top[0].name) + '</h3>' : '<h3>🏆 ' + top.map(t => RR.esc(t.name)).join(' and ') + '</h3>') +
       '<div class="rd-sub">' + RR.esc(G.mode.name) + ' · ' + b.rounds + (b.rounds === 1 ? ' round' : ' rounds') + '</div>' + tableHtml(list) +
-      '<div class="rd-btns"><button type="button" class="pill-btn go" data-rd="battle-new">Battle again</button><button type="button" class="pill-btn" data-rd="battle-edit">Change the battle</button></div></div>');
+      '<div class="rd-btns"><button type="button" class="pill-btn go" data-rd="battle-new">Battle again</button><button type="button" class="pill-btn" data-rd="battle-edit">Change the battle</button>' + HOME_BTN + '</div></div>');
     G.announce('Battle over. ' + (top.length === 1 ? 'The winner: ' + top[0].name + '. ' : 'A tie: ' + top.map(t => t.name).join(' and ') + '. ') + list.map(t => t.name + ' ' + scoreText(t)).join(', ') + '.');
     if (RR.device.celebrate) RR.Sound.celebrate(3);
   }
@@ -129,6 +132,9 @@
     const golds = r.filter(c => c.gold).length;
     const twos = r.filter(c => c.stars >= 2).length;
     const rank = saveBest(total, stars, r.length, golds);
+    // My stats (history.js): the round, its points before Points off
+    RR.History.game({ game: s.game, key: RR.Scores.key(), label: G.modeLabel(), n: r.length, gold: golds,
+      pts: r.reduce((a, c) => a + (c.h ? c.h.p : c.pts), 0), clean: r.filter(c => c.stars >= 2).length });
     const tricky = trickyOf(G.rstats);
     const isLevel = G.mode.kind === 'level';
     const ready = isLevel && !G.playingSet() && r.length >= 5 && twos >= Math.ceil(r.length * 0.8) && G.mode.n < RR.LEVELS.length;
@@ -144,7 +150,7 @@
       (ready ? '<div class="rd-ready">Ready for the next level!</div>' : '') +
       '<div class="rd-btns">' + (whole ? '<button type="button" class="pill-btn go" data-rd="song" data-label="' + (set ? '▶ Hear the whole set' : items.length > 1 ? '▶ Hear your songs' : '▶ Hear your song') + '">' + (set ? '▶ Hear the whole set' : items.length > 1 ? '▶ Hear your songs' : '▶ Hear your song') + '</button>' : '') +
       '<button type="button" class="pill-btn" data-rd="again">Play again</button>' +
-      (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn" data-rd="settings">Settings</button>') +
+      (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn" data-rd="settings">Settings</button>') + HOME_BTN +
       (ready ? '<button type="button" class="pill-btn go" data-rd="next">Level ' + (G.mode.n + 1) + ' ▸</button>' : '') + '</div></div>');
     G.announce((whole ? 'You played all of ' + whole + '. ' : 'Round done. ') + (RR.device.stars ? golds + (golds === 1 ? ' gold star. ' : ' gold stars. ') : '') + (RR.device.points ? total + ' points. ' : '') + (ready ? 'Ready for the next level.' : ''));
   }
@@ -152,11 +158,13 @@
     const c = G.clock;
     const pts = c.pts;
     const rank = saveBest(RR.device.points ? pts : c.notes, 0, 0);
+    RR.History.game({ game: 'clock', key: RR.Scores.key(), label: G.modeLabel(), secs: c.secs, notes: c.notes, n: c.melodies, clean: c.clean,
+      pts: G.round.reduce((a, e) => a + (e.h ? e.h.p : e.pts), 0), gold: G.round.filter(e => e.gold).length });
     show('<div class="rd-card"><h3>Time’s up!</h3><div class="rd-sub">Beat the clock · ' + c.secs + ' s · ' + RR.esc(G.modeLabel()) + (rank === 0 ? ' · <b class="new-best">a new best!</b>' : '') + '</div>' +
       '<div class="rd-stats"><div><b>' + c.notes + '</b>notes</div><div><b>' + c.melodies + '</b>melodies</div><div><b>' + c.clean + '</b>clean</div>' +
       (RR.device.points ? '<div><b>' + pts + '</b>points</div>' : '') + '</div>' +
       '<div class="rd-btns"><button type="button" class="pill-btn go" data-rd="again">Go again</button>' +
-      (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn" data-rd="settings">Settings</button>') + '</div></div>');
+      (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn" data-rd="settings">Settings</button>') + HOME_BTN + '</div></div>');
     G.announce('Time’s up. ' + c.notes + ' notes, ' + c.melodies + ' melodies, ' + c.clean + ' clean.');
   }
 
@@ -176,6 +184,7 @@
     else if (a === 'battle-go') { hideRound(); G.draw(); }
     else if (a === 'battle-new') { G.clearBattle(); G.newRound(); }
     else if (a === 'battle-edit') { G.clearBattle(); G.newRound(); RR.Settings.open('session'); }
+    else if (a === 'home') { G.newRound(); RR.View.go('home'); }
   });
 
   /* ---- the Score board window ---- */
@@ -219,7 +228,7 @@
       (mix.length ? '<ul class="mixups">' + mix.map(m => { const [a, b] = m[0].split('>'); return '<li>You played ' + pill(b) + ' for ' + pill(a) + ' ' + m[1] + (m[1] === 1 ? ' time' : ' times') + '</li>'; }).join('') + '</ul>' : '') +
       (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn' + (G.setup.tricky ? ' go' : ' primary') + '" data-board="tricky">' + (G.setup.tricky ? '✓ Practising these' : 'Practise these') + '</button>') + '</div>' +
       '<div class="panel wide"><h3>Totals</h3><div class="tiles"><div class="tile"><b>' + (tot.melodies | 0) + '</b><span>melodies read</span></div><div class="tile"><b>' + (tot.notes | 0) + '</b><span>notes read</span></div>' +
-      '<div class="tile"><b>' + acc + '%</b><span>first try</span></div><div class="tile tile-btn"><button type="button" class="pill-btn" data-board="reset">Reset scores…</button></div></div></div>';
+      '<div class="tile"><b>' + acc + '%</b><span>first try</span></div><div class="tile tile-btn"><button type="button" class="pill-btn go" data-board="stats">📊 All my stats ▸</button></div></div></div>';
   }
   function open() {
     G.pause();
@@ -241,6 +250,7 @@
       G.queue = []; G.drawChips();
       RR.toast(G.setup.tricky ? 'Made-up melodies will use your tricky notes more' : 'Tricky notes: back to normal');
     }
+    if (b.dataset.board === 'stats') { close(); RR.View.go('stats'); return; }
     if (b.dataset.board === 'reset') {
       if (!(await RR.ask('Reset all the scores' + (RR.device.player ? ' for ' + RR.device.player : '') + '? Best scores, stars on the levels and tricky notes all go.', 'Reset'))) return;
       RR.Scores.reset(); G.points = 0; G.streak = 0; G.bestStreak = 0; G.drawChips();

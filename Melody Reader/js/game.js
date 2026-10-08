@@ -14,8 +14,9 @@
    tier 3). A try done → finish(): RR.Points, stars, the streak, the
    praise, then the next card (by itself, or the Next button glows), or
    Round done. The metronome (2026-10-06): a tap opens Slow · Moderate ·
-   Fast; picking one in a Test counts in at once; it is Off again on every
-   new melody — nothing ever counts in by itself.
+   Fast; picking one in a Test counts in at once; in Practice it simply
+   starts clicking (2026-10-07: no count-in — syncTick); it is Off again on
+   every new melody — nothing ever counts in by itself.
 
    Which stage a card opens in (the user's rule): Practice — unless the
    player went to Test on the last card *before playing a note in
@@ -90,7 +91,7 @@
       const m = G.mode;
       if (m.kind === 'lesson') return 'lesson:' + m.name;
       if (G.playingSet()) return 'set:' + G.setup.set;          // a melody set is its own score board
-      return m.kind === 'level' ? String(m.n) : m.kind === 'session' ? 'session:' + m.id : 'custom';
+      return m.kind === 'level' ? RR.levelKey(m.n) : m.kind === 'session' ? 'session:' + m.id : 'custom';
     },
     entry(key) {
       const L = this.me().levels;
@@ -268,7 +269,8 @@
   function newRound() {
     clearTimeout(G.autoT);
     stopClock();
-    G.round = []; G.rstats = {}; G.overlay = false; G.dealt = [];
+    endlessDone();
+    G.round = []; G.rstats = {}; G.overlay = false; G.dealt = []; G.needNew = false;
     G.roundStreak = G.streak;
     if (RR.Board) RR.Board.hideRound();
     const s = G.setup;
@@ -277,6 +279,7 @@
     else if (G.playingSet() && len) G.roundN = Math.min(len, G.playingSet().melodies.length) || len;
     else G.roundN = len || ((s.game === 'endless' || s.game === 'clock') ? Infinity : 5);
     G.clock = s.game === 'clock' ? { secs: s.clockSecs, started: null, notes: 0, melodies: 0, clean: 0, pts: 0, timer: null } : null;
+    G.roundGame = G.battle ? 'battle' : s.game;
     G.battleResume = false;
     if (G.battle) {
       G.roundN = RR.battleTotal(G.battle);
@@ -293,6 +296,20 @@
     nextCard();
   }
   G.newRound = newRound;
+
+  /* an Endless run ends when another round starts (or the page closes): My stats keeps the longest */
+  function endlessDone() {
+    if (G.roundGame !== 'endless' || !G.round.length) return;
+    RR.History.endless({ n: G.round.filter(e => !e.skip).length, pts: G.round.reduce((a, e) => a + (e.h ? e.h.p : 0), 0), gold: G.round.filter(e => e.gold).length });
+  }
+  window.addEventListener('pagehide', endlessDone);
+
+  /* leaving the music for the home page or My stats: the sound stops, a count-in is called off, and
+     Beat the clock — which can't wait — is over: Carry on starts a new one (G.needNew) */
+  G.leave = function () {
+    G.pause();
+    if (G.clock && G.clock.started && G.phase !== 'done' && !G.overlay) { stopClock(); G.needNew = true; }
+  };
 
   /* ---------------- Battle Mode ---------------- */
   const battleShape = () => G.battle.teams.length + '-' + G.battle.per + '-' + G.battle.rounds;
@@ -340,6 +357,7 @@
     if (G.fresh) { G.fresh = false; G.openTest = false; } else leaveCard();
     if (G.battle && RR.battleAt(G.battle, G.round.length).q === 0) G.openTest = false;   // each team's turn starts afresh: Practice (if any)
     G.metro = 'off';                                       // every melody: tap the metronome and pick a tempo (the user's, 2026-10-06)
+    syncTick();
     if (!card && G.battle && G.battlePlan) card = RR.clone(G.battlePlan[Math.min(G.round.length, G.roundN - 1)]);
     if (!card) { if (!G.queue.length) refill(); card = G.queue.shift(); }
     G.card = card; G.dealt.push(card);
@@ -403,7 +421,7 @@
     if (G.overlay || G.stage !== 'practice') return;
     stopHear(true); if (RR.Beat) RR.Beat.stop();
     clearTimeout(G.autoT);
-    resetCard('game'); draw();
+    resetCard('game'); syncTick(); draw();
     if (metroOn()) RR.Beat.start();
     else announce('Test: play it for points.');
   };
@@ -413,7 +431,7 @@
     if (G.overlay || G.stage !== 'game' || !canPractise()) return;
     stopHear(true); if (RR.Beat) RR.Beat.stop();
     clearTimeout(G.autoT);
-    resetCard('practice'); draw();
+    resetCard('practice'); draw(); syncTick();
     announce('Practice: nothing counts.');
   };
   G.toggleMode = () => { if (G.stage === 'practice') G.toGame(); else G.toPractice(); };
@@ -424,7 +442,7 @@
     if (G.phase !== 'countin') return;
     RR.Beat.stop();
     const practice = G.setup.practice && !G.clock;
-    resetCard(practice ? 'practice' : undefined); draw();
+    resetCard(practice ? 'practice' : undefined); draw(); syncTick();
     announce(practice ? 'Stopped. Practice: nothing counts.' : 'Stopped.');
   };
   /* Practice is there unless the practice has none, it's Beat the clock, or
@@ -441,7 +459,7 @@
     const s = G.setup, pick = $('#metro-pick');
     pick.innerHTML = (metroOn() ? '<button type="button" data-metro="off" class="off">Off</button>' : '') +
       RR.Points.PACES.map(p => '<button type="button" data-metro="' + p.id + '" class="' + (G.metro === p.id ? 'on' : '') + '">' +
-        '<b>' + p.name + '</b><small>' + RR.paceTempo(s, p.id) + ' BPM</small></button>').join('');
+        '<b>' + p.name + '</b><small>' + RR.beatTempo(s, p.id, G.card.time) + ' BPM</small></button>').join('');
     pick.hidden = false;
     $('#btn-metro').setAttribute('aria-expanded', 'true');
     const f = pick.querySelector('.on') || pick.querySelector('[data-metro]:not(.off)'); if (f) f.focus();
@@ -464,8 +482,29 @@
       RR.Beat.stop(); resetCard(); draw();
       if (metroOn()) RR.Beat.start();
     } else drawSides();
-    announce(metroOn() ? 'Metronome: ' + RR.Points.paceOf(G.metro).name : 'Metronome off');
+    syncTick();                                  // Practice: the click starts (or changes pace, or stops) at once
+    announce(metroOn() ? 'Metronome: ' + RR.Points.paceOf(G.metro).name + (G.stage === 'practice' ? ', clicking' : '') : 'Metronome off');
   }
+
+  /* the practice metronome (2026-10-07, the user's): clicking whenever the card is in Practice with the
+     metronome on, the music on screen and nothing over it — no count-in; a Test counts in instead */
+  function syncTick() {
+    if (!RR.Beat || !RR.Beat.tickStart) return;
+    const want = metroOn() && G.card && G.stage === 'practice' && !G.clock && !G.overlay &&
+      G.phase !== 'countin' && G.phase !== 'running' && (!RR.View || RR.View.current === 'play') &&
+      !windowOpen() && !(RR.Maker && RR.Maker.active);
+    const now = RR.Beat.ticking();
+    if (!want) { if (now) RR.Beat.tickStop(); }
+    else if (now !== G.metro) RR.Beat.tickStart();
+  }
+  G.syncTick = syncTick;
+  /* each click: the metronome button gives a little nod (the bar's first beat a bigger one) */
+  G.metroBeat = function (accent) {
+    if (reduced()) return;
+    const m = $('#btn-metro');
+    m.classList.remove('beat', 'beat1'); void m.offsetWidth;
+    m.classList.add(accent ? 'beat1' : 'beat');
+  };
 
   /* ↻ — a card with something played starts over; an untouched one starts
      the whole round over */
@@ -489,8 +528,9 @@
         announce('The battle starts over.');
       });
     } else {
-      // the round from its first melody: the same melodies, its points taken back
+      // the round from its first melody: the same melodies, its points taken back (from My stats too)
       G.points -= G.round.reduce((a, r) => a + r.pts, 0);
+      G.round.forEach(r => { if (r.h) RR.History.unmelody(r.h); });
       G.streak = G.roundStreak | 0;
       G.queue = G.dealt.concat(G.queue);
       newRound();
@@ -517,6 +557,7 @@
     me.totals.notes = (me.totals.notes | 0) + 1;
     if (first) me.totals.first = (me.totals.first | 0) + 1;
     if (G.clock) { G.clock.notes++; drawChips(); }
+    if (!G.battle) RR.History.note(note, first);     // My stats: a battle is the teams', not the player's
   }
   G.record = record;
   function mixup(target, played) {
@@ -614,7 +655,7 @@
     const gold = made && pts >= (s.gold || 11);
     G.clean = pts >= 8;                         // every note first time
     // a card counts once in the round: tried again (Start over, or back to Practice), the new try replaces it
-    const again = G.cardEntry >= 0;
+    const again = G.cardEntry >= 0, old = again ? G.round[G.cardEntry] : null;
     if (!again) G.cardStreak = G.streak;
     G.streak = G.clean ? G.cardStreak + 1 : 0;
     G.bestStreak = Math.max(G.bestStreak, G.streak);
@@ -623,8 +664,13 @@
     const c = G.card;
     const entry = { stars, pts, made, gold, label: c.set ? '#' + c.part : c.title ? c.title.split(/[ ,]/)[0] + ' ' + c.part : 'Made up' };
     if (G.battle) { entry.team = G.battleNow().team; pts = r.pts; entry.pts = pts; }   // a battle's points go to the team, even with points off
+    else {
+      // My stats (history.js): the try, its points before Points off; a try again takes the old one back
+      if (old && old.h) RR.History.unmelody(old.h);
+      entry.h = RR.History.melody({ pts: r.pts, tier: r.tier, gold, made, pace: G.run ? G.run.pace : null });
+      RR.History.streak(G.streak);
+    }
     if (again) {
-      const old = G.round[G.cardEntry];
       if (!G.battle) G.points -= old.pts;
       if (G.clock) G.clock.pts -= old.pts;
       G.round[G.cardEntry] = entry;
@@ -692,17 +738,20 @@
     if (G.hearing) { stopHear(true); return; }
     if (G.overlay || G.phase === 'countin' || G.phase === 'running' || !canHear()) return;
     if (!RR.Sound.ctx) return;
-    const s = G.setup, beat = 60 / RR.paceTempo(s, RR.listenPace()), spt = beat / 4;
-    const per = G.card.time[0], lead = metroOn() ? per : 0;
-    const t0 = RR.Sound.now() + 0.12 + lead * beat;
+    const s = G.setup, spt = 60 / RR.paceTempo(s, RR.listenPace()) / 4;
+    const M = RR.meter(G.card.time), pick = G.card.pickup || 0, beat = M.beatTicks * spt;
+    // the practice metronome clicking: come in on its next bar line, with no clicks of Listen's own
+    const join = RR.Beat.tickNextBar ? RR.Beat.tickNextBar(0.15 + pick * spt) : null;
+    const lead = metroOn() && join == null ? M.barTicks - pick : 0;   // ticks of clicks before the music (a pick-up shortens it)
+    const t0 = join != null ? join - pick * spt : RR.Sound.now() + 0.12 + lead * spt;
     G.hearing = true; $('#btn-play').classList.add('playing');
     $('#btn-play').setAttribute('aria-label', 'Stop');
     G.hearTimers = [];
-    if (metroOn()) {
-      // clicks aren't stoppable once made, so each is made just before it is due
+    if (metroOn() && join == null) {
+      // clicks aren't stoppable once made, so each is made just before it is due — on the bar's beats, from a bar before
       const total = G.evs.reduce((a, e) => a + e.t, 0);
-      for (let b = -lead; b < total / 4; b++) {
-        const t = t0 + b * beat, accent = ((b % per) + per) % per === 0;
+      for (let tk = pick - M.barTicks; tk < total; tk += M.beatTicks) {
+        const t = t0 + tk * spt, b = Math.round((tk - pick) / M.beatTicks), accent = ((b % M.beats) + M.beats) % M.beats === 0;
         G.hearTimers.push(setTimeout(() => RR.Sound.click(t, accent, false), Math.max(0, (t - RR.Sound.now() - 0.15) * 1000)));
       }
     }
@@ -731,6 +780,7 @@
      can't be played under a window) is called off — the card starts again */
   G.pause = function () {
     stopHear(true); closePick();
+    if (RR.Beat && RR.Beat.tickStop) RR.Beat.tickStop();
     if (RR.Beat && (RR.Beat.running() || G.phase === 'countin' || G.phase === 'running')) { RR.Beat.stop(); resetCard(); draw(); }
   };
   G.hearIt = hearIt;
@@ -769,7 +819,7 @@
     const s = G.setup;
     const fitW = music.clientWidth, fitH = music.clientHeight;
     if (fitW && fitH) {
-      const card = G.card, barTicks = card.time[0] * 4;
+      const card = G.card, barTicks = RR.meter(card.time).barTicks, pick = card.pickup || 0;
       const total = G.evs.reduce((a, e) => a + e.t, 0);
       const rowH = 2.7 + 4 + 2.9 + (s.labels !== 'none' ? 1.5 : 0);
       const age = RR.now() - G.justAt;
@@ -777,10 +827,11 @@
       const justLit = age < 450 ? G.justLit : -1;
       const ghosts = G.ghosts.map(g => ({ id: g.id, col: g.col, age: RR.now() - g.at }));
       // a two-bar melody on a narrow screen (a phone held upright) is drawn one bar above the other
-      const cut = G.evs.findIndex(e => e.start >= barTicks);
-      const split = fitW < 560 && total === 2 * barTicks && cut > 0;
+      // (a pick-up stays with the first bar)
+      const cutTick = pick + barTicks, cut = G.evs.findIndex(e => e.start >= cutTick);
+      const split = fitW < 560 && total === 2 * barTicks && cut > 0 && G.evs[cut].start === cutTick;
       const ranges = split ? [[0, cut], [cut, G.evs.length]] : [[0, G.evs.length]];
-      const subs = ranges.map(([a, b], r) => ({ a, b, startTick: r ? barTicks : 0, card: { time: card.time, notes: card.notes.slice(a, b) }, noTime: r > 0, endBar: split && r === 0 ? 'single' : 'final' }));
+      const subs = ranges.map(([a, b], r) => ({ a, b, startTick: r ? cutTick : 0, card: { time: card.time, pickup: r ? 0 : pick, notes: card.notes.slice(a, b) }, noTime: r > 0, endBar: split && r === 0 ? 'single' : 'final' }));
       const widest = Math.max.apply(null, subs.map(x => { const m = RR.Eng.measure(x.card, false, x.noTime); return m.prefix + m.notes * 0.95 + m.fixed; }));
       const ss = Math.max(8, Math.min(fitH / (rowH * subs.length), fitW / widest, split ? 26 : 46));   // 46: a smartboard's big staff
       const shift = (i, a, b) => (i >= a && i < b ? i - a : -1);
@@ -836,10 +887,10 @@
   function describe() {
     const c = G.card, total = G.evs.reduce((a, e) => a + e.t, 0);
     const notes = G.evs.filter(e => !e.rest).length, lit = G.states.filter(x => x === 'lit').length;
-    const bars = Math.round(total / (c.time[0] * 4));
+    const bars = Math.round(total / RR.meter(c.time).barTicks);
     const name = c.title ? c.title + ', ' + (c.sub ? c.sub + ', ' : '') + c.part + ' of ' + c.of : 'A made-up melody';
     const bn = G.battleNow();
-    return (bn ? G.battle.teams[bn.team].name + '’s turn. ' : '') + (G.stage === 'practice' ? 'Practice. ' : 'Test. ') + 'The music: ' + name + '. ' + c.time[0] + '/4, ' + bars + (bars === 1 ? ' bar' : ' bars') + ', ' + notes + ' notes' +
+    return (bn ? G.battle.teams[bn.team].name + '’s turn. ' : '') + (G.stage === 'practice' ? 'Practice. ' : 'Test. ') + 'The music: ' + name + '. ' + RR.meterText(c.time) + ', ' + (c.pickup ? 'a pick-up and ' : '') + bars + (bars === 1 ? ' bar' : ' bars') + ', ' + notes + ' notes' +
       (lit ? ', ' + lit + ' played' : '') + (G.clean ? '' : ', with slips') + '.';
   }
 
@@ -877,8 +928,8 @@
     m.disabled = !!G.clock;
     m.setAttribute('aria-haspopup', 'true');
     $('#metro-label').textContent = on ? pace.name : 'Off';
-    m.title = on ? 'Metronome: ' + pace.name + ' (' + RR.paceTempo(s, pace.id) + ' BPM) — a Test counts you in, worth ' + pace.lo + '–' + pace.hi + ' points. Tap to change.' :
-      'Metronome off. Tap to pick a tempo' + (practice ? ' (Listen plays at it; a Test counts in)' : ' — the count-in starts at once');
+    m.title = on ? 'Metronome: ' + pace.name + ' (' + RR.beatTempo(s, pace.id, G.card.time) + ' BPM)' + (practice ? ', clicking' : '') + ' — a Test counts you in, worth ' + pace.lo + '–' + pace.hi + ' points. Tap to change.' :
+      'Metronome off. Tap to pick a tempo' + (practice ? ' — it clicks while you practise; a Test counts in' : ' — the count-in starts at once');
     m.setAttribute('aria-label', m.title);
     const w = WEIGHT[G.metro] || WEIGHT.off;
     $('#metro-weight').setAttribute('transform', 'translate(' + (12 + 5.6 * w).toFixed(2) + ' ' + (15.2 - 11.6 * w).toFixed(2) + ') rotate(25.8)');

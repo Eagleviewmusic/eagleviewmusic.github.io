@@ -34,7 +34,7 @@
     const letter = LETTERS[i % 7], octave = 4 + Math.floor(i / 7);
     const midi = (octave + 1) * 12 + SEMI[i % 7];
     return {
-      i, id: letter + octave, letter, octave, key, colour: COLOUR[letter],
+      i, id: letter + octave, letter, octave, key, colour: COLOUR[letter], midi,
       freq: 440 * Math.pow(2, (midi - 69) / 12),
       step: LETTERS.indexOf(letter) + 7 * octave,       // E4 = 30 is the bottom line
       len: 100 - i * 4                                    // the bar's height, %
@@ -45,6 +45,19 @@
   RR.TEN = RR.BARS.slice(0, 10).map(b => b.id);
   RR.TWELVE = RR.BARS.map(b => b.id);
   RR.STEP = { C4: 28, E4: 30, G4: 32, B4: 34, D5: 36, F5: 38, A5: 40 };
+
+  /* ---- meters (2026-10-07: 6/8 joined 2/4 3/4 4/4) ----
+     in ticks, a sixteenth = 1: a bar, a beat (a quarter — or in 6/8 a dotted
+     quarter, two to the bar) and how many beats. A melody may also start
+     with a pick-up (card.pickup, in ticks): its last bar is that much short */
+  RR.METERS = [[2, 4], [3, 4], [4, 4], [6, 8]];
+  RR.meter = function (time) {
+    const t = Array.isArray(time) && time.length === 2 ? time : [4, 4];
+    const compound = t[1] === 8 && t[0] % 3 === 0;
+    const barTicks = t[0] * 16 / (t[1] || 4), beatTicks = compound ? 6 : 16 / (t[1] || 4);
+    return { barTicks, beatTicks, beats: barTicks / beatTicks, compound };
+  };
+  RR.meterText = t => t[0] + '/' + t[1];
 
   /* ---- storage ---- */
   RR.KEY = {
@@ -104,6 +117,7 @@
   /* after a melody (2026-10-05): a green check — played through; a gold star — a high score */
   RR.CHECK_SVG = '<svg class="mk-check" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22" fill="#16a34a"/><path d="M13.5 24.5l7 7 14-15" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   RR.STAR_SVG = '<svg class="mk-star" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 3.5l6.2 13 14.2 1.8-10.4 9.8 2.7 14.1L24 35.3l-12.7 6.9 2.7-14.1L3.6 18.3l14.2-1.8z" fill="#fbbf24" stroke="#d97706" stroke-width="2.5" stroke-linejoin="round"/></svg>';
+  RR.HOME_SVG = '<svg class="ib" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.2L12 3.8l8.5 7.4M6 9.6V20h4.6v-5.6h2.8V20H18V9.6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   /* a melody in the round, small: its gold star, its check, or a grey dash (missed notes, skipped) */
   RR.markHtml = function (r) {
     if (r && r.gold && RR.device.stars) return '<span class="mk mk-g" title="Gold star">' + RR.STAR_SVG + '</span>';
@@ -168,6 +182,7 @@
   }, true);
   RR.windowOpened = el => { if (el && el.hidden !== false) el._returnFocus = document.activeElement; };
   RR.windowClosed = el => {
+    if (RR.Game && RR.Game.syncTick) setTimeout(RR.Game.syncTick, 0);   // the practice metronome, if it was clicking
     const f = el && el._returnFocus;
     if (el) el._returnFocus = null;
     if (f && document.contains(f) && f.focus && !f.closest('[hidden]')) f.focus();

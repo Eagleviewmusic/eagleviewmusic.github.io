@@ -10,9 +10,14 @@
                     closes a window, or stops a count-in (as tapping its
                     Get ready card does: back to Practice)
      the buttons    Listen · Practice / Test · the metronome · Start over ·
-                    Next · the level chip · the score chip · Settings
-     the start      a lesson link if the address has one; else the practice
-                    or level this browser was last on
+                    Next · the level chip · the score chip · Settings ·
+                    ‹ Home · the Melody Reader name (the home page)
+     the start      a lesson link if the address has one (straight to the
+                    music); else the practice or level this browser was
+                    last on, and the home page (home.js, 2026-10-07)
+     the views      the keys above belong to the music; on the home page
+                    and My stats they do nothing (Escape on My stats goes
+                    back)
      the sound      woken on the first touch or key (the family's priming)
    ========================================================================== */
 (function () {
@@ -20,7 +25,7 @@
   const RR = window.RR, $ = RR.$, G = RR.Game;
 
   const shelfOpen = () => !!document.querySelector('.evm-shelf.show');
-  function anyWindow() { return RR.Settings.isOpen() || RR.Board.isOpen() || RR.Melodies.isOpen() || shelfOpen() || !!document.querySelector('.modal.ask'); }
+  function anyWindow() { return RR.Settings.isOpen() || RR.Board.isOpen() || RR.Melodies.isOpen() || RR.View.songsOpen() || shelfOpen() || !!document.querySelector('.modal.ask'); }
   function closeWindows() {
     if (shelfOpen()) return;                     // the shelf closes itself on Escape
     if (RR.Settings.isOpen()) RR.Settings.close();
@@ -33,13 +38,14 @@
     const tag = e.target && e.target.tagName;
     if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
     if (e.key === 'Escape') {
+      if (RR.View.current !== 'play') { if (!anyWindow() && RR.View.current === 'stats') RR.View.back(); else closeWindows(); return; }
       if (G.pickOpen()) { G.closePick(); $('#btn-metro').focus(); }
       else if (RR.Maker.active && !anyWindow()) RR.Maker.cancel();
       else if (G.phase === 'countin' && !anyWindow()) G.stopCountIn();
       else closeWindows();
       return;
     }
-    if (anyWindow()) return;
+    if (anyWindow() || RR.View.current !== 'play') return;
     if (RR.Maker.active) {                       // Make a melody: ⌫ takes back, Space hears it
       if (e.key === 'Backspace') { e.preventDefault(); RR.Maker.undo(); return; }
       if (e.key === ' ' && tag !== 'BUTTON') { e.preventDefault(); RR.Maker.hear(); return; }
@@ -87,7 +93,18 @@
   $('#mel-btn').addEventListener('click', () => { if (!RR.Maker.active) RR.Melodies.open(); });
   $('#level-chip').addEventListener('click', () => { if (!RR.Maker.active) RR.Settings.open(G.mode.kind === 'lesson' ? 'leave' : 'level'); });
   $('#score-chip').addEventListener('click', () => { if (!RR.Maker.active) RR.Board.open(); });
-  $('#settings').addEventListener('click', e => { if (e.target === $('#settings') || e.target.closest('[data-close]')) RR.Settings.close(); });
+  $('#settings').addEventListener('click', e => {
+    if (e.target === $('#settings') || e.target.closest('[data-close]')) RR.Settings.close();
+    if (e.target.closest('[data-play]')) RR.View.go('play');          // ▶ Play: from the home page too
+  });
+  // ‹ Home (‹ Back on My stats opened from the music); writing a melody, Cancel comes first
+  $('#app-home').addEventListener('click', () => { if (RR.Maker.active) RR.Maker.cancel(); else RR.View.back(); });
+  // the name (and the logo): the home page, from anywhere — already there, back to its top
+  $('#brand').addEventListener('click', () => {
+    if (RR.Maker.active) RR.Maker.cancel();
+    else if (RR.View.current === 'home') $('#home').scrollTo({ top: 0, behavior: 'smooth' });
+    else RR.View.go('home');
+  });
   $('#board').addEventListener('click', e => { if (e.target === $('#board') || e.target.closest('[data-close]')) RR.Board.close(); });
 
   // the first touch or key wakes the sound, and a sleeping speaker with it
@@ -124,7 +141,7 @@
     if (G.setup.set && G.setup.set !== 'lesson' && !RR.Sets.get(G.setup.set)) {
       RR.device.set = null; RR.saveDevice(); G.setup.set = null; G.queue = []; G.applyInstrument(); G.newRound();
     }
-    RR.Melodies.render(); G.drawChips();
+    RR.Melodies.render(); G.drawChips(); RR.View.render();
   }
 
   function start() {
@@ -138,6 +155,7 @@
       got = RR.Sets.receiveFromUrl();
       restore();
     }
+    RR.View.init(lesson ? 'play' : 'home');
     RR.Sets.startShelf(shelfChanged);
     if (got) arrived(got);
     if (window.self !== window.top) document.documentElement.classList.add('in-iframe');

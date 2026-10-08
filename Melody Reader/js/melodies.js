@@ -119,6 +119,7 @@
     G.setup.set = id; G.queue = []; G.fresh = true;     // a new set starts with Practice on
     G.applyInstrument(); G.newRound();
     close();
+    if (RR.View) RR.View.go('play');
     RR.toast('Playing ' + RR.Sets.get(id).title);
   }
   function stop() {

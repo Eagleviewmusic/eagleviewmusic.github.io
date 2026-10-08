@@ -31,9 +31,10 @@ Through the Claude Apps server (`../.claude/serve.js`; python's
 `http://localhost:8816/tests/` runs the engine checks (generator, Songbook,
 levels, engraver, practices, lesson links, melody sets under the library
 rules, the points, My sessions, the gold star, round lengths, Battle
-Mode and its fair plan, the Helps' choices, the session page's rules) —
-77 of them, all passing
-as of 2026-10-05.
+Mode and its fair plan, the Helps' choices, the session page's rules, My
+stats' history and charts, the new ladder: 300 melodies a level against
+its notes, moves, leaps, meters and pick-ups) — 96 of them, all passing as
+of 2026-10-07.
 
 The Teacher Library shelf reads `../Teacher Library/index.json`, which only
 exists on the live site; served from its own folder (8815/8816) it can't be
@@ -44,6 +45,78 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 — and delete it afterwards.
 
 ## What's built (all six phases)
+
+- **The home page** (2026-10-07, the user's ask: "a neutral page", not
+  always mid-game) — the app opens here (a lesson link still opens on the
+  music). From the top:
+  - **Play / Carry on** — what was playing (the level or session and its
+    game, "1 of 5 played" while a round is under way), the player's points
+    and gold stars (all time) and days in a row; the players' names to
+    switch, when there are any. A round that is over, or a Beat the clock
+    left part-way, starts afresh.
+  - **What to read** — the fifteen levels as rainbow badges with their
+    stars, My sessions as chips (+ New session), and what the chosen one
+    is ("C to G · ta ta-a · 1 bar"; a My melodies set laid over it, with ×
+    to stop it). ✎ Choose the notes and rhythms opens Settings.
+  - **How to play** — a card each: **Rounds** (− n +, the best for this
+    level and length), **Songs** (Choose… the Songbook songs and My
+    melodies sets, in order), **Beat the Clock** (30 s · 60 s · 2 min, the
+    record), **Endless** (the longest run), **Battle** (the battles, +
+    New battle). The card's choices are kept on the page until ▶ Play,
+    then saved as the Format tab saves them (`RR.Settings.setFormat`: the
+    browser's for a level, the session's own for a session). With a
+    battle chosen, the other cards play the level this browser was last on.
+  - **Make your own** — My melodies, a new session ("My session 2", its
+    page opens to name it), a lesson link (Settings → Share).
+  - **My stats, in brief** — the last 7 days as columns, today's and this
+    week's melodies, points, first try and time, and See them all ▸.
+  - Getting about: the **Melody Reader name** (and its logo) is a button
+    to the home page from anywhere (2026-10-07; on the home page, back to
+    its top). **‹ Home** at the top left of the music (where ‹ Eagle
+    View is on the home page; it shows inside a frame too), **Home** on
+    Round done, Time's up and Battle over, and the browser's Back — one
+    history entry above home, so Back from the music or My stats comes
+    home and Back from home leaves. Leaving the music pauses it (a
+    count-in stops; Beat the clock is over). Settings' ▶ Play goes to the
+    music from anywhere.
+- **My stats** (2026-10-07, the user's ask: "beef up the statistics") — a
+  page of its own (the home page, or 📊 All my stats on the Score board,
+  which then has ‹ Back), for the player playing:
+  - **The totals** — points earned, melodies read, gold stars, notes
+    read, right first time, time playing, rounds finished, days in a row
+    (and the best run).
+  - **Over time**, one range above it all (7 days · 30 days · 12 weeks ·
+    All time — by the day, the week, or after two years the month):
+    **Activity** (points, melodies or minutes) · **Right first time** (a
+    line) · **Average score** (points a melody, a line — the volume can't
+    hide whether they're getting better) · **Note by note** (a little
+    xylophone, each bar as tall as its first-try share, ▲▼ against the
+    range before, the trickiest ringed) · **How your melodies scored** (one
+    bar: found the notes / own steady beat / with the metronome, then
+    checks and gold stars) · **With the metronome** (Tests at Slow ·
+    Moderate · Fast, darker = in time all through).
+  - **Recent** — the last 50 melodies (a column each by kind of score, the
+    average of ten as a line, ▲ up from the ten before) and **Every day
+    you played** (a calendar, 26 weeks, fewer on a phone).
+  - **All time** — the levels' stars (and the sessions'), **Records** (best
+    round, Beat the clock per length in notes, longest Endless run,
+    longest streak, busiest day), **Mix-ups**, **Last games**, **Best
+    rounds** from every level and session; Reset scores.
+  - Every chart has a tooltip (hover, or a tap) and a **Table** button
+    with the same numbers. With Points off no points show anywhere (the
+    charts that are only points go); with Gold stars off, no gold stars.
+    Colours checked with the dataviz validator: amber `#d97706` for
+    amounts, teal `#0d9488` for first try, one amber ramp for the three
+    kinds of score (`#e59a3a · #c06a10 · #7c3f0a`) and the calendar.
+  - **What it counts** (`js/history.js`): a melody finished in a Test,
+    once — a try again replaces it, Start over on an untouched card takes
+    the round's back, as the round does; points before Points off; notes
+    as they're read; time in 5-second steps while the music is on screen,
+    the page visible and someone has touched it in the last minute (not
+    while writing a melody). Practice never counts; battles are the
+    teams', not here. Points, gold stars and time count from the day this
+    version first opened (`since`, said under the totals) — melodies,
+    notes and first try were counted before and carry on.
 
 - **The xylophone** — Rainbow Xylophone's look and both sounds (Vibraphone,
   Marimba), touch with glissando, mouse and pen (either button), keys 1–0
@@ -75,7 +148,13 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   - **The metronome** (one way everywhere since 2026-10-06 — Battle Mode's) —
     a tap opens a choice: **Slow · Moderate · Fast** (each with its BPM; Off
     too while it is on). Picking one in a Test **counts in at once**; in
-    Practice it sets Listen's pace and clicks, and Test then counts in. The
+    **Practice it starts clicking at once — no count-in** (2026-10-07, the
+    user's): the card's beats, the bar's first higher, a nod of the button
+    on each, for as long as the card is in Practice with the metronome on
+    (a window or the home page stops it; closing the window brings it
+    back). Listen joins the click, coming in on its next bar line. Test
+    stops the click and counts in, as before (`syncTick`, game.js; the
+    click itself is beat.js's `tickStart`). The
     label under it says which, it lights green, and its weight sits higher
     on the arm for slower, as on a real one. It is **Off again on every new
     melody** — nothing counts in by itself: no rolling on to the next
@@ -180,8 +259,56 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   dots; the ladder counts rounds of 5 or more), Song (card by card, then *Hear your song*),
   Beat the clock (30 s · 60 s · 2 min), Endless. The game belongs to the
   browser, not the practice, so changing it never makes a level Custom.
-- **Fifteen levels** in six rainbow bands, a Songbook of twelve songs, and
-  made-up melodies for every card.
+- **Fifteen levels** in six rainbow bands — **redone 2026-10-07 in a music
+  teacher's order** (the user's two sequences; this supersedes the design
+  folder's LEVELS.md). Every level is made-up melodies only (no Songbook
+  cards; the Songbook stays for Song and for sessions). Solfège with C =
+  Do (the xylophone has nothing below C, so there is no low La or So —
+  the user chose high Do for Level 5):
+
+  | Level | Notes | Moves | Rhythm (new) |
+  |---|---|---|---|
+  | 1 Mi and So | E G | Steps | ta, ti-ti |
+  | 2 Add La | E G A | Steps | — |
+  | 3 Add Do | C E G A | Steps | sh (quarter rest) |
+  | 4 Add Re | C D E G A (pentatonic) | Steps | — |
+  | 5 High Do | + C5 | Steps | ta-a |
+  | 6 Add Fa | + F (no B) | Steps | — |
+  | 7 Add Ti | C to high C | Steps | ti-ri-ti-ri |
+  | 8 The whole octave | C to high C, half the melodies La-based (end on A) | Skips | — |
+  | 9 Up to high E | C4–E5 | Skips | sh-sh, ta-a-a-a |
+  | 10 Up to high F | C4–F5 | Skips | — |
+  | 11 Up to high G | E4–G5 | Skips | syn-co-pa, tam-ti |
+  | 12 Leaps of a 4th | two-octave pentatonic | 4ths | — |
+  | 13 Leaps of a 5th | D4–G5 | 5ths | ti-ti-ri, ti-ri-ti |
+  | 14 Six-eight time | C4–F5 | 4ths, 5ths | 6/8, pick-ups |
+  | 15 Everything | all twelve | 4ths, 5ths, major 6ths | 4/4 or 6/8 each melody, pick-ups |
+
+  Every level before 15 leaves some bars out; major 6ths only at 15, and
+  never all three kinds of leap in one melody. Each level's new note and
+  new rhythm come up more often (`focus`, hidden from Settings). The helps
+  climb as before (colours → lit → black, letters off from 12), except
+  that Level 14 keeps Practice and Listen (6/8 is new there) — Level 15
+  is the one sight-reading level (no Practice, one go, Flash).
+  **The ladder started fresh** (the user's choice): level scores are kept
+  under `lv2:<n>` (`RR.levelKey`); the old ladder's `'1'…'15'` stay in the
+  scores file, unused (My stats hides their best rounds).
+- **Meters and pick-ups** (2026-10-07) — 2/4 3/4 4/4 and **6/8**, as many
+  as a practice likes (`times`; each melody uses one; `time` is the first).
+  6/8 has its own cells (ti-ti-ti, ta ti, ti ta, tam, tam-a, a dotted
+  quarter rest, ti-ri ti ti), beamed in threes, counted in 1 2 · 1 2 on the
+  dotted quarter at 2/3 of the tempo (the eighths move as fast as in 4/4).
+  **Pick-ups**: half the melodies start before the first bar line — a beat
+  (ta or ti-ti) in 2/4 3/4 4/4, an eighth in 6/8 — and the last bar is that
+  much short, as in print; the count-in brings them in on time (a beat's
+  pick-up in 4/4 is counted 1 2 3, played on 4), Listen's bar of clicks
+  too. Settings → Rhythm: the Time row takes any of the four, a Pick-ups
+  switch, and the 6/8 cells under the others when 6/8 is on. **Leaps**:
+  Melodic Difficulty → Leaps too now asks which — a 4th, a 5th, a major
+  6th — by interval (never a tritone), with seconds and thirds; an older
+  practice's Leaps too reads as 4ths and 5ths (it used to allow anything
+  up to an octave). The rhythm names are the Kodály ones (ti-ri-ti-ri,
+  tam-ti, ti-ti-ri, ti-ri-ti, syn-co-pa).
 - **Settings** — Level (My sessions on top, then the levels with their best
   stars), Notes, Rhythms, How to play, Helps, Points, Sound, Share.
 - **The session page, laid out by the user** (2026-10-06; a battle's the
@@ -304,6 +431,10 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 | `js/sets.js` | My melodies' data: melody sets by the EVM Library rules, links, backups, the shelf |
 | `js/melodies.js`, `js/maker.js` | the My melodies window; Make a melody |
 | `js/players.js` | names on a shared computer |
+| `js/history.js` | My stats' history: the days, the last 200 melodies, the last 60 games, records, time playing; ranges and streaks (pure, tested) |
+| `js/charts.js` | the SVG charts (columns, line, calendar, one split bar) and their tooltip |
+| `js/stats.js` | the My stats page |
+| `js/home.js` | the home page, and the three views (`RR.View`: home · play · stats) with the browser's Back |
 | `lib/` | vendored copies — see `lib/README.md` |
 | `assets/MA4A-rainbow-reader-cover.jpg` | the hub card's cover (400×400) |
 | `tests/index.html` | the engine checks |
@@ -312,7 +443,10 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 
 `rainbow_reader_device_v1` (sound, points/stars, folded notes, the current
 level or practice, the game), `rainbow_reader_scores_v1` (per player: best
-rounds, the ladder's stars, first-try counts per note, mix-ups, totals),
+rounds, the ladder's stars, first-try counts per note, mix-ups, totals —
+and since 2026-10-07 My stats' `days`, `log`, `games`, `rec`, `since`, with
+totals `points` `gold` `made` `rounds` `secs` beside the old three; an
+older file just lacks them and gains them on first use, so no new key),
 `rainbow_reader_sessions_v1` (My sessions; `rainbow_reader_mine_v1`, the old
 Mine band, is read once into it and left alone), `rainbow_reader_sets_v1` (My
 melodies, an id map of EVM items). The device also keeps the set being
@@ -320,6 +454,27 @@ played and the player names. Every read is checked and
 falls back to defaults; a change of shape gets a new `_v2` key.
 
 ## Traps (found while building)
+
+- **The new ladder (2026-10-07).** Anything that needs a bar's or a beat's
+  length goes through `RR.meter(card.time)` (never `time[0] * 4`), and
+  anything that counts bars from tick 0 subtracts `card.pickup` first (the
+  engraver's bar lines and beams, the phone's two rows, the count-in,
+  Listen). A lone up-stem eighth before a bar line (a pick-up) hid the bar
+  line under its flag — the engraver now leaves the flag room. Ending on
+  Do used to jump there from anywhere (a 6th in a Steps level); the last
+  note now goes home only by an allowed move, and `make()` tries again
+  otherwise.
+
+- **The home page and My stats (2026-10-07).** The three views are classes
+  on `<html>` (`view-home` · `view-play` · `view-stats`); the music's card
+  is still dealt while hidden (its draw waits for a width, and the
+  ResizeObserver draws it when it shows). Keys 1–0 and Space/Enter belong
+  to the music only. `.ghost` is the ghost notes' class (it fades to
+  opacity 0) — the outlined card button is `.mc-play.outline`. Charts are
+  drawn at their host's width after the page is laid out (`charts` list,
+  `fill()`), again on a resize. In the browser pane, a page scrolled from
+  script may not repaint until a real scroll — the screenshot lags, not
+  the page.
 
 - `[hidden]` loses to any `display:` rule — `style.css` puts
   `[hidden] { display: none !important; }` first.

@@ -20,6 +20,11 @@
    picker(selected)            → the Notes tab's twelve tappable notes
    events(card)                → the notes with their start ticks
 
+   A card's meter can be 2/4 3/4 4/4 or 6/8 (RR.meter: in 6/8 the eighths
+   are beamed in threes, a dotted-quarter beat), and it can start with a
+   pick-up (card.pickup ticks before the first bar line; the last bar is
+   that much short, and closes with the final bar line) — 2026-10-07.
+
    Two things about redrawing (the whole SVG is rebuilt on every change):
    a CSS animation on an element with a transform attribute would replace
    it, so the lit pop runs on a wrapping <g>; and a rebuilt element
@@ -58,14 +63,15 @@
     });
     return { evs, total: tick };
   }
-  // eighths and sixteenths beamed within their beat
-  function beamGroups(evs) {
+  // eighths and sixteenths beamed within their beat (a dotted quarter in 6/8), counted from the bar line after a pick-up
+  function beamGroups(evs, M, pick) {
     const groups = []; let cur = [];
+    const beatOf = ev => Math.floor((ev.start - pick) / M.beatTicks);
     const flush = () => { if (cur.length > 1) groups.push(cur); cur = []; };
     evs.forEach(ev => {
       const short = !ev.rest && ev.t < 4 && ev.t !== 3;
       if (!short) { flush(); return; }
-      if (cur.length && Math.floor(cur[0].start / 4) !== Math.floor(ev.start / 4)) flush();
+      if (cur.length && beatOf(cur[0]) !== beatOf(ev)) flush();
       cur.push(ev);
     });
     flush();
@@ -87,23 +93,23 @@
     if (t === 6) return 'ta-i';
     if (t >= 4) return 'ta';
     if (t === 2) return 'ti';
-    return pos % 2 === 0 ? 'ti' : 'ka';
+    return pos % 2 === 0 ? 'ti' : 'ri';
   }
 
   function measure(card, bare, noTime) {
     const k = 1 / UNITS;
     const { evs, total } = events(card);
-    const barTicks = card.time[0] * 4;
+    const barTicks = RR.meter(card.time).barTicks, pick = card.pickup || 0;
     const prefix = bare ? 0.4 : 0.5 + gw('gClef', k) + (noTime ? 1.4 : 0.8 + gw('timeSig4', k) + 1.4);
     let notes = 0; evs.forEach(ev => { notes += spaceSS(ev.t); });
-    return { prefix, notes, fixed: Math.ceil(total / barTicks) * 1.2 + 0.8 };
+    return { prefix, notes, fixed: (Math.ceil((total - pick) / barTicks) + (pick ? 1 : 0)) * 1.2 + 0.8 };
   }
 
   function render(card, o) {
     const ss = o.ss, k = ss / UNITS;
     const { evs, total } = events(card);
-    const barTicks = card.time[0] * 4;
-    const groups = beamGroups(evs);
+    const M = RR.meter(card.time), barTicks = M.barTicks, pick = card.pickup || 0;
+    const groups = beamGroups(evs, M, pick);
     const hw = gw('noteheadBlack', k);
     const states = o.states || [], judge = o.judge || [];
     const hasLabels = o.labels && o.labels !== 'none';
@@ -132,9 +138,12 @@
     evs.forEach(ev => {
       ev.x = x;
       x += spaceSS(ev.t) * ss * stretch;
-      if ((ev.start + ev.t) % barTicks === 0) {
+      const end = ev.start + ev.t;
+      if (end === total || (end >= pick && (end - pick) % barTicks === 0)) {
         const final = ev.start + ev.t === total;
-        const bx = ev.x + gw(headFor(ev.t), k) + Math.max(ss * (final ? 1.4 : 1.0), (x - ev.x - hw) * (final ? 0.6 : 0.42));
+        // a lone eighth or sixteenth with its stem up (a pick-up, say): its flag needs room before the bar line
+        const flag = !ev.rest && ev.t <= 2 && ev.beam === null && ev.step < B4 ? gw(ev.t === 1 ? 'flag16thUp' : 'flag8thUp', k) : 0;
+        const bx = ev.x + gw(headFor(ev.t), k) + Math.max(ss * (final ? 1.4 : 1.0) + flag, (x - ev.x - hw) * (final ? 0.6 : 0.42) + flag * 0.6);
         barXs.push(bx);
         if (ev.rest && ev.t === barTicks) ev.x = (barStart + bx) / 2 - gw('restWhole', k) / 2 - ss * 0.3;
         x = bx + ss * 1.2; barStart = x;
@@ -185,7 +194,9 @@
       const q = [];
       if (ev.rest) {
         const name = restFor(ev.t);
-        q.push(at(name, ev.x + (ev.t >= 16 ? 0 : (hw - gw(name, k)) / 2), name === 'restWhole' ? yOf(D5) : yOf(B4), k, FILL));
+        const rx = ev.x + (ev.t >= 16 ? 0 : (hw - gw(name, k)) / 2);
+        q.push(at(name, rx, name === 'restWhole' ? yOf(D5) : yOf(B4), k, FILL));
+        if (dotted(ev.t)) q.push(boxAt('augmentationDot', rx + gw(name, k) + ss * 0.3, yOf(D5) + ss * 0.5 - gh('augmentationDot', k) / 2, k, FILL));
       } else {
         const b = BAR[ev.p];
         const coloured = o.colour === 'always' || (o.colour === 'lit' && lit);

@@ -117,7 +117,7 @@
         RR.BANDS.map(b => '<div class="band" style="--bc:' + b.colour + '"><div class="band-head"><b>' + b.name + ' · ' + b.title + '</b><span>' + b.about + '</span></div>' +
           RR.LEVELS.filter(l => l.band === b.id).map(l => '<button type="button" class="lvl' + (cur.kind === 'level' && l.n === cur.n ? ' on' : '') + '" data-level="' + l.n + '">' +
             '<span class="n">' + l.n + '</span><span class="t"><b>' + l.name + '</b><span>' + RR.summary(l) + '</span></span>' +
-            '<span class="s" aria-label="best ' + RR.Scores.levelStars(String(l.n)) + ' stars">' + RR.starsHtml(RR.Scores.levelStars(String(l.n)), 3) + '</span></button>').join('') +
+            '<span class="s" aria-label="best ' + RR.Scores.levelStars(RR.levelKey(l.n)) + ' stars">' + RR.starsHtml(RR.Scores.levelStars(RR.levelKey(l.n)), 3) + '</span></button>').join('') +
           '</div>').join('');
     },
     /* a session's (or a battle's) page — every choice on one page, saved as you go; laid out by the user (2026-10-06):
@@ -137,16 +137,26 @@
       return '<div class="sec"><h3>Choose the Notes</h3>' +
         '<div class="notes-pick">' + RR.Eng.picker(s.notes) +
         '<div class="pick-xylo">' + RR.BARS.map(b => '<button type="button" data-note="' + b.id + '" class="' + (s.notes.includes(b.id) ? '' : 'off') + '" style="--c:' + b.colour + ';--len:' + (b.len * 0.8) + '%" aria-pressed="' + s.notes.includes(b.id) + '" aria-label="' + b.id + '">' + b.letter + '</button>').join('') + '</div></div>' +
-        row('Melodic Difficulty', seg('moves', [['steps', 'Steps'], ['skips', 'Steps and skips'], ['leaps', 'Leaps too']], s.moves)) + '</div>';
+        row('Melodic Difficulty', seg('moves', [['steps', 'Steps'], ['skips', 'Steps and skips'], ['leaps', 'Leaps too']], s.moves)) +
+        // which leaps (2026-10-07): a 4th, a 5th, a major 6th — any two of them in one melody
+        (s.moves === 'leaps' ? row('Leaps of a', '<div class="seg" role="group" aria-label="Which leaps">' + [['P4', '4th'], ['P5', '5th'], ['M6', 'Major 6th']].map(o =>
+          '<button type="button" data-leap="' + o[0] + '" class="' + (s.leaps.includes(o[0]) ? 'on' : '') + '" aria-pressed="' + s.leaps.includes(o[0]) + '">' + o[1] + '</button>').join('') + '</div>') : '') + '</div>';
     },
+    /* the cells for the meters chosen (2/4 3/4 4/4 share theirs; 6/8 has its own), the meters — any of them:
+       each melody uses one — Pick-ups, the length */
     rhythms() {
-      const s = G.setup;
+      const s = G.setup, kinds = s.times.map(t => RR.meter(t).compound ? 'compound' : 'simple');
+      const cellBtn = c => {
+        const time = c.meter === 'compound' ? [c.len / 2, 8] : [Math.max(1, c.len / 4), 4];   // beamed as its meter beams it
+        const pic = RR.Eng.render({ time, notes: c.ticks.map(t => t < 0 ? { p: null, t: -t } : { p: 'A4', t }) }, { ss: 6.5, bare: true, colour: 'black', labels: 'none', maxStretch: 1 }).svg;
+        return '<button type="button" class="cell' + (s.rhythms.includes(c.id) ? ' on' : '') + '" data-cell="' + c.id + '" aria-pressed="' + s.rhythms.includes(c.id) + '"><span class="pic">' + pic + '</span><b>' + c.name + '</b><small>' + c.about + '</small></button>';
+      };
+      const has = t => s.times.some(x => x[0] === t[0] && x[1] === t[1]);
       return '<div class="sec"><h3>Choose the Rhythm</h3>' +
-        '<div class="cells">' + RR.Melody.CELLS.map(c => {
-          const pic = RR.Eng.render({ time: [Math.max(1, c.len / 4), 4], notes: c.ticks.map(t => t < 0 ? { p: null, t: -t } : { p: 'A4', t }) }, { ss: 6.5, bare: true, colour: 'black', labels: 'none', maxStretch: 1 }).svg;
-          return '<button type="button" class="cell' + (s.rhythms.includes(c.id) ? ' on' : '') + '" data-cell="' + c.id + '" aria-pressed="' + s.rhythms.includes(c.id) + '"><span class="pic">' + pic + '</span><b>' + c.name + '</b><small>' + c.about + '</small></button>';
-        }).join('') + '</div>' +
-        row('Time', seg('time', [['2', '2/4'], ['3', '3/4'], ['4', '4/4']], s.time[0])) +
+        (kinds.includes('simple') ? '<div class="cells">' + RR.Melody.CELLS.filter(c => c.meter === 'simple').map(cellBtn).join('') + '</div>' : '') +
+        (kinds.includes('compound') ? '<div class="picks-head">In 6/8</div><div class="cells">' + RR.Melody.CELLS.filter(c => c.meter === 'compound').map(cellBtn).join('') + '</div>' : '') +
+        row('Time', '<div class="seg" role="group" aria-label="Time (each melody uses one)">' + RR.METERS.map(t => '<button type="button" data-meter="' + RR.meterText(t) + '" class="' + (has(t) ? 'on' : '') + '" aria-pressed="' + has(t) + '">' + RR.meterText(t) + '</button>').join('') + '</div>') +
+        swRow('Pick-ups (some melodies start before the first beat)', 'pickup', s.pickup) +
         row('Length', seg('bars', [['1', '1 bar'], ['2', '2 bars']], s.bars)) + swRow('End on a long note', 'endLong', s.endLong) + '</div>';
     },
     /* Format: Rounds (how many) · Song (the songs and My melodies sets to play, any number of them) · Beat the Clock · Endless;
@@ -235,7 +245,7 @@
     else if (G.contentChanged) { G.contentChanged = false; G.queue = []; if (G.battle) G.replanBattle(); G.nextCard(); }
   }
 
-  const CONTENT = ['notes', 'rhythms', 'time', 'bars', 'moves', 'endDo', 'endLong', 'from', 'tricky'];
+  const CONTENT = ['notes', 'rhythms', 'time', 'times', 'pickup', 'leaps', 'bars', 'moves', 'endDo', 'endLong', 'from', 'tricky'];
   const ROUND = ['game', 'clockSecs', 'song', 'songPicks'];
   function change(k, v) {
     const s = G.setup;
@@ -275,7 +285,8 @@
       RR.device.set = null; s.set = null; RR.saveDevice(); G.roundChanged = true;
       if (v === s.from) { G.applyInstrument(); G.drawChips(); return; }
     }
-    if (k === 'time') s.time = [+v, 4];
+    if (k === 'time') { s.time = [+v, 4]; s.times = [s.time.slice()]; }
+    else if (k === 'times') { s.times = v; s.time = v[0].slice(); }
     else if (['bars', 'flash', 'clockSecs', 'gold'].includes(k)) s[k] = +v;
     else if (/^tempo\d$/.test(k)) {        // Slow ≤ Moderate ≤ Fast: dragging one past another pushes it along
       const i = +k[5], tp = s.tempos.slice();
@@ -357,6 +368,26 @@
       if (notes.includes(id)) { if (notes.length > 1) notes = notes.filter(x => x !== id); } else notes.push(id);
       change('notes', notes); render(); return;
     }
+    // a meter on or off (at least one stays on); a leap on or off (at least one stays on)
+    const mt = t.closest('[data-meter]');
+    if (mt) {
+      const [a, b] = mt.dataset.meter.split('/').map(Number), s = G.setup;
+      const on = s.times.some(x => x[0] === a && x[1] === b);
+      let ts = on ? s.times.filter(x => !(x[0] === a && x[1] === b)) : s.times.concat([[a, b]]);
+      if (!ts.length) return;
+      ts = RR.METERS.filter(m => ts.some(x => x[0] === m[0] && x[1] === m[1])).map(m => m.slice());
+      // 6/8 turned on with none of its rhythms yet: its two plainest come with it
+      if (a === 6 && !on && !s.rhythms.some(id => RR.Melody.CELL[id].meter === 'compound' && !RR.Melody.CELL[id].rest)) s.rhythms = s.rhythms.concat(['c3', 'cdq']);
+      if (!(a === 6) && !on && !s.rhythms.some(id => RR.Melody.CELL[id].meter === 'simple' && !RR.Melody.CELL[id].rest)) s.rhythms = s.rhythms.concat(['q', 'ee']);
+      change('times', ts); render(); return;
+    }
+    const lp = t.closest('[data-leap]');
+    if (lp) {
+      const s = G.setup, id = lp.dataset.leap;
+      const list = s.leaps.includes(id) ? s.leaps.filter(x => x !== id) : Object.keys(RR.Melody.LEAPS).filter(x => x === id || s.leaps.includes(x));
+      if (list.length) { change('leaps', list); render(); }
+      return;
+    }
     const pk = t.closest('[data-pick]');
     if (pk) { change('notes', pk.dataset.pick.split(',')); render(); return; }
     const so = t.closest('[data-songpick]');
@@ -365,7 +396,7 @@
     if (cl) {
       const id = cl.dataset.cell, s = G.setup, CELL = C();
       let r = s.rhythms.slice();
-      const notes = r.filter(x => !CELL[x].rest);
+      const notes = r.filter(x => !CELL[x].rest && CELL[x].meter === CELL[id].meter);
       if (r.includes(id)) { if (!(notes.length === 1 && notes[0] === id)) r = r.filter(x => x !== id); } else r.push(id);
       change('rhythms', r); render();
       // hear it: on G, at the Moderate tempo
@@ -421,7 +452,7 @@
       render();
       const all = body.querySelectorAll('.bt-name'), f = all[all.length - 1]; if (f) { f.focus(); f.select(); }
     } else if (a === 'play-session') {
-      close();
+      close(); RR.View.go('play');
     } else if (a === 'delete-session') {
       await deleteSession(G.mode.id);
     } else if (a === 'copy-link') {
@@ -483,5 +514,15 @@
   });
   $('#tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { tab = b.dataset.tab; body.scrollTop = 0; render(); } });
 
-  RR.Settings = { open, close, render, isOpen: () => !$('#settings').hidden };
+  /* the home page's format cards (2026-10-07): how to play, chosen there — the same path as the Format
+     tab (a level's game is the browser's, a session's its own); the caller starts the round */
+  function setFormat(f) {
+    if (f.len) change('countSet', f.len);
+    else if (f.game) change('game', f.game);
+    if (f.clockSecs) change('clockSecs', String(f.clockSecs));
+    if (f.songPicks && f.songPicks.length) change('songPicks', f.songPicks.slice());
+    G.roundChanged = false; G.contentChanged = false;
+  }
+
+  RR.Settings = { open, close, render, setFormat, isOpen: () => !$('#settings').hidden };
 })();
