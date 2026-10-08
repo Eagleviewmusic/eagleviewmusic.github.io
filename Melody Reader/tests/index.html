@@ -256,17 +256,64 @@
       const fr = P.free({ tries: [0, 0, 0, 0, 0, 0], starts, times: at(80) }), fs1 = P.free({ tries: [0, 1, 0, 0, 0, 0], starts, times: at(80) });
       check('Points: on your own, every note first time in rhythm → 12; one slip → tier 1', fr.pts === 12 && fr.tier === 2 && fs1.pts === 7 && fs1.tier === 1);
       const J = (p, g2) => Array(p).fill('Perfect').concat(Array(g2).fill('Good'));
-      const ci = (judge, pace, wrong, times) => P.countIn({ judge, pace, wrong: wrong || 0, starts: starts.slice(0, judge.length), times: times || at(80).slice(0, judge.length) });
+      const ci = (judge, pace, tries, times) => P.countIn({ judge, pace, tries, starts: starts.slice(0, judge.length), times: times || at(80).slice(0, judge.length) });
       check('Points, tier 3: all Perfect — Slow 15 · Moderate 18 · Fast 20', ci(J(4, 0), 'slow').pts === 15 && ci(J(4, 0), 'moderate').pts === 18 && ci(J(4, 0), 'fast').pts === 20);
       check('Points, tier 3: fewer Perfect, still all in time — Slow 14 / 13 · Moderate 16 · Fast 19',
         ci(J(2, 2), 'slow').pts === 14 && ci(J(1, 3), 'slow').pts === 13 && ci(J(1, 3), 'moderate').pts === 16 && ci(J(2, 2), 'fast').pts === 19 && ci(J(3, 1), 'fast').pts === 20);
       const late = ci(['Perfect', 'Late', 'Perfect', 'Perfect'], 'fast');
       check('Points: a count-in with every bar right but one late drops to 9–12', late.tier === 2 && late.pts >= 9 && late.pts <= 12, late.pts + '');
-      const miss = ci(['Perfect', 'Missed', 'Perfect', 'Perfect'], 'fast'), wrong = ci(J(4, 0), 'fast', 1), lots = ci(['Missed', 'Late', 'Missed', 'Missed'], 'fast', 5);
-      check('Points: a missed note or a wrong bar drops a count-in to 1–8 (−½ a wrong bar, never below 1)', miss.pts === 6 && wrong.pts === 7 && lots.pts === 1 && miss.tier === 1 && wrong.tier === 1,
+      const miss = ci(['Perfect', 'Missed', 'Perfect', 'Perfect'], 'fast'), wrong = ci(J(4, 0), 'fast', [1, 0, 0, 0]), lots = ci(['Missed', 'Late', 'Missed', 'Missed'], 'fast', [0, 3, 0, 0]);
+      check('Points: a missed note or a wrong bar drops a count-in to 1–8 (a note found second time ½, never below 1)', miss.pts === 6 && wrong.pts === 7 && lots.pts === 1 && miss.tier === 1 && wrong.tier === 1,
         [miss.pts, wrong.pts, lots.pts].join(' '));
       check('Stars follow the tiers: ★ 1–7 · ★★ 8–12 · ★★★ 13–20',
         [0, 1, 7, 8, 12, 13, 20].map(P.starsFor).join('') === '0112233');
+      // a metronome run, followed (2026-10-07): a player a little slow (or fast, or late in) is followed, not dropped
+      (function () {
+        let st = 0;
+        const mel = [['E4', 4], ['D4', 4], ['C4', 8], ['E4', 2], ['D4', 2], ['C4', 4], [null, 4], ['G4', 4], ['E4', 4], ['D4', 4], ['E4', 4], ['C4', 16]]
+          .map(([p, t]) => { const n = { p, start: st, rest: !p }; st += t; return n; });
+        const spt = 0.25, q = 4 * spt, ok = Math.max(0.26, 0.38 * q);
+        const AT = { startT: 10, spt, beat: q, perfect: Math.max(0.075, 0.11 * q), good: Math.max(0.15, 0.22 * q), ok };
+        const metroEnd = AT.startT + st * spt + 0.12;
+        let seed = 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+        // scale: 1.1 = 10% slow; delay: a late start (s); jitter: ± s; skip: a note never played; wrongAt: a wrong bar just before that note
+        function play(o) {
+          const f = P.follower(mel, AT), when = n => AT.startT + (o.delay || 0) + n.start * spt * (o.scale || 1) + (o.jitter ? (rnd() - 0.5) * 2 * o.jitter : 0);
+          mel.forEach((n, i) => {
+            if (n.rest || i === o.skip) return;
+            if (i === o.wrongAt) f.strike('B4', when(n) - 0.12);
+            f.strike(n.p, when(n));
+          });
+          const stray = o.stray ? f.strike('A4', when(mel[mel.length - 1]) + 0.2) : null;
+          const idx = mel.map((n, i) => n.rest ? -1 : i).filter(i => i >= 0);
+          const judge = idx.map(i => f.judge[i] || 'Missed');
+          const r = P.countIn({ judge, starts: idx.map(i => mel[i].start), times: idx.map(i => f.times[i]), tries: idx.map(i => f.tries[i]), wrong: f.wrong(), pace: 'slow' });
+          // the old way, the clock alone: how many notes fell outside their click's window
+          const outside = idx.filter(i => Math.abs(when(mel[i]) - (AT.startT + mel[i].start * spt)) > ok).length;
+          return { f, judge, r, stray, outside, n: idx.length };
+        }
+        const inTime = play({}), slow = play({ scale: 1.1 }), slower = play({ scale: 1.25 }), quick = play({ scale: 0.9 }), lateIn = play({ delay: 1 }), wobbly = play({ scale: 1.12, jitter: 0.04 });
+        check('A metronome run in time: every note found and with the click → 13–15 at Slow', inTime.r.tier === 3 && inTime.r.pts === 15 && inTime.judge.every(j => j === 'Perfect'));
+        check('A metronome run 10% slow — steady — is followed: every note found, scored as on your own (12), not 1–4',
+          slow.judge.every(j => j !== 'Missed') && slow.r.tier === 2 && slow.r.pts === 12 && slow.f.wrong() === 0,
+          slow.judge.join(' ') + ' → ' + slow.r.pts + ' (the clock alone would have dropped ' + slow.outside + ' of ' + slow.n + ')');
+        check('25% slow, 10% fast, a beat late in, or slow and a little uneven: every note still found, 11–12',
+          [slower, quick, lateIn, wobbly].every(x => x.judge.every(j => j !== 'Missed') && x.f.wrong() === 0 && x.r.pts >= 11 && x.r.tier === 2),
+          [slower, quick, lateIn, wobbly].map(x => x.r.pts).join(' · '));
+        const skip = play({ scale: 1.1, skip: 4 }), wrongBar = play({ scale: 1.1, wrongAt: 7 }), stray = play({ stray: true });
+        check('A note passed over is Missed (the rest still found); a wrong bar counts against its note (½); a strike after the last note counts for nothing',
+          skip.f.judge[4] === 'Missed' && skip.judge.filter(j => j === 'Missed').length === 1 && skip.r.tier === 1 && skip.r.pts === Math.floor(8 * (skip.n - 1) / skip.n) &&
+          wrongBar.f.tries[7] === 1 && wrongBar.judge.every(j => j !== 'Missed') && wrongBar.r.pts === Math.floor(8 * (wrongBar.n - 0.5) / wrongBar.n) &&
+          stray.stray && stray.stray.stray === true && stray.f.wrong() === 0 && stray.r.tier === 3,
+          skip.r.pts + ' · ' + wrongBar.r.pts);
+        // the run's end: just after the last note; or, the player stopped, once the next note is well overdue
+        const stop = P.follower(mel, AT); [0, 1, 2].forEach(i => stop.strike(mel[i].p, AT.startT + mel[i].start * spt * 1.1));
+        const done = slow.f.endAt(metroEnd), lastT = slow.f.times[mel.length - 1];
+        check('The run ends just after the last note — or waits for a slow player, then ends once the next note is overdue',
+          Math.abs(done - (lastT + 0.3)) < 1e-9 && stop.endAt(metroEnd) >= metroEnd && isFinite(stop.endAt(metroEnd)) && stop.next() === 3 &&
+          P.follower(mel, AT).endAt(metroEnd) === metroEnd,
+          'the last note struck at ' + (lastT - AT.startT).toFixed(2) + ' s → ends at ' + (done - AT.startT).toFixed(2) + ' s; stopped after 3 notes → ' + (stop.endAt(metroEnd) - AT.startT).toFixed(2) + ' s');
+      })();
       check('Slow · Moderate · Fast are 60 · 80 · 100 by default', ['slow', 'moderate', 'fast'].map(id => RR.paceTempo(RR.DEFAULTS, id)).join() === '60,80,100');
     })();
 

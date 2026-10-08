@@ -629,7 +629,7 @@
   function scoreRun() {
     const idx = noteIdx();
     return RR.Points.countIn({ judge: idx.map(i => G.judge[i] || 'Missed'), starts: idx.map(i => G.evs[i].start),
-      times: idx.map(i => G.times[i]), wrong: G.run ? G.run.wrong : 0, pace: G.run ? G.run.pace : 'slow' });
+      times: idx.map(i => G.times[i]), tries: idx.map(i => G.tries[i]), wrong: G.run ? G.run.wrong : 0, pace: G.run ? G.run.pace : 'slow' });
   }
   function scoreFree() {
     const idx = noteIdx();

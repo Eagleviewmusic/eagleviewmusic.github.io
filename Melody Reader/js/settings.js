@@ -187,7 +187,7 @@
     },
     points() {
       return '<div class="sec">' + swRow('Points', '@points', RR.device.points) +
-        RR.note('pt-how', 'Each melody earns 1 to 20. Find the notes: 1–8 (a note right first time counts 1, second time ½). Every note first time, in your own steady beat: 9–12. A Test with the metronome, every note right and in time: Slow 13–15, Moderate 16–18, Fast 19–20 — but a wrong or missed note with the metronome drops it to 1–8. Stars: ★ 1–7 · ★★ 8–12 · ★★★ 13–20.') +
+        RR.note('pt-how', 'Each melody earns 1 to 20. Find the notes: 1–8 (a note right first time counts 1, second time ½). Every note first time, in your own steady beat: 9–12. A Test with the metronome, every note right and in time: Slow 13–15, Moderate 16–18, Fast 19–20. Every note right but not quite with the click (a little behind, say) scores as on your own: 9–12. A wrong or missed note drops it to 1–8. Stars: ★ 1–7 · ★★ 8–12 · ★★★ 13–20.') +
         RR.note('pt', 'With points off there are no numbers anywhere. The lights, sparkles and stars stay.') +
         swRow('Gold stars', '@stars', RR.device.stars) +
         swRow('Celebration sounds', '@celebrate', RR.device.celebrate) + '</div>' +

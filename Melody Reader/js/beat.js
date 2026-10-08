@@ -18,15 +18,22 @@
    the app's pane is hidden; a loop run on them froze the mockup's count-in
    for good.)
 
-   A strike is judged by the audio time being *heard* when it happened
+   A strike is timed by the audio time being *heard* when it happened
    (RR.Sound.eventTime — the event's timeStamp through the output
-   timestamp): a child plays to what they hear. It is matched to the
-   nearest unplayed note within the OK window:
+   timestamp): a child plays to what they hear. Which note it is comes
+   from RR.Points.follower (2026-10-07): by where the player is — each
+   note expected a written length after the last one found, at their own
+   tempo — so a player drifting a little behind is followed and every
+   note counts (it used to be the clock alone, and a slow player's later
+   notes were all Missed). Against the click, each note found is
 
      Perfect  ≤ max(75 ms, 0.11 beat)    Good  ≤ max(150 ms, 0.22 beat)
-     Early / Late  ≤ max(260 ms, 0.38 beat)    beyond that: Missed
+     Early / Late  ≤ max(260 ms, 0.38 beat)    beyond that: Off
 
-   Any other strike is a wrong bar.
+   (a beat = a quarter here). A note passed over is Missed; any other
+   strike is a wrong bar, counted against the note nearest it. The run
+   ends just after the last note — or, if the player stops, once the next
+   note is well overdue.
 
    Meters and pick-ups (2026-10-07): the clicks are the meter's beats — a
    quarter, or in 6/8 a dotted quarter (two to the bar, so the count is
@@ -86,11 +93,13 @@
     for (let b = 0; t0 + b * beat < startT + total * spt - 1e-6; b++) clicks.push({ t: t0 + b * beat, accent: b % M.beats === 0 });
     const okW = Math.max(0.26, 0.38 * quarter);
     const last = G.evs.reduce((a, e) => e.rest ? a : Math.max(a, e.start), 0);
+    const perfect = Math.max(0.075, 0.11 * quarter), good = Math.max(0.15, 0.22 * quarter);
     B = {
       my, n, beat, spt, t0, startT, clicks, ci: 0, timer: null,
-      perfect: Math.max(0.075, 0.11 * quarter), good: Math.max(0.15, 0.22 * quarter), ok: okW,
-      // the end: the last note's length, or its window if that is longer (a short last note)
-      end: Math.max(startT + total * spt, startT + last * spt + okW) + 0.12,
+      // the metronome's end: the last note's length, or its window if that is longer (a short last note)
+      metroEnd: Math.max(startT + total * spt, startT + last * spt + okW) + 0.12,
+      cap: startT + total * spt * 2 + 4,                          // however slow: the run ends by then
+      follow: RR.Points.follower(G.evs.map(e => ({ p: e.p, start: e.start, rest: e.rest })), { startT, spt, beat, perfect, good, ok: okW }),
       flashAt: s.flash ? RR.now() + s.flash * 1000 : null
     };
     if (CI) CI.run(clicks.slice(0, shown).map(c => RR.Sound.heardAt(c.t)), RR.Sound.heardAt(startT));
@@ -108,11 +117,9 @@
     const heard = RR.Sound.heardNow();
     if (G.phase === 'countin' && heard >= B.startT - Math.min(B.beat, 4 * B.spt) * 0.45) { G.phase = 'running'; G.drawSides(); }
     if (B.flashAt && RR.now() >= B.flashAt && !G.hidden) { G.hidden = true; B.flashAt = null; G.draw(); }
-    // missed notes are only noted — nothing shows until the end
-    G.evs.forEach((ev, i) => {
-      if (!ev.rest && !G.judge[i] && heard > B.startT + ev.start * B.spt + B.ok) G.judge[i] = 'Missed';
-    });
-    if (G.phase === 'running' && heard > B.end) {
+    // the end: just after the last note — or, the player having stopped, once the next note is well overdue
+    // (missed notes are only noted; nothing shows until then)
+    if (G.phase === 'running' && heard > Math.min(B.cap, B.follow.endAt(B.metroEnd))) {
       stop(true);
       G.hidden = false;
       G.finish();
@@ -122,24 +129,19 @@
   function strike(id, e) {
     if (!B) return;
     const at = RR.Sound.eventTime(e);
-    let best = null;
-    G.evs.forEach((ev, i) => {
-      if (ev.rest || G.judge[i]) return;
-      const d = at - (B.startT + ev.start * B.spt);
-      if (Math.abs(d) <= B.ok && (!best || Math.abs(d) < Math.abs(best.d))) best = { i, d };
-    });
     const game = G.stage === 'game';
-    if (best && G.evs[best.i].p === id) {
-      const a = Math.abs(best.d);
-      G.judge[best.i] = a <= B.perfect ? 'Perfect' : a <= B.good ? 'Good' : best.d < 0 ? 'Early' : 'Late';
-      G.times[best.i] = at;
-      G.lightNote(best.i);
-      if (game) G.record(id, G.tries[best.i] === 0);
-      G.draw(); G.sparkAtNote(best.i);
-    } else {
-      // a wrong bar: it only sounds
+    const res = B.follow.strike(id, at);
+    if (res.i !== undefined) {
+      B.follow.judge.forEach((j, i) => { if (j && !G.judge[i]) G.judge[i] = j; });   // this note, and any passed over (Missed)
+      G.times[res.i] = at;
+      G.lightNote(res.i);
+      if (game) G.record(id, G.tries[res.i] === 0);
+      G.draw(); G.sparkAtNote(res.i);
+    } else if (res.wrong !== undefined) {
+      // a wrong bar: it only sounds, and counts against the note it was nearest
       G.run.wrong++; G.slips++; G.clean = false;
-      if (best) { G.tries[best.i]++; if (game) G.mixup(G.evs[best.i].p, id); }
+      G.tries[res.wrong]++;
+      if (game) G.mixup(G.evs[res.wrong].p, id);
     }
   }
 
@@ -192,6 +194,6 @@
     start, stop, strike, running: () => !!B,
     tickStart, tickStop, tickNextBar, ticking: () => (T ? T.pace : tPending),
     /* for tests: when the music starts (audio time) and how long a tick is */
-    info: () => B && { startT: B.startT, spt: B.spt, beat: B.beat, windows: [B.perfect, B.good, B.ok] }
+    info: () => B && { startT: B.startT, spt: B.spt, beat: B.beat, metroEnd: B.metroEnd, endAt: B.follow.endAt(B.metroEnd) }
   };
 })();

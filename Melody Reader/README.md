@@ -33,7 +33,8 @@ levels, engraver, practices, lesson links, melody sets under the library
 rules, the points, My sessions, the gold star, round lengths, Battle
 Mode and its fair plan, the Helps' choices, the session page's rules, My
 stats' history and charts, the new ladder: 300 melodies a level against
-its notes, moves, leaps, meters and pick-ups) — 96 of them, all passing as
+its notes, moves, leaps, meters and pick-ups; metronome runs played in
+time, slow, fast, late in, with a note skipped or a wrong bar) — 101 of them, all passing as
 of 2026-10-07.
 
 The Teacher Library shelf reads `../Teacher Library/index.json`, which only
@@ -249,9 +250,19 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   (first try 1, second ½); **9–12** every note first time in your own steady
   beat (a least-squares fit finds your tempo; the leftover, in beats, is the
   grade — 12 ≤ 0.06, 11 ≤ 0.10, 10 ≤ 0.15, 9 ≤ 0.21, else 8); **13–20** a
-  clean Test with the metronome: Slow 13–15, Moderate 16–18, Fast 19–20. A count-in
-  with every bar right but some early/late drops to 9–12; a wrong or missed
-  note drops it to 1–8 (−½ a wrong bar). Stars: ★ 1–7 · ★★ 8–12 · ★★★ 13–20;
+  clean Test with the metronome: Slow 13–15, Moderate 16–18, Fast 19–20. A
+  metronome run with every bar right first time but not all with the click —
+  some early or late, or a player drifting behind — scores as on your own,
+  9–12 (at least 9 if every note was within the click's window); a wrong or
+  missed note drops it to 1–8 (a note found second time ½, a missed one 0).
+  **Which note a strike is** (2026-10-07, the user's report: "a little too
+  slow … a score of 1 to 4"): `RR.Points.follower` follows the player — each
+  note expected a written length after the last one found, at their own
+  tempo (the last five notes, kept to 60–160% of the metronome's) — and the
+  click only decides Perfect · Good · Early · Late · Off. It used to be the
+  clock alone, so a player 10% slow drifted out of the windows after a few
+  notes and everything after was Missed or a wrong bar. The run ends just
+  after the last note, or once the next one is well overdue. Stars: ★ 1–7 · ★★ 8–12 · ★★★ 13–20;
   next level at ★★ or better in 4 of 5. The streak counts 8+ in a row (no
   bonus). Points and stars can each be turned off.
 - **Games** — a round of any 1–99 melodies (− / + or type it; 2026-10-05 —
@@ -454,6 +465,13 @@ played and the player names. Every read is checked and
 falls back to defaults; a change of shape gets a new `_v2` key.
 
 ## Traps (found while building)
+
+- **A metronome run follows the player (2026-10-07).** Don't go back to
+  matching strikes to notes by the click alone: drift is cumulative, so
+  any fixed window drops a slightly slow player's later notes. Tests that
+  press bars in the real app must use a level whose bars are live — the
+  new Level 1 greys out everything but E and G, and a greyed bar ignores
+  `RR.Xylo.press`.
 
 - **The new ladder (2026-10-07).** Anything that needs a bar's or a beat's
   length goes through `RR.meter(card.time)` (never `time[0] * 4`), and

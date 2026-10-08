@@ -53,7 +53,7 @@
   const poly = (pts, attrs) => '<polygon ' + (attrs || '') + ' points="' + pts.map(p => r2(p[0]) + ',' + r2(p[1])).join(' ') + '"/>';
   const FILL = 'fill="' + INK + '"';
   // judgement words, each at least 4.5:1 on the paper (WCAG AA)
-  const JUDGE_COLOUR = { Perfect: '#15803d', Good: '#0f766e', Early: '#c2410c', Late: '#c2410c', Missed: '#78716c' };
+  const JUDGE_COLOUR = { Perfect: '#15803d', Good: '#0f766e', Early: '#c2410c', Late: '#c2410c', Off: '#c2410c', Missed: '#78716c' };
 
   function events(card) {
     const evs = []; let tick = 0;
