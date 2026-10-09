@@ -28,8 +28,10 @@
         └─────────────────────┘
 
    It stays out for as long as the hat is on, and nothing is drawn around
-   the note, so the song does not move when the hat goes on. Every button
-   calls score.js — the same functions the keys call.
+   the note, so the song does not move when the hat goes on (2026-10-08:
+   except the × and + on the selected note's box — note-tools.js — which
+   sit over the song and move nothing). Every button calls score.js — the
+   same functions the keys call.
 
    PICK-UP (2026-10-01, the user's design; score.js PICK-UPS). On a word
    that is not in a pick-up, Pick-up starts a new line there (as New

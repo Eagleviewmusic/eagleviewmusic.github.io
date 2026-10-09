@@ -1081,6 +1081,39 @@
     changed('connected');
   }
 
+  /* The × on the selected note's box (note-tools.js, the user's design
+     2026-10-08): that note goes in one tap — Undo brings it back. On a
+     syllable with other notes, the column alone (its word stays, on the
+     syllable's notes that are left); a syllable's only note goes with
+     its word (deleteSyllable). A tie into it from the column before is
+     let go. The note after it is selected, so × again goes on. */
+  function deleteNoteState() {
+    const note = (S.editing && currentNoteIndex >= 0) ? getActiveNote() : null;
+    const syl = note && note.closest('.syllable');
+    if (!syl) return { can: false, whole: false };
+    const whole = syl.querySelectorAll('.harmony-stack').length <= 1;
+    return { can: whole ? can('structure') : can('connected'), whole };
+  }
+  function deleteCurrentNote() {
+    const st = deleteNoteState();
+    if (!st.can) return;
+    const stack = getActiveNote().closest('.harmony-stack');
+    const line = stack && stack.closest('.notation-line');
+    if (!line) return;
+    const cols = Array.from(line.querySelectorAll('.harmony-stack'));
+    const before = cols[cols.indexOf(stack) - 1];
+    if (before) delete before.dataset.tie;
+    if (st.whole) { deleteSyllable(); return; }
+    const stacks = Array.from(stack.closest('.syllable').querySelectorAll('.harmony-stack'));
+    const i = stacks.indexOf(stack);
+    const next = stacks[i + 1] || stacks[i - 1];
+    stack.remove();
+    updateLineHeight(line);
+    const nextNote = next && next.querySelector('.note');
+    if (nextNote) setNoteAsActive(nextNote, true);
+    changed('connected');
+  }
+
   /* ================= TIES =================
      Tie (the Edit box's Rhythm section) holds the selected note over into
      a NEW note: the same pitches, an eighth (the value circles change it),
@@ -2558,7 +2591,7 @@
     notateAll, clearAllValues, notateLine, clearLineValues, selectNextStack,
     toggleRestOnCurrentNote, insertRestAfterCurrent,
     // the Edit box's note, syllable and word tools (edit-box.js)
-    handleAccidentalClick, duplicateCurrentNote, removeCurrentConnectedNote,
+    handleAccidentalClick, duplicateCurrentNote, removeCurrentConnectedNote, deleteCurrentNote, deleteNoteState,
     addHarmonyNote, removeHarmonyNote, connectedState, harmonyState,
     addSyllableAfterCurrent, newLineAfterCurrent, handleEnterKeyClick, joinLineWithPrevious,
     joinUp, joinState, newLineState, toggleTie, tieState, soundNote,

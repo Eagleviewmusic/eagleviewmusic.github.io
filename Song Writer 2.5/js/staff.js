@@ -129,8 +129,7 @@
   };
 
   const INK = '#2B1D38';
-  const GOLD = '#FFD700';
-  const SOUND = '#9C168E';     // the sounding note (style.css --sound)
+  const SOUND = '#9C168E';     // the sounding word's box (style.css --sound); the note's glow is Do's colour
   const ACC_GLYPH = { '-2': 'accidentalDoubleFlat', '-1': 'accidentalFlat', '0': 'accidentalNatural', '1': 'accidentalSharp', '2': 'accidentalDoubleSharp' };
 
   const n2 = v => Number(Number(v).toFixed(2));
@@ -930,14 +929,17 @@
 
     const active = SW.score.getActiveNote();
     // a saved picture shows the music, not the selection; while it plays,
-    // the play light (View → While it plays → Light up) stands in for it
+    // the sounding note's light stands in for it. View → Light up
+    // selected/played (Note · Box · Both · Off) lights both (the
+    // selection too since 2026-10-08, user); the note's glow is Do's colour.
     const capturing = document.body.classList.contains('capturing');
     const playing = !!S.playing && !capturing;
     const activeStack = active && !capturing && !playing ? active.closest('.harmony-stack') : null;
-    const light = playing && SW.settings ? SW.settings.view.playLight : 'off';
+    const light = SW.settings ? SW.settings.view.playLight : 'note';
     const soundStack = playing ? line.querySelector('.harmony-stack.sounding') : null;
     const noteLight = light === 'note' || light === 'both';
     const boxLight = light === 'box' || light === 'both';
+    const glow = SW.settings ? SW.settings.lightColour() : SOUND;
     const barNumbers = !SW.settings || !SW.settings.layout || !SW.settings.layout.show || SW.settings.layout.show.barNumbers !== false;
     const parts = [];
     const cuts = [];
@@ -945,8 +947,9 @@
     rows.forEach((row, ri) => {
       parts.push(renderRow(row, {
         bs, left, withTime: withTime && ri === 0, lastRow: ri === rows.length - 1,
-        lastLine, le, activeStack, showNames: S.showNames, barNumbers, clock: clock || { at: 0, p0: 0 }, W, cuts, hits,
-        soundStack: noteLight ? soundStack : null
+        lastLine, le, showNames: S.showNames, barNumbers, clock: clock || { at: 0, p0: 0 }, W, cuts, hits, glow,
+        soundStack: noteLight ? soundStack : null,
+        selStack: noteLight ? activeStack : null, selNote: active
       }));
     });
     hitMaps.set(line, hits);
@@ -956,7 +959,7 @@
     // 2026-10-01). On a written line the word's own box (style.css) stays
     // clear; a line of blocks keeps it, behind its blocks already.
     const under = [];
-    if (activeStack && line.contains(activeStack)) under.push(markBox(activeStack, line, plan, bs, 'rgba(255,215,0,.30)', 'rgba(255,215,0,.5)', 2));
+    if (activeStack && boxLight && line.contains(activeStack)) under.push(markBox(activeStack, line, plan, bs, 'rgba(255,215,0,.30)', 'rgba(255,215,0,.5)', 2));
     if (soundStack && boxLight) under.push(markBox(soundStack, line, plan, bs, 'rgba(156,22,142,.10)', SOUND, 0));
     svg.innerHTML = under.join('') + parts.join('');
     syncCut(line, cuts[0] || null);
@@ -969,8 +972,17 @@
      its own: the syllable's first column), never the whole syllable with
      the notes and rests connected to it. Height as the word's box. */
   function markBox(stack, line, plan, bs, fill, edge, grow) {
+    const R = markRect(stack, line, plan, bs);
+    if (!R) return '';
+    const x = R.x - grow, y = R.y - grow, w = R.w + 2 * grow, h = R.h + 2 * grow;
+    const r = ' x="' + n2(x) + '" y="' + n2(y) + '" width="' + n2(w) + '" height="' + n2(h) + '" rx="8"';
+    return '<rect' + r + ' fill="none" stroke="' + edge + '" stroke-width="' + (grow ? 6 : 5) + '" opacity="' + (grow ? '.6' : '.22') + '"/>'
+      + '<rect' + r + ' fill="' + fill + '"' + (grow ? '' : ' stroke="' + edge + '" stroke-width="1.5"') + '/>';
+  }
+  /* …the box itself, in line coordinates: { x, y, w, h } */
+  function markRect(stack, line, plan, bs) {
     const body = stack.closest('.syl-body');
-    if (!body) return '';
+    if (!body) return null;
     const I = plan && plan.info.get(stack);
     const s = SS_PX * bs;
     const so = offsetIn(stack, line);
@@ -987,10 +999,17 @@
       rx = Math.max(rx, t.x + text.offsetWidth + 4);
     }
     const o = offsetIn(body, line);
-    const x = l - grow, y = o.y - grow, w = rx - l + 2 * grow, h = body.offsetHeight + 2 * grow;
-    const r = ' x="' + n2(x) + '" y="' + n2(y) + '" width="' + n2(w) + '" height="' + n2(h) + '" rx="8"';
-    return '<rect' + r + ' fill="none" stroke="' + edge + '" stroke-width="' + (grow ? 6 : 5) + '" opacity="' + (grow ? '.6' : '.22') + '"/>'
-      + '<rect' + r + ' fill="' + fill + '"' + (grow ? '' : ' stroke="' + edge + '" stroke-width="1.5"') + '/>';
+    return { x: l, y: o.y, w: rx - l, h: body.offsetHeight };
+  }
+  /* The selected note's box on a written line, as drawn (the selection's
+     2 px all round), in its line's coordinates — or null when the line
+     has no staff. For the × and + on it (note-tools.js). */
+  function boxOf(stack) {
+    const line = stack && stack.closest('.notation-line');
+    const plan = line && plans.get(line);
+    if (!plan || !line.classList.contains('has-staff')) return null;
+    const R = markRect(stack, line, plan, blockScale());
+    return R && { x: R.x - 2, y: R.y - 2, w: R.w + 4, h: R.h + 4 };
   }
 
   /* ================= the pick-up's bar line: the × =================
@@ -1041,15 +1060,30 @@
     if (last && last.info && last.info.endDx !== undefined) staffEnd = last.x + last.info.endDx;
     else if (last) staffEnd = last.x + last.stack.offsetWidth / 2 + s * 0.5;
 
-    // the sounding note lit (View → Light up → Note): a glow BEHIND its
-    // heads (or its rest), under the staff lines, the head's colour untouched
-    if (o.soundStack) evs.forEach(ev => {
-      if (ev.stack !== o.soundStack || !ev.notated || !ev.info) return;
-      const spots = ev.rest ? [{ x: ev.x, y: yOf(B4) }]
-        : ev.info.heads.map(h => ({ x: ev.x + h.dx, y: yOf(h.pt.step) }));
+    // the note lit (View → Light up selected/played → Note): a glow of
+    // Do's colour BEHIND its heads (or its rest), under the staff lines, the
+    // head's colour untouched — every head of the sounding note, the
+    // selected head of the selected one
+    const glowAt = (ev, only) => {
+      if (ev.rest) return [{ x: ev.x, y: yOf(B4) }];
+      let pts = ev.pitches;
+      if (only) {
+        const sel = ev.pitches.find(pt => pt.el === only);
+        if (sel) pts = [sel];
+      }
+      // a head's place comes from the plan's own pass: match by pitch
+      return pts.map(pt => {
+        const h = ev.info.heads.find(x => x.pt.midi === pt.midi);
+        return { x: ev.x + (h ? h.dx : 0), y: yOf(pt.step) };
+      });
+    };
+    if (o.soundStack || o.selStack) evs.forEach(ev => {
+      if (!ev.stack || !ev.notated || !ev.info) return;
+      const spots = ev.stack === o.soundStack ? glowAt(ev, null) : ev.stack === o.selStack ? glowAt(ev, o.selNote) : null;
+      if (!spots) return;
       spots.forEach(pt => {
-        p.push('<circle cx="' + n2(pt.x) + '" cy="' + n2(pt.y) + '" r="' + n2(s * 1.7) + '" fill="' + SOUND + '" opacity=".16"/>');
-        p.push('<circle cx="' + n2(pt.x) + '" cy="' + n2(pt.y) + '" r="' + n2(s * 1.15) + '" fill="' + SOUND + '" opacity=".38"/>');
+        p.push('<circle cx="' + n2(pt.x) + '" cy="' + n2(pt.y) + '" r="' + n2(s * 1.7) + '" fill="' + o.glow + '" opacity=".2"/>');
+        p.push('<circle cx="' + n2(pt.x) + '" cy="' + n2(pt.y) + '" r="' + n2(s * 1.15) + '" fill="' + o.glow + '" opacity=".45"/>');
       });
     });
 
@@ -1089,7 +1123,7 @@
       x: ev.x + pc.dx, value: pc.value, rest: pc.rest, filler: pc.filler, notated: true, beam: null, stack: null, ghost: ev.ghost,
       pitches: ev.pitches, info: pc, tiePitches: ev.pitches
     });
-    const noNames = Object.assign({}, o, { showNames: false, activeStack: {} });   // (no selection ring on a piece)
+    const noNames = Object.assign({}, o, { showNames: false });
     const fillerOpacity = S.editing ? 0.38 : 1;
     evs.forEach((ev, i) => {
       if (!ev.notated || !ev.info) return;
@@ -1325,13 +1359,6 @@
         ? 'fill="#FFFFFF" fill-opacity=".85" stroke="' + h.pt.color + '" stroke-width="' + n2(ring * 2.2) + '" stroke-dasharray="' + n2(ring * 4) + ' ' + n2(ring * 3) + '" stroke-linejoin="round"'
         : 'fill="' + h.pt.color + '" stroke="' + INK + '" stroke-width="' + ring + '" stroke-linejoin="round"'));
     });
-    if (o.activeStack === ev.stack) {
-      const sel = ev.pitches.find(pt => pt.el.classList.contains('selected-note')) || ev.pitches[0];
-      const h = I.heads.find(x => x.pt === sel);
-      const cx = ev.x + (h ? h.dx : 0);
-      p.push('<circle cx="' + n2(cx) + '" cy="' + n2(yOf(sel.step)) + '" r="' + n2(s * 0.95) + '" fill="none" stroke="' + GOLD + '" stroke-width="' + n2(Math.max(2, s * 0.14)) + '" opacity=".95"/>');
-      p.push('<circle cx="' + n2(cx) + '" cy="' + n2(yOf(sel.step)) + '" r="' + n2(s * 1.25) + '" fill="none" stroke="' + GOLD + '" stroke-width="' + n2(s * 0.3) + '" opacity=".28"/>');
-    }
     return p.join('');
   }
 
@@ -1351,9 +1378,6 @@
     const p = [at(name, x, originY, k, 'fill="' + INK + '"')];
     if (v.dotted) p.push(boxAt('augmentationDot', cx + w / 2 + s * E.dotGap, yOf(B4 + 1) - gh('augmentationDot', k) / 2, k));
     ev.topY = yOf(D5) - s * 0.5;
-    if (o.activeStack === ev.stack) {
-      p.push('<circle cx="' + n2(cx) + '" cy="' + n2(yOf(B4)) + '" r="' + n2(s * 1.15) + '" fill="none" stroke="' + GOLD + '" stroke-width="' + n2(Math.max(2, s * 0.14)) + '" opacity=".95"/>');
-    }
     return p.join('');
   }
 
@@ -1517,5 +1541,5 @@
     if (e.propertyName === 'height' && e.target.classList && e.target.classList.contains('note')) schedule();
   });
 
-  SW.staff = { render, schedule, geometry, keySignature, plan: line => plans.get(line), hitAt, available: !!G };
+  SW.staff = { render, schedule, geometry, keySignature, plan: line => plans.get(line), hitAt, boxOf, available: !!G };
 })();

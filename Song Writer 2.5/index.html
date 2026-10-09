@@ -357,16 +357,12 @@
 
 <!-- ============ POPOVER: VIEW ============
      How the page looks and which parts of the stage are out — the room,
-     rather than the song. Remembered in song_writer_25_view_prefs_v1. -->
+     rather than the song. Remembered in song_writer_25_view_prefs_v1.
+     2026-10-08 (user): Scale · Text size · Lyric font on top, then Music
+     Page, then Staging; headings and option names only — no explaining
+     text. -->
 <div class="popover popover-wide" id="view-popover" role="dialog" aria-label="View options">
   <div class="popover-scroll">
-    <div class="popover-title">On the stage</div>
-    <div class="switch-list" id="stage-switches"></div>
-    <p class="popover-note" id="stage-note">The Song · Keyboard · Chords switch at the top sets the chord panel and the keyboard. The chord track is its own: on, the song’s chords show everywhere.</p>
-
-    <div class="popover-title">On the page</div>
-    <div class="switch-list" id="page-switches"></div>
-
     <div class="popover-title">Scale</div>
     <div class="seg seg-wide" role="group" aria-label="How big the music is">
       <button class="seg-btn" id="block-auto-btn">Justify&nbsp;width</button>
@@ -394,51 +390,52 @@
       <button class="chip font-chip" data-font="clear">Big &amp; clear</button>
       <button class="chip font-chip" data-font="story">Storybook</button>
     </div>
-    <p class="popover-note" id="lyric-font-note"></p>
 
-    <div class="popover-title" id="kbd-strip-title">Keyboard &amp; strip</div>
-    <!-- Key colours: the three ways the keyboard wears colour (settings.js) -->
-    <div class="kbc-block" id="kb-colors-row">
-      <span class="size-row-name">Key colours</span>
-      <div class="kbc-choices" role="radiogroup" aria-label="Key colours">
-        <button class="kbc-choice" type="button" role="radio" data-kc="rainbow"><span class="kbc-pic"></span><span class="kbc-label">Rainbow</span></button>
-        <button class="kbc-choice" type="button" role="radio" data-kc="played"><span class="kbc-pic"></span><span class="kbc-label">Colours when played</span></button>
-        <button class="kbc-choice" type="button" role="radio" data-kc="single"><span class="kbc-pic"></span><span class="kbc-label">One colour</span></button>
-      </div>
-      <div class="kbc-swatches" id="kb-color-swatches" role="radiogroup" aria-label="The one colour">
-        <label class="kbc-custom" title="Any colour"><input type="color" id="kb-color-custom" aria-label="Any colour"></label>
-      </div>
-      <p class="popover-note" id="kb-colors-note"></p>
-    </div>
-    <div class="switch-list" id="kbd-switches"></div>
-    <div class="size-row" id="strip-size-row">
-      <span class="size-row-name">Chord panel</span>
-      <div class="seg" role="group" id="strip-size-seg">
-        <button class="seg-btn" data-ss="sm">S</button>
-        <button class="seg-btn" data-ss="md">M</button>
-        <button class="seg-btn" data-ss="lg">L</button>
-      </div>
-    </div>
-
-    <div class="popover-title">While it plays</div>
-    <div class="size-row" id="play-light-row">
-      <span class="size-row-name">Light up</span>
-      <div class="seg" role="radiogroup" aria-label="Light up while it plays" id="play-light-seg">
+    <div class="popover-title">Music Page</div>
+    <div class="switch-list" id="page-switches"></div>
+    <!-- the selected note, and the one sounding while it plays (settings.js
+         applyView → body.light-note / .light-box; staff.js, style.css) -->
+    <div class="seg-block" id="play-light-row">
+      <span class="size-row-name">Light up selected/played</span>
+      <div class="seg seg-wide" role="radiogroup" aria-label="Light up selected/played" id="play-light-seg">
         <button class="seg-btn" type="button" role="radio" data-pl="note">Note</button>
         <button class="seg-btn" type="button" role="radio" data-pl="box">Box</button>
         <button class="seg-btn" type="button" role="radio" data-pl="both">Both</button>
         <button class="seg-btn" type="button" role="radio" data-pl="off">Off</button>
       </div>
     </div>
-    <p class="popover-note" id="play-light-note"></p>
-    <div class="switch-list" id="play-switches"></div>
+    <div class="switch-list" id="page-switches-more"></div>
+
+    <div class="popover-title" id="stage-title">Staging</div>
+    <div class="switch-list" id="stage-switches"></div>
+    <!-- what lights the keyboard's keys (keyboard-dock.js paint) -->
+    <div class="seg-block" id="kb-lights-row">
+      <span class="size-row-name">Keyboard notes light up the:</span>
+      <div class="seg seg-wide" role="radiogroup" aria-label="Keyboard notes light up the" id="kb-lights-seg">
+        <button class="seg-btn" type="button" role="radio" data-kl="melody">Melody</button>
+        <button class="seg-btn" type="button" role="radio" data-kl="chords">Chords</button>
+        <button class="seg-btn" type="button" role="radio" data-kl="both">Both</button>
+        <button class="seg-btn" type="button" role="radio" data-kl="neither">Neither</button>
+      </div>
+    </div>
+    <!-- Keyboard Colors: the three ways the keyboard wears colour (settings.js) -->
+    <div class="kbc-block" id="kb-colors-row">
+      <span class="size-row-name">Keyboard Colors</span>
+      <div class="kbc-choices" role="radiogroup" aria-label="Keyboard Colors">
+        <button class="kbc-choice" type="button" role="radio" data-kc="rainbow"><span class="kbc-pic"></span><span class="kbc-label">Rainbow</span></button>
+        <button class="kbc-choice" type="button" role="radio" data-kc="played"><span class="kbc-pic"></span><span class="kbc-label">Colors when played</span></button>
+        <button class="kbc-choice" type="button" role="radio" data-kc="single"><span class="kbc-pic"></span><span class="kbc-label">One color</span></button>
+      </div>
+      <div class="kbc-swatches" id="kb-color-swatches" role="radiogroup" aria-label="The one color">
+        <label class="kbc-custom" title="Any color"><input type="color" id="kb-color-custom" aria-label="Any color"></label>
+      </div>
+    </div>
 
     <div class="popover-divider" id="layout-settings-divider"></div>
     <button class="popover-link popover-link-strong" id="layout-settings-btn">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/></svg>
       Layout settings…
     </button>
-    <p class="popover-note" id="layout-settings-note">What is on the page, and which notes, values and chords can be written.</p>
     <div class="popover-divider"></div>
     <button class="popover-link" id="help-btn">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
@@ -954,6 +951,7 @@
       <li><span class="help-key edit">⛑</span><div><b>The hat</b> beside Play puts you in Edit, and takes you out again. Every tool comes out in the <b>Edit box</b> — drag it by its title bar to any part of the screen, or fold it up with ⌃; it stays out until you take the hat off. Tap a word to type it — <span class="help-key">Space</span> moves to the next word, <span class="help-key">⌫</span> at the start goes back.</div></li>
       <li><span class="help-key edit">♩</span><div><b>Value circles</b> write the selected block on the staff and step to the next one — so a phrase is one tap per note. Tap the lit circle again for a rest; the block circle turns a note back into a block. <b>Dotted</b> works before or after: on a block it lights and waits for the value you tap next. <b>Tie</b> holds the note over into a new eighth note on the same syllable (tap a circle to change its length) — over the bar line when the note ends a bar; Tie again unties it. <span class="help-key">[</span> <span class="help-key">]</span> step the value, and <b>⋯</b> writes (or unwrites) a whole line or song at once.</div></li>
       <li><span class="help-key edit">A</span><div><b>Letter keys</b> in Edit, with neither the chord panel nor the keyboard out (the <b>Song</b> tab), type pitches: <b>A S D F G H J K</b> = do re mi fa so la ti do′, <b>Q W E R T Y</b> = do′ … la′, <b>Z X C</b> = so, la, ti below, <b>V</b> = do. <span class="help-key">↑</span> <span class="help-key">↓</span> move a step. Double-click a block’s top or bottom half to move it too.</div></li>
+      <li><span class="help-key edit">×</span><div><b>On the selected note</b>, with the hat on: the <b>×</b> at the top of its box deletes that note in one tap (a note on its own goes with its word; <b>Undo</b> brings it back), and the <b>+</b> on its right side adds a new note after it, on the same syllable, with no word — double-tap under it to give it one.</div></li>
       <li><span class="help-key edit">♯</span><div><b>Note</b>, in the Edit box: ♯ ♭ sharpen or flatten the selected note (tap again for natural); <b>Harmony</b> adds a note two steps above it, and − takes the selected one away. <b>Syllable</b> shows a dot for each note on this word — tap one to select it — and − takes the selected one away. Two buttons add a note: <b>+ Note/Syllable</b> gives it a syllable of its own after this one; <b>+ Note Only</b> puts it on this same syllable.</div></li>
       <li><span class="help-key edit">↵</span><div><b>Words &amp; lines</b>, in the Edit box: <b>New line</b> starts a line after this word, and <b>Join up</b> (on the first word of a line) joins the line to the one above. <b>Delete</b> removes the syllable — tap it twice, so one stray tap never loses work. <b>Staff notation</b> at the foot of the box is the same switch as in View: off, the rhythms show under the blocks.</div></li>
       <li><span class="help-key edit">♪</span><div><b>Pick-ups</b> (Layout settings → 1-beat pick-up, saved with the song): every line starts with a one-beat pick-up. With the hat on, point at the bar line after a pick-up and press its <b>×</b>: the bar line goes and the pick-up joins the first bar. Or select a line’s pick-up and <b>Join up</b> moves just that beat to the end of the line above — press it again to join the whole line. <b>Delete</b> on a pick-up takes it away and puts a rest in the bar above. A new line starts with its pick-up again.</div></li>
@@ -994,7 +992,7 @@
       <ul>
         <li>The same frame, toolbar and windows as Rhythm Poetry, Ostinato Builder and the Music Stand.</li>
         <li>The construction hat sits beside Play again, as a switch. With it on, every tool — the value circles, ♯ ♭, harmony, and the word and line tools — is in one Edit box you can drag anywhere on the screen.</li>
-        <li>Song · Keyboard · Chords at the top: the song on its own, with a keyboard that follows the melody, or with the chord panel. The song’s chords show wherever <b>View → Chord track</b> is on, and sound wherever <b>Sound → Chords</b> is on.</li>
+        <li>Song · Keyboard · Chords at the top: the song on its own, with a keyboard that follows the melody, or with the chord panel. The song’s chords show wherever <b>View → Display Chord Progression in the music</b> is on, and sound wherever <b>Sound → Chords</b> is on.</li>
         <li>Present mode, a count-in, a steady beat, and Go round or This line at the end — for practising a line over and over.</li>
         <li>Staff notation one note at a time, bar numbers, a tempo from 30 to 300, Save picture, and lesson tempo rules.</li>
         <li>Digital Accordion’s chord panel: the scale’s fourteen chords on the same keys in every scale (F D S A G R E Q W, 1–5), Z X C V B to change them, Core · Full · Extended · Extreme, a chord editor for 7ths and inversions, and a scale menu beside the key.</li>
@@ -1080,6 +1078,7 @@
 <script src="js/components/progression-window.js"></script>
 <script src="js/components/chord-track.js"></script>
 <script src="js/components/edit-box.js"></script>
+<script src="js/components/note-tools.js"></script>
 <script src="js/keymap.js"></script>
 <script src="js/app.js"></script>
 </body>

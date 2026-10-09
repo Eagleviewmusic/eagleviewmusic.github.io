@@ -85,6 +85,7 @@ Preview: `.claude/launch.json` entry **song-writer** (port 8797), or the
 | `js/score.js` | The score editor — 1.0's engine, function for function — plus the JSON model, 1.0's text format, the section heads, and the functions the edit layer calls. |
 | `js/timing.js` | The one reading of the song's time: ticks per column, bars, beats, beam groups — shared by the staff and the player. |
 | `js/components/progression-window.js` | **The Chord Progression window** (2.5, 2026-10-03; reworked 2026-10-05): Edit Chords — a guide top to bottom (Choose your chords and their rhythm: Build your own / Pre-built beside the board and its switch-on changes; Build your chord progression: the listening box, cards, double-click → the chord editor with Standard / Custom rhythm; Name it, Hear it, Place it in the song), the returning view, Starters; Chord Placement — the map; Just here. |
+| `js/components/note-tools.js` | **The selected note's × and +** (2.5, 2026-10-08): in Edit, × on the top of its box deletes the note, + on its right side adds one after it (see The Edit box). |
 | `js/components/chord-track.js` | **The chord track in the score** (2.5, 2026-10-03): the chords drawn over every line, the faint + on an empty bar, selection and keys, play lights, the chords after the melody (`#chord-tail`). |
 | `js/track.js` | **Chord progressions and the chord track** (2.5, 2026-10-03): the model (`progressions`, `track`), rhythm strings ↔ cells, the bar grid, the chords in time with every strike (`events()`), the writers the windows use, the old lane read as loose chords, `selfTest()`. Design: `../Song Writer Chord Progressions/`. |
 | `js/staff.js` | **Staff notation in the score.** The engraver: spaces each written line (by note length, accidentals, words, bar lines), packs and justifies its rows, then draws one SVG per line behind the blocks: staff, clef, key and time signatures, coloured noteheads, stems, flags, beams, rests, bar lines, **bar numbers**, names, the selection ring. |
@@ -191,6 +192,22 @@ there. The corner under the panel is away while editing (the
 keyboard's 1–4 / Focus go back to the dock). It stays out for as long as the
 hat is on; nothing is drawn around the note, so the song does not move when the
 hat goes on.
+
+**× and + on the selected note** (`js/components/note-tools.js`, 2026-10-08,
+the user's design): in Edit, the box round the selected note (the one View →
+Light up selected/played → Box lights; the buttons sit there whatever the light)
+carries an **×** at its top and a **+** on its right side. × =
+`score.js deleteCurrentNote` — one tap, Undo brings it back: the column alone
+when its syllable has other notes (the word stays with them), the syllable and
+its word when it is the only note; a tie into it is let go; the note after it is
+selected, so × again goes on. + = **+ Note Only** (`duplicateCurrentNote`): a
+note after it on the same syllable, no word (double-tap under it for one); dimmed
+at eight, with the usual toast; where a lesson allows words but not connected
+notes it adds a syllable instead. Placed from `SW.staff.boxOf(stack)` on a
+written line, the `.syl-body` (× 1.05 under the Box light) on blocks; a child of
+the selected line (z 26), away while playing, typing a word, in Present and in a
+saved picture; never takes the focus (Space would press it). The Edit box's own
+Delete (two taps) and Delete/Backspace keys are unchanged.
 
 ```
 ┌─────────────────────┐
@@ -547,14 +564,27 @@ Each file's header comment is the full contract.
 
 ## Settings
 
-- **View**: On the stage (panel, chord track, keyboard) · On the page
-  (staff notation, section colours, chord rhythm) · Scale (Justify width / Fixed) · Text size ·
-  Lyric font · Keyboard & strip (**Key colours** — Rainbow /
-  Colours when played / One colour + 10 swatches and a colour picker; `kbColors`,
-  `kbColor` — **Chords light the keys**, `kbChordLights`, default on: off, a sounding chord no
-  longer washes its keys, only the melody lights them — Chord panel S/M/L) · While it plays (Light up: Note · Box · Both · Off — behind the note, staff.js draws it under the staff on written lines;
-  Follow along) · Layout settings… · How this works. Also remembered, set from
-  the panel itself: `chordSet`, `modSlots`, `chordNames` and `chordTones`.
+- **View** (reordered 2026-10-08, the user's notes; headings and option names
+  only — no explaining text): Scale (Justify width / Fixed) · Text size ·
+  Lyric font · **Music Page**: Display Staff Notation (`showStaff`) · **Light up
+  selected/played** — Note · Box · Both · Off (`playLight`): the SELECTED note
+  follows it too, not only the sounding one (Note = a glow behind the head on a
+  written line, a ring round the block on a line of blocks; Box = the yellow box
+  behind the selected word, plum while playing; Off = nothing lights, Edit
+  included — the word's orange underline in Edit stays). The Note light wears
+  **Do's colour** (`SW.settings.lightColour()` = `M.noteColour('do')`, CSS
+  `--light` / `--light-glow`, refreshed on key/scale/load): F Dorian green, E♭
+  major yellow · Follow along as song plays (`followScroll`) · Display Chord
+  Progression in the music (`showLane`, the chord track) · Display Chord Rhythms
+  in the music with dots (`chordRhythm`) · Background Section Colors (`colours`)
+  · **Staging**: Display Chord Panel (`showStrip`) · Display Keyboard
+  (`showDock`) · **Keyboard notes light up the:** Melody · Chords · Both ·
+  Neither (`kbLights`, default Both; was the *Chords light the keys* switch —
+  off reads as Melody; a key you press still shows) · **Keyboard Colors** —
+  Rainbow / Colors when played / One color + 10 swatches and a color picker
+  (`kbColors`, `kbColor`) · Layout settings… · How this works. The chord
+  panel's S/M/L sizes are gone: it is always Medium (200 px). Also remembered,
+  set from the panel itself: `chordSet`, `modSlots`, `chordNames` and `chordTones`.
 - **Sound**: see Playing.
 - **Layout settings**: On the page (section titles, the panel's letter keys,
   bar numbers, 1-beat pick-up); notes that can be written; sharps and flats,

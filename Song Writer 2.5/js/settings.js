@@ -58,9 +58,8 @@
     kbFocus: false,         // the keyboard: keys outside the key (and the song) greyed and silent
     kbColors: 'rainbow',    // the keyboard's key colours: 'rainbow' | 'played' | 'single'
     kbColor: '#9C168E',     //   the one colour, for 'single' (Song Writer's plum to start)
-    kbChordLights: true,    // the keyboard: a chord that sounds lights its keys (the pale wash); off, only the melody lights them
+    kbLights: 'both',       // View → Keyboard notes light up the: 'melody' | 'chords' | 'both' | 'neither' (2026-10-08; was kbChordLights, a switch for the chords' wash)
     dockHeight: 'md',       // the keyboard: 'sm' | 'md' | 'lg', or px from its grip
-    stripSize: 'md',
     chordSet: 'extreme',    // the chord panel: 'core' | 'full' | 'extended' | 'extreme' (js/chords.js)
     chordNames: 'roman',    // the panel's names: 'roman' (I IV V) | 'letter' (C F G) — the I/C button on the panel
     chordTones: false,      // ♪ notes: the notes inside every chord block
@@ -72,8 +71,8 @@
     chordVolume: 100,
     room: 35,               // Sound → Room: the reverb, % (Key Blocks' default)
     laneChordsPlay: true,   // Sound → Chords: the lane's chords sound where they change
-    playLight: 'note',      // While it plays → Light up: 'note' | 'box' | 'both' | 'off' (was lightNotes, a switch; 'note' the default — the user's call)
-    followScroll: true,     // While it plays → Follow along
+    playLight: 'note',      // Light up selected/played: 'note' | 'box' | 'both' | 'off' (was lightNotes, a switch; 'note' the default — the user's call)
+    followScroll: true,     // Follow along as song plays
     colourPictures: true,   // Library → Keep the section colours in saved pictures
     tapDetail: false,       // 2.5 Tap it in: snap the taps to eighths (false) or sixteenths (true)
     showBeats: false,       // 2.5 the beat strip over each written line, in Edit (js/components/beat-strip.js)
@@ -82,16 +81,22 @@
     chordRhythm: true       // 2.5 the chord track shows its strikes as dots (chord-track.js)
   };
   const view = Object.assign({}, VIEW_DEFAULTS);
-  /* View → While it plays → Light up (2026-10-01): what shows the note
+  /* View → Light up selected/played (2026-10-01; the selection too since
+     2026-10-08, user): what shows the note that is selected and the note
      that is sounding. Every light sits behind the note (staff.js draws the
-     box and the glow under the staff), so a note keeps its colour. */
+     box and the glow under the staff), so a note keeps its colour. The
+     glow wears Do's colour — the tonic's letter (F Dorian: green; E♭
+     major: yellow) — lightColour(); the boxes keep theirs (selected yellow,
+     sounding plum). */
   const PLAY_LIGHTS = ['note', 'box', 'both', 'off'];
-  const PLAY_LIGHT_NOTES = {
-    note: 'The sounding note glows',
-    box: 'A box behind the word that is sounding',
-    both: 'The note glows, with a box behind its word',
-    off: 'Nothing lights up while it plays'
-  };
+  const KB_LIGHTS = ['melody', 'chords', 'both', 'neither'];
+  function lightColour() { return (M.noteColour && M.noteColour('do')) || '#9C168E'; }
+  function syncLight() {
+    const c = lightColour();
+    root.style.setProperty('--light', c);
+    root.style.setProperty('--light-glow', ui.tint(c, 0.55));
+  }
+  ['key:changed', 'scale:changed', 'score:loaded'].forEach(evt => SW.bus.on(evt, syncLight));
 
   /* The three workspaces — what is on the stage — the Song · Keyboard ·
      Chords switch in the top bar. (2.0 called them Classic · Melody ·
@@ -115,6 +120,8 @@
         if (raw.showStaff === undefined && raw.showValues !== undefined) view.showStaff = !!raw.showValues;
         // Light up the notes was a switch until 2026-10-01: on → the box, off → off
         if (raw.playLight === undefined && raw.lightNotes === false) view.playLight = 'off';
+        // Chords light the keys was a switch until 2026-10-08: off → the melody alone
+        if (raw.kbLights === undefined && raw.kbChordLights === false) view.kbLights = 'melody';
       }
     } catch (e) {}
     if (OLD_WORKSPACE[view.workspace]) view.workspace = OLD_WORKSPACE[view.workspace];
@@ -142,9 +149,10 @@
     }
     if (typeof view.dockHeight === 'number') view.dockHeight = ui.clamp(Math.round(view.dockHeight) || 100, 52, 600);
     else if (!DOCK_HEIGHTS.includes(view.dockHeight)) view.dockHeight = 'md';
-    ['showStrip', 'showLane', 'showDock', 'showStaff', 'colours', 'kbFocus', 'kbChordLights', 'laneChordsPlay', 'followScroll', 'colourPictures', 'tapDetail', 'showBeats']
+    ['showStrip', 'showLane', 'showDock', 'showStaff', 'colours', 'kbFocus', 'laneChordsPlay', 'followScroll', 'colourPictures', 'tapDetail', 'showBeats']
       .forEach(k => { view[k] = !!view[k]; });
     if (PLAY_LIGHTS.indexOf(view.playLight) === -1) view.playLight = VIEW_DEFAULTS.playLight;
+    if (KB_LIGHTS.indexOf(view.kbLights) === -1) view.kbLights = VIEW_DEFAULTS.kbLights;
   }
   function saveView() {
     try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (e) {}
@@ -169,22 +177,23 @@
     return true;
   }
 
+  /* Rounded: the app's own font. Early reader (Andika): the a and g
+     children learn to write. Big & clear (Atkinson Hyperlegible): every
+     letter distinct from across the room. Storybook (Literata). */
   const LYRIC_FONTS = {
-    rounded: { family: "'Nunito', sans-serif", note: 'Friendly and round — the app’s own font.' },
-    reader:  { family: "'Andika', 'Nunito', sans-serif", note: 'Made for beginning readers: the a and g children learn to write, and no letter mistaken for another.' },
-    clear:   { family: "'Atkinson Hyperlegible', 'Nunito', sans-serif", note: 'Built so every letter stays distinct from across the room — good on a projector.' },
-    story:   { family: "'Literata', Georgia, serif", note: 'A storybook serif, for words that should read like a poem on the page.' }
+    rounded: { family: "'Nunito', sans-serif" },
+    reader:  { family: "'Andika', 'Nunito', sans-serif" },
+    clear:   { family: "'Atkinson Hyperlegible', 'Nunito', sans-serif" },
+    story:   { family: "'Literata', Georgia, serif" }
   };
   const DOCK_HEIGHTS = ['sm', 'md', 'lg'];   // keyboard-dock.js turns these into px
 
-  /* View → Key colours: three ways for the keyboard to wear colour, and
-     the colours offered for 'single' (any other through the picker). */
+  /* View → Keyboard Colors: three ways for the keyboard to wear colour —
+     rainbow (every key its note's colour on top, as the blocks), played
+     (plain keys that light in their note's colour), single (plain keys
+     that light in the one colour) — and the colours offered for 'single'
+     (any other through the picker). */
   const KEY_COLOURS = ['rainbow', 'played', 'single'];
-  const KEY_COLOUR_NOTES = {
-    rainbow: 'Every key wears its note’s colour on top, as the blocks do.',
-    played: 'Plain keys; a key lights up in its note’s colour when it plays.',
-    single: 'Plain keys; every key lights up in the one colour you pick.'
-  };
   const KEY_SWATCHES = [
     { c: '#9C168E', name: 'Plum' }, { c: '#FF3B30', name: 'Red' }, { c: '#FF9500', name: 'Orange' },
     { c: '#FFCC00', name: 'Yellow' }, { c: '#34C759', name: 'Green' }, { c: '#48C4C8', name: 'Teal' },
@@ -208,7 +217,7 @@
     });
     return svg + '</svg>';
   }
-  const STRIP_WIDTHS = { sm: 156, md: 200, lg: 248 };   // the panel's row of five needs the room (2026-09-27)
+  const STRIP_W = 200;   // the chord panel's width: its row of five needs the room (2026-09-27); S/L sizes gone 2026-10-08 (user)
 
   /* Scale → Justify width. 1.0 zoomed the whole page to fit an 800 × 550
      frame, never past 100%; that rule still shrinks the music on a small
@@ -232,7 +241,8 @@
     root.style.setProperty('--bs', blockScale().toFixed(3));
     root.style.setProperty('--text-scale', (view.textPct / 100).toFixed(3));
     root.style.setProperty('--lyric-font', LYRIC_FONTS[view.lyricFont].family);
-    root.style.setProperty('--strip-w', (STRIP_WIDTHS[view.stripSize] || STRIP_WIDTHS.md) + 'px');
+    root.style.setProperty('--strip-w', STRIP_W + 'px');
+    syncLight();
 
     const b = document.body;
     b.dataset.workspace = view.workspace;
@@ -240,8 +250,8 @@
     b.classList.toggle('show-lane', shows('lane'));
     b.classList.toggle('show-dock', shows('dock'));
     b.classList.toggle('show-staff', !!view.showStaff);
-    b.classList.toggle('play-note', view.playLight === 'note' || view.playLight === 'both');
-    b.classList.toggle('play-box', view.playLight === 'box' || view.playLight === 'both');
+    b.classList.toggle('light-note', view.playLight === 'note' || view.playLight === 'both');
+    b.classList.toggle('light-box', view.playLight === 'box' || view.playLight === 'both');
     b.classList.toggle('hide-section-titles', !layout.show.sectionTitles);
     b.classList.toggle('hide-keycaps', !layout.show.keycaps);
     if (SW.score && SW.score.setColours && S.colorScheme !== !!view.colours) SW.score.setColours(!!view.colours);
@@ -290,23 +300,27 @@
     });
   }
 
-  /* ---------------- the View popover ---------------- */
-  const STAGE_SWITCHES = [
-    { key: 'showStrip', name: 'Chord panel', desc: 'Digital Accordion’s chords for the left hand', part: 'strip' },
-    { key: 'showLane', name: 'Chord track', desc: 'The song’s chords above the words, and after the melody', part: 'strip' },
-    { key: 'showDock', name: 'Keyboard', desc: 'Lights the melody under the song', part: 'dock' }
-  ];
+  /* ---------------- the View popover ----------------
+     2026-10-08 (user): Scale · Text size · Lyric font, then Music Page
+     (1–6), then Staging (7–10); a heading and the option's name, no
+     explaining text. Music Page: Display Staff Notation · Light up
+     selected/played · Follow along as song plays · Display Chord
+     Progression in the music (showLane — the chord track) · Display Chord
+     Rhythms in the music with dots · Background Section Colors. Staging:
+     Display Chord Panel · Display Keyboard · Keyboard notes light up the ·
+     Keyboard Colors. */
   const PAGE_SWITCHES = [
-    { key: 'showStaff', name: 'Staff notation', desc: 'Written notes on a treble staff; off, every column stays a block with a small value mark' },
-    { key: 'colours', name: 'Section colours', desc: 'A pastel band behind each line' },
-    { key: 'chordRhythm', name: 'Chord rhythm', desc: 'Dots on the chord track where each chord is played', part: 'strip' }
+    { key: 'showStaff', name: 'Display Staff Notation' }
   ];
-  /* a keyboard preference: set as one (setKeyboard), so only the keyboard repaints */
-  const KBD_SWITCHES = [
-    { key: 'kbChordLights', name: 'Chords light the keys', desc: 'A chord that sounds washes its keys in colour, under the melody', part: 'dock', keyboard: true }
+  const PAGE_SWITCHES_MORE = [
+    { key: 'followScroll', name: 'Follow along as song plays' },
+    { key: 'showLane', name: 'Display Chord Progression in the music', part: 'strip' },
+    { key: 'chordRhythm', name: 'Display Chord Rhythms in the music with dots', part: 'strip' },
+    { key: 'colours', name: 'Background Section Colors' }
   ];
-  const PLAY_SWITCHES = [
-    { key: 'followScroll', name: 'Follow along', desc: 'Scroll to keep the sounding note in view' }
+  const STAGE_SWITCHES = [
+    { key: 'showStrip', name: 'Display Chord Panel', part: 'strip' },
+    { key: 'showDock', name: 'Display Keyboard', part: 'dock' }
   ];
   function fillSwitches(listId, rows) {
     const list = $(listId);
@@ -314,20 +328,15 @@
     list.innerHTML = '';
     rows.forEach(s => {
       if (s.part && SW.lessons && !SW.lessons.shellAllows(s.part)) return;
-      const set = s.keyboard ? setKeyboard : setView;
-      list.appendChild(ui.switchRow(s.name, s.desc, !!view[s.key], () => set({ [s.key]: !view[s.key] })));
+      list.appendChild(ui.switchRow(s.name, '', !!view[s.key], () => setView({ [s.key]: !view[s.key] })));
     });
   }
 
   function syncViewControls() {
     const allow = k => !SW.lessons || SW.lessons.shellAllows(k);
-    fillSwitches('stage-switches', STAGE_SWITCHES);
-    const stageCount = $('stage-switches') ? $('stage-switches').children.length : 0;
-    showHide($('stage-switches') && $('stage-switches').previousElementSibling, stageCount > 0);
-    showHide($('stage-note'), allow('strip') && allow('dock'));
     fillSwitches('page-switches', PAGE_SWITCHES);
-    fillSwitches('kbd-switches', KBD_SWITCHES);
-    fillSwitches('play-switches', PLAY_SWITCHES);
+    fillSwitches('page-switches-more', PAGE_SWITCHES_MORE);
+    fillSwitches('stage-switches', STAGE_SWITCHES);
     $('block-auto-btn').classList.toggle('active', view.blockSize === 'auto');
     $('block-fixed-btn').classList.toggle('active', view.blockSize === 'fixed');
     const pct = Math.round(blockScale() * 100);
@@ -340,19 +349,18 @@
     $('text-smaller-btn').disabled = view.textPct <= 60;
     $('text-bigger-btn').disabled = view.textPct >= 250;
     document.querySelectorAll('#lyric-font-row .font-chip').forEach(c => c.classList.toggle('active', c.dataset.font === view.lyricFont));
-    $('lyric-font-note').textContent = LYRIC_FONTS[view.lyricFont].note;
-    document.querySelectorAll('#strip-size-seg .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.ss === view.stripSize));
-    document.querySelectorAll('#play-light-seg .seg-btn').forEach(b => {
-      const on = b.dataset.pl === view.playLight;
+    const radio = (sel, key, val) => document.querySelectorAll(sel).forEach(b => {
+      const on = b.dataset[key] === val;
       b.classList.toggle('active', on);
       b.setAttribute('aria-checked', String(on));
     });
-    if ($('play-light-note')) $('play-light-note').textContent = PLAY_LIGHT_NOTES[view.playLight];
-    // the keyboard and strip sizes go with the parts a lesson leaves in
+    radio('#play-light-seg .seg-btn', 'pl', view.playLight);
+    radio('#kb-lights-seg .seg-btn', 'kl', view.kbLights);
+    // the keyboard's rows go with the keyboard a lesson leaves in; Staging with whatever is left
+    showHide($('kb-lights-row'), allow('dock'));
     showHide($('kb-colors-row'), allow('dock'));
     syncKeyColours();
-    showHide($('strip-size-row'), allow('strip'));
-    showHide($('kbd-strip-title'), allow('dock') || allow('strip'));
+    showHide($('stage-title'), allow('dock') || allow('strip'));
   }
 
   /* ---------------- View → Key colours ---------------- */
@@ -390,7 +398,6 @@
     custom.classList.toggle('active', !preset);
     custom.style.setProperty('--sw', view.kbColor);
     $('kb-color-custom').value = view.kbColor.toLowerCase();
-    $('kb-colors-note').textContent = KEY_COLOUR_NOTES[view.kbColors] || '';
   }
   function wireKeyColours() {
     const row = $('kb-colors-row');
@@ -527,8 +534,9 @@
       setView({ lyricFont: c.dataset.font });
     });
     wireKeyColours();
-    $('strip-size-seg').addEventListener('click', e => { const b = e.target.closest('.seg-btn'); if (b) setView({ stripSize: b.dataset.ss }); });
     $('play-light-seg').addEventListener('click', e => { const b = e.target.closest('.seg-btn'); if (b) setView({ playLight: b.dataset.pl }); });
+    // a keyboard preference: set as one (setKeyboard), so only the keyboard repaints
+    $('kb-lights-seg').addEventListener('click', e => { const b = e.target.closest('.seg-btn'); if (b) setKeyboard({ kbLights: b.dataset.kl }); });
     wireMixer();
     $('voicing-seg').addEventListener('click', e => { const b = e.target.closest('.seg-btn'); if (b) setView({ voicing: b.dataset.voicing }, { quiet: true }); });
     $('at-end-seg').addEventListener('click', e => {
@@ -1023,7 +1031,7 @@
   SW.settings = {
     init, view, get layout() { return layout; },
     VIEW_DEFAULTS, WORKSPACES,
-    setView, setKeyboard, setWorkspace, toggleStrip, applyView, shows, blockScale, syncSoundControls,
+    setView, setKeyboard, setWorkspace, toggleStrip, applyView, shows, blockScale, syncSoundControls, lightColour,
     can, allowedNotes, allowedValues, allowedKeys, tempoRange, clampTempo,
     layoutSnapshot, applyLayoutSnapshot, resetLayout, layoutEditable, layoutSummary,
     usePieceLayout,

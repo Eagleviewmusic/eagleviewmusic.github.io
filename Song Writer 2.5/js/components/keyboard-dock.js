@@ -40,9 +40,11 @@
    melody's own keys — full colour — always show over it. The chord's keys stay lit while
    you step with the arrows or change a pitch (user, 2026-09-27); a tap on
    the manuscript — not on a note — or putting the chord panel away
-   clears them (chord:cleared). View → Chords light the keys (kbChordLights)
-   turns the chord's lights off; the chord is still followed, so turning
-   it back on lights a chord that is already sounding. A key rings for as long as it is held, in the
+   clears them (chord:cleared). View → Keyboard notes light up the:
+   Melody · Chords · Both · Neither (kbLights, 2026-10-08) says which of
+   the two light; what is not lit is still followed, so turning it back
+   on lights a note or chord that is already there. A key you press
+   always shows it. A key rings for as long as it is held, in the
    Sound popover's Melody sound; sliding a finger across the keys plays
    each one in turn; in Edit, a tap sets the selected block to that pitch
    (SW.score.setActiveNoteMidi).
@@ -55,7 +57,7 @@
    no longer the key's (Focus greys it, unless the song uses it). It lasts
    as long as the chord's lit keys do.
 
-   Preferences (SW.settings.view, remembered): kbOctaves 1–4, kbFocus, kbChordLights,
+   Preferences (SW.settings.view, remembered): kbOctaves 1–4, kbFocus, kbLights,
    dockHeight 'sm' | 'md' | 'lg' | a number of px.
 
    API
@@ -114,7 +116,9 @@
   const oneColor = () => (/^#[0-9a-f]{6}$/i.test(view().kbColor || '') ? view().kbColor : '#9C168E');
   const octaves = () => Math.min(4, Math.max(1, +view().kbOctaves || 2));
   const focusOn = () => !!view().kbFocus;
-  const chordLightsOn = () => view().kbChordLights !== false;
+  const lights = () => view().kbLights || 'both';
+  const melodyLightsOn = () => lights() === 'melody' || lights() === 'both';
+  const chordLightsOn = () => lights() === 'chords' || lights() === 'both';
   const whitesShown = () => (flexOn() ? vkWindow().W : 7 * octaves() + 3);
 
   /* THE VIRTUAL KEYBOARD'S WINDOW. With only the keyboard out, the keys
@@ -539,8 +543,8 @@
      always shows; let go, and the key goes back to the chord's wash. */
   const CHORD_WASH = 0.42, CHORD_BLACK = 0.5;
   function paint() {
-    const melody = new Set(lit.melody);
-    const chord = new Set(chordLightsOn() ? lit.chord : []);   // View → Chords light the keys
+    const melody = new Set(melodyLightsOn() ? lit.melody : []);   // View → Keyboard notes light up the
+    const chord = new Set(chordLightsOn() ? lit.chord : []);
     for (let m = LOW; m <= HIGH; m++) {
       const k = keyEls[m];
       const on = melody.has(m);
