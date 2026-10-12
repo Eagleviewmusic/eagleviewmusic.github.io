@@ -1,7 +1,7 @@
 {
   "format": "evm-index",
   "formatVersion": 1,
-  "generatedAt": "2026-10-08T00:09:38.707Z",
+  "generatedAt": "2026-10-12T23:38:30.664Z",
   "items": [
     {
       "app": "music-stand",
@@ -118,6 +118,15 @@
       "title": "Shake the Papaya Down",
       "updatedAt": 1790784841925,
       "path": "song-writer--song_1790772508264_4822.json",
+      "book": "More songs"
+    },
+    {
+      "app": "song-writer",
+      "kind": "song",
+      "id": "song_1791829434924_757l",
+      "title": "The Eagle View Song",
+      "updatedAt": 1791848285125,
+      "path": "song-writer--song_1791829434924_757l.json",
       "book": "More songs"
     },
     {
