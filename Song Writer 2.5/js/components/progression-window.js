@@ -324,7 +324,12 @@
   function whereText(id) {
     const st = T.stretches().filter(r => r.prog === id);
     if (!st.length) return 'not in the song yet';
-    return 'in the song: ' + st.map(r => r.to === 'melody' ? 'bar ' + r.from + ' to the end of the melody' : (r.from === r.to ? 'bar ' + r.from : 'bars ' + r.from + '–' + r.to)).join(', ');
+    const g = T.grid();
+    return 'in the song: ' + st.map(r => {
+      const last = T.lastOf(r, g);                 // up to the next stretch
+      if (r.to === 'melody' && last >= g.lastBar) return 'bar ' + r.from + ' to the end of the melody';
+      return r.from === last ? 'bar ' + r.from : 'bars ' + r.from + '–' + last;
+    }).join(', ');
   }
   function listHtml() {
     let html = '<p class="pw-kicker">This song</p>';
@@ -1432,7 +1437,8 @@
        • ▶ Play the song: the toolbar's Play, from the playhead, which
          follows the music (SW.player.position)
      Stretches never overlap: one put over another takes those bars, and
-     the other carries on afterwards where it would have been (track.js).
+     the other carries on afterwards where it would have been — one "to
+     the end of the melody" stops where the new one starts (track.js).
      ================================================================== */
   const BANDS = [
     { bc: '#F6E4F4', bd: '#9C168E' }, { bc: '#DDF2E8', bd: '#2E8B57' }, { bc: '#E3ECFF', bd: '#3A5BD9' },
@@ -1568,7 +1574,7 @@
       '</div>';
 
     body.innerHTML = html;
-    foot.innerHTML = ui.note('song.overlap', 'Stretches never overlap: putting one over another gives it those bars, and the other carries on afterwards where it would have been.') +
+    foot.innerHTML = ui.note('song.overlap', 'Stretches never overlap: putting one over another gives it those bars, and the other carries on afterwards where it would have been — unless it runs to the end of the melody: then it stops where the new one starts.') +
       '<span class="pw-gap"></span><button type="button" class="btn btn-primary" data-act="done">Done</button>';
     const sc = body.querySelector('.mp-scroll');
     if (sc) {
@@ -1607,9 +1613,9 @@
       (p && !sp.waiting ? ' <span class="mp-times">' + esc(timesText(times)) + '</span>' : '') + '</h3>';
     html += '<div class="mp-fields">' +
       '<label>From bar <input type="number" class="mp-in" data-field="from" min="' + m.firstBar + '" max="999" value="' + r.from + '"></label>' +
-      '<label>to bar <input type="number" class="mp-in" data-field="to" min="' + r.from + '" max="999" value="' + (r.to === 'melody' ? Math.max(r.from, g.lastBar) : r.to) + '"></label>' +
+      '<label>to bar <input type="number" class="mp-in" data-field="to" min="' + r.from + '" max="999" value="' + (r.to === 'melody' ? sp.last : r.to) + '"></label>' +
       (p ? '<label>or <input type="number" class="mp-in narrow" data-field="times" min="1" max="99" step="1" value="' + Math.max(1, Math.round(times) || 1) + '"> times through</label>' : '') +
-      '<button type="button" class="mp-toggle' + (r.to === 'melody' ? ' on' : '') + '" data-song="to-melody" title="It grows and shrinks with the melody">to the end of the melody</button>' +
+      '<button type="button" class="mp-toggle' + (r.to === 'melody' ? ' on' : '') + '" data-song="to-melody" title="It grows and shrinks with the melody, and stops where the next progression starts">to the end of the melody</button>' +
     '</div>';
     if (p && p.chords.length > 1) {
       let acc = 0, matched = false;

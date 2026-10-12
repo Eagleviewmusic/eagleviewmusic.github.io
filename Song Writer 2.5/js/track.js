@@ -248,17 +248,32 @@
     return r;
   }
 
-  /* where a stretch ends for cutting and overlap: its own bar, or the
-     melody's last (never before its start) */
+  /* where a stretch ends: its own bar, or the melody's last (never before
+     its start) */
   const lastOf = (r, lastBar) => (r.to === 'melody' ? Math.max(r.from, lastBar) : r.to);
+  /* where it really ends, as it plays (expand): never past the bar before
+     the next stretch, which takes over. A stretch "to the end of the
+     melody" with others after it holds only its own bars — cutting by
+     lastOf instead let one such stretch wipe out every stretch after it
+     (2026-10-12). */
+  function reach(r, list, lastBar) {
+    let last = lastOf(r, lastBar);
+    list.forEach(o => { if (o !== r && o.from > r.from) last = Math.min(last, o.from - 1); });
+    return Math.max(r.from, last);
+  }
 
   /* Take bars from..to (inclusive) out of a list of stretches: one wholly
      inside goes, one across an end is trimmed, one around both is split —
-     its second part carries on where it would have been. */
-  function cutList(list, from, to, mt, byId, lastBar) {
+     its second part carries on where it would have been. `laid`: a new
+     stretch is going in there — one "to the end of the melody" that it
+     starts on or inside stops where it starts, and does not carry on
+     after it (the user, 2026-10-12: laying a song out section by section
+     left the first one running on after the last). A stretch that only
+     grows into it from before pushes its start back, as ever. */
+  function cutList(list, from, to, mt, byId, lastBar, laid) {
     const out = [];
     list.forEach(r0 => {
-      const rf = r0.from, rt = lastOf(r0, lastBar);
+      const rf = r0.from, rt = reach(r0, list, lastBar);
       if (rt < from || rf > to) { out.push(r0); return; }
       if (rf < from) {
         const left = clone(r0);
@@ -270,7 +285,7 @@
         }
         out.push(left);
       }
-      if (rt > to) out.push(shiftStart(clone(r0), to + 1 - rf, mt, byId));
+      if (rt > to && !(laid && r0.to === 'melody' && rf <= from)) out.push(shiftStart(clone(r0), to + 1 - rf, mt, byId));
     });
     return out;
   }
@@ -653,17 +668,19 @@
     commit('step');
   }
 
-  /* put a stretch in, taking its bars from whatever had them */
+  /* put a stretch in, taking its bars from whatever had them — a stretch
+     "to the end of the melody" only the bars up to the next stretch */
   function put(st, g) {
     const mt = meterOf();
-    const last = lastOf(st, g.lastBar);
-    S.track = cutList(S.track, st.from, last, mt, byIdNow(), g.lastBar);
+    const last = st.to === 'melody' ? reach(st, S.track, g.lastBar) : st.to;
+    S.track = cutList(S.track, st.from, last, mt, byIdNow(), g.lastBar, true);
     S.track.push(st);
     S.track.sort((a, b) => a.from - b.from);
   }
   /* Put a progression in: bars from..to (to: a bar, or 'melody'). Without
      `to`: to the end of the melody, or once through when the melody ends
-     before `from`. */
+     before `from` — but never into the next stretch already in the song:
+     dropped into a gap, it fills the gap. */
   function place(progId, from, to) {
     const p = findProg(progId);
     if (!p) return;
@@ -672,6 +689,8 @@
     if (to === undefined || to === null) {
       if (g.lastBar >= from) to = 'melody';
       else to = from + Math.max(1, Math.ceil(cycleBeats(p, g.mt) / g.mt.beats)) - 1;
+      const next = S.track.reduce((n, r) => (r.from > from ? Math.min(n, r.from) : n), Infinity);
+      if (next - 1 < lastOf({ from, to }, g.lastBar)) to = next - 1;
     }
     put({ prog: progId, from, to }, g);
     commit('place');
@@ -705,6 +724,8 @@
     const r = S.track[index];
     if (!r || !bars) return;
     const st = clone(r);
+    // "to the end of the melody" but stopped by the next stretch: it moves as the bars it plays
+    if (st.to === 'melody' && reach(r, S.track, g.lastBar) < lastOf(r, g.lastBar)) st.to = reach(r, S.track, g.lastBar);
     S.track.splice(index, 1);
     st.from = Math.max(g.p0 > 0 ? 0 : 1, st.from + bars);
     if (st.to !== 'melody') st.to = Math.max(st.from, st.to + bars);
@@ -1054,6 +1075,18 @@
     eq('cut phase', list[1], { prog: 'p1', from: 4, to: 8, phase: 12 });
     ev = expand([verse], list, g4);
     eq('cut keeps chords on their bars', ev.map(e => e.id + '@' + e.at / 96), ['I@0', 'IV@1', 'vi@3', 'I@4', 'IV@5', 'V@6', 'vi@7']);
+    // "to the end of the melody" with stretches after it holds only its own bars (2026-10-12: it used to be cut as if it ran to bar 56)
+    const later = [{ prog: 'p1', from: 1, to: 'melody' }, { prog: 'p2', from: 9, to: 16 }, { prog: 'p1', from: 17, to: 24 }];
+    eq('reach', later.map(r => reach(r, later, 56)), [8, 16, 24]);
+    eq('cut inside it', cutList(later, 5, 6, mt4, { p1: verse, p2: two }, 56),
+      [{ prog: 'p1', from: 1, to: 4 }, { prog: 'p1', from: 7, to: 'melody', phase: 8 }, { prog: 'p2', from: 9, to: 16 }, { prog: 'p1', from: 17, to: 24 }]);
+    eq('the ones after it stay', cutList(later, 9, 16, mt4, { p1: verse, p2: two }, 56), [{ prog: 'p1', from: 1, to: 'melody' }, { prog: 'p1', from: 17, to: 24 }]);
+    // a stretch laid on one "to the end of the melody" ends it there (taking bars out, above, leaves the rest)
+    eq('laid inside it', cutList(later, 5, 6, mt4, { p1: verse, p2: two }, 56, true),
+      [{ prog: 'p1', from: 1, to: 4 }, { prog: 'p2', from: 9, to: 16 }, { prog: 'p1', from: 17, to: 24 }]);
+    const toEnd = [{ prog: 'p1', from: 9, to: 'melody' }];
+    eq('laid on its start', cutList(toEnd, 9, 16, mt4, { p1: verse }, 56, true), []);
+    eq('grown into from before', cutList(toEnd, 1, 12, mt4, { p1: verse }, 56, true), [{ prog: 'p1', from: 13, to: 'melody' }]);
     // a new time signature: ta ta ti-ti ta in 4/4 → 12/8 → 4/4 comes back; 4/4 → 3/4 drops the last beat
     const keep = { p: S.progressions, t: S.track };
     S.progressions = [{ id: 'p1', name: 'V', rhythm: 'q q e e q', chords: [{ chord: 'I', rhythm: 'h h' }] }];
@@ -1091,7 +1124,7 @@
     place, setStretch, moveStretch, trimStart, removeStretch, clear, clearBars,
     // for the map (the window's Chord Placement)
     shown: g => current(g || grid()),                               // the stretches on show (an old song's lane, read as one)
-    lastOf: (r, g) => lastOf(r, (g || grid()).lastBar),             // a stretch's last bar, 'melody' resolved
+    lastOf: (r, g) => { g = g || grid(); return reach(r, current(g), g.lastBar); },   // the last bar a stretch plays ('melody' resolved, up to the next stretch)
     cycleBeats: p => cycleBeats(p, meterOf()),
     // when the song changes (score.js calls these before it records the change)
     followScale, followMeter,

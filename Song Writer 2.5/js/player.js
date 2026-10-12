@@ -10,9 +10,13 @@
                word and column (View → While it plays → Light up).
 
    Everything is placed on the audio clock — a setTimeout would drift. A
-   pass is scheduled up front (songs are short), and a timer loop moves
-   the highlight when the clock passes each cue, allowing for the
-   output's latency so the light changes with the sound.
+   pass is planned up front, but its sounds are laid on the clock only a
+   moment ahead of the music (LOOKAHEAD): laying a whole song down at once
+   (2026-10-12, a 56-bar song with its chords, some 8,400 audio nodes)
+   overloaded the audio — its clock crawled at a quarter speed and the
+   start went silent. A timer loop tops the sounds up and moves the
+   highlight when the clock passes each cue, allowing for the output's
+   latency so the light changes with the sound.
 
    THE FAMILY'S START (EVM Library/evm-count-in.js, as in Rhythm Poetry,
    Ostinato Builder and the Music Stand): Play shows ■ at once, puts up
@@ -71,8 +75,11 @@
 
   const START_GAP = 0.1;      // seconds between the sound being ready and beat one
   const HANDOVER = 0.3;       // the next pass is laid down this long before it is due
+  const LOOKAHEAD = 1.5;      // seconds of sound on the clock ahead of the music
 
   let voices = [];            // { o: oscillator, start, end } scheduled for this run
+  let pending = [];           // sounds planned but not yet on the clock: { t, play } in time order
+  let pendingIndex = 0;
   let cues = [];              // [{ t (ctx seconds), ev, chord? }] in order
   let cueIndex = 0;
   let loopTimer = 0;
@@ -108,6 +115,16 @@
   function silence() {
     voices.forEach(v => { try { v.o.stop(); } catch (e) {} });
     voices = [];
+    pending = [];
+    pendingIndex = 0;
+  }
+
+  /* Lay on the clock every planned sound due before now + LOOKAHEAD. */
+  function pump() {
+    const now = ctx().currentTime;
+    while (pendingIndex < pending.length && pending[pendingIndex].t <= now + LOOKAHEAD) pending[pendingIndex++].play();
+    if (pendingIndex > 256) { pending = pending.slice(pendingIndex); pendingIndex = 0; }
+    if (voices.length > 256) voices = voices.filter(v => v.end > now);
   }
 
   function stop() {
@@ -180,6 +197,7 @@
     const melody = S.sound.melody;
     const mt = plan.song.meter;
     const newCues = [];
+    const sounds = [];          // this pass's sounds, laid on the clock by pump()
 
     plan.all.forEach(ev => {
       if (ev.at < fromTick || ev.at >= toTick) return;
@@ -194,8 +212,10 @@
         // the pass starts here), and a tied note sounds for the whole chain
         if (ev.tiedIn && ev.tiedIn.has(p.midi) && ev.at !== fromTick) return;
         const hold = ev.sustain && ev.sustain.get(p.midi) ? ev.sustain.get(p.midi) * tickSec : dur;
-        const o = SW.audio.tone(M.midiToFreq(p.midi), at, hold * 0.96, level);
-        if (o) voices.push({ o, start: at, end: at + hold + 0.1 });
+        sounds.push({ t: at, play: () => {
+          const o = SW.audio.tone(M.midiToFreq(p.midi), at, hold * 0.96, level);
+          if (o) voices.push({ o, start: at, end: at + hold + 0.1 });
+        } });
       });
     });
 
@@ -215,7 +235,9 @@
         if (s0 < fromTick) { if (resumed) return; s0 = fromTick; }
         const when = anchor + secs(s0);
         const hold = (sEnd - s0) * tickSec * 0.95;
-        SW.audio.playChordFrequencies(freqs, when, hold).forEach(o => voices.push({ o, start: when, end: when + hold + 0.1 }));
+        sounds.push({ t: when, play: () => {
+          SW.audio.playChordFrequencies(freqs, when, hold).forEach(o => voices.push({ o, start: when, end: when + hold + 0.1 }));
+        } });
       });
     });
     if (plan.chords.length) {
@@ -236,16 +258,22 @@
       const bt = mt.beatTicks;
       const shift = plan.song.shift || 0;
       for (let t = Math.ceil((fromTick + shift) / bt) * bt - shift; t < toTick; t += bt) {
-        const o = SW.audio.click(anchor + secs(t), (t + shift) % mt.barTicks === 0, true);
-        if (o) voices.push({ o, start: anchor + secs(t), end: anchor + secs(t) + 0.1 });
+        const when = anchor + secs(t), strong = (t + shift) % mt.barTicks === 0;
+        sounds.push({ t: when, play: () => {
+          const o = SW.audio.click(when, strong, true);
+          if (o) voices.push({ o, start: when, end: when + 0.1 });
+        } });
       }
     }
 
-    // keep only what is still to sound, then add this pass's cues
+    // keep only what is still to sound, then add this pass's cues and sounds
     const now = ctx().currentTime;
     voices = voices.filter(v => v.end > now);
     cues = cues.slice(cueIndex).concat(newCues);
     cueIndex = 0;
+    pending = pending.slice(pendingIndex).concat(sounds).sort((x, y) => x.t - y.t);
+    pendingIndex = 0;
+    pump();
     return anchor + secs(toTick);
   }
 
@@ -335,6 +363,7 @@
   /* Move the highlight when the clock passes each cue. */
   function loop() {
     if (!S.playing || !run) return;
+    pump();
     const now = ctx().currentTime - latency();
     while (cueIndex < cues.length && cues[cueIndex].t <= now + 0.02) {
       const cue = cues[cueIndex++];
@@ -379,6 +408,8 @@
       if (v.start > now) { try { v.o.stop(); } catch (e) {} return false; }
       return true;
     });
+    pending = [];                                 // what was still to come is planned again at the new tempo
+    pendingIndex = 0;
     clearTimeout(passTimer);
     cues = cues.filter(c => c.t <= now);
     cueIndex = Math.min(cueIndex, cues.length);
