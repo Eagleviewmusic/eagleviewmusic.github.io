@@ -1,10 +1,178 @@
+// The Garden layout's plants: garden/<plant>-<stage>.webp, stage 1 (empty pot) to 6 (full bloom)
+const GARDEN_PLANTS = ['flytrap', 'violet', 'daisy', 'rose', 'bellflower', 'dahlia', 'sunflower', 'tulip', 'lily', 'cactus'];
+const GARDEN_STAGES = 6;
+// How many class sessions in a row each of stages 1-5 lasts (stage 6 lasts until the flower is
+// replanted), for classes that meet once a week and classes that meet several times a week.
+// The user can change these in Settings > Garden Growth.
+const GARDEN_GROWTH_DEFAULTS = { weekly: [1, 1, 1, 1, 1], daily: [1, 1, 2, 2, 2] };
+const GARDEN_GROWTH_MAX = 20;
+// Garden sizes in px, kept in step with the .layout-garden rules in styles.css. A "pot" width
+// here is the width of its picture (--garden-w); each pot stands on a shelf in a slightly
+// narrower slot, so full-grown leaves may overlap a neighbour's a little.
+const GARDEN = {
+  minW: 56,          // narrowest pot before the garden scrolls instead
+  maxW: 190,         // widest pot, so a small class doesn't get giant ones
+  pitch: 0.86,       // a pot's slot on the shelf, as a share of the picture's width
+  bedPadX: 28,       // a shelf's left + right padding
+  bedPadY: 12,       // a shelf's top + bottom padding
+  bedGap: 10,        // space between shelves (and between the window and the first shelf)
+  shelfTop: 0.07,    // the top of the shelf the pots stand on, as a share of the picture's width
+  potFoot: 0.0635,   // the clear strip under the pot in every picture, as a share of its width
+  frameX: 8,         // the window frame around the flower bed: .garden-border's side,
+  frameTop: 8,       // top
+  frameBottom: 14,   // and bottom (the sill) borders
+  borderShare: 0.15, // the grass border of replanted flowers: this share of the height,
+  borderMinH: 84,    // but no shorter
+  borderMaxH: 150,   // or taller than these
+  bloomAspect: 252 / 291, // width / height of a garden/<plant>-bloom.webp
+  bloomSoil: 0.064,  // share of that picture below the soil line (BLOOM_BOTTOM in make-garden.py)
+  frontGrass: 0.19,  // grass strip heights, as a share of the border's height
+  backGrass: 0.22,
+  frontGrassBase: 14 / 60, // the solid ground at the bottom of grass-front.svg / grass-back.svg
+  backGrassBase: 16 / 90
+};
+
+// A seat card's name is written as big as fits its card on one line. w = the card's room for
+// the name in px (kept in step with the .seat / .seat .student-name padding in styles.css),
+// max = the biggest size, two = the biggest size when a long first + last name takes two lines.
+const SEAT_NAME = {
+  font: "'Patrick Hand', 'Chalkboard SE', 'Comic Sans MS', cursive",  // the --font-hand stack
+  faces: { w: 90, max: 26, two: 14 },    // .seat: 110 x 75, initials sticker above the name
+  plain: { w: 65, max: 27, two: 15.5 },  // .seat.no-faces: 85 x 52
+  grading: { faces: 22, plain: 14 },     // while grading the score buttons need the room (the sticker is hidden)
+  min: 12
+};
+
+// The crayon colours of the seat cards' stripes and initials stickers
+const SEAT_COLORS = ['#d2463b', '#e07a26', '#b8860b', '#3f8f4a', '#2f6db3', '#7a55a6', '#1f8a86'];
+
+// Group Tables: the seats sit around a table in a box the teacher can resize. Sizes in px.
+const TABLE = {
+  pad: 14,        // floor between the cards and the box's edge, where the chairs stand
+  gap: 12,        // between neighbouring cards, and between a card and the table
+  freeW: 130,     // the clear middle of a table, for its tent card
+  freeH: 44,
+  space: 12,      // the least floor between two tables
+  minScale: 0.6,  // cards shrink to fit a box sized smaller than they need, down to this much
+  emptyW: 260,    // an empty table's width
+  border: 2       // .group-box.table-group's border
+};
+
+const TABLE_LAYOUTS = ['half', 'third', 'fourth', 'fifth', 'sixth'];
+
+// Special seating rules (Settings → Special Seating Rules), kept by Arrange Seating → Random.
+// Left and right are as the chart shows them on screen.
+const SEATING_RULE_TYPES = {
+  front: { label: 'Sit near the front', short: 'Near the front', icon: '⬆', phrase: 'sits near the front' },
+  back: { label: 'Sit near the back', short: 'Near the back', icon: '⬇', phrase: 'sits near the back' },
+  left: { label: 'Sit on the left side', short: 'Left side', icon: '⬅', phrase: 'sits on the left side' },
+  right: { label: 'Sit on the right side', short: 'Right side', icon: '➡', phrase: 'sits on the right side' },
+  outside: { label: 'Sit in an outside seat (end of a row)', short: 'Outside seat', icon: '↔', phrase: 'sits in an outside seat' },
+  with: { label: 'Sit with', pair: true, phrase: 'sits with' },
+  apart: { label: "Don't sit with", pair: true, phrase: "doesn't sit with" }
+};
+
+// Band seating: chairs on arcs around the podium (front arc first) and a percussion line across
+// the back. A chair can be given an instrument, which colours it; the chairs with the same
+// instrument are that instrument's section. [id, name, abbreviation, colour]
+const BAND_FAMILIES = [
+  { name: 'Woodwinds', items: [
+    ['piccolo', 'Piccolo', 'Picc', '#6cc5e0'],
+    ['flute', 'Flute', 'Fl', '#2a9fd6'],
+    ['oboe', 'Oboe', 'Ob', '#8a5cd1'],
+    ['englishhorn', 'English Horn', 'EH', '#b18ae6'],
+    ['bassoon', 'Bassoon', 'Bsn', '#8c5a2c'],
+    ['contrabassoon', 'Contrabassoon', 'CBsn', '#5f3b1c'],
+    ['ebclarinet', 'E♭ Clarinet', 'E♭Cl', '#6fcf97'],
+    ['clarinet', 'Clarinet', 'Cl', '#2f9e5a'],
+    ['altoclarinet', 'Alto Clarinet', 'ACl', '#48b39c'],
+    ['bassclarinet', 'Bass Clarinet', 'BCl', '#1f6b47'],
+    ['contrabassclarinet', 'Contrabass Clarinet', 'CBCl', '#134a31'],
+    ['sopranosax', 'Soprano Saxophone', 'SSx', '#f2a7c3'],
+    ['altosax', 'Alto Saxophone', 'ASx', '#e0598f'],
+    ['tenorsax', 'Tenor Saxophone', 'TSx', '#c13874'],
+    ['barisax', 'Baritone Saxophone', 'BSx', '#8c2556'],
+    ['recorder', 'Recorder', 'Rec', '#9fd36a']
+  ] },
+  { name: 'Brass', items: [
+    ['trumpet', 'Trumpet', 'Tpt', '#e8a317'],
+    ['cornet', 'Cornet', 'Cor', '#f3c94f'],
+    ['flugelhorn', 'Flugelhorn', 'Flg', '#c98a1a'],
+    ['horn', 'French Horn', 'Hn', '#ec7a30'],
+    ['mellophone', 'Mellophone', 'Mel', '#f4a06a'],
+    ['trombone', 'Trombone', 'Tbn', '#d63d3d'],
+    ['basstrombone', 'Bass Trombone', 'BTbn', '#a52a2a'],
+    ['euphonium', 'Euphonium / Baritone', 'Bar', '#b8643a'],
+    ['tuba', 'Tuba', 'Tuba', '#7b2020'],
+    ['sousaphone', 'Sousaphone', 'Sou', '#571616']
+  ] },
+  { name: 'Strings', items: [
+    ['violin1', 'Violin I', 'Vn1', '#4466e8'],
+    ['violin2', 'Violin II', 'Vn2', '#8199f3'],
+    ['viola', 'Viola', 'Va', '#5a2fb5'],
+    ['cello', 'Cello', 'Vc', '#1f3fae'],
+    ['bass', 'Double Bass', 'DB', '#0f2a6b'],
+    ['harp', 'Harp', 'Hp', '#a3a83a'],
+    ['guitar', 'Guitar', 'Gtr', '#a0703c'],
+    ['bassguitar', 'Bass Guitar', 'BGtr', '#6e4a24']
+  ] },
+  { name: 'Percussion & Keys', items: [
+    ['timpani', 'Timpani', 'Timp', '#7d6650'],
+    ['snare', 'Snare Drum', 'SD', '#5f7380'],
+    ['bassdrum', 'Bass Drum', 'BD', '#3d4b55'],
+    ['drumkit', 'Drum Kit', 'Kit', '#2b2f36'],
+    ['cymbals', 'Cymbals', 'Cym', '#b3a04a'],
+    ['aux', 'Auxiliary Percussion', 'Aux', '#6e8b74'],
+    ['glockenspiel', 'Glockenspiel / Bells', 'Glk', '#9aa5b1'],
+    ['xylophone', 'Xylophone', 'Xyl', '#b08d6a'],
+    ['marimba', 'Marimba', 'Mar', '#8a6a4b'],
+    ['vibraphone', 'Vibraphone', 'Vib', '#7f97a8'],
+    ['chimes', 'Chimes', 'Chm', '#a3a3a3'],
+    ['piano', 'Piano / Keyboard', 'Keys', '#444b55'],
+    ['percussion', 'Percussion (general)', 'Perc', '#8a8f96']
+  ] }
+];
+const BAND_INSTRUMENTS = {};
+BAND_FAMILIES.forEach(f => f.items.forEach(([id, name, abbr, color]) => {
+  BAND_INSTRUMENTS[id] = { id, name, abbr, color, family: f.name, order: Object.keys(BAND_INSTRUMENTS).length };
+}));
+
+const BAND = {
+  maxRows: 4,
+  maxSeats: 40,     // chairs in one arc
+  maxPerc: 16,
+  arc: 95 * Math.PI / 180,  // each arc reaches a little past the podium's sides, as on a band chart
+  frontR: 170,      // the front arc's least radius, leaving room for the podium
+  gap: 10,          // between neighbouring chairs on an arc
+  rowGap: 18,       // between a chair and the chairs of the arc in front of it
+  percGap: 44,      // between the back arc and the percussion line
+  percPerLine: 8,   // more stations than this stand in two lines
+  podiumW: 130,
+  podiumH: 54,
+  pad: 34,
+  // A new percussion station gets the first of these not already on the line
+  percDefaults: ['timpani', 'aux', 'drumkit', 'glockenspiel', 'piano', 'snare', 'bassdrum', 'xylophone', 'marimba', 'vibraphone', 'chimes', 'cymbals']
+};
+
 class SeatingChartApp {
       constructor() {
         this.classes = [];
         this.currentClassId = null;
         this.isEditMode = false;
         this.isClassListEditMode = false;
+        // Which sidebar list is showing: 'today' (Today's List) or 'roster' (Class Roster); a per-browser convenience
+        // Pressing the open tab again folds the list away until either tab is pressed
+        this.sidebarListTab = 'today';
+        this.sidebarListHidden = false;
+        try {
+          if (localStorage.getItem('classPlanner_sidebarListTab') === 'roster') this.sidebarListTab = 'roster';
+          this.sidebarListHidden = localStorage.getItem('classPlanner_sidebarListHidden') === '1';
+        } catch (e) { /* storage blocked: start on Today's List, open */ }
         this.isAttendanceView = false;
+        // The checked floor pattern behind the seating chart (Settings → Background Pattern); on unless
+        // turned off. The Garden keeps its own wall either way.
+        this.chartPattern = true;
+        try { this.chartPattern = localStorage.getItem('classPlanner_chartPattern') !== 'off'; } catch (e) { /* stays on */ }
         
         this.draggedStudentName = null;
         this.sourceGroupIndex = null;
@@ -31,6 +199,12 @@ class SeatingChartApp {
         this.settingShowFaces = true;
         this.settingShowGradesRatio = true;
         this.chartZoom = parseInt(localStorage.getItem('classPlanner_chartZoom') || '80', 10);
+        this.gardenGrowth = this.normalizeGardenGrowth(this.readJson('classPlanner_gardenGrowth_v1'));
+        // Settings > Edit Garden: the class whose garden is being fixed by hand (never saved)
+        this.gardenEditClassId = null;
+        // The test dial's device-only stages are gone now that plants grow from attendance
+        localStorage.removeItem('classPlanner_gardenTest_v1');
+        localStorage.removeItem('classPlanner_gardenTestStage');
 
         this.subjects = [
           {
@@ -76,12 +250,61 @@ class SeatingChartApp {
           this.currentClassId = this.classes[0] ? this.classes[0].id : null;
         }
 
+        // The Garden sizes its pots to fit the screen, and Band and the tables fit their room to its
+        // width, so refit when the window or full screen changes
+        const refitGarden = () => {
+          cancelAnimationFrame(this.gardenRefitFrame);
+          this.gardenRefitFrame = requestAnimationFrame(() => {
+            const cls = this.getCurrentClass();
+            if (!cls) return;
+            if (cls.layout === 'band' || TABLE_LAYOUTS.includes(cls.layout)) {
+              if (this.bandPaintDown || document.querySelector('.table-moving')) return;
+              if (Math.round(this.getChartContentWidth()) !== this.chartRoomW) this.renderChart(cls);
+              return;
+            }
+            if (cls.layout !== 'garden') return;
+            const space = this.getGardenSpace();
+            if (space && `${space.width}x${space.height}` !== this.gardenSpaceKey) this.renderChart(cls);
+          });
+        };
+        window.addEventListener('resize', refitGarden);
+        const chartViewport = document.querySelector('#seatingAppBody .viewport');
+        if (chartViewport && window.ResizeObserver) new ResizeObserver(refitGarden).observe(chartViewport);
+
+        // Card names are sized by measuring them in the handwriting font, so size them again once it loads
+        if (document.fonts && document.fonts.load) {
+          document.fonts.load(`20px ${SEAT_NAME.font}`).then(() => this.render()).catch(() => {});
+        }
+
         // Drop-between-names: show where a dragged name will land
         document.addEventListener('dragover', (e) => this.updateSeatInsertMarker(e));
         document.addEventListener('drop', () => this.hideSeatInsertMarker());
         document.addEventListener('dragend', () => this.hideSeatInsertMarker());
 
+        // Full screen: the drop-down bars sit under the floating controls, and the page moves down by
+        // their height (--fs-bars-h) so they cover neither the controls nor the chart
+        const topBars = document.getElementById('topBarsContainer');
+        if (topBars && window.ResizeObserver) {
+          new ResizeObserver(() => {
+            document.body.style.setProperty('--fs-bars-h', `${topBars.offsetHeight}px`);
+          }).observe(topBars);
+        }
+
+        // Band: a paint stroke ends wherever the pointer is let go; the chair editor closes on a press
+        // anywhere outside it, or on Escape (which then leaves full screen alone)
+        document.addEventListener('pointerup', () => this.endBandPaint());
+        document.addEventListener('pointercancel', () => this.endBandPaint());
+        document.addEventListener('pointerdown', (e) => {
+          if (!this.bandEditorChairId || !e.target || !e.target.closest) return;
+          if (e.target.closest('#bandChairEditor, .band-tag, .band-chair-open')) return;
+          this.closeBandChairEditor();
+        });
+
         window.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && this.bandEditorChairId) {
+            this.closeBandChairEditor();
+            return;
+          }
           if (e.key === 'Escape' && this.isFullScreen) {
             this.toggleFullScreen(false);
           }
@@ -97,6 +320,7 @@ class SeatingChartApp {
           const rosterEditBtn = document.getElementById('rosterEditBtn');
           const rowsSub = document.getElementById('rowsSubheader');
           const linesSub = document.getElementById('linesSubheader');
+          const bandSub = document.getElementById('bandSubheader');
 
           if (layoutBar && layoutBar.classList.contains('open')) {
             if (
@@ -108,7 +332,8 @@ class SeatingChartApp {
               !(fsEditBtn && fsEditBtn.contains(e.target)) &&
               !(rosterEditBtn && rosterEditBtn.contains(e.target)) &&
               !(rowsSub && rowsSub.contains(e.target)) &&
-              !(linesSub && linesSub.contains(e.target))
+              !(linesSub && linesSub.contains(e.target)) &&
+              !(bandSub && bandSub.contains(e.target))
             ) {
               this.closeLayoutMenu();
             }
@@ -136,6 +361,7 @@ class SeatingChartApp {
         });
 
         this.applyChartZoom();
+        this.applyChartPattern();
         this.checkAndResetDailyAbsences();
 
         // Listen for window focus & visibility to auto-reset absences at the start of a new day
@@ -350,6 +576,29 @@ class SeatingChartApp {
         if (label) label.textContent = `${this.chartZoom}%`;
       }
 
+      applyChartPattern() {
+        document.body.classList.toggle('no-chart-pattern', !this.chartPattern);
+      }
+
+      setChartPattern(on) {
+        this.chartPattern = on !== false;
+        try { localStorage.setItem('classPlanner_chartPattern', this.chartPattern ? 'on' : 'off'); } catch (e) { /* not remembered */ }
+        this.applyChartPattern();
+      }
+
+      toggleChartPatternSetting() {
+        this.settingChartPattern = !this.settingChartPattern;
+        this.updateChartPatternToggle();
+      }
+
+      updateChartPatternToggle() {
+        const btn = document.getElementById('btnToggleChartPattern');
+        if (!btn) return;
+        btn.textContent = this.settingChartPattern ? 'ON' : 'OFF';
+        btn.classList.toggle('is-on', this.settingChartPattern);
+        btn.setAttribute('aria-pressed', this.settingChartPattern ? 'true' : 'false');
+      }
+
       setZoom(val) {
         const num = parseInt(val, 10);
         this.chartZoom = isNaN(num) ? 80 : Math.min(100, Math.max(20, num));
@@ -441,9 +690,121 @@ class SeatingChartApp {
         };
 
         const sampleClass = this.sanitizeAndMigrateClass(rawSample, 'subj_music');
-        this.classes.push(sampleClass);
-        this.currentClassId = sampleClass.id;
+        // The Star Wars class shows off every layout, the special seating rules, attendance and grades;
+        // a new ClassPlanner opens on it
+        const starWars = this.buildStarWarsClass();
+        if (starWars) {
+          const swClass = this.sanitizeAndMigrateClass(starWars, 'subj_music');
+          this.classes.push(swClass, sampleClass);
+          this.currentClassId = swClass.id;
+        } else {
+          this.classes.push(sampleClass);
+          this.currentClassId = sampleClass.id;
+        }
         this.saveData();
+      }
+
+      // The Star Wars sample class (star-wars-sample.js): every layout seated, special seating rules,
+      // attendance by episode (which grows the garden) and grades. Null if the sample file is missing.
+      buildStarWarsClass() {
+        const S = (typeof STAR_WARS_SAMPLE !== 'undefined') ? STAR_WARS_SAMPLE : null;
+        if (!S) return null;
+        const names = S.students.map(s => s[0]);
+        const byName = Object.fromEntries(S.students.map(s => [s[0], s]));
+        const profiles = {};
+        S.students.forEach(([full, first, last]) => { profiles[full] = { firstName: first, lastName: last, rosterName: full }; });
+
+        // One date per episode; present if they are in it
+        const dates = S.dates.map(([ep, y, m, d]) => {
+          const day = new Date(y, m - 1, d);
+          const statuses = {};
+          names.forEach(n => { statuses[n] = byName[n][3].split(' ').includes(ep) ? 'present' : 'absent'; });
+          return { id: 'date_' + day.getTime(), date: `${m}/${d}/${String(y).slice(2)}`, day: day.toLocaleDateString('en-US', { weekday: 'long' }), timestamp: day.getTime(), statuses };
+        });
+        const dateOf = ep => dates[S.dates.findIndex(d => d[0] === ep)];
+
+        // Grades from each student's skill, a little different per test; only those present that day
+        const wobble = (name, title) => (this.nameHash(name + title) % 3) - 1;
+        const gradeColumns = S.grades.map(([title, category, style, ep], i) => {
+          const day = dateOf(ep);
+          const grades = {};
+          names.forEach(n => {
+            if (!day || day.statuses[n] !== 'present') return;
+            const skill = byName[n][5];
+            const w = wobble(n, title);
+            if (style === 'points') grades[n] = Math.max(0, Math.min(10, 5 + skill + w));
+            else if (style === 'standards') grades[n] = String(Math.max(1, Math.min(4, skill + Math.min(0, w))));
+            else grades[n] = skill >= 4 ? (w >= 0 ? 'star' : 'plus') : skill === 3 ? 'plus' : skill === 2 ? (w > 0 ? 'plus' : 'minus') : (w > 0 ? 'minus' : 'x');
+          });
+          return { id: `g_starwars_${i + 1}`, date: day ? day.date : '', title, category, gradingStyle: style, maxPoints: 10, grades };
+        });
+
+        let n = 0;
+        const rule = (student, type, other) => ({ id: `rsw${++n}`, student, type, ...(other ? { other } : {}) });
+        const seatingRules = [
+          ...Object.entries(S.places).flatMap(([type, list]) => list.map(s => rule(s, type))),
+          ...S.with.map(([a, b]) => rule(a, 'with', b)),
+          ...S.apart.map(([a, b]) => rule(a, 'apart', b))
+        ];
+
+        // Band: strings on the front arc, woodwinds in the middle, brass at the back, then percussion
+        const family = id => (BAND_INSTRUMENTS[id] || {}).family;
+        const percIds = new Set(BAND_FAMILIES.find(f => f.name === 'Percussion & Keys').items.map(i => i[0]));
+        const seat = S.seating || {};
+        const bandRows = seat.band || {
+          rows: [
+            names.filter(s => family(byName[s][4]) === 'Strings'),
+            names.filter(s => family(byName[s][4]) === 'Woodwinds' && !['contrabassoon', 'tenorsax'].includes(byName[s][4])),
+            names.filter(s => family(byName[s][4]) === 'Brass' || ['contrabassoon', 'tenorsax'].includes(byName[s][4]))
+          ],
+          perc: names.filter(s => percIds.has(byName[s][4]))
+        };
+        const chair = s => this.makeBandChair(byName[s][4], s);
+        const band = { rows: bandRows.rows.map(row => row.map(chair)), perc: bandRows.perc.map(chair) };
+
+        const groups = (count) => this.distributeStudentsEquallyInOrder(names, count, 'last');
+        const rowsCount = 6;   // rows of 7 fit across the classroom
+        const linesCount = 4;
+        const first = dates[0];
+        return {
+          id: 'class-star-wars-' + Date.now(),
+          name: S.name,
+          subjectId: 'subj_music',
+          layout: 'band',
+          rowsCount,
+          linesCount,
+          rowAlignment: 'center',
+          rowsRowAlign: {},
+          showFirstName: true,
+          showLastName: false,
+          showFaces: true,
+          showInitials: true,
+          showGradesAttendanceRatio: true,
+          classList: [...names],
+          studentProfiles: profiles,
+          rows: seat.rows || this.distributeStudentsEquallyInOrder(names, rowsCount, 'last'),
+          lines: seat.lines || this.autoBalanceGroups(names, linesCount, 'last'),
+          circle: seat.circle || this.sortStudentsByName(names, 'last'),
+          layoutsData: {
+            half: seat.half || groups(2),
+            third: seat.third || groups(3),
+            fourth: seat.fourth || groups(4),
+            fifth: seat.fifth || groups(5),
+            sixth: seat.sixth || groups(6),
+            ...Object.fromEntries(TABLE_LAYOUTS.map(k => [`${k}Rows`, this.defaultTableRows(k)]))
+          },
+          containerSizes: seat.tables ? JSON.parse(JSON.stringify(seat.tables)) : {},
+          band,
+          seatingRules,
+          unplacedStudents: [],
+          absentStudents: [],
+          attendanceDates: dates,
+          attendancePace: 'weekly',
+          gardenStart: new Date(first.timestamp).toISOString(),
+          subjectGrades: { subj_music: gradeColumns },
+          scheduleTime: '',
+          scheduleDays: []
+        };
       }
 
       parseStudentName(rawName) {
@@ -552,6 +913,7 @@ class SeatingChartApp {
         localStorage.setItem('classPlanner_currentId_v6', this.currentClassId || '');
         localStorage.setItem('classPlanner_appName', this.appName || 'ClassPlanner');
         localStorage.setItem('classPlanner_subjects_v1', JSON.stringify(this.subjects));
+        localStorage.setItem('classPlanner_gardenGrowth_v1', JSON.stringify(this.gardenGrowth));
         localStorage.setItem('classPlanner_schedules_v1', JSON.stringify(this.schedules || []));
         localStorage.setItem('classPlanner_currentScheduleId_v1', this.currentScheduleId || '');
         localStorage.setItem('classPlanner_scheduleTimeBlocks_v1', JSON.stringify(this.scheduleTimeBlocks || []));
@@ -819,6 +1181,12 @@ class SeatingChartApp {
         if (!Array.isArray(c.freeform)) c.freeform = [...c.classList];
         else c.freeform = c.freeform.map(s => String(s).trim()).filter(Boolean);
         if (!c.freeformPositions || typeof c.freeformPositions !== 'object') c.freeformPositions = {};
+        if (c.seatingRules !== undefined) c.seatingRules = this.normalizeSeatingRules(c.seatingRules);
+        if (c.band !== undefined) {
+          const band = this.normalizeBand(c.band);
+          if (band) c.band = band;
+          else delete c.band;
+        }
 
         if (!c.layoutsData || typeof c.layoutsData !== 'object') c.layoutsData = {};
         ['half', 'third', 'fourth', 'fifth', 'sixth'].forEach((layoutKey, idx) => {
@@ -1131,6 +1499,11 @@ class SeatingChartApp {
             }
           });
         }
+        if (c.band && Array.isArray(c.band.rows)) {
+          [...c.band.rows.flat(), ...(Array.isArray(c.band.perc) ? c.band.perc : [])].forEach(ch => {
+            if (ch && typeof ch.student === 'string' && ch.student.trim()) set.add(ch.student.trim());
+          });
+        }
         return Array.from(set);
       }
 
@@ -1155,9 +1528,9 @@ class SeatingChartApp {
           if (!btn) return;
 
           if (this.selectedArrangeMode === m) {
-            btn.style.cssText = 'flex: 1; font-weight: bold; padding: 6px 4px; font-size: 0.8rem; background: #4f46e5; color: white; border: 1.5px solid #4338ca; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.15); cursor: pointer;';
+            btn.style.cssText = 'flex: 1; font-weight: bold; padding: 6px 4px; font-size: 0.8rem; background: var(--primary); color: white; border: 1.5px solid var(--primary-hover); border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.15); cursor: pointer;';
           } else {
-            btn.style.cssText = 'flex: 1; font-weight: bold; padding: 6px 4px; font-size: 0.8rem; background: #e2e8f0; color: #475569; border: 1.5px solid #cbd5e1; border-radius: 6px; cursor: pointer;';
+            btn.style.cssText = 'flex: 1; font-weight: bold; padding: 6px 4px; font-size: 0.8rem; background: var(--line); color: var(--ink-soft); border: 1.5px solid var(--line-strong); border-radius: 6px; cursor: pointer;';
           }
         });
       }
@@ -1180,6 +1553,9 @@ class SeatingChartApp {
         this.updateDisplayToggleUI('btnToggleDisplayFirstName', this.settingShowFirstName);
         this.updateDisplayToggleUI('btnToggleDisplayLastName', this.settingShowLastName);
         this.updateDisplayToggleUI('btnToggleDisplayInitials', this.settingShowFaces);
+        this.settingChartPattern = this.chartPattern;
+        this.updateChartPatternToggle();
+        this.updateGardenEditToggle();
 
         document.getElementById('settingsModal').classList.add('active');
       }
@@ -1193,9 +1569,9 @@ class SeatingChartApp {
         const btn = document.getElementById(btnId);
         if (!btn) return;
         if (isActive) {
-          btn.style.cssText = 'font-weight: 700; padding: 5px 9px; font-size: 0.78rem; background: #38bdf8; color: white; border: 1.5px solid #0284c7; cursor: pointer; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.15s ease;';
+          btn.style.cssText = 'font-weight: 700; padding: 5px 9px; font-size: 0.78rem; background: var(--sky); color: white; border: 1.5px solid var(--sky); cursor: pointer; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.15s ease;';
         } else {
-          btn.style.cssText = 'font-weight: 700; padding: 5px 9px; font-size: 0.78rem; background: #e2e8f0; color: #64748b; border: 1.5px solid #cbd5e1; cursor: pointer; border-radius: 6px; box-shadow: none; transition: all 0.15s ease;';
+          btn.style.cssText = 'font-weight: 700; padding: 5px 9px; font-size: 0.78rem; background: var(--line); color: var(--ink-muted); border: 1.5px solid var(--line-strong); cursor: pointer; border-radius: 6px; box-shadow: none; transition: all 0.15s ease;';
         }
       }
 
@@ -1204,10 +1580,10 @@ class SeatingChartApp {
         if (!btn) return;
         if (isActive) {
           btn.textContent = 'ON';
-          btn.style.cssText = 'font-weight: 700; padding: 6px 16px; background: #38bdf8; color: white; border: 1.5px solid #0284c7; min-width: 70px; cursor: pointer; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);';
+          btn.style.cssText = 'font-weight: 700; padding: 6px 16px; background: var(--sky); color: white; border: 1.5px solid var(--sky); min-width: 70px; cursor: pointer; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);';
         } else {
           btn.textContent = 'OFF';
-          btn.style.cssText = 'font-weight: 700; padding: 6px 16px; background: #e2e8f0; color: #64748b; border: 1.5px solid #cbd5e1; min-width: 70px; cursor: pointer; border-radius: 6px;';
+          btn.style.cssText = 'font-weight: 700; padding: 6px 16px; background: var(--line); color: var(--ink-muted); border: 1.5px solid var(--line-strong); min-width: 70px; cursor: pointer; border-radius: 6px;';
         }
       }
 
@@ -1260,6 +1636,7 @@ class SeatingChartApp {
           this.updateAppTitle();
         }
 
+        if (typeof this.settingChartPattern === 'boolean') this.setChartPattern(this.settingChartPattern);
         currentClass.showFirstName = this.settingShowFirstName;
         currentClass.showLastName = this.settingShowLastName;
         currentClass.showFaces = this.settingShowFaces;
@@ -1315,7 +1692,9 @@ class SeatingChartApp {
           const sortedStudents = this.sortStudentsByName(allStudents, mode);
           const layout = currentClass.layout || 'rows';
 
-          if (layout === 'circle') {
+          if (mode === 'random' && this.arrangeRandomWithRules(currentClass, allStudents)) {
+            // The class's special seating rules chose where everyone sits
+          } else if (layout === 'circle') {
             currentClass.circle = [...sortedStudents];
           } else if (layout === 'lines') {
             const numLines = currentClass.linesCount || 4;
@@ -1324,6 +1703,8 @@ class SeatingChartApp {
             currentClass.freeform = [...sortedStudents];
             currentClass.freeformPositions = {};
             this.initInitialFreeformPositions(currentClass);
+          } else if (layout === 'band') {
+            if (currentClass.band) this.arrangeBandByName(currentClass.band, mode);
           } else if (['half', 'third', 'fourth', 'fifth', 'sixth'].includes(layout)) {
             const numGroups = layout === 'half' ? 2 : layout === 'third' ? 3 : layout === 'fourth' ? 4 : layout === 'fifth' ? 5 : 6;
             currentClass.layoutsData[layout] = this.autoBalanceGroups(allStudents, numGroups, mode);
@@ -1370,12 +1751,14 @@ class SeatingChartApp {
           appName: this.appName || 'ClassPlanner',
           exportedAt: new Date().toISOString(),
           gradingStyle: this.gradingStyle || 'informal',
+          chartPattern: this.chartPattern !== false,
           suppressRemoveStudentWarning: this.suppressRemoveStudentWarning === true,
           currentClassId: this.currentClassId || (sanitizedClasses[0] ? sanitizedClasses[0].id : null),
           subjects: this.subjects || [],
           schedules: this.schedules || [],
           currentScheduleId: this.currentScheduleId || 'sched_regular',
           calendarSync: this.isCalendarSyncEnabled === true,
+          gardenGrowth: this.gardenGrowth,
           classes: sanitizedClasses
         };
 
@@ -1422,6 +1805,10 @@ class SeatingChartApp {
               this.updateAppTitle();
             }
 
+            if (typeof importedData.chartPattern === 'boolean') {
+              this.setChartPattern(importedData.chartPattern);
+            }
+
             if (importedData.gradingStyle) {
               this.gradingStyle = importedData.gradingStyle;
               localStorage.setItem('seatingApp_gradingStyle', this.gradingStyle);
@@ -1434,6 +1821,10 @@ class SeatingChartApp {
 
             if (typeof importedData.calendarSync === 'boolean') {
               this.isCalendarSyncEnabled = importedData.calendarSync;
+            }
+
+            if (importedData.gardenGrowth && typeof importedData.gardenGrowth === 'object') {
+              this.gardenGrowth = this.normalizeGardenGrowth(importedData.gardenGrowth);
             }
 
             if (Array.isArray(importedData.subjects) && importedData.subjects.length > 0) {
@@ -1547,6 +1938,7 @@ class SeatingChartApp {
         const layout = currentClass.layout;
         if (layout === 'circle') return currentClass.circle || [];
         if (layout === 'freeform') return currentClass.freeform || [];
+        if (layout === 'band') return this.getBandChairs(currentClass.band).map(ch => ch.student).filter(Boolean);
         if (layout === 'lines') {
           let all = [];
           if (currentClass.lines) currentClass.lines.forEach(l => { if (Array.isArray(l)) all.push(...l); });
@@ -1827,9 +2219,10 @@ class SeatingChartApp {
         const refreshBtn = document.getElementById('btnAttendanceRefresh');
         if (refreshBtn) {
           refreshBtn.innerHTML = '✓';
-          refreshBtn.style.color = '#15803d';
-          refreshBtn.style.borderColor = '#86efac';
-          refreshBtn.style.background = '#dcfce7';
+          refreshBtn.style.color = 'var(--green-dark)';
+          refreshBtn.style.borderColor = 'var(--green-line)';
+          refreshBtn.style.setProperty('--btn-edge', 'var(--green-line)');
+          refreshBtn.style.background = 'var(--green-soft)';
           refreshBtn.style.fontWeight = '900';
           refreshBtn.style.transform = 'scale(1.2)';
           refreshBtn.style.transition = 'all 0.2s ease';
@@ -1842,6 +2235,7 @@ class SeatingChartApp {
             refreshBtn.innerHTML = '🔄';
             refreshBtn.style.color = '';
             refreshBtn.style.borderColor = '';
+            refreshBtn.style.removeProperty('--btn-edge');
             refreshBtn.style.background = '';
             refreshBtn.style.fontWeight = '';
             refreshBtn.style.transform = '';
@@ -1884,13 +2278,15 @@ class SeatingChartApp {
 
         if (this.isAttendanceSessionActive) {
           btn.textContent = 'Complete';
-          btn.style.background = '#f97316';
-          btn.style.borderColor = '#ea580c';
+          btn.style.background = 'var(--orange)';
+          btn.style.borderColor = 'var(--orange-dark)';
+          btn.style.setProperty('--btn-edge', 'var(--orange-dark)');
           btn.style.color = '#ffffff';
         } else {
           btn.textContent = 'Attendance';
-          btn.style.background = '#2563eb';
-          btn.style.borderColor = '#1d4ed8';
+          btn.style.background = 'var(--blue)';
+          btn.style.borderColor = 'var(--blue-dark)';
+          btn.style.setProperty('--btn-edge', 'var(--blue-dark)');
           btn.style.color = '#ffffff';
         }
       }
@@ -2053,6 +2449,7 @@ class SeatingChartApp {
 
       switchViewMode(mode) {
         this.currentViewMode = mode || 'chart';
+        if (this.currentViewMode !== 'chart') this.gardenEditClassId = null;
         this.isAttendanceView = (this.currentViewMode === 'attendance');
         this.updateViewMode();
       }
@@ -2453,13 +2850,15 @@ class SeatingChartApp {
         btns.forEach(btn => {
           if (this.isDraftScoringActive && this.draftGradeColumn) {
             btn.textContent = 'Complete';
-            btn.style.background = '#f97316';
-            btn.style.borderColor = '#ea580c';
+            btn.style.background = 'var(--orange)';
+            btn.style.borderColor = 'var(--orange-dark)';
+            btn.style.setProperty('--btn-edge', 'var(--orange-dark)');
             btn.style.color = '#ffffff';
           } else {
             btn.textContent = 'Add Grade';
-            btn.style.background = '#dc2626';
-            btn.style.borderColor = '#b91c1c';
+            btn.style.background = 'var(--red)';
+            btn.style.borderColor = 'var(--red-dark)';
+            btn.style.setProperty('--btn-edge', 'var(--red-dark)');
             btn.style.color = '#ffffff';
           }
         });
@@ -2480,13 +2879,15 @@ class SeatingChartApp {
         btns.forEach(btn => {
           if (this.isDraftAttendanceActive && this.draftAttendanceDate) {
             btn.textContent = 'Complete';
-            btn.style.background = '#f97316';
-            btn.style.borderColor = '#ea580c';
+            btn.style.background = 'var(--orange)';
+            btn.style.borderColor = 'var(--orange-dark)';
+            btn.style.setProperty('--btn-edge', 'var(--orange-dark)');
             btn.style.color = '#ffffff';
           } else {
             btn.textContent = 'Add Date';
-            btn.style.background = '#2563eb';
-            btn.style.borderColor = '#1d4ed8';
+            btn.style.background = 'var(--blue)';
+            btn.style.borderColor = 'var(--blue-dark)';
+            btn.style.setProperty('--btn-edge', 'var(--blue-dark)');
             btn.style.color = '#ffffff';
           }
         });
@@ -2893,8 +3294,9 @@ class SeatingChartApp {
 
           if (startBtn) {
             startBtn.textContent = 'Add Grade';
-            startBtn.style.background = '#dc2626';
-            startBtn.style.borderColor = '#b91c1c';
+            startBtn.style.background = 'var(--red)';
+            startBtn.style.borderColor = 'var(--red-dark)';
+            startBtn.style.setProperty('--btn-edge', 'var(--red-dark)');
             startBtn.style.color = '#ffffff';
           }
 
@@ -2988,8 +3390,9 @@ class SeatingChartApp {
         if (startBtn) {
           startBtn.textContent = 'Complete';
           startBtn.classList.remove('btn-secondary');
-          startBtn.style.background = '#f97316';
-          startBtn.style.borderColor = '#ea580c';
+          startBtn.style.background = 'var(--orange)';
+          startBtn.style.borderColor = 'var(--orange-dark)';
+          startBtn.style.setProperty('--btn-edge', 'var(--orange-dark)');
           startBtn.style.color = '#ffffff';
         }
 
@@ -3381,19 +3784,6 @@ class SeatingChartApp {
         return (currentClass && currentClass.attendancePace === 'daily') ? 'daily' : 'weekly';
       }
 
-      getAttendanceStreakLevels(currentClass) {
-        return this.getAttendancePace(currentClass) === 'daily' ? [3, 9, 18] : [3, 6, 12];
-      }
-
-      // Seat glow levels: 1 = light blue, 2 = gold, 3 = diamond blue with twinkling stars
-      getAttendanceStreakTier(streak, currentClass) {
-        const [blue, gold, diamond] = this.getAttendanceStreakLevels(currentClass);
-        if (streak >= diamond) return 3;
-        if (streak >= gold) return 2;
-        if (streak >= blue) return 1;
-        return 0;
-      }
-
       toggleGradesAttendanceIndicators() {
         this.showGradesAttendanceIndicators = (this.showGradesAttendanceIndicators === false) ? true : false;
         const btn = document.getElementById('btnToggleGradesAttendance');
@@ -3429,14 +3819,14 @@ class SeatingChartApp {
           displayGradeCols.push({ ...this.draftGradeColumn, isDraft: true });
         }
 
-        let html = '<thead><tr><th style="min-width: 220px; text-align: left; background-color: #f1f5f9;">Student Name</th>';
+        let html = '<thead><tr><th style="min-width: 220px; text-align: left; background-color: var(--paper-3);">Student Name</th>';
         displayGradeCols.forEach((col, idx) => {
           if (col.isDraft) {
-            html += `<th style="background-color: #f8fafc; border-bottom: 2px solid #cbd5e1; border-left: 2px dashed #94a3b8; border-right: 2px dashed #94a3b8;">
+            html += `<th style="background-color: var(--paper-2); border-bottom: 2px solid var(--line-strong); border-left: 2px dashed var(--ink-faint); border-right: 2px dashed var(--ink-faint);">
               <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.25; padding: 4px 2px;">
-                <span style="font-weight: 800; font-size: 0.85rem; color: #475569; background: #e2e8f0; padding: 2px 8px; border-radius: 12px; border: 1px solid #cbd5e1; font-family: inherit;">${this.escapeHtml(col.title || 'Grade')}</span>
-                <span style="font-weight: 700; font-size: 0.8rem; color: #64748b; margin-top: 3px;">${col.date}</span>
-                <span style="font-weight: 800; font-size: 0.68rem; text-transform: uppercase; color: #f97316; margin-top: 2px; letter-spacing: 0.5px;">(Drafting)</span>
+                <span style="font-weight: 800; font-size: 0.85rem; color: var(--ink-soft); background: var(--line); padding: 2px 8px; border-radius: 12px; border: 1px solid var(--line-strong); font-family: inherit;">${this.escapeHtml(col.title || 'Grade')}</span>
+                <span style="font-weight: 700; font-size: 0.8rem; color: var(--ink-muted); margin-top: 3px;">${col.date}</span>
+                <span style="font-weight: 800; font-size: 0.68rem; text-transform: uppercase; color: var(--orange); margin-top: 2px; letter-spacing: 0.5px;">(Drafting)</span>
               </div>
             </th>`;
           } else {
@@ -3462,7 +3852,7 @@ class SeatingChartApp {
               <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.25; padding: 4px 2px;">
                 ${editControlsHTML}
                 <span style="font-weight: 800; font-size: 0.85rem; color: ${theme.color}; background: ${theme.bgHeader}; padding: 2px 8px; border-radius: 12px; border: 1px solid ${theme.border}; font-family: inherit;">${this.escapeHtml(col.title || 'Grade')}</span>
-                <span style="font-weight: 700; font-size: 0.8rem; color: #0f172a; margin-top: 3px;">${col.date}</span>
+                <span style="font-weight: 700; font-size: 0.8rem; color: var(--ink); margin-top: 3px;">${col.date}</span>
               </div>
             </th>`;
           }
@@ -3481,7 +3871,7 @@ class SeatingChartApp {
 
             const showGradesRatio = (this.showGradesAttendanceIndicators !== false) && (currentClass ? (currentClass.showGradesAttendanceRatio !== false) : true);
             const ratioText = showGradesRatio ? this.getStudentAttendanceRatio(currentClass, student) : '';
-            const ratioHTML = showGradesRatio ? `<span style="font-size: 0.8rem; font-weight: 700; color: var(--primary); background: #e0e7ff; padding: 2px 6px; border-radius: 10px;">${ratioText}</span>` : '';
+            const ratioHTML = showGradesRatio ? `<span class="register-ratio">${ratioText}</span>` : '';
             let gradeCellsHTML = '';
 
             displayGradeCols.forEach(col => {
@@ -3513,7 +3903,7 @@ class SeatingChartApp {
                   } else {
                     cellContent = `<button type="button" class="points-badge-btn points-badge-unscored" onclick="event.stopPropagation(); app.openPointsEntryModal('${this.escapeQuotes(student)}', 'draft')">? / ${maxPts}</button>`;
                   }
-                  gradeCellsHTML += `<td style="background-color: #f8fafc; border: 1px solid #cbd5e1; text-align: center; padding: 6px 4px; border-left: 2px dashed #cbd5e1; border-right: 2px dashed #cbd5e1; position: relative; ${absentBgStyle}">
+                  gradeCellsHTML += `<td style="background-color: var(--paper-2); border: 1px solid var(--line-strong); text-align: center; padding: 6px 4px; border-left: 2px dashed var(--line-strong); border-right: 2px dashed var(--line-strong); position: relative; ${absentBgStyle}">
                     ${attIndicatorHTML}
                     ${cellContent}
                   </td>`;
@@ -3522,7 +3912,7 @@ class SeatingChartApp {
                   const is3 = (String(gradeVal) === '3');
                   const is2 = (String(gradeVal) === '2');
                   const is1 = (String(gradeVal) === '1');
-                  gradeCellsHTML += `<td style="background-color: #f8fafc; border: 1px solid #cbd5e1; text-align: center; padding: 6px 4px; border-left: 2px dashed #cbd5e1; border-right: 2px dashed #cbd5e1; position: relative; ${absentBgStyle}">
+                  gradeCellsHTML += `<td style="background-color: var(--paper-2); border: 1px solid var(--line-strong); text-align: center; padding: 6px 4px; border-left: 2px dashed var(--line-strong); border-right: 2px dashed var(--line-strong); position: relative; ${absentBgStyle}">
                     ${attIndicatorHTML}
                     <div class="standards-score-controls" style="justify-content: center; display: inline-flex; gap: 3px;">
                       <button type="button" class="standards-btn standards-btn-4 ${is4 ? 'active-4' : ''}" onclick="event.stopPropagation(); app.recordDraftGradeScore('${this.escapeQuotes(student)}', '4')" title="4 - Advanced (Yellow)">4</button>
@@ -3537,7 +3927,7 @@ class SeatingChartApp {
                   const isMinus = (gradeVal === 'minus');
                   const isX = (gradeVal === 'x');
 
-                  gradeCellsHTML += `<td style="background-color: #f8fafc; border: 1px solid #cbd5e1; text-align: center; padding: 6px 4px; border-left: 2px dashed #cbd5e1; border-right: 2px dashed #cbd5e1; position: relative; ${absentBgStyle}">
+                  gradeCellsHTML += `<td style="background-color: var(--paper-2); border: 1px solid var(--line-strong); text-align: center; padding: 6px 4px; border-left: 2px dashed var(--line-strong); border-right: 2px dashed var(--line-strong); position: relative; ${absentBgStyle}">
                     ${attIndicatorHTML}
                     <div class="grade-score-controls" style="justify-content: center;">
                       <button class="grade-score-btn grade-btn-plus ${isCheck ? 'active-check' : (isStar ? 'active-star' : '')}" onclick="event.stopPropagation(); app.recordDraftGradeScore('${this.escapeQuotes(student)}', 'plus')" title="Click for Plus (+), click again for Gold Star (★)">${isStar ? '★' : '+'}</button>
@@ -3555,9 +3945,9 @@ class SeatingChartApp {
                     const earned = Number(gradeVal);
                     const maxPts = Number(col.maxPoints || 10);
                     const pct = Math.round((earned / maxPts) * 100);
-                    symbolHTML = `<span style="font-weight: 700; font-size: 0.88rem; color: #0f172a; white-space: nowrap;">${earned}/${maxPts} <span style="font-size: 0.8rem; font-weight: 600; color: #64748b;">(${pct}%)</span></span>`;
+                    symbolHTML = `<span style="font-weight: 700; font-size: 0.88rem; color: var(--ink); white-space: nowrap;">${earned}/${maxPts} <span style="font-size: 0.8rem; font-weight: 600; color: var(--ink-muted);">(${pct}%)</span></span>`;
                   } else {
-                    symbolHTML = `<span style="color: #cbd5e1; font-weight: bold;">—</span>`;
+                    symbolHTML = `<span style="color: var(--line-strong); font-weight: bold;">—</span>`;
                   }
                 } else if (String(gradeVal) === '4') {
                   symbolHTML = `<span class="standards-grade-badge grade-standards-4" title="4 - Advanced">4</span>`;
@@ -3590,7 +3980,7 @@ class SeatingChartApp {
               }
             });
 
-            html += `<tr><td><div style="display: flex; align-items: center; gap: 8px;"><span style="font-weight: 600; color: #0f172a;">${this.escapeHtml(fullName)}</span>${ratioHTML}</div></td>${gradeCellsHTML}</tr>`;
+            html += `<tr><td><div style="display: flex; align-items: center; gap: 8px;"><span class="register-name">${this.escapeHtml(fullName)}</span>${ratioHTML}</div></td>${gradeCellsHTML}</tr>`;
           });
         }
         html += '</tbody>';
@@ -3623,6 +4013,7 @@ class SeatingChartApp {
       }
 
       switchClass(classId) {
+        this.gardenEditClassId = null;
         this.currentClassId = classId;
         this.saveData();
         this.renderClassDropdown();
@@ -3688,6 +4079,8 @@ class SeatingChartApp {
         }
       }
 
+      // + Add Class (or Enter): the new class goes at the top of the list; Confirm saves it without
+      // switching to it
       addClassFromModal() {
         const nameInput = document.getElementById('modalAddClassName');
         const name = nameInput.value.trim();
@@ -3696,8 +4089,14 @@ class SeatingChartApp {
           return;
         }
 
-        const newClass = {
-          id: 'class-' + Date.now(),
+        this.tempClasses.unshift(this.makeNewModalClass(name));
+        nameInput.value = '';
+        this.renderModalClassesList();
+      }
+
+      makeNewModalClass(name) {
+        return {
+          id: 'class-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
           name: name,
           layout: 'rows',
           rowsCount: 4,
@@ -3715,14 +4114,14 @@ class SeatingChartApp {
           },
           containerHeights: {}
         };
-
-        this.tempClasses.push(newClass);
-        nameInput.value = '';
-        this.renderModalClassesList();
       }
 
       saveEditedClasses() {
-        if (this.tempClasses.length === 0) {
+        // A name typed but not added yet: Confirm creates that class at the top and opens it
+        const nameInput = document.getElementById('modalAddClassName');
+        const pendingName = nameInput ? nameInput.value.trim() : '';
+
+        if (this.tempClasses.length === 0 && !pendingName) {
           alert('You must have at least one class.');
           return;
         }
@@ -3732,15 +4131,28 @@ class SeatingChartApp {
           return;
         }
 
+        let openId = null;
+        if (pendingName) {
+          const newClass = this.makeNewModalClass(pendingName);
+          this.tempClasses.unshift(newClass);
+          openId = newClass.id;
+          nameInput.value = '';
+        }
+
         this.classes = JSON.parse(JSON.stringify(this.tempClasses));
+        if (openId) this.currentClassId = openId;
         if (!this.classes.some(c => c.id === this.currentClassId)) {
           this.currentClassId = this.classes[0].id;
         }
 
         this.saveData();
-        this.renderClassDropdown();
-        this.render();
         this.closeModal('editClassesModal');
+        if (openId) {
+          this.switchClass(openId);
+        } else {
+          this.renderClassDropdown();
+          this.render();
+        }
       }
 
       // =========================================================================
@@ -4099,15 +4511,15 @@ class SeatingChartApp {
           btn.classList.add('active');
           if (badge) {
             badge.textContent = 'ON';
-            badge.style.background = '#2563eb';
+            badge.style.background = 'var(--blue)';
             badge.style.color = '#ffffff';
           }
         } else {
           btn.classList.remove('active');
           if (badge) {
             badge.textContent = 'OFF';
-            badge.style.background = '#e2e8f0';
-            badge.style.color = '#64748b';
+            badge.style.background = 'var(--line)';
+            badge.style.color = 'var(--ink-muted)';
           }
         }
       }
@@ -4183,7 +4595,7 @@ class SeatingChartApp {
                         <button type="button" class="btn-schedule-week-nav" onclick="event.stopPropagation(); app.changeCalendarSyncWeek(-1)" title="Previous Week">‹</button>
                         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; flex: 1;">
                           <span style="font-size: 0.8rem; font-weight: 800; padding: 1px 8px; border-radius: 10px; ${badgeStyle}">${d.dateStr}</span>
-                          <span style="font-size: 0.95rem; font-weight: ${d.isToday ? '800' : '700'}; color: ${d.isToday ? '#1e40af' : '#1e293b'};">${d.label}</span>
+                          <span style="font-size: 0.95rem; font-weight: ${d.isToday ? '800' : '700'}; color: ${d.isToday ? 'var(--blue-dark)' : 'var(--ink)'};">${d.label}</span>
                         </div>
                         <div style="width: 26px; flex-shrink: 0;"></div>
                       </div>
@@ -4194,7 +4606,7 @@ class SeatingChartApp {
                         <div style="width: 26px; flex-shrink: 0;"></div>
                         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; flex: 1;">
                           <span style="font-size: 0.8rem; font-weight: 800; padding: 1px 8px; border-radius: 10px; ${badgeStyle}">${d.dateStr}</span>
-                          <span style="font-size: 0.95rem; font-weight: ${d.isToday ? '800' : '700'}; color: ${d.isToday ? '#1e40af' : '#1e293b'};">${d.label}</span>
+                          <span style="font-size: 0.95rem; font-weight: ${d.isToday ? '800' : '700'}; color: ${d.isToday ? 'var(--blue-dark)' : 'var(--ink)'};">${d.label}</span>
                         </div>
                         <button type="button" class="btn-schedule-week-nav" onclick="event.stopPropagation(); app.changeCalendarSyncWeek(1)" title="Next Week">›</button>
                       </div>
@@ -4203,7 +4615,7 @@ class SeatingChartApp {
                     headerInnerHtml = `
                       <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; width: 100%;">
                         <span style="font-size: 0.8rem; font-weight: 800; padding: 1px 8px; border-radius: 10px; ${badgeStyle}">${d.dateStr}</span>
-                        <span style="font-size: 0.95rem; font-weight: ${d.isToday ? '800' : '700'}; color: ${d.isToday ? '#1e40af' : '#1e293b'};">${d.label}</span>
+                        <span style="font-size: 0.95rem; font-weight: ${d.isToday ? '800' : '700'}; color: ${d.isToday ? 'var(--blue-dark)' : 'var(--ink)'};">${d.label}</span>
                       </div>
                     `;
                   }
@@ -4225,10 +4637,10 @@ class SeatingChartApp {
         if (timeBlocks.length === 0) {
           html += `
             <tr>
-              <td colspan="6" style="padding: 60px 20px; text-align: center; color: #64748b; font-size: 1rem; background: #fafafa;">
+              <td colspan="6" style="padding: 60px 20px; text-align: center; color: var(--ink-muted); font-size: 1rem; background: var(--paper-2);">
                 <div style="font-size: 2.6rem; margin-bottom: 12px;">🗓️</div>
-                <div style="font-weight: 800; font-size: 1.25rem; color: #1e293b; margin-bottom: 8px;">Welcome to Your Weekly Schedule</div>
-                <div style="font-size: 0.95rem; color: #64748b; margin-bottom: 22px; max-width: 480px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+                <div style="font-weight: 800; font-size: 1.25rem; color: var(--ink); margin-bottom: 8px;">Welcome to Your Weekly Schedule</div>
+                <div style="font-size: 0.95rem; color: var(--ink-muted); margin-bottom: 22px; max-width: 480px; margin-left: auto; margin-right: auto; line-height: 1.5;">
                   Start by creating your blocks of time. Click below to begin with <strong>8:30-9:00</strong> and customize your daily time slots for <strong>${this.escapeHtml(activeSched.name)}</strong>.
                 </div>
                 <button type="button" class="btn btn-primary" style="font-weight: 800; font-size: 1rem; padding: 12px 28px; border-radius: 8px; box-shadow: 0 2px 6px rgba(37,99,235,0.3);" onclick="app.initScheduleTimeBlocks()">
@@ -4274,8 +4686,8 @@ class SeatingChartApp {
               `;
             } else {
               html += `
-                <td class="schedule-time-cell" style="padding: 10px 14px; text-align: center; background: #ffffff;">
-                  <span style="font-weight: 700; font-size: 0.95rem; color: #1e293b;">${this.escapeHtml(timeSlot)}</span>
+                <td class="schedule-time-cell" style="padding: 10px 14px; text-align: center; background: var(--paper);">
+                  <span style="font-weight: 700; font-size: 0.95rem; color: var(--ink);">${this.escapeHtml(timeSlot)}</span>
                 </td>
               `;
             }
@@ -4353,7 +4765,7 @@ class SeatingChartApp {
                 });
                 html += `</td>`;
               } else {
-                html += `<td class="${cellHighlightClass}" style="text-align: center; vertical-align: middle; padding: 8px; ${todayCellStyle}"><span style="color: #cbd5e1; font-size: 0.9rem; user-select: none;">—</span></td>`;
+                html += `<td class="${cellHighlightClass}" style="text-align: center; vertical-align: middle; padding: 8px; ${todayCellStyle}"><span style="color: var(--line-strong); font-size: 0.9rem; user-select: none;">—</span></td>`;
               }
             });
 
@@ -4367,11 +4779,11 @@ class SeatingChartApp {
           html += `
             <tfoot>
               <tr>
-                <td style="padding: 8px 12px; text-align: center; background: #f8fafc; border-top: 1.5px solid #cbd5e1;">
+                <td style="padding: 8px 12px; text-align: center; background: var(--paper-2); border-top: 1.5px solid var(--line-strong);">
                   <button type="button" class="btn btn-outline" style="font-size: 0.8rem; font-weight: 700; padding: 4px 10px;" onclick="app.addTimeBlockAtEnd()" title="Add another 30-min time block">+ Add Block</button>
                 </td>
-                <td colspan="5" style="padding: 8px 12px; text-align: right; background: #f8fafc; border-top: 1.5px solid #cbd5e1;">
-                  <button type="button" style="background: none; border: none; color: #94a3b8; font-size: 0.78rem; font-weight: 600; cursor: pointer; text-decoration: underline;" onclick="app.clearAllScheduleTimeBlocks()">Reset Time Blocks</button>
+                <td colspan="5" style="padding: 8px 12px; text-align: right; background: var(--paper-2); border-top: 1.5px solid var(--line-strong);">
+                  <button type="button" style="background: none; border: none; color: var(--ink-faint); font-size: 0.78rem; font-weight: 600; cursor: pointer; text-decoration: underline;" onclick="app.clearAllScheduleTimeBlocks()">Reset Time Blocks</button>
                 </td>
               </tr>
             </tfoot>
@@ -4948,7 +5360,7 @@ class SeatingChartApp {
           const slots = this.getClassScheduleSlots(c, this.tempSelectedScheduleId);
 
           const pace = this.getAttendancePace(c);
-          const paceToggleHtml = isText ? '' : `<div class="pace-toggle" title="Perfect-attendance glow — Weekly: 3 / 6 / 12 classes in a row · Daily: 3 / 9 / 18">
+          const paceToggleHtml = isText ? '' : `<div class="pace-toggle" title="How often this class meets, which sets how fast its Garden grows">
                   <button type="button" class="${pace === 'weekly' ? 'active' : ''}" onclick="app.setScheduleModalClassPace(${idx}, 'weekly')">Weekly</button>
                   <button type="button" class="${pace === 'daily' ? 'active' : ''}" onclick="app.setScheduleModalClassPace(${idx}, 'daily')">Daily</button>
                 </div>`;
@@ -4962,17 +5374,17 @@ class SeatingChartApp {
                   <button type="button" class="btn btn-outline" style="padding: 1px 6px; font-size: 0.75rem;" onclick="app.moveScheduleModalClass(${idx}, -1)" ${idx === 0 ? 'disabled' : ''}>▲</button>
                   <button type="button" class="btn btn-outline" style="padding: 1px 6px; font-size: 0.75rem;" onclick="app.moveScheduleModalClass(${idx}, 1)" ${idx === this.tempScheduleClasses.length - 1 ? 'disabled' : ''}>▼</button>
                 </div>
-                <button type="button" class="schedule-color-circle-btn" style="background-color: ${c.color || '#059669'};" onclick="app.openScheduleColorPicker(${idx})" title="Change Color"></button>
-                ${isText ? `<span style="font-size: 0.72rem; font-weight: 800; background: #e2e8f0; color: #475569; padding: 3px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; flex-shrink: 0;">Text</span>` : ''}
-                <input type="text" value="${this.escapeHtml(c.name || '')}" placeholder="Name..." style="flex: 1; font-weight: 700; font-size: 0.95rem; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px;" oninput="app.tempScheduleClasses[${idx}].name = this.value">
+                <button type="button" class="schedule-color-circle-btn" style="background-color: ${c.color || 'var(--green)'};" onclick="app.openScheduleColorPicker(${idx})" title="Change Color"></button>
+                ${isText ? `<span style="font-size: 0.72rem; font-weight: 800; background: var(--line); color: var(--ink-soft); padding: 3px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; flex-shrink: 0;">Text</span>` : ''}
+                <input type="text" value="${this.escapeHtml(c.name || '')}" placeholder="Name..." style="flex: 1; font-weight: 700; font-size: 0.95rem; padding: 6px 10px; border: 1px solid var(--line-strong); border-radius: 6px;" oninput="app.tempScheduleClasses[${idx}].name = this.value">
                 ${paceToggleHtml}
                 <button type="button" class="btn" style="background: var(--danger); color: white; padding: 5px 10px; font-size: 1.1rem; line-height: 1;" onclick="app.deleteScheduleModalClass(${idx})" title="Delete">&times;</button>
               </div>
 
               <div style="display: flex; justify-content: center; align-items: center; margin-top: -2px;">
                 <button type="button" class="btn-schedule-card-expand" onclick="app.toggleScheduleCardExpand(${idx})" title="Click to view and edit schedule">
-                  ${summaryText ? `<span style="font-size: 0.78rem; font-weight: 700; color: #475569;">${this.escapeHtml(summaryText)}</span>` : ''}
-                  <span style="font-size: 0.82rem; font-weight: 800; color: #2563eb;">⌄</span>
+                  ${summaryText ? `<span style="font-size: 0.78rem; font-weight: 700; color: var(--ink-soft);">${this.escapeHtml(summaryText)}</span>` : ''}
+                  <span style="font-size: 0.82rem; font-weight: 800; color: var(--blue);">⌄</span>
                 </button>
               </div>
             `;
@@ -5036,9 +5448,9 @@ class SeatingChartApp {
                   <button type="button" class="btn btn-outline" style="padding: 1px 6px; font-size: 0.75rem;" onclick="app.moveScheduleModalClass(${idx}, -1)" ${idx === 0 ? 'disabled' : ''}>▲</button>
                   <button type="button" class="btn btn-outline" style="padding: 1px 6px; font-size: 0.75rem;" onclick="app.moveScheduleModalClass(${idx}, 1)" ${idx === this.tempScheduleClasses.length - 1 ? 'disabled' : ''}>▼</button>
                 </div>
-                <button type="button" class="schedule-color-circle-btn" style="background-color: ${c.color || '#059669'};" onclick="app.openScheduleColorPicker(${idx})" title="Change Color"></button>
-                ${isText ? `<span style="font-size: 0.72rem; font-weight: 800; background: #e2e8f0; color: #475569; padding: 3px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; flex-shrink: 0;">Text</span>` : ''}
-                <input type="text" value="${this.escapeHtml(c.name || '')}" placeholder="Name..." style="flex: 1; font-weight: 700; font-size: 0.95rem; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px;" oninput="app.tempScheduleClasses[${idx}].name = this.value">
+                <button type="button" class="schedule-color-circle-btn" style="background-color: ${c.color || 'var(--green)'};" onclick="app.openScheduleColorPicker(${idx})" title="Change Color"></button>
+                ${isText ? `<span style="font-size: 0.72rem; font-weight: 800; background: var(--line); color: var(--ink-soft); padding: 3px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; flex-shrink: 0;">Text</span>` : ''}
+                <input type="text" value="${this.escapeHtml(c.name || '')}" placeholder="Name..." style="flex: 1; font-weight: 700; font-size: 0.95rem; padding: 6px 10px; border: 1px solid var(--line-strong); border-radius: 6px;" oninput="app.tempScheduleClasses[${idx}].name = this.value">
                 ${paceToggleHtml}
                 <button type="button" class="btn" style="background: var(--danger); color: white; padding: 5px 10px; font-size: 1.1rem; line-height: 1;" onclick="app.deleteScheduleModalClass(${idx})" title="Delete">&times;</button>
               </div>
@@ -5048,10 +5460,10 @@ class SeatingChartApp {
               </div>
 
               ${isExpandedNotes ? `
-                <div class="schedule-notes-drawer" style="margin-top: 4px; padding: 10px 12px; background: #f8fafc; border-radius: 8px; border: 1.5px dashed #cbd5e1; display: flex; flex-direction: column; gap: 8px;">
+                <div class="schedule-notes-drawer" style="margin-top: 4px; padding: 10px 12px; background: var(--paper-2); border-radius: 8px; border: 1.5px dashed var(--line-strong); display: flex; flex-direction: column; gap: 8px;">
                   ${hasNotes ? `
                     <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 2px;">
-                      <div style="font-size: 0.75rem; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.3px;">Notes:</div>
+                      <div style="font-size: 0.75rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.3px;">Notes:</div>
                       ${notes.map((note, noteIdx) => {
                         let targetLabel = 'Every class';
                         if (note.target === 'specific') {
@@ -5060,12 +5472,12 @@ class SeatingChartApp {
                           targetLabel = `Only once: ${this.formatNoteDateDisplay(note.date)}`;
                         }
                         return `
-                        <div style="display: flex; align-items: center; justify-content: space-between; background: white; padding: 5px 8px; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 0.82rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; background: var(--paper); padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line); font-size: 0.82rem;">
                           <div>
-                            <span style="font-weight: 700; color: #1e293b;">${this.escapeHtml(note.text)}</span>
-                            <span style="color: #64748b; font-size: 0.75rem; margin-left: 6px;">(${targetLabel})</span>
+                            <span style="font-weight: 700; color: var(--ink);">${this.escapeHtml(note.text)}</span>
+                            <span style="color: var(--ink-muted); font-size: 0.75rem; margin-left: 6px;">(${targetLabel})</span>
                           </div>
-                          <button type="button" style="background: none; border: none; color: #ef4444; font-weight: bold; cursor: pointer; padding: 0 4px; font-size: 1rem; line-height: 1;" onclick="app.deleteScheduleNote(${idx}, ${noteIdx})" title="Delete Note">&times;</button>
+                          <button type="button" style="background: none; border: none; color: var(--red); font-weight: bold; cursor: pointer; padding: 0 4px; font-size: 1rem; line-height: 1;" onclick="app.deleteScheduleNote(${idx}, ${noteIdx})" title="Delete Note">&times;</button>
                         </div>
                       `;
                       }).join('')}
@@ -5073,10 +5485,10 @@ class SeatingChartApp {
                   ` : ''}
 
                   <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <div style="font-size: 0.75rem; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.3px;">+ Add Additional Text / Note:</div>
-                    <input type="text" id="noteInput_${idx}" placeholder="Enter additional text (e.g. Choir, Recorders, etc.)..." style="width: 100%; box-sizing: border-box; padding: 6px 10px; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 6px;" onkeydown="if(event.key === 'Enter') app.addScheduleNoteToClass(${idx})">
+                    <div style="font-size: 0.75rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.3px;">+ Add Additional Text / Note:</div>
+                    <input type="text" id="noteInput_${idx}" placeholder="Enter additional text (e.g. Choir, Recorders, etc.)..." style="width: 100%; box-sizing: border-box; padding: 6px 10px; font-size: 0.85rem; border: 1px solid var(--line-strong); border-radius: 6px;" onkeydown="if(event.key === 'Enter') app.addScheduleNoteToClass(${idx})">
                     
-                    <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem; color: #334155; margin-top: 2px;">
+                    <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem; color: var(--ink-soft); margin-top: 2px;">
                       <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
                         <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 600;">
                           <input type="radio" name="noteTarget_${idx}" value="all" checked onchange="app.handleNoteTargetChange(${idx}, 'all')">
@@ -5099,8 +5511,8 @@ class SeatingChartApp {
                       </div>
 
                       <div id="noteDateContainer_${idx}" style="display: none; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap;">
-                        <label for="noteDateInput_${idx}" style="font-weight: 700; font-size: 0.82rem; color: #475569;">Select Date:</label>
-                        <input type="date" id="noteDateInput_${idx}" value="${todayIso}" style="padding: 5px 10px; font-size: 0.85rem; border: 1.5px solid #cbd5e1; border-radius: 6px; font-family: inherit; font-weight: 600; color: #1e293b; background: white; outline: none; cursor: pointer;">
+                        <label for="noteDateInput_${idx}" style="font-weight: 700; font-size: 0.82rem; color: var(--ink-soft);">Select Date:</label>
+                        <input type="date" id="noteDateInput_${idx}" value="${todayIso}" style="padding: 5px 10px; font-size: 0.85rem; border: 1.5px solid var(--line-strong); border-radius: 6px; font-family: inherit; font-weight: 600; color: var(--ink); background: var(--paper); outline: none; cursor: pointer;">
                       </div>
                     </div>
 
@@ -5114,7 +5526,7 @@ class SeatingChartApp {
               ${isConfigured ? `
                 <div style="display: flex; justify-content: center; align-items: center; margin-top: 2px;">
                   <button type="button" class="btn-schedule-card-expand" onclick="app.toggleScheduleCardExpand(${idx})" title="Collapse schedule card" style="padding: 1px 12px; font-size: 0.75rem;">
-                    <span style="font-size: 0.75rem; font-weight: 800; color: #64748b;">⌃ Collapse</span>
+                    <span style="font-size: 0.75rem; font-weight: 800; color: var(--ink-muted);">⌃ Collapse</span>
                   </button>
                 </div>
               ` : ''}
@@ -5279,7 +5691,7 @@ class SeatingChartApp {
           if (!customHex) {
             html += `
               <div class="color-swatch-item custom-swatch blank" onclick="app.onCustomSwatchClick(${slotIdx})" title="Click to choose a custom color">
-                <span style="font-size: 0.95rem; color: #94a3b8; font-weight: 800;">+</span>
+                <span style="font-size: 0.95rem; color: var(--ink-faint); font-weight: 800;">+</span>
               </div>
             `;
           } else {
@@ -5504,21 +5916,21 @@ class SeatingChartApp {
         this.tempSubjects.forEach((s, sIdx) => {
           if (!Array.isArray(s.categories)) s.categories = [];
           const card = document.createElement('div');
-          card.style.cssText = 'background: white; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);';
+          card.style.cssText = 'background: var(--paper); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);';
 
           const catCount = s.categories.length;
           const isExpanded = s.isExpanded !== false;
 
           let categoriesHTML = '';
           if (s.categories.length === 0) {
-            categoriesHTML = '<div style="font-size: 0.82rem; color: #94a3b8; font-style: italic; margin-bottom: 6px;">No subcategories yet. Add one below.</div>';
+            categoriesHTML = '<div style="font-size: 0.82rem; color: var(--ink-faint); font-style: italic; margin-bottom: 6px;">No subcategories yet. Add one below.</div>';
           } else {
             categoriesHTML = '<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">';
             s.categories.forEach((cat, cIdx) => {
               categoriesHTML += `
-                <div style="display: inline-flex; align-items: center; background: white; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 2px 6px; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+                <div style="display: inline-flex; align-items: center; background: var(--paper); border: 1.5px solid var(--line-strong); border-radius: 6px; padding: 2px 6px; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
                   <input type="text" value="${this.escapeHtml(cat)}" style="border: none; padding: 2px 4px; font-size: 0.85rem; font-weight: 700; width: 105px; outline: none; background: transparent;" oninput="app.tempSubjects[${sIdx}].categories[${cIdx}] = this.value">
-                  <button type="button" onclick="app.deleteModalCategory(${sIdx}, ${cIdx})" style="background: transparent; border: none; color: #ef4444; font-size: 1rem; line-height: 1; cursor: pointer; font-weight: bold; padding: 0 2px;" title="Remove Category">&times;</button>
+                  <button type="button" onclick="app.deleteModalCategory(${sIdx}, ${cIdx})" style="background: transparent; border: none; color: var(--red); font-size: 1rem; line-height: 1; cursor: pointer; font-weight: bold; padding: 0 2px;" title="Remove Category">&times;</button>
                 </div>
               `;
             });
@@ -5532,7 +5944,7 @@ class SeatingChartApp {
                 <input type="text" value="${this.escapeHtml(s.name)}" style="flex: 1; font-weight: 700; font-size: 0.95rem; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color);" oninput="app.tempSubjects[${sIdx}].name = this.value">
               </div>
               <div style="display: flex; align-items: center; gap: 6px;">
-                <button type="button" class="btn btn-outline" onclick="app.toggleSubjectSublevel(${sIdx})" style="font-size: 0.8rem; font-weight: 600; padding: 5px 10px; background: #f8fafc;">
+                <button type="button" class="btn btn-outline" onclick="app.toggleSubjectSublevel(${sIdx})" style="font-size: 0.8rem; font-weight: 600; padding: 5px 10px; background: var(--paper-2);">
                   ${isExpanded ? 'Subcategories ▴' : `Subcategories (${catCount}) ▾`}
                 </button>
                 <button type="button" class="btn" style="background: var(--danger); color: white; padding: 5px 10px; font-size: 0.9rem;" onclick="app.deleteModalSubject(${sIdx})" title="Delete Subject">&times;</button>
@@ -5540,13 +5952,13 @@ class SeatingChartApp {
             </div>
 
             ${isExpanded ? `
-              <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 10px; margin-top: 4px;">
+              <div style="background: var(--paper-2); border: 1px dashed var(--line-strong); border-radius: 6px; padding: 10px; margin-top: 4px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                  <span style="font-weight: 700; font-size: 0.8rem; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">Assessment Subcategories:</span>
+                  <span style="font-weight: 700; font-size: 0.8rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.5px;">Assessment Subcategories:</span>
                 </div>
                 ${categoriesHTML}
                 <div style="display: flex; gap: 6px; align-items: center;">
-                  <input type="text" id="modalAddCategory_${sIdx}" placeholder="New category (e.g. Drawing, Pottery)..." style="flex: 1; padding: 5px 10px; font-size: 0.85rem; background: white; border-radius: 6px; border: 1px solid var(--border-color);" onkeydown="if(event.key === 'Enter') app.addCategoryFromModal(${sIdx})">
+                  <input type="text" id="modalAddCategory_${sIdx}" placeholder="New category (e.g. Drawing, Pottery)..." style="flex: 1; padding: 5px 10px; font-size: 0.85rem; background: var(--paper); border-radius: 6px; border: 1px solid var(--border-color);" onkeydown="if(event.key === 'Enter') app.addCategoryFromModal(${sIdx})">
                   <button type="button" class="btn btn-secondary" onclick="app.addCategoryFromModal(${sIdx})" style="font-size: 0.82rem; padding: 5px 12px; font-weight: 700;">+ Add</button>
                 </div>
               </div>
@@ -5676,6 +6088,7 @@ class SeatingChartApp {
       setLayout(layoutType) {
         const currentClass = this.getCurrentClass();
         if (!currentClass) return;
+        if (layoutType !== 'garden') this.gardenEditClassId = null;
 
         const all = this.getAllClassStudents(currentClass);
         const sortedByLast = this.sortStudentsByName(all, 'last');
@@ -5694,6 +6107,8 @@ class SeatingChartApp {
             currentClass.freeform = [...sortedByLast];
           }
           this.initInitialFreeformPositions(currentClass);
+        } else if (layoutType === 'band') {
+          if (!currentClass.band) currentClass.band = this.createDefaultBand(sortedByLast);
         } else if (['half', 'third', 'fourth', 'fifth', 'sixth'].includes(layoutType)) {
           const numGroups = layoutType === 'half' ? 2 : layoutType === 'third' ? 3 : layoutType === 'fourth' ? 4 : layoutType === 'fifth' ? 5 : 6;
           const gArr = currentClass.layoutsData[layoutType];
@@ -5868,6 +6283,7 @@ class SeatingChartApp {
         if (currentClass.freeformPositions && currentClass.freeformPositions[nameToRemove]) {
           delete currentClass.freeformPositions[nameToRemove];
         }
+        this.getBandChairs(currentClass.band).forEach(ch => { if (ch.student === nameToRemove) ch.student = ''; });
         if (currentClass.layoutsData) {
           ['half', 'third', 'fourth', 'fifth', 'sixth'].forEach(key => {
             if (Array.isArray(currentClass.layoutsData[key])) {
@@ -5915,6 +6331,17 @@ class SeatingChartApp {
           if (!currentClass.freeform) currentClass.freeform = [];
           if (!currentClass.freeform.includes(nameToPlace)) currentClass.freeform.push(nameToPlace);
           this.initInitialFreeformPositions(currentClass);
+        } else if (layout === 'band') {
+          // The first open chair, front arc first; else a new chair at the end of the back arc
+          const band = currentClass.band;
+          if (band && !this.findBandChair(band, nameToPlace)) {
+            const open = this.getBandChairs(band).find(ch => !ch.student);
+            if (open) open.student = nameToPlace;
+            else {
+              const back = band.rows[band.rows.length - 1];
+              if (back.length < BAND.maxSeats) back.push(this.makeBandChair('', nameToPlace));
+            }
+          }
         } else if (layout === 'lines') {
           const lineCount = currentClass.linesCount || 4;
           if (!Array.isArray(currentClass.lines) || currentClass.lines.length < lineCount) {
@@ -6011,6 +6438,33 @@ class SeatingChartApp {
         if (seats.length === 0) return { index: 0, marker: null };
         const rects = seats.map(el => el.getBoundingClientRect());
 
+        if (zoneEl.classList.contains('seat-drop-table')) {
+          // Seats go clockwise around the table: land before or after the nearest seat,
+          // on the side of the neighbour the pointer is heading toward
+          const centers = rects.map(r => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 }));
+          let near = 0;
+          centers.forEach((c, i) => {
+            if (Math.hypot(c.x - clientX, c.y - clientY) < Math.hypot(centers[near].x - clientX, centers[near].y - clientY)) near = i;
+          });
+          const c = centers[near];
+          const prev = centers[near - 1] || c;
+          const next = centers[near + 1] || c;
+          let dx = next.x - prev.x;
+          let dy = next.y - prev.y;
+          if (!dx && !dy) dx = 1;
+          const after = (clientX - c.x) * dx + (clientY - c.y) * dy > 0;
+          const index = after ? near + 1 : near;
+          const r = rects[near];
+          const other = after ? centers[near + 1] : centers[near - 1];
+          const sideways = Math.abs(dx) >= Math.abs(dy);
+          if (sideways) {
+            const x = other ? (c.x + other.x) / 2 : (after ? r.right + 6 : r.left - 6);
+            return { index, marker: { left: x - 2, top: r.top, width: 4, height: r.height } };
+          }
+          const y = other ? (c.y + other.y) / 2 : (after ? r.bottom + 6 : r.top - 6);
+          return { index, marker: { left: r.left, top: y - 2, width: r.width, height: 4 } };
+        }
+
         if (vertical) {
           let index = rects.findIndex(r => clientY < r.top + r.height / 2);
           if (index === -1) index = rects.length;
@@ -6048,7 +6502,10 @@ class SeatingChartApp {
         const zoneEl = seatEl.parentElement;
         if (!zoneEl || !zoneEl.classList.contains('seat-drop-zone')) return 'swap';
         const r = seatEl.getBoundingClientRect();
-        const frac = zoneEl.classList.contains('seat-drop-vertical')
+        // At a table's two ends the neighbours are above and below
+        const vertical = zoneEl.classList.contains('seat-drop-vertical') ||
+          (zoneEl.classList.contains('seat-drop-table') && (seatEl.dataset.side === 'left' || seatEl.dataset.side === 'right'));
+        const frac = vertical
           ? (clientY - r.top) / r.height
           : (clientX - r.left) / r.width;
         return (frac < 0.28 || frac > 0.72) ? 'insert' : 'swap';
@@ -6095,6 +6552,7 @@ class SeatingChartApp {
       hideSeatInsertMarker() {
         const el = document.getElementById('seatInsertMarker');
         if (el) el.style.display = 'none';
+        this.hideBandDropHint();
       }
 
       // The drop position inside a row/section/line/group, or the end when unknown.
@@ -6464,6 +6922,11 @@ class SeatingChartApp {
 
         const currentClass = this.getCurrentClass();
         if (!currentClass) return;
+        // Band chairs have no list order to change from the roster
+        if (currentClass.layout === 'band') {
+          this.resetDragState();
+          return;
+        }
 
         if (Array.isArray(currentClass.unplacedStudents)) {
           currentClass.unplacedStudents = currentClass.unplacedStudents.filter(n => n !== this.draggedStudentName);
@@ -6606,164 +7069,10 @@ class SeatingChartApp {
         e.currentTarget.classList.remove('drag-over');
       }
 
-      handleGroupDragStart(e, groupIndex) {
-        if (!this.isEditMode) return;
-        this.draggedGroupIndex = groupIndex;
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', 'group-' + groupIndex);
-        e.stopPropagation();
-
-        document.body.classList.add('group-dragging-active');
-
-        const box = document.getElementById(`group-box-${groupIndex}`);
-        if (box) box.classList.add('group-dragging');
-      }
-
-      handleGroupDragOver(e, targetIndex) {
-        if (!this.isEditMode || this.draggedGroupIndex === null) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-
-        const box = document.getElementById(`group-box-${targetIndex}`);
-        if (!box) return;
-
-        const rect = box.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const width = rect.width;
-
-        box.classList.remove('group-drop-target', 'group-drop-left', 'group-drop-right');
-
-        if (mouseX < width * 0.3) {
-          box.classList.add('group-drop-left');
-        } else if (mouseX > width * 0.7) {
-          box.classList.add('group-drop-right');
-        } else {
-          box.classList.add('group-drop-target');
-        }
-      }
-
-      handleGroupDragEnter(e, targetIndex) {
-        if (!this.isEditMode || this.draggedGroupIndex === null) return;
-        e.preventDefault();
-      }
-
-      handleGroupDragLeave(e, targetIndex) {
-        if (!this.isEditMode || this.draggedGroupIndex === null) return;
-        const box = document.getElementById(`group-box-${targetIndex}`);
-        if (box && !box.contains(e.relatedTarget)) {
-          box.classList.remove('group-drop-target', 'group-drop-left', 'group-drop-right');
-        }
-      }
-
-      handleGroupDrop(e, targetIndex, layoutType) {
-        if (!this.isEditMode || this.draggedGroupIndex === null) return;
-        e.preventDefault();
-        e.stopPropagation();
-
-        const box = document.getElementById(`group-box-${targetIndex}`);
-        let mode = 'swap';
-        if (box) {
-          if (box.classList.contains('group-drop-left')) mode = 'left';
-          else if (box.classList.contains('group-drop-right')) mode = 'right';
-          box.classList.remove('group-drop-target', 'group-drop-left', 'group-drop-right');
-        }
-
-        const currentClass = this.getCurrentClass();
-        if (!currentClass || !currentClass.layoutsData || !currentClass.layoutsData[layoutType]) return;
-
-        if (mode === 'swap') {
-          // Swap student arrays between tables
-          const groups = currentClass.layoutsData[layoutType];
-          const temp = groups[this.draggedGroupIndex];
-          groups[this.draggedGroupIndex] = groups[targetIndex];
-          groups[targetIndex] = temp;
-        } else {
-          // Reorder table position (left or right of target)
-          const groups = currentClass.layoutsData[layoutType];
-          const fromIdx = this.draggedGroupIndex;
-          if (fromIdx !== targetIndex) {
-            const movedGroup = groups.splice(fromIdx, 1)[0];
-            let insertIdx = targetIndex;
-            if (fromIdx < targetIndex) {
-              insertIdx = mode === 'left' ? targetIndex - 1 : targetIndex;
-            } else {
-              insertIdx = mode === 'right' ? targetIndex + 1 : targetIndex;
-            }
-            insertIdx = Math.max(0, Math.min(insertIdx, groups.length));
-            groups.splice(insertIdx, 0, movedGroup);
-          }
-        }
-
-        this.saveData();
-        this.render();
-        this.resetDragState();
-      }
-
-      handleRowDrop(e, targetRowIdx, layoutType) {
-        if (!this.isEditMode || this.draggedGroupIndex === null) return;
-        e.preventDefault();
-        e.stopPropagation();
-
-        const currentClass = this.getCurrentClass();
-        if (!currentClass || !currentClass.layoutsData) return;
-
-        const rowKey = `${layoutType}Rows`;
-        let rows = currentClass.layoutsData[rowKey];
-        if (!rows) return;
-
-        const gIdx = this.draggedGroupIndex;
-
-        // Move groupIndex into targetRowIdx
-        rows = rows.map(r => r.filter(id => id !== gIdx));
-        if (!rows[targetRowIdx]) rows[targetRowIdx] = [];
-        rows[targetRowIdx].push(gIdx);
-
-        // Clean up empty rows
-        currentClass.layoutsData[rowKey] = rows.filter(r => r.length > 0);
-
-        this.saveData();
-        this.render();
-        this.resetDragState();
-      }
-
-      handleNewRowDrop(e, layoutType) {
-        if (!this.isEditMode || this.draggedGroupIndex === null) return;
-        e.preventDefault();
-        e.stopPropagation();
-
-        const currentClass = this.getCurrentClass();
-        if (!currentClass || !currentClass.layoutsData) return;
-
-        const rowKey = `${layoutType}Rows`;
-        let rows = currentClass.layoutsData[rowKey];
-        if (!rows) rows = [];
-
-        const gIdx = this.draggedGroupIndex;
-
-        // Remove from existing row
-        rows = rows.map(r => r.filter(id => id !== gIdx)).filter(r => r.length > 0);
-
-        // Create new bottom row
-        rows.push([gIdx]);
-        currentClass.layoutsData[rowKey] = rows;
-
-        this.saveData();
-        this.render();
-        this.resetDragState();
-      }
-
       handleDragEnd(e) {
         this.resetDragState();
-        document.body.classList.remove('group-dragging-active');
         document.querySelectorAll('.seat.dragging, .roster-item.dragging').forEach(el => el.classList.remove('dragging'));
-        document.querySelectorAll('.seat.drag-over, .roster-item.drag-over, .group-box.drag-over').forEach(el => el.classList.remove('drag-over'));
-        document.querySelectorAll('.group-box.group-dragging').forEach(el => el.classList.remove('group-dragging'));
-        document.querySelectorAll('.group-box.group-drop-target, .group-box.group-drop-left, .group-box.group-drop-right').forEach(el => {
-          el.classList.remove('group-drop-target', 'group-drop-left', 'group-drop-right');
-        });
-        document.querySelectorAll('.group-row-slot.row-drop-target, .row-add-bottom-zone.drag-over').forEach(el => {
-          el.classList.remove('row-drop-target', 'drag-over');
-        });
+        document.querySelectorAll('.seat.drag-over, .roster-item.drag-over, .group-box.drag-over, .band-chair-open.drag-over, .band-drop-insert').forEach(el => el.classList.remove('drag-over', 'band-drop-insert'));
       }
 
       resetDragState() {
@@ -6836,7 +7145,7 @@ class SeatingChartApp {
 
         // 1. Screen flash visual effect
         const flashOverlay = document.createElement('div');
-        flashOverlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: white; opacity: 0.6; z-index: 10000; pointer-events: none; transition: opacity 0.25s ease-out;';
+        flashOverlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--paper); opacity: 0.6; z-index: 10000; pointer-events: none; transition: opacity 0.25s ease-out;';
         document.body.appendChild(flashOverlay);
 
         setTimeout(() => {
@@ -6854,18 +7163,21 @@ class SeatingChartApp {
 
         const wrapper = document.createElement('div');
         wrapper.className = 'snapshot-export-wrapper';
-        wrapper.style.cssText = 'position: absolute; left: -9999px; top: -9999px; background: #ffffff; padding: 32px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; font-family: Segoe UI, system-ui, -apple-system, sans-serif; width: 1100px; min-height: 700px;';
+        wrapper.style.cssText = 'position: absolute; left: -9999px; top: -9999px; background: var(--paper); padding: 32px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; font-family: Segoe UI, system-ui, -apple-system, sans-serif; width: 1100px; min-height: 700px;';
 
         // Class Name Title Banner
         const titleEl = document.createElement('div');
-        titleEl.style.cssText = 'font-size: 1.8rem; font-weight: 800; color: #0f172a; text-align: center; margin-bottom: 20px; letter-spacing: 0.5px;';
+        titleEl.style.cssText = 'font-size: 1.8rem; font-weight: 800; color: var(--ink); text-align: center; margin-bottom: 20px; letter-spacing: 0.5px;';
         titleEl.textContent = className;
         wrapper.appendChild(titleEl);
 
         // Chalkboard Front Banner
         const chalkboard = document.getElementById('chalkboardFront');
-        if (chalkboard && (!currentClass || currentClass.layout !== 'circle')) {
+        if (chalkboard && (!currentClass || (currentClass.layout !== 'circle' && currentClass.layout !== 'garden' && currentClass.layout !== 'band'))) {
           const cbClone = chalkboard.cloneNode(true);
+          // html2canvas can't draw CSS zoom (it shrinks the boxes but not the text), so the picture
+          // is drawn at full size and fitted to its own page instead
+          cbClone.style.zoom = '1';
           cbClone.style.margin = '0 0 24px 0';
           cbClone.style.width = '550px';
           cbClone.style.maxWidth = '100%';
@@ -6876,10 +7188,37 @@ class SeatingChartApp {
         const chartContainer = document.getElementById('chartContainer');
         if (chartContainer) {
           const chartClone = chartContainer.cloneNode(true);
-          chartClone.querySelectorAll('.row-align-dots, .circle-dial-container, .group-drag-handle, .resize-handle, .remove-btn').forEach(el => el.remove());
+          chartClone.querySelectorAll('.row-align-dots, .circle-dial-container, .group-drag-handle, .table-shape-btn, .resize-handle, .remove-btn, .band-tag-none').forEach(el => el.remove());
+          // html2canvas draws transform but not the scale property that shrinks a crowded table's cards
+          chartClone.querySelectorAll('.seat').forEach(el => {
+            if (el.style.scale) {
+              el.style.transform = `scale(${el.style.scale})`;
+              el.style.scale = '';
+            }
+          });
+          chartClone.style.zoom = '1';
           chartClone.style.maxWidth = '1000px';
           chartClone.style.width = '100%';
           chartClone.style.minHeight = 'auto';
+          // A table floor laid out in full screen can be wider than the picture: shrink it to fit
+          const cloneFloor = chartClone.querySelector('.table-floor, .band-floor');
+          if (cloneFloor) {
+            const floorW = parseFloat(cloneFloor.style.width) || 1000;
+            const floorH = parseFloat(cloneFloor.style.height) || 0;
+            const k = Math.min(1, 1000 / floorW);
+            cloneFloor.style.transform = k < 1 ? `scale(${k.toFixed(4)})` : '';
+            cloneFloor.style.marginBottom = k < 1 ? `${-floorH * (1 - k)}px` : '';
+            if (cloneFloor.classList.contains('band-floor')) cloneFloor.style.marginLeft = `max(0px, calc((100% - ${(floorW * k).toFixed(1)}px) / 2))`;
+          }
+          if (currentClass && currentClass.layout === 'garden') {
+            const perBed = Math.max(1, ...Array.from(chartClone.querySelectorAll('.garden-bed'), bed => bed.children.length));
+            const liveW = parseFloat(chartContainer.style.getPropertyValue('--garden-w')) || 110;
+            const cloneW = Math.min(liveW, this.gardenWidthFor(1000, perBed));
+            chartClone.style.setProperty('--garden-w', `${cloneW}px`);
+            chartClone.querySelectorAll('.garden-bed').forEach(bed => {
+              bed.style.width = `${Math.ceil(perBed * cloneW * GARDEN.pitch + GARDEN.bedPadX)}px`;
+            });
+          }
           wrapper.appendChild(chartClone);
         }
 
@@ -6941,7 +7280,7 @@ class SeatingChartApp {
 
         // Screen flash visual effect
         const flashOverlay = document.createElement('div');
-        flashOverlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: white; opacity: 0.6; z-index: 10000; pointer-events: none; transition: opacity 0.25s ease-out;';
+        flashOverlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--paper); opacity: 0.6; z-index: 10000; pointer-events: none; transition: opacity 0.25s ease-out;';
         document.body.appendChild(flashOverlay);
 
         setTimeout(() => {
@@ -6966,26 +7305,26 @@ class SeatingChartApp {
 
         const wrapper = document.createElement('div');
         wrapper.className = 'snapshot-export-wrapper';
-        wrapper.style.cssText = `position: absolute; left: -9999px; top: -9999px; background: #ffffff; padding: 32px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; font-family: Segoe UI, system-ui, -apple-system, sans-serif; width: ${minWidth}px;`;
+        wrapper.style.cssText = `position: absolute; left: -9999px; top: -9999px; background: var(--paper); padding: 32px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; font-family: Segoe UI, system-ui, -apple-system, sans-serif; width: ${minWidth}px;`;
 
         // Banner Title
         const titleEl = document.createElement('div');
-        titleEl.style.cssText = 'font-size: 1.75rem; font-weight: 800; color: #0f172a; text-align: center; margin-bottom: 24px; letter-spacing: 0.5px;';
+        titleEl.style.cssText = 'font-size: 1.75rem; font-weight: 800; color: var(--ink); text-align: center; margin-bottom: 24px; letter-spacing: 0.5px;';
         titleEl.textContent = `${rawClassName} — Attendance Register`;
         wrapper.appendChild(titleEl);
 
         // Build pristine export table (standard table, no position:sticky!)
         const exportTable = document.createElement('table');
-        exportTable.style.cssText = 'width: 100%; border-collapse: collapse; background: #ffffff; font-size: 0.95rem; font-family: inherit; text-align: center;';
+        exportTable.style.cssText = 'width: 100%; border-collapse: collapse; background: var(--paper); font-size: 0.95rem; font-family: inherit; text-align: center;';
 
         // Table Header
-        let theadHTML = '<thead><tr style="background-color: #f8fafc;">';
-        theadHTML += '<th style="padding: 12px 16px; border: 1px solid #cbd5e1; font-weight: 700; color: #0f172a; text-align: left; min-width: 220px; background-color: #f1f5f9;">Student Name</th>';
+        let theadHTML = '<thead><tr style="background-color: var(--paper-2);">';
+        theadHTML += '<th style="padding: 12px 16px; border: 1px solid var(--line-strong); font-weight: 700; color: var(--ink); text-align: left; min-width: 220px; background-color: var(--paper-3);">Student Name</th>';
         dates.forEach(d => {
-          theadHTML += `<th style="padding: 10px 12px; border: 1px solid #cbd5e1; min-width: 65px; background-color: #f8fafc; vertical-align: middle;">
+          theadHTML += `<th style="padding: 10px 12px; border: 1px solid var(--line-strong); min-width: 65px; background-color: var(--paper-2); vertical-align: middle;">
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.25;">
-              <span style="font-weight: 800; font-size: 0.9rem; color: #0f172a;">${d.date}</span>
-              <span style="font-weight: 600; font-size: 0.75rem; color: #64748b; margin-top: 2px;">${d.day}</span>
+              <span style="font-weight: 800; font-size: 0.9rem; color: var(--ink);">${d.date}</span>
+              <span style="font-weight: 600; font-size: 0.75rem; color: var(--ink-muted); margin-top: 2px;">${d.day}</span>
             </div>
           </th>`;
         });
@@ -6994,7 +7333,7 @@ class SeatingChartApp {
         // Table Body
         let tbodyHTML = '<tbody>';
         if (classList.length === 0) {
-          tbodyHTML += `<tr><td colspan="${dates.length + 1}" style="padding: 30px; text-align: center; color: #94a3b8; font-style: italic; border: 1px solid #cbd5e1;">No students in this class list</td></tr>`;
+          tbodyHTML += `<tr><td colspan="${dates.length + 1}" style="padding: 30px; text-align: center; color: var(--ink-faint); font-style: italic; border: 1px solid var(--line-strong);">No students in this class list</td></tr>`;
         } else {
           classList.forEach((student, rIdx) => {
             const profile = this.getStudentProfile(currentClass, student);
@@ -7012,15 +7351,15 @@ class SeatingChartApp {
               if (status === 'present' || status === 'absent') recordedCount++;
               if (status === 'present') {
                 presentCount++;
-                dateCells += `<td style="padding: 8px; border: 1px solid #e2e8f0; vertical-align: middle;">
-                  <span style="color: #10b981; font-weight: 800; font-size: 1.1rem; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: #ecfdf5; border: 1px solid #a7f3d0;">✓</span>
+                dateCells += `<td style="padding: 8px; border: 1px solid var(--line); vertical-align: middle;">
+                  <span style="color: var(--green); font-weight: 800; font-size: 1.1rem; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: var(--green-soft); border: 1px solid var(--green-line);">✓</span>
                 </td>`;
               } else if (status === 'absent') {
-                dateCells += `<td style="padding: 8px; border: 1px solid #e2e8f0; vertical-align: middle;">
-                  <span style="color: #ef4444; font-weight: 800; font-size: 1rem; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: #fef2f2; border: 1px solid #fecaca;">✕</span>
+                dateCells += `<td style="padding: 8px; border: 1px solid var(--line); vertical-align: middle;">
+                  <span style="color: var(--red); font-weight: 800; font-size: 1rem; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: var(--red-soft); border: 1px solid var(--red-line);">✕</span>
                 </td>`;
               } else {
-                dateCells += `<td style="padding: 8px; border: 1px solid #e2e8f0; vertical-align: middle;"></td>`;
+                dateCells += `<td style="padding: 8px; border: 1px solid var(--line); vertical-align: middle;"></td>`;
               }
             });
 
@@ -7028,10 +7367,10 @@ class SeatingChartApp {
             const rowBg = (rIdx % 2 === 1) ? '#f8fafc' : '#ffffff';
 
             tbodyHTML += `<tr style="background-color: ${rowBg};">
-              <td style="padding: 10px 14px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f172a; text-align: left;">
+              <td style="padding: 10px 14px; border: 1px solid var(--line-strong); font-weight: 600; color: var(--ink); text-align: left;">
                 <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
                   <span>${this.escapeHtml(fullName)}</span>
-                  <span style="font-size: 0.8rem; font-weight: 800; color: var(--primary); background: #e0e7ff; padding: 2px 7px; border-radius: 12px; white-space: nowrap;">${ratioText}</span>
+                  <span style="font-size: 0.8rem; font-weight: 800; color: var(--primary); background: var(--primary-soft); padding: 2px 7px; border-radius: 12px; white-space: nowrap;">${ratioText}</span>
                 </div>
               </td>
               ${dateCells}
@@ -7084,7 +7423,7 @@ class SeatingChartApp {
         }
 
         const flashOverlay = document.createElement('div');
-        flashOverlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: white; opacity: 0.6; z-index: 10000; pointer-events: none; transition: opacity 0.25s ease-out;';
+        flashOverlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--paper); opacity: 0.6; z-index: 10000; pointer-events: none; transition: opacity 0.25s ease-out;';
         document.body.appendChild(flashOverlay);
 
         setTimeout(() => {
@@ -7111,25 +7450,25 @@ class SeatingChartApp {
 
         const wrapper = document.createElement('div');
         wrapper.className = 'snapshot-export-wrapper';
-        wrapper.style.cssText = `position: absolute; left: -9999px; top: -9999px; background: #ffffff; padding: 32px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; font-family: Segoe UI, system-ui, -apple-system, sans-serif; width: ${minWidth}px;`;
+        wrapper.style.cssText = `position: absolute; left: -9999px; top: -9999px; background: var(--paper); padding: 32px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; font-family: Segoe UI, system-ui, -apple-system, sans-serif; width: ${minWidth}px;`;
 
         const titleEl = document.createElement('div');
-        titleEl.style.cssText = 'font-size: 1.75rem; font-weight: 800; color: #0f172a; text-align: center; margin-bottom: 24px; letter-spacing: 0.5px;';
+        titleEl.style.cssText = 'font-size: 1.75rem; font-weight: 800; color: var(--ink); text-align: center; margin-bottom: 24px; letter-spacing: 0.5px;';
         titleEl.textContent = `${rawClassName} — Grades Register (${subjName})`;
         wrapper.appendChild(titleEl);
 
         const exportTable = document.createElement('table');
-        exportTable.style.cssText = 'width: 100%; border-collapse: collapse; background: #ffffff; font-size: 0.95rem; font-family: inherit; text-align: center;';
+        exportTable.style.cssText = 'width: 100%; border-collapse: collapse; background: var(--paper); font-size: 0.95rem; font-family: inherit; text-align: center;';
 
-        let theadHTML = '<thead><tr style="background-color: #f8fafc;">';
-        theadHTML += '<th style="padding: 12px 16px; border: 1px solid #cbd5e1; font-weight: 700; color: #0f172a; text-align: left; min-width: 220px; background-color: #f1f5f9;">Student Name</th>';
+        let theadHTML = '<thead><tr style="background-color: var(--paper-2);">';
+        theadHTML += '<th style="padding: 12px 16px; border: 1px solid var(--line-strong); font-weight: 700; color: var(--ink); text-align: left; min-width: 220px; background-color: var(--paper-3);">Student Name</th>';
         gradeCols.forEach(col => {
           const theme = this.getCategoryTheme(col.title);
 
           theadHTML += `<th style="padding: 10px 12px; border: 1px solid ${theme.border}; min-width: 80px; background-color: ${theme.bgCell}; vertical-align: middle;">
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.25;">
               <span style="font-weight: 800; font-size: 0.85rem; color: ${theme.color}; background: ${theme.bgHeader}; padding: 2px 8px; border-radius: 12px; border: 1px solid ${theme.border};">${this.escapeHtml(col.title || 'Grade')}</span>
-              <span style="font-weight: 700; font-size: 0.8rem; color: #0f172a; margin-top: 3px;">${col.date}</span>
+              <span style="font-weight: 700; font-size: 0.8rem; color: var(--ink); margin-top: 3px;">${col.date}</span>
             </div>
           </th>`;
         });
@@ -7137,7 +7476,7 @@ class SeatingChartApp {
 
         let tbodyHTML = '<tbody>';
         if (classList.length === 0) {
-          tbodyHTML += `<tr><td colspan="${gradeCols.length + 1}" style="padding: 30px; text-align: center; color: #94a3b8; font-style: italic; border: 1px solid #cbd5e1;">No students in this class list</td></tr>`;
+          tbodyHTML += `<tr><td colspan="${gradeCols.length + 1}" style="padding: 30px; text-align: center; color: var(--ink-faint); font-style: italic; border: 1px solid var(--line-strong);">No students in this class list</td></tr>`;
         } else {
           classList.forEach((student, rIdx) => {
             const profile = this.getStudentProfile(currentClass, student);
@@ -7158,10 +7497,10 @@ class SeatingChartApp {
 
               if (this.showGradesAttendanceIndicators !== false && attStatus) {
                 if (attStatus === 'absent') {
-                  attIndicatorHTML = `<span style="position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background-color: #ef4444;"></span>`;
+                  attIndicatorHTML = `<span style="position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background-color: var(--red);"></span>`;
                   cellBg = '#fef2f2';
                 } else if (attStatus === 'present') {
-                  attIndicatorHTML = `<span style="position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background-color: #10b981;"></span>`;
+                  attIndicatorHTML = `<span style="position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background-color: var(--green);"></span>`;
                 }
               }
 
@@ -7173,26 +7512,26 @@ class SeatingChartApp {
                   const earned = Number(gradeVal);
                   const maxPts = Number(col.maxPoints || 10);
                   const pct = Math.round((earned / maxPts) * 100);
-                  symbolHTML = `<span style="font-weight: 700; font-size: 0.88rem; color: #0f172a; white-space: nowrap;">${earned}/${maxPts} <span style="font-size: 0.8rem; font-weight: 600; color: #64748b;">(${pct}%)</span></span>`;
+                  symbolHTML = `<span style="font-weight: 700; font-size: 0.88rem; color: var(--ink); white-space: nowrap;">${earned}/${maxPts} <span style="font-size: 0.8rem; font-weight: 600; color: var(--ink-muted);">(${pct}%)</span></span>`;
                 } else {
-                  symbolHTML = `<span style="color: #cbd5e1; font-weight: bold;">—</span>`;
+                  symbolHTML = `<span style="color: var(--line-strong); font-weight: bold;">—</span>`;
                 }
               } else if (String(gradeVal) === '4') {
                 symbolHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; font-weight: 900; font-size: 0.95rem; background: #fef08a; color: #854d0e; border: 1px solid #fde047;">4</span>`;
               } else if (String(gradeVal) === '3') {
-                symbolHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; font-weight: 900; font-size: 0.95rem; background: #bbf7d0; color: #166534; border: 1px solid #86efac;">3</span>`;
+                symbolHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; font-weight: 900; font-size: 0.95rem; background: #bbf7d0; color: var(--green-dark); border: 1px solid var(--green-line);">3</span>`;
               } else if (String(gradeVal) === '2') {
-                symbolHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; font-weight: 900; font-size: 0.95rem; background: #fed7aa; color: #9a3412; border: 1px solid #fdba74;">2</span>`;
+                symbolHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; font-weight: 900; font-size: 0.95rem; background: #fed7aa; color: #9a3412; border: 1px solid var(--orange-line);">2</span>`;
               } else if (String(gradeVal) === '1') {
-                symbolHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; font-weight: 900; font-size: 0.95rem; background: #fecaca; color: #991b1b; border: 1px solid #fca5a5;">1</span>`;
+                symbolHTML = `<span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; font-weight: 900; font-size: 0.95rem; background: var(--red-line); color: var(--red-dark); border: 1px solid var(--red-line);">1</span>`;
               } else if (gradeVal === 'star') {
                 symbolHTML = `<span style="color: #b45309; font-weight: 900; font-size: 1.15rem; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: #fef3c7; border: 1px solid #fbbf24;">★</span>`;
               } else if (gradeVal === 'check' || gradeVal === 'plus') {
-                symbolHTML = `<span style="color: #10b981; font-weight: 900; font-size: 1.1rem; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: #ecfdf5; border: 1px solid #a7f3d0;">+</span>`;
+                symbolHTML = `<span style="color: var(--green); font-weight: 900; font-size: 1.1rem; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: var(--green-soft); border: 1px solid var(--green-line);">+</span>`;
               } else if (gradeVal === 'minus') {
-                symbolHTML = `<span style="color: #ef4444; font-weight: 900; font-size: 1.2rem; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: #fef2f2; border: 1px solid #fecaca;">−</span>`;
+                symbolHTML = `<span style="color: var(--red); font-weight: 900; font-size: 1.2rem; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: var(--red-soft); border: 1px solid var(--red-line);">−</span>`;
               } else if (gradeVal === 'x') {
-                symbolHTML = `<span style="color: #dc2626; font-weight: 900; font-size: 1rem; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: #fef2f2; border: 1px solid #fecaca;">✕</span>`;
+                symbolHTML = `<span style="color: var(--red); font-weight: 900; font-size: 1rem; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: var(--red-soft); border: 1px solid var(--red-line);">✕</span>`;
               } else {
                 symbolHTML = ``;
               }
@@ -7205,10 +7544,10 @@ class SeatingChartApp {
 
             const showGradesRatio = (this.showGradesAttendanceIndicators !== false) && (currentClass ? (currentClass.showGradesAttendanceRatio !== false) : true);
             const ratioText = showGradesRatio ? this.getStudentAttendanceRatio(currentClass, student) : '';
-            const ratioHTML = showGradesRatio ? `<span style="font-size: 0.8rem; font-weight: 700; color: #4f46e5; background: #e0e7ff; padding: 2px 6px; border-radius: 10px;">${ratioText}</span>` : '';
+            const ratioHTML = showGradesRatio ? `<span class="register-ratio">${ratioText}</span>` : '';
             const rowBg = (rIdx % 2 === 1) ? '#ffffff' : '#ffffff';
             tbodyHTML += `<tr style="background-color: ${rowBg};">
-              <td style="padding: 10px 14px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f172a; text-align: left; background-color: #ffffff;">
+              <td style="padding: 10px 14px; border: 1px solid var(--line-strong); font-weight: 600; color: var(--ink); text-align: left; background-color: var(--paper);">
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <span>${this.escapeHtml(fullName)}</span>
                   ${ratioHTML}
@@ -7338,6 +7677,11 @@ class SeatingChartApp {
                 el.style.height = `${newHeight}px`;
               }
             }
+
+            // A group table re-seats its students around the table as it changes size
+            if (typeof el._relayout === 'function') {
+              el._relayout(parseFloat(el.style.width) || el.offsetWidth, parseFloat(el.style.height) || el.offsetHeight);
+            }
           };
 
           const onMouseUp = () => {
@@ -7347,7 +7691,9 @@ class SeatingChartApp {
             const currentClass = this.getCurrentClass();
             if (currentClass) {
               if (!currentClass.containerSizes) currentClass.containerSizes = {};
+              // Keep anything else saved with the size (a table's round/square shape)
               currentClass.containerSizes[sizeKey] = {
+                ...(currentClass.containerSizes[sizeKey] || {}),
                 width: el.offsetWidth,
                 height: el.offsetHeight
               };
@@ -7471,8 +7817,26 @@ class SeatingChartApp {
           }
         });
 
+        // Special seating rules about a student who has left the class go with them
+        if (Array.isArray(currentClass.seatingRules) && currentClass.seatingRules.some(r => !allowedNames.has(r.student) || (r.other && !allowedNames.has(r.other)))) {
+          currentClass.seatingRules = currentClass.seatingRules.filter(r => allowedNames.has(r.student) && (!r.other || allowedNames.has(r.other)));
+        }
+
+        // Band chairs: a name not on the class list, or already in another chair, leaves its chair open
+        if (currentClass.band) {
+          const seen = new Set();
+          this.getBandChairs(currentClass.band).forEach(ch => {
+            if (!ch.student) return;
+            if (!allowedNames.has(ch.student) || seen.has(ch.student)) ch.student = '';
+            else seen.add(ch.student);
+          });
+        }
+
         // 6. Ensure active group layout is populated if empty
         const activeLayout = currentClass.layout || 'rows';
+        if (activeLayout === 'band' && !currentClass.band) {
+          currentClass.band = this.createDefaultBand(this.sortStudentsByName([...allowedNames], 'last'));
+        }
         if (['half', 'third', 'fourth', 'fifth', 'sixth'].includes(activeLayout)) {
           const numGroups = activeLayout === 'half' ? 2 : activeLayout === 'third' ? 3 : activeLayout === 'fourth' ? 4 : activeLayout === 'fifth' ? 5 : 6;
           const gArr = currentClass.layoutsData ? currentClass.layoutsData[activeLayout] : null;
@@ -7648,6 +8012,8 @@ class SeatingChartApp {
           }
         }
 
+        this.updateBandSubheader(currentClass);
+
         if (linesSub) {
           if (isEditingMain && currentClass.layout === 'lines') {
             linesSub.style.display = 'flex';
@@ -7668,10 +8034,16 @@ class SeatingChartApp {
           this.syncUnplacedWithClassList(currentClass);
 
           const layout = currentClass.layout;
-          ['rows', 'lines', 'circle', 'half', 'third', 'fourth', 'fifth', 'sixth', 'freeform'].forEach(l => {
+          ['garden', 'rows', 'lines', 'circle', 'band', 'freeform'].forEach(l => {
             const btn = document.getElementById(`btnLayout${l.charAt(0).toUpperCase() + l.slice(1)}`);
             if (btn) btn.classList.toggle('active', layout === l);
           });
+          const tablesSelect = document.getElementById('layoutTablesSelect');
+          if (tablesSelect) {
+            const isTables = TABLE_LAYOUTS.includes(layout);
+            tablesSelect.value = isTables ? layout : '';
+            tablesSelect.classList.toggle('active', isTables);
+          }
           const absentSet = new Set(Array.isArray(currentClass.absentStudents) ? currentClass.absentStudents : []);
           const seatedStudents = this.getAllStudents();
           const presentSeatedCount = seatedStudents.filter(s => !absentSet.has(s)).length;
@@ -7681,7 +8053,7 @@ class SeatingChartApp {
 
           const chalkboard = document.getElementById('chalkboardFront');
           if (chalkboard) {
-            chalkboard.style.display = (layout === 'circle') ? 'none' : 'block';
+            chalkboard.style.display = (layout === 'circle' || layout === 'garden' || layout === 'band') ? 'none' : 'block';
           }
         }
 
@@ -7720,6 +8092,48 @@ class SeatingChartApp {
         this.renderClassList();
       }
 
+      // Renames one student in every seating structure of a class: the live rows/lines, the
+      // per-row-count copies getRowsData/getLinesData swap back in, divided rows, circle,
+      // free form, the group layouts, the unplaced list, today's absences and the garden plant.
+      // Arrays are changed in place, because rows/lines can be the same array as a count copy.
+      // classList and studentProfiles stay with the callers (each rename path has its own rules).
+      // Attendance statuses and grades are NOT moved: they stay under the old name.
+      renameStudentSeating(currentClass, oldName, newName) {
+        if (!currentClass || !oldName || !newName || oldName === newName) return;
+        const renameIn = arr => {
+          if (!Array.isArray(arr)) return;
+          arr.forEach((item, i) => {
+            if (Array.isArray(item)) renameIn(item);
+            else if (item === oldName) arr[i] = newName;
+          });
+        };
+
+        renameIn(currentClass.rows);
+        renameIn(currentClass.lines);
+        ['rowsData', 'linesData'].forEach(key => {
+          const copies = currentClass[key];
+          if (copies && typeof copies === 'object') Object.values(copies).forEach(renameIn);
+        });
+        renameIn(currentClass.dividedRowsData);
+        renameIn(currentClass.circle);
+        renameIn(currentClass.freeform);
+        if (currentClass.freeformPositions && currentClass.freeformPositions[oldName]) {
+          currentClass.freeformPositions[newName] = currentClass.freeformPositions[oldName];
+          delete currentClass.freeformPositions[oldName];
+        }
+        if (currentClass.layoutsData) {
+          ['half', 'third', 'fourth', 'fifth', 'sixth'].forEach(key => renameIn(currentClass.layoutsData[key]));
+        }
+        this.getBandChairs(currentClass.band).forEach(ch => { if (ch.student === oldName) ch.student = newName; });
+        this.getSeatingRules(currentClass).forEach(r => {
+          if (r.student === oldName) r.student = newName;
+          if (r.other === oldName) r.other = newName;
+        });
+        renameIn(currentClass.unplacedStudents);
+        renameIn(currentClass.absentStudents);
+        this.renameGardenPlant(currentClass, oldName, newName);
+      }
+
       saveClassListEdits() {
         const currentClass = this.getCurrentClass();
         if (!currentClass || !Array.isArray(currentClass.classList)) return;
@@ -7742,43 +8156,13 @@ class SeatingChartApp {
         });
 
         renames.forEach(r => {
-          // 1. Update classList
+          // 1. Update classList (by position, so one of two same-named students can be renamed)
           currentClass.classList[r.idx] = r.newName;
 
-          // 2. Update rows
-          if (Array.isArray(currentClass.rows)) {
-            currentClass.rows = currentClass.rows.map(row => Array.isArray(row) ? row.map(n => n === r.original ? r.newName : n) : []);
-          }
+          // 2. Update every seating chart
+          this.renameStudentSeating(currentClass, r.original, r.newName);
 
-          // 3. Update circle
-          if (Array.isArray(currentClass.circle)) {
-            currentClass.circle = currentClass.circle.map(n => n === r.original ? r.newName : n);
-          }
-
-          // 4. Update freeform
-          if (Array.isArray(currentClass.freeform)) {
-            currentClass.freeform = currentClass.freeform.map(n => n === r.original ? r.newName : n);
-          }
-          if (currentClass.freeformPositions && currentClass.freeformPositions[r.original]) {
-            currentClass.freeformPositions[r.newName] = currentClass.freeformPositions[r.original];
-            delete currentClass.freeformPositions[r.original];
-          }
-
-          // 5. Update group layouts
-          if (currentClass.layoutsData) {
-            ['half', 'third', 'fourth', 'fifth', 'sixth'].forEach(key => {
-              if (Array.isArray(currentClass.layoutsData[key])) {
-                currentClass.layoutsData[key] = currentClass.layoutsData[key].map(g => Array.isArray(g) ? g.map(n => n === r.original ? r.newName : n) : []);
-              }
-            });
-          }
-
-          // 6. Update unplacedStudents
-          if (Array.isArray(currentClass.unplacedStudents)) {
-            currentClass.unplacedStudents = currentClass.unplacedStudents.map(n => n === r.original ? r.newName : n);
-          }
-
-          // 7. Update studentProfiles
+          // 3. Update studentProfiles
           const parsed = this.parseStudentName(r.newName);
           if (!currentClass.studentProfiles) currentClass.studentProfiles = {};
           currentClass.studentProfiles[r.newName] = {
@@ -7906,13 +8290,17 @@ class SeatingChartApp {
         if (saveBtn) {
           saveBtn.style.display = this.isClassListEditMode ? 'inline-block' : 'none';
         }
+        // Adding names is part of editing the roster: the boxes sit at the top, the names below
+        const addBox = document.getElementById('classListAddBox');
+        if (addBox) addBox.style.display = this.isClassListEditMode ? '' : 'none';
+        this.applySidebarListTab();
 
         const currentClass = this.getCurrentClass();
         const masterList = (currentClass && currentClass.classList) ? currentClass.classList : [];
         if (countSpan) countSpan.textContent = masterList.length;
 
         if (masterList.length === 0) {
-          ul.innerHTML = '<li class="roster-item" style="color: var(--text-muted); font-style: italic;">No class list created yet</li>';
+          ul.innerHTML = '<li class="roster-item roster-empty-note">No class list created yet</li>';
           return;
         }
 
@@ -7931,17 +8319,16 @@ class SeatingChartApp {
 
           const li = document.createElement('li');
           li.className = 'roster-item';
-          li.style.cssText = 'padding: 4px 8px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; gap: 6px;';
 
           let delBtnHTML = '';
           let nameHTML = '';
 
           if (this.isClassListEditMode) {
-            nameHTML = `<div style="display: flex; align-items: center; gap: 4px; flex: 1;">
-              <span style="font-weight: 600; font-size: 0.8rem; color: #64748b;">${idx + 1}.</span>
-              <input type="text" class="class-list-name-input" data-index="${idx}" data-original="${this.escapeQuotes(student)}" value="${this.escapeQuotes(rosterName)}" style="flex: 1; padding: 2px 6px; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 4px; background: #ffffff;">
+            nameHTML = `<div class="class-list-row-edit">
+              <span class="class-list-num">${idx + 1}.</span>
+              <input type="text" class="class-list-name-input" data-index="${idx}" data-original="${this.escapeQuotes(student)}" value="${this.escapeQuotes(rosterName)}">
             </div>`;
-            delBtnHTML = `<button class="roster-del-btn" style="background: var(--danger); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" onclick="event.stopPropagation(); app.confirmRemoveStudentFromClass('${this.escapeQuotes(student)}')" title="Remove Student from Class">&times;</button>`;
+            delBtnHTML = `<button class="roster-del-btn class-list-del" onclick="event.stopPropagation(); app.confirmRemoveStudentFromClass('${this.escapeQuotes(student)}')" title="Remove Student from Class">&times;</button>`;
           } else {
             nameHTML = `<span>${idx + 1}. ${this.escapeHtml(rosterName)}</span>`;
           }
@@ -8221,11 +8608,11 @@ class SeatingChartApp {
         let html = '<thead><tr><th></th>';
         displayDates.forEach(d => {
           if (d.isDraft) {
-            html += `<th style="background-color: #f8fafc; border-bottom: 2px solid #cbd5e1; border-left: 2px dashed #94a3b8; border-right: 2px dashed #94a3b8;">
+            html += `<th style="background-color: var(--paper-2); border-bottom: 2px solid var(--line-strong); border-left: 2px dashed var(--ink-faint); border-right: 2px dashed var(--ink-faint);">
               <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.2; padding: 2px 0;">
-                <span style="font-weight: 700; font-size: 0.85rem; color: #0f172a;">${d.date}</span>
-                <span style="font-weight: 500; font-size: 0.72rem; color: #64748b; margin-top: 1px;">${d.day}</span>
-                <span style="font-weight: 800; font-size: 0.68rem; text-transform: uppercase; color: #f97316; margin-top: 2px; letter-spacing: 0.5px;">(Drafting)</span>
+                <span style="font-weight: 700; font-size: 0.85rem; color: var(--ink);">${d.date}</span>
+                <span style="font-weight: 500; font-size: 0.72rem; color: var(--ink-muted); margin-top: 1px;">${d.day}</span>
+                <span style="font-weight: 800; font-size: 0.68rem; text-transform: uppercase; color: var(--orange); margin-top: 2px; letter-spacing: 0.5px;">(Drafting)</span>
               </div>
             </th>`;
           } else {
@@ -8236,8 +8623,8 @@ class SeatingChartApp {
             html += `<th>
               <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.2; padding: 2px 0;">
                 ${delBtnHTML}
-                <span style="font-weight: 700; font-size: 0.85rem; color: #0f172a;">${d.date}</span>
-                <span style="font-weight: 500; font-size: 0.72rem; color: #64748b; margin-top: 1px; text-transform: none; letter-spacing: 0;">${d.day}</span>
+                <span style="font-weight: 700; font-size: 0.85rem; color: var(--ink);">${d.date}</span>
+                <span style="font-weight: 500; font-size: 0.72rem; color: var(--ink-muted); margin-top: 1px; text-transform: none; letter-spacing: 0;">${d.day}</span>
               </div>
             </th>`;
           }
@@ -8277,10 +8664,10 @@ class SeatingChartApp {
                   draftStatusHTML = `<span class="attendance-status-absent" title="Absent (Click for Dash —)">✕</span>`;
                   draftBg = 'background-color: #fef2f2 !important;';
                 } else {
-                  draftStatusHTML = `<span style="color: #94a3b8; font-weight: 800; font-size: 1.1rem;" title="Unrecorded (Click for Present ✓)">—</span>`;
+                  draftStatusHTML = `<span style="color: var(--ink-faint); font-weight: 800; font-size: 1.1rem;" title="Unrecorded (Click for Present ✓)">—</span>`;
                 }
 
-                dateCellsHTML += `<td style="${draftBg} border-left: 2px dashed #cbd5e1; border-right: 2px dashed #cbd5e1; text-align: center; cursor: pointer; user-select: none;" onclick="event.stopPropagation(); app.toggleDraftAttendanceStudent('${this.escapeQuotes(student)}')" title="Click to cycle attendance (— → ✓ → ✕)">${draftStatusHTML}</td>`;
+                dateCellsHTML += `<td style="${draftBg} border-left: 2px dashed var(--line-strong); border-right: 2px dashed var(--line-strong); text-align: center; cursor: pointer; user-select: none;" onclick="event.stopPropagation(); app.toggleDraftAttendanceStudent('${this.escapeQuotes(student)}')" title="Click to cycle attendance (— → ✓ → ✕)">${draftStatusHTML}</td>`;
               } else {
                 let statusHTML = '';
                 if (status === 'present') {
@@ -8289,7 +8676,7 @@ class SeatingChartApp {
                 } else if (status === 'absent') {
                   statusHTML = `<span class="attendance-status-absent" title="Absent">✕</span>`;
                 } else {
-                  statusHTML = this.isEditMode ? `<span style="color: #cbd5e1; font-weight: bold; font-size: 0.9rem;">—</span>` : ``;
+                  statusHTML = this.isEditMode ? `<span style="color: var(--line-strong); font-weight: bold; font-size: 0.9rem;">—</span>` : ``;
                 }
 
                 const cellClass = this.isEditMode ? 'attendance-cell-interactive' : '';
@@ -8308,7 +8695,7 @@ class SeatingChartApp {
               ? `title="Click to toggle attendance for ${this.escapeHtml(fullName)}"`
               : '';
 
-            html += `<tr><td ${studentClick} ${studentTitle}><div style="display: flex; align-items: center; gap: 8px;"><span style="font-weight: 600; color: #0f172a;">${this.escapeHtml(fullName)}</span><span style="font-size: 0.8rem; font-weight: 700; color: var(--primary); background: #e0e7ff; padding: 2px 6px; border-radius: 10px;">${ratioText}</span></div></td>${dateCellsHTML}</tr>`;
+            html += `<tr><td ${studentClick} ${studentTitle}><div style="display: flex; align-items: center; gap: 8px;"><span class="register-name">${this.escapeHtml(fullName)}</span><span class="register-ratio">${ratioText}</span></div></td>${dateCellsHTML}</tr>`;
           });
         }
         html += '</tbody>';
@@ -8401,6 +8788,107 @@ class SeatingChartApp {
         this.renderGradeSubjectDropdown();
       }
 
+      // Today's List in three parts: present (seated, in seating order), absent, and to be placed
+      getTodaysListSections(currentClass) {
+        const absentSet = new Set(Array.isArray(currentClass.absentStudents) ? currentClass.absentStudents : []);
+        const allPlaced = this.getAllStudents();
+        const unplacedMaster = Array.isArray(currentClass.unplacedStudents) ? currentClass.unplacedStudents : [];
+        return {
+          presentStudents: allPlaced.filter(s => !absentSet.has(s)),
+          absentStudents: Array.from(absentSet),
+          unplacedStudents: unplacedMaster.filter(s => !absentSet.has(s))
+        };
+      }
+
+      setSidebarListTab(tab) {
+        tab = tab === 'roster' ? 'roster' : 'today';
+        // The open tab pressed again hides the list; any tab pressed while it is hidden shows that list
+        if (tab === this.sidebarListTab && !this.sidebarListHidden) {
+          this.sidebarListHidden = true;
+        } else {
+          this.sidebarListTab = tab;
+          this.sidebarListHidden = false;
+        }
+        try {
+          localStorage.setItem('classPlanner_sidebarListTab', this.sidebarListTab);
+          localStorage.setItem('classPlanner_sidebarListHidden', this.sidebarListHidden ? '1' : '0');
+        } catch (e) { /* not remembered, which is fine */ }
+        const note = document.getElementById('listCopyNote');
+        if (note) note.textContent = '';
+        this.applySidebarListTab();
+      }
+
+      applySidebarListTab() {
+        const panel = document.querySelector('.panel-lists');
+        if (panel) {
+          panel.dataset.listTab = this.sidebarListTab;
+          panel.classList.toggle('list-hidden', this.sidebarListHidden);
+        }
+        [['listTabToday', 'today'], ['listTabRoster', 'roster']].forEach(([id, tab]) => {
+          const btn = document.getElementById(id);
+          if (!btn) return;
+          const open = this.sidebarListTab === tab && !this.sidebarListHidden;
+          btn.classList.toggle('active', open);
+          btn.setAttribute('aria-selected', open ? 'true' : 'false');
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          btn.title = open ? 'Click again to hide the list' : 'Show this list';
+        });
+      }
+
+      // Copies the list on show as plain text: a title line, then one student per line (Today's List
+      // adds a tab and their status), so it pastes into a document as a list and a sheet as columns
+      copySidebarList() {
+        const currentClass = this.getCurrentClass();
+        if (!currentClass) return;
+        const nameOf = s => String(this.getStudentProfile(currentClass, s).rosterName || s).replace(/\s+/g, ' ').trim();
+        const className = String(currentClass.name || 'Class').replace(/\s+/g, ' ').trim();
+        let lines;
+        if (this.sidebarListTab === 'roster') {
+          const list = Array.isArray(currentClass.classList) ? currentClass.classList : [];
+          lines = [`${className} \u2014 Class Roster (${list.length})`, ...list.map(nameOf)];
+        } else {
+          const { presentStudents, absentStudents, unplacedStudents } = this.getTodaysListSections(currentClass);
+          const total = Array.isArray(currentClass.classList) ? currentClass.classList.length : 0;
+          const day = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+          lines = [
+            `${className} \u2014 Today's List, ${day} (${presentStudents.length}/${total} present)`,
+            ...presentStudents.map(s => `${nameOf(s)}\tPresent`),
+            ...absentStudents.map(s => `${nameOf(s)}\tAbsent`),
+            ...unplacedStudents.map(s => `${nameOf(s)}\tTo Be Placed`)
+          ];
+        }
+        const text = lines.join('\n');
+        const done = (ok) => {
+          const note = document.getElementById('listCopyNote');
+          const btn = document.getElementById('listCopyBtn');
+          if (note) note.textContent = ok ? 'Copied!' : 'Try again';
+          if (btn) btn.classList.toggle('copied', ok);
+          clearTimeout(this.listCopyTimer);
+          this.listCopyTimer = setTimeout(() => {
+            if (note) note.textContent = '';
+            if (btn) btn.classList.remove('copied');
+          }, 1800);
+        };
+        const fallback = () => {
+          const area = document.createElement('textarea');
+          area.value = text;
+          area.setAttribute('readonly', '');
+          area.style.cssText = 'position: fixed; left: -9999px; top: 0;';
+          document.body.appendChild(area);
+          area.select();
+          let ok = false;
+          try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+          area.remove();
+          done(ok);
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(() => done(true), fallback);
+        } else {
+          fallback();
+        }
+        this.lastCopiedList = text;
+      }
+
       renderRoster() {
         const list = document.getElementById('rosterList');
         if (!list) return;
@@ -8409,34 +8897,22 @@ class SeatingChartApp {
         const currentClass = this.getCurrentClass();
         if (!currentClass) return;
 
-        const absentSet = new Set(Array.isArray(currentClass.absentStudents) ? currentClass.absentStudents : []);
-        const allPlaced = this.getAllStudents();
-        const unplacedMaster = Array.isArray(currentClass.unplacedStudents) ? currentClass.unplacedStudents : [];
-
-        // Filter into 3 lists:
-        // 1. Present = placed students who are NOT in absentSet
-        const presentStudents = allPlaced.filter(s => !absentSet.has(s));
-
-        // 2. Absent = all students currently in absentSet
-        const absentStudents = Array.from(absentSet);
-
-        // 3. To Be Placed = unplaced students who are NOT in absentSet
-        const unplacedStudents = unplacedMaster.filter(s => !absentSet.has(s));
+        const { presentStudents, absentStudents, unplacedStudents } = this.getTodaysListSections(currentClass);
 
         if (presentStudents.length === 0 && absentStudents.length === 0 && unplacedStudents.length === 0) {
-          list.innerHTML = '<li class="roster-item" style="color: var(--text-muted); font-style: italic;">No students added</li>';
+          list.innerHTML = '<li class="roster-item roster-empty-note">No students added</li>';
           return;
         }
 
         // --- SECTION 1: PRESENT STUDENTS ---
         const presentHeader = document.createElement('li');
-        presentHeader.style.cssText = 'font-weight: 700; color: #059669; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; margin-bottom: 6px; padding: 4px 8px; background: #ecfdf5; border-radius: 4px; pointer-events: none; border-left: 3px solid #10b981; display: flex; justify-content: space-between; align-items: center;';
+        presentHeader.className = 'roster-section-head roster-section-present';
         presentHeader.innerHTML = `<span>Present (${presentStudents.length})</span>`;
         list.appendChild(presentHeader);
 
         if (presentStudents.length === 0) {
           const emptyLi = document.createElement('li');
-          emptyLi.style.cssText = 'padding: 4px 8px; font-size: 0.8rem; color: #94a3b8; font-style: italic;';
+          emptyLi.className = 'roster-none';
           emptyLi.textContent = 'None';
           list.appendChild(emptyLi);
         } else {
@@ -8471,13 +8947,13 @@ class SeatingChartApp {
 
         // --- SECTION 2: ABSENT STUDENTS ---
         const absentHeader = document.createElement('li');
-        absentHeader.style.cssText = 'font-weight: 700; color: #dc2626; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 12px; margin-bottom: 6px; padding: 4px 8px; background: #fef2f2; border-radius: 4px; pointer-events: none; border-left: 3px solid #ef4444; display: flex; justify-content: space-between; align-items: center;';
+        absentHeader.className = 'roster-section-head roster-section-absent';
         absentHeader.innerHTML = `<span>Absent (${absentStudents.length})</span>`;
         list.appendChild(absentHeader);
 
         if (absentStudents.length === 0) {
           const emptyLi = document.createElement('li');
-          emptyLi.style.cssText = 'padding: 4px 8px; font-size: 0.8rem; color: #94a3b8; font-style: italic;';
+          emptyLi.className = 'roster-none';
           emptyLi.textContent = 'None';
           list.appendChild(emptyLi);
         } else {
@@ -8486,11 +8962,10 @@ class SeatingChartApp {
             const displayName = profile.rosterName || student;
             const li = document.createElement('li');
             li.className = 'roster-item absent-roster-item';
-            li.style.cssText = 'padding: 5px 8px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 4px; opacity: 0.85;';
             li.title = 'Click to reinstate student';
             li.innerHTML = `
-              <span style="text-decoration: line-through; color: #64748b; font-weight: 500;">${this.escapeHtml(displayName)}</span>
-              <button class="reinstate-btn" onclick="event.stopPropagation(); app.toggleStudentAbsent('${this.escapeQuotes(student)}')" style="background: var(--primary); color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 0.72rem; padding: 2px 8px; cursor: pointer; transition: background 0.2s ease;">Reinstate</button>
+              <span class="absent-name">${this.escapeHtml(displayName)}</span>
+              <button class="reinstate-btn" onclick="event.stopPropagation(); app.toggleStudentAbsent('${this.escapeQuotes(student)}')">Reinstate</button>
             `;
 
             li.onclick = () => {
@@ -8503,13 +8978,13 @@ class SeatingChartApp {
 
         // --- SECTION 3: TO BE PLACED STUDENTS ---
         const unplacedHeader = document.createElement('li');
-        unplacedHeader.style.cssText = 'font-weight: 700; color: #4338ca; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 12px; margin-bottom: 6px; padding: 4px 8px; background: #e0e7ff; border-radius: 4px; pointer-events: none; border-left: 3px solid #6366f1; display: flex; justify-content: space-between; align-items: center;';
+        unplacedHeader.className = 'roster-section-head roster-section-unplaced';
         unplacedHeader.innerHTML = `<span>To Be Placed (${unplacedStudents.length})</span>`;
         list.appendChild(unplacedHeader);
 
         if (unplacedStudents.length === 0) {
           const emptyLi = document.createElement('li');
-          emptyLi.style.cssText = 'padding: 4px 8px; font-size: 0.8rem; color: #94a3b8; font-style: italic;';
+          emptyLi.className = 'roster-none';
           emptyLi.textContent = 'None';
           list.appendChild(emptyLi);
         } else {
@@ -8518,16 +8993,22 @@ class SeatingChartApp {
             const displayName = profile.rosterName || student;
             const li = document.createElement('li');
             li.className = 'roster-item unplaced-item';
-            li.style.cssText = 'cursor: pointer; background: #fff1f2; border: 1px dashed #fca5a5; color: #991b1b; padding: 6px 10px; border-radius: 6px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;';
             li.title = 'Click to place student on chart';
             li.innerHTML = `
-              <span style="font-weight: 600;">+ ${this.escapeHtml(displayName)}</span>
-              <span style="font-size: 0.75rem; color: #e11d48; font-weight: bold;">[Place]</span>
+              <span class="unplaced-name">+ ${this.escapeHtml(displayName)}</span>
+              <span class="unplaced-tag">[Place]</span>
             `;
 
             li.onclick = () => {
               this.placeUnseatedStudent(student);
             };
+            // In Band seating a name can be dragged straight onto the chair it belongs in
+            if (this.isEditMode && currentClass.layout === 'band') {
+              li.draggable = true;
+              li.title = 'Click to place in the first open chair, or drag onto a chair';
+              li.ondragstart = (e) => this.handleDragStart(e, student, null);
+              li.ondragend = (e) => this.handleDragEnd(e);
+            }
 
             list.appendChild(li);
           });
@@ -8538,6 +9019,9 @@ class SeatingChartApp {
         const container = document.getElementById('chartContainer');
         container.innerHTML = '';
         container.removeAttribute('style');
+        // The Garden hangs its shelves on the classroom wall instead of standing on the floor
+        const viewport = container.parentElement;
+        if (viewport) viewport.classList.toggle('garden-room', Boolean(currentClass && currentClass.layout === 'garden'));
 
         if (!currentClass || !currentClass.classList || currentClass.classList.length === 0) {
           container.className = 'chart-container';
@@ -8546,7 +9030,9 @@ class SeatingChartApp {
         }
 
         const layout = currentClass.layout;
-        if (layout === 'rows') {
+        if (layout === 'garden') {
+          this.renderGardenLayout(container, currentClass);
+        } else if (layout === 'rows') {
           this.renderRowsLayout(container, currentClass);
         } else if (layout === 'lines') {
           this.renderLinesLayout(container, currentClass);
@@ -8554,9 +9040,649 @@ class SeatingChartApp {
           this.renderCircleLayout(container, currentClass);
         } else if (layout === 'freeform') {
           this.renderFreeformLayout(container, currentClass);
+        } else if (layout === 'band') {
+          this.renderBandLayout(container, currentClass);
         } else {
           this.renderGroupedLayout(container, currentClass, layout);
         }
+      }
+
+      // Garden: every seated student (in Rows order) gets a pot above their name, laid out
+      // on as many beds as makes the pots biggest on screen. Each student's plant is picked
+      // once and kept in currentClass.gardenPlants.
+      renderGardenLayout(container, currentClass) {
+        container.className = 'chart-container layout-garden';
+        const isNewGarden = isNaN(Date.parse(currentClass.gardenStart));
+        if (isNewGarden) currentClass.gardenStart = new Date().toISOString();
+        if (this.assignGardenPlants(currentClass) || isNewGarden) this.saveData();
+        this.preloadGardenImages();
+
+        const space = this.getGardenSpace();
+        this.gardenSpaceKey = `${space.width}x${space.height}`;
+        const borderH = Math.round(Math.max(GARDEN.borderMinH, Math.min(GARDEN.borderMaxH, space.height * GARDEN.borderShare)));
+        container.style.width = `${space.width}px`;
+        const border = this.renderGardenBorder(currentClass, space.width, borderH);
+        if (this.isGardenEditing()) {
+          container.classList.add('garden-editing');
+          const note = document.createElement('div');
+          note.className = 'garden-edit-note';
+          note.innerHTML = `<span>✏️ Editing this garden: click a pot to grow it one stage, or a border flower to remove it.</span>`;
+          const done = document.createElement('button');
+          done.type = 'button';
+          done.textContent = 'Done';
+          done.onclick = (e) => {
+            e.stopPropagation();
+            this.setGardenEditing(false);
+          };
+          note.appendChild(done);
+          border.appendChild(note);
+        }
+        container.appendChild(border);
+
+        const students = this.getAllStudents();
+        if (students.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'empty-state';
+          empty.textContent = 'No students are seated yet. Seat them in Rows and their pots appear here, in the same order.';
+          container.appendChild(empty);
+          return;
+        }
+
+        const fit = this.fitGarden(students.length, space.width, space.height - borderH - GARDEN.bedGap);
+        container.style.setProperty('--garden-w', `${Math.max(GARDEN.minW, Math.floor(fit.w))}px`);
+        // While grading, the score buttons sit under each label, on the front of the shelf
+        container.style.setProperty('--below-tag', this.isGradeScoringActive ? '27px' : '0px');
+
+        const base = Math.floor(students.length / fit.beds);
+        const extra = students.length % fit.beds;
+        // Every shelf is as long as the fullest one needs, centred under the window
+        const potW = Math.max(GARDEN.minW, Math.floor(fit.w));
+        const shelfW = Math.ceil((base + (extra ? 1 : 0)) * potW * GARDEN.pitch + GARDEN.bedPadX);
+        let next = 0;
+        for (let b = 0; b < fit.beds; b++) {
+          const bed = document.createElement('div');
+          bed.className = 'garden-bed';
+          bed.style.width = `${Math.min(space.width, shelfW)}px`;
+          const size = base + (b < extra ? 1 : 0);
+          students.slice(next, next + size).forEach(name => bed.appendChild(this.createSeatElement(name, null)));
+          next += size;
+          container.appendChild(bed);
+        }
+      }
+
+      // The room the garden has on screen. Outside full screen the whole page scrolls (the
+      // sidebar is tall), so the height is the window below the header, not the chart area.
+      // The Layout and Zoom bars are left out: they cover the garden only while open.
+      getGardenSpace() {
+        const viewport = document.querySelector('#seatingAppBody .viewport');
+        if (!viewport) return null;
+        const vs = getComputedStyle(viewport);
+        const padX = parseFloat(vs.paddingLeft) + parseFloat(vs.paddingRight);
+        const padY = parseFloat(vs.paddingTop) + parseFloat(vs.paddingBottom);
+        const header = document.querySelector('header');
+        const top = (this.isFullScreen || !header) ? 0 : header.offsetHeight;
+        const height = this.isFullScreen ? viewport.clientHeight : window.innerHeight - top;
+        return {
+          width: Math.floor(viewport.clientWidth - padX - 4),
+          height: Math.floor(height - padY - 4)
+        };
+      }
+
+      // Height of one pot on its shelf at picture width w: the picture (its clear strip under the
+      // pot stands on the shelf top), the shelf top, then the name label on the shelf's front,
+      // plus the score buttons under the label while grading
+      gardenCardHeight(w) {
+        const tag = Math.min(22, Math.max(12, w * 0.17));
+        const shelf = w * GARDEN.shelfTop;
+        return w * (432 / 252) - w * GARDEN.potFoot - shelf * 0.45 + shelf + 4 + tag * 1.25 + 6 + (this.isGradeScoringActive ? 27 : 0);
+      }
+
+      // Widest picture that lets perBed pots share one shelf in availW
+      gardenWidthFor(availW, perBed) {
+        return (availW - GARDEN.bedPadX) / (perBed * GARDEN.pitch);
+      }
+
+      // The number of beds that gives the biggest pots, and that pot width
+      fitGarden(count, availW, availH) {
+        const heightFor = (beds, w) => beds * (this.gardenCardHeight(w) + GARDEN.bedPadY + GARDEN.bedGap);
+        let best = { beds: 1, w: 0 };
+        for (let beds = 1; beds <= count; beds++) {
+          const perBed = Math.ceil(count / beds);
+          if (beds > 1 && Math.ceil(count / (beds - 1)) === perBed) continue;
+          let w = Math.min(GARDEN.maxW, this.gardenWidthFor(availW, perBed));
+          if (heightFor(beds, w) > availH) {
+            let lo = 0;
+            let hi = w;
+            for (let i = 0; i < 24; i++) {
+              const mid = (lo + hi) / 2;
+              if (heightFor(beds, mid) <= availH) lo = mid; else hi = mid;
+            }
+            w = lo;
+          }
+          if (w > best.w + 0.5) best = { beds, w };
+        }
+        return best;
+      }
+
+      // The kind of plant in the student's pot now: their first plant, or the one they were
+      // given when an absence or a replant started a new plant
+      getGardenPlant(currentClass, student) {
+        const { starts } = this.getGardenGrowth(currentClass, student);
+        return this.getGardenKind(currentClass, student, starts[starts.length - 1]) || GARDEN_PLANTS[0];
+      }
+
+      // The kind given to the plant that began at `start`: 'first' (kept in gardenPlants), or
+      // 'r'/'a' + the day of the replant or absence that started it (kept in gardenNewPlants)
+      getGardenKind(currentClass, student, start) {
+        const kind = start === 'first'
+          ? (currentClass.gardenPlants || {})[student]
+          : ((currentClass.gardenNewPlants || {})[student] || {})[start];
+        return GARDEN_PLANTS.includes(kind) ? kind : null;
+      }
+
+      setGardenKind(currentClass, student, start, kind) {
+        if (start === 'first') {
+          if (!currentClass.gardenPlants || typeof currentClass.gardenPlants !== 'object') currentClass.gardenPlants = {};
+          currentClass.gardenPlants[student] = kind;
+          return;
+        }
+        if (!currentClass.gardenNewPlants || typeof currentClass.gardenNewPlants !== 'object') currentClass.gardenNewPlants = {};
+        if (!currentClass.gardenNewPlants[student]) currentClass.gardenNewPlants[student] = {};
+        currentClass.gardenNewPlants[student][start] = kind;
+      }
+
+      // Gives out plants: a first plant for each student without one (the kind the class has
+      // fewest of, ties at random, so the kinds stay even), then a new kind for each plant an
+      // absence or a replant has started. Returns true when any were given out.
+      assignGardenPlants(currentClass) {
+        if (!currentClass.gardenPlants || typeof currentClass.gardenPlants !== 'object') currentClass.gardenPlants = {};
+        const plants = currentClass.gardenPlants;
+        const counts = {};
+        GARDEN_PLANTS.forEach(p => { counts[p] = 0; });
+        const needPlant = [];
+        const students = (currentClass.classList || []).filter(Boolean);
+        students.forEach(student => {
+          if (GARDEN_PLANTS.includes(plants[student])) counts[plants[student]]++;
+          else needPlant.push(student);
+        });
+        for (let i = needPlant.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [needPlant[i], needPlant[j]] = [needPlant[j], needPlant[i]];
+        }
+        needPlant.forEach(student => {
+          const plant = this.pickFewestGardenPlant(counts, GARDEN_PLANTS);
+          plants[student] = plant;
+          counts[plant]++;
+        });
+
+        let changed = needPlant.length > 0;
+        students.forEach(student => {
+          const { starts } = this.getGardenGrowth(currentClass, student);
+          const start = starts[starts.length - 1];
+          if (this.getGardenKind(currentClass, student, start)) return;
+          this.setGardenKind(currentClass, student, start, this.pickNextGardenPlant(currentClass, student, starts));
+          changed = true;
+        });
+        return changed;
+      }
+
+      // Of the given kinds, the one the class has fewest of (ties at random)
+      pickFewestGardenPlant(counts, kinds) {
+        const fewest = Math.min(...kinds.map(p => counts[p]));
+        const choices = kinds.filter(p => counts[p] === fewest);
+        return choices[Math.floor(Math.random() * choices.length)];
+      }
+
+      // A student's new plant is never the kind they had just before, and is one they haven't
+      // grown to full bloom yet until they've had all ten. Among those, the class's fewest kind.
+      pickNextGardenPlant(currentClass, student, starts) {
+        const earlier = starts.slice(0, -1).map(start => this.getGardenKind(currentClass, student, start)).filter(Boolean);
+        const previous = earlier[earlier.length - 1];
+        const grown = new Set((currentClass.gardenBorder || []).filter(f => f && f.student === student).map(f => f.plant));
+        let kinds = GARDEN_PLANTS.filter(p => !grown.has(p) && p !== previous);
+        if (kinds.length === 0) kinds = GARDEN_PLANTS.filter(p => p !== previous);
+        const counts = {};
+        GARDEN_PLANTS.forEach(p => { counts[p] = 0; });
+        (currentClass.classList || []).forEach(other => {
+          if (!other || other === student) return;
+          const theirStarts = this.getGardenGrowth(currentClass, other).starts;
+          const plant = this.getGardenKind(currentClass, other, theirStarts[theirStarts.length - 1]);
+          if (plant) counts[plant]++;
+        });
+        return this.pickFewestGardenPlant(counts, kinds);
+      }
+
+      renameGardenPlant(currentClass, oldName, newName) {
+        if (!currentClass || oldName === newName) return;
+        ['gardenPlants', 'gardenNewPlants'].forEach(key => {
+          const byStudent = currentClass[key];
+          if (byStudent && byStudent[oldName] !== undefined) {
+            byStudent[newName] = byStudent[oldName];
+            delete byStudent[oldName];
+          }
+        });
+        ['gardenBorder', 'gardenEdits'].forEach(key => {
+          if (Array.isArray(currentClass[key])) {
+            currentClass[key].forEach(item => { if (item && item.student === oldName) item.student = newName; });
+          }
+        });
+      }
+
+      getGardenStageFor(sessions, pace) {
+        const lengths = this.gardenGrowth[pace] || GARDEN_GROWTH_DEFAULTS.weekly;
+        let through = 0;
+        for (let stage = 1; stage < GARDEN_STAGES; stage++) {
+          through += lengths[stage - 1];
+          if (sessions <= through) return stage;
+        }
+        return GARDEN_STAGES;
+      }
+
+      // Midnight (local) of the day a time falls on
+      gardenDay(time) {
+        const d = new Date(time);
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      }
+
+      // Day one of the class's garden: everyone starts at stage 1 then, whatever their attendance
+      // before. Set the first time the class's Garden is shown.
+      getGardenStartDay(currentClass) {
+        const start = Date.parse(currentClass && currentClass.gardenStart);
+        return this.gardenDay(isNaN(start) ? Date.now() : start);
+      }
+
+      // The student's current plant: how many classes it has grown (`sessions`), its `stage`, and
+      // every plant start so far (`starts`: 'first', then 'r<day>' for each replant, 'a<day>' for
+      // each absence that ended a plant, 'e<id>' for each Edit Garden "grow something else").
+      // Only classes from the garden's day one count. Marked present = one more class. A replant
+      // starts a new plant that same day, which counts as its first class. An absence ends a plant
+      // that has started growing, unless it is in full bloom: that waits for its replant. Classes
+      // with no mark for the student are skipped. An Edit Garden change puts the plant at the start
+      // of its stage. On any one day the class comes first, then replants and edits in the order made.
+      getGardenGrowth(currentClass, student) {
+        const pace = this.getAttendancePace(currentClass);
+        const firstDay = this.getGardenStartDay(currentClass);
+        const events = [];
+        (Array.isArray(currentClass.attendanceDates) ? currentClass.attendanceDates : []).forEach(d => {
+          if (!d || !d.statuses) return;
+          const day = this.gardenDay(typeof d.timestamp === 'number' ? d.timestamp : (Date.parse(d.date) || 0));
+          if (day >= firstDay) events.push({ type: 'class', day, time: 0, status: d.statuses[student] });
+        });
+        (Array.isArray(currentClass.gardenBorder) ? currentClass.gardenBorder : []).forEach(f => {
+          const time = f && f.student === student ? Date.parse(f.date) : NaN;
+          if (!isNaN(time)) events.push({ type: 'replant', day: this.gardenDay(time), time });
+        });
+        (Array.isArray(currentClass.gardenEdits) ? currentClass.gardenEdits : []).forEach(edit => {
+          const time = edit && edit.student === student ? Date.parse(edit.date) : NaN;
+          if (!isNaN(time)) events.push({ type: 'edit', day: this.gardenDay(time), time, edit });
+        });
+        events.sort((a, b) => a.day - b.day || (a.type === 'class' ? 0 : 1) - (b.type === 'class' ? 0 : 1) || a.time - b.time);
+
+        let count = 0;
+        const starts = ['first'];
+        events.forEach(e => {
+          if (e.type === 'replant') {
+            count = 1;
+            starts.push(`r${e.day}`);
+          } else if (e.type === 'edit') {
+            if (e.edit.newPlant) starts.push(`e${e.edit.id}`);
+            count = this.gardenFirstClassOf(e.edit.stage, pace);
+          } else if (e.status === 'present') {
+            count++;
+          } else if (e.status === 'absent' && count > 0 && this.getGardenStageFor(count, pace) < GARDEN_STAGES) {
+            count = 0;
+            starts.push(`a${e.day}`);
+          }
+        });
+        return { sessions: count, stage: this.getGardenStageFor(count, pace), starts };
+      }
+
+      // The class count at which a stage begins (stage 1 begins at the first class)
+      gardenFirstClassOf(stage, pace) {
+        const lengths = this.gardenGrowth[pace] || GARDEN_GROWTH_DEFAULTS.weekly;
+        const target = Math.min(GARDEN_STAGES, Math.max(1, parseInt(stage, 10) || 1));
+        return 1 + lengths.slice(0, target - 1).reduce((a, b) => a + b, 0);
+      }
+
+      // ---- Edit Garden (Settings): fixing a class's garden by hand. It stays on only while that
+      // class's Garden is open in the Seating Chart.
+      isGardenEditing() {
+        if (!this.gardenEditClassId) return false;
+        const currentClass = this.getCurrentClass();
+        const inGarden = currentClass && currentClass.id === this.gardenEditClassId && currentClass.layout === 'garden'
+          && (this.currentViewMode === 'chart' || !this.currentViewMode);
+        if (!inGarden) this.gardenEditClassId = null;
+        return Boolean(inGarden);
+      }
+
+      setGardenEditing(on) {
+        const currentClass = this.getCurrentClass();
+        this.gardenEditClassId = (on && currentClass && currentClass.layout === 'garden') ? currentClass.id : null;
+        this.updateGardenEditToggle();
+        this.renderChart(currentClass);
+      }
+
+      toggleGardenEditing() {
+        this.setGardenEditing(!this.isGardenEditing());
+      }
+
+      updateGardenEditToggle() {
+        const btn = document.getElementById('btnToggleGardenEdit');
+        if (!btn) return;
+        const currentClass = this.getCurrentClass();
+        const available = Boolean(currentClass && currentClass.layout === 'garden' && (this.currentViewMode === 'chart' || !this.currentViewMode));
+        const on = this.isGardenEditing();
+        // Filled in while on; the old note line is now the button's tooltip
+        btn.classList.toggle('is-on', on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        btn.disabled = !available;
+        btn.title = !available
+          ? 'Open this class in the Garden layout first'
+          : on
+            ? 'Editing this class\'s garden: click to stop (it also stops when you leave its garden)'
+            : 'Edit this class\'s garden (this class only; turns off when you leave its garden)';
+      }
+
+      // Edit Garden click on a pot: one stage more; a full-bloom plant asks what to grow next
+      advanceGardenPlant(student) {
+        const currentClass = this.getCurrentClass();
+        if (!currentClass || !student) return;
+        const { stage } = this.getGardenGrowth(currentClass, student);
+        if (stage >= GARDEN_STAGES) {
+          this.openGardenRegrow(student);
+          return;
+        }
+        this.addGardenEdit(currentClass, student, stage + 1, false);
+        this.saveData();
+        this.renderChart(currentClass);
+      }
+
+      // Hand edits are kept in the class data (gardenEdits) so growth keeps counting from them.
+      // Clicks on one student's pot on the same day become one edit.
+      addGardenEdit(currentClass, student, stage, newPlant) {
+        if (!Array.isArray(currentClass.gardenEdits)) currentClass.gardenEdits = [];
+        const now = new Date();
+        const theirs = currentClass.gardenEdits.filter(e => e && e.student === student);
+        const last = theirs[theirs.length - 1];
+        const replantedSince = last && (currentClass.gardenBorder || []).some(f => f && f.student === student && Date.parse(f.date) > Date.parse(last.date));
+        if (!newPlant && last && !last.newPlant && !replantedSince && this.gardenDay(Date.parse(last.date)) === this.gardenDay(now.getTime())) {
+          last.stage = stage;
+          last.date = now.toISOString();
+          return;
+        }
+        const edit = { id: `edit_${now.getTime().toString(36)}_${Math.random().toString(36).slice(2, 6)}`, student, date: now.toISOString(), stage };
+        if (newPlant) edit.newPlant = true;
+        currentClass.gardenEdits.push(edit);
+      }
+
+      openGardenRegrow(student) {
+        const currentClass = this.getCurrentClass();
+        if (!currentClass) return;
+        this.pendingGardenRegrow = student;
+        const name = this.getStudentProfile(currentClass, student).firstName || student;
+        const plant = this.getGardenPlant(currentClass, student);
+        const label = this.getGardenPlantLabel(plant).toLowerCase();
+        document.getElementById('gardenRegrowImg').src = this.getGardenBloomImage(plant);
+        document.getElementById('gardenRegrowTitle').textContent = `${name}'s ${label} is in full bloom`;
+        document.getElementById('gardenRegrowSame').textContent = `Regrow the ${label}`;
+        document.getElementById('gardenRegrowModal').classList.add('active');
+      }
+
+      // Regrow: the same plant from an empty pot. Something else: a different kind from an empty pot.
+      confirmGardenRegrow(newPlant) {
+        const currentClass = this.getCurrentClass();
+        const student = this.pendingGardenRegrow;
+        this.pendingGardenRegrow = null;
+        this.closeModal('gardenRegrowModal');
+        if (!currentClass || !student) return;
+        this.addGardenEdit(currentClass, student, 1, newPlant);
+        this.assignGardenPlants(currentClass);
+        this.saveData();
+        this.renderChart(currentClass);
+      }
+
+      // Stage lengths for both paces: whole numbers from 1 to GARDEN_GROWTH_MAX, defaults where missing
+      normalizeGardenGrowth(growth) {
+        const out = {};
+        Object.keys(GARDEN_GROWTH_DEFAULTS).forEach(pace => {
+          const given = growth && Array.isArray(growth[pace]) ? growth[pace] : [];
+          out[pace] = GARDEN_GROWTH_DEFAULTS[pace].map((def, i) => {
+            const n = parseInt(given[i], 10);
+            return (n >= 1 && n <= GARDEN_GROWTH_MAX) ? n : def;
+          });
+        });
+        return out;
+      }
+
+      readJson(key) {
+        try {
+          return JSON.parse(localStorage.getItem(key) || 'null');
+        } catch (e) {
+          return null;
+        }
+      }
+
+      // Replanting is for full-grown plants, and only when a click means nothing else
+      // (not while arranging, taking attendance or grading)
+      canReplantGarden(stage, isAbsent) {
+        return stage === GARDEN_STAGES && !isAbsent && !this.isEditMode && !this.isAttendanceSessionActive && !this.isGradeScoringActive && !this.isGardenEditing();
+      }
+
+      getGardenImage(plant, stage) {
+        return `garden/${plant}-${stage}.webp`;
+      }
+
+      preloadGardenImages() {
+        if (this.gardenImages) return;
+        this.gardenImages = [];
+        GARDEN_PLANTS.forEach(plant => {
+          for (let stage = 1; stage <= GARDEN_STAGES; stage++) {
+            const img = new Image();
+            img.src = this.getGardenImage(plant, stage);
+            this.gardenImages.push(img);
+          }
+          const bloom = new Image();
+          bloom.src = this.getGardenBloomImage(plant);
+          this.gardenImages.push(bloom);
+        });
+      }
+
+      // Settings > Garden Growth: how many classes each stage lasts, for Weekly and Daily classes.
+      // Edits stay in a draft until Save.
+      openGardenGrowthModal() {
+        this.gardenGrowthDraft = JSON.parse(JSON.stringify(this.gardenGrowth));
+        this.renderGardenGrowthModal();
+        document.getElementById('gardenGrowthModal').classList.add('active');
+      }
+
+      renderGardenGrowthModal() {
+        const draft = this.gardenGrowthDraft;
+        const paces = ['weekly', 'daily'];
+        const stepper = (pace, i) => `
+          <div class="growth-stepper">
+            <button type="button" onclick="app.stepGardenGrowth('${pace}', ${i}, -1)" ${draft[pace][i] <= 1 ? 'disabled' : ''} aria-label="Fewer classes">−</button>
+            <span>${draft[pace][i]}</span>
+            <button type="button" onclick="app.stepGardenGrowth('${pace}', ${i}, 1)" ${draft[pace][i] >= GARDEN_GROWTH_MAX ? 'disabled' : ''} aria-label="More classes">+</button>
+          </div>`;
+        let rows = '';
+        for (let stage = 1; stage <= GARDEN_STAGES; stage++) {
+          rows += `
+            <div class="growth-stage">
+              <img src="${this.getGardenImage('sunflower', stage)}" alt="">
+              <span>Stage ${stage}</span>
+            </div>
+            ${stage < GARDEN_STAGES
+              ? paces.map(pace => stepper(pace, stage - 1)).join('')
+              : '<div class="growth-until">until replanted</div><div class="growth-until">until replanted</div>'}`;
+        }
+        const total = pace => draft[pace].reduce((a, b) => a + b, 0) + 1;
+        document.getElementById('gardenGrowthGrid').innerHTML = `
+          <div></div>
+          <div class="growth-head">Weekly<small>meets once a week</small></div>
+          <div class="growth-head">Daily<small>meets several times a week</small></div>
+          ${rows}
+          <div class="growth-total-label">Full bloom after</div>
+          ${paces.map(pace => `<div class="growth-total">${total(pace)} classes</div>`).join('')}`;
+      }
+
+      stepGardenGrowth(pace, index, delta) {
+        const lengths = this.gardenGrowthDraft[pace];
+        lengths[index] = Math.min(GARDEN_GROWTH_MAX, Math.max(1, lengths[index] + delta));
+        this.renderGardenGrowthModal();
+      }
+
+      resetGardenGrowthDraft() {
+        this.gardenGrowthDraft = JSON.parse(JSON.stringify(GARDEN_GROWTH_DEFAULTS));
+        this.renderGardenGrowthModal();
+      }
+
+      saveGardenGrowth() {
+        this.gardenGrowth = this.normalizeGardenGrowth(this.gardenGrowthDraft);
+        this.gardenGrowthDraft = null;
+        this.closeModal('gardenGrowthModal');
+        this.saveData();
+        this.render();
+      }
+
+      openGardenReplant(student) {
+        const currentClass = this.getCurrentClass();
+        if (!currentClass || !student) return;
+        this.pendingGardenReplant = student;
+        const profile = this.getStudentProfile(currentClass, student);
+        const name = profile.firstName || student;
+        document.getElementById('gardenReplantImg').src = this.getGardenBloomImage(this.getGardenPlant(currentClass, student));
+        document.getElementById('gardenReplantTitle').textContent = `Replant ${name}'s flower?`;
+        document.getElementById('gardenReplantText').textContent = `The ${this.getGardenPlantLabel(this.getGardenPlant(currentClass, student)).toLowerCase()} goes into the flower bed outside the window, where it stays. Then ${name} starts a new pot with a different mystery plant.`;
+        document.getElementById('gardenReplantModal').classList.add('active');
+      }
+
+      // Saves the flower in the class's border (part of the class data, so backups keep it)
+      // and starts the student's pot again
+      confirmGardenReplant() {
+        const currentClass = this.getCurrentClass();
+        const student = this.pendingGardenReplant;
+        this.pendingGardenReplant = null;
+        this.closeModal('gardenReplantModal');
+        if (!currentClass || !student) return;
+
+        if (!Array.isArray(currentClass.gardenBorder)) currentClass.gardenBorder = [];
+        const flower = {
+          id: `flower_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+          student,
+          plant: this.getGardenPlant(currentClass, student),
+          date: new Date().toISOString()
+        };
+        currentClass.gardenBorder.push(flower);
+        this.gardenJustPlanted = flower.id;
+
+        const { starts } = this.getGardenGrowth(currentClass, student);
+        this.setGardenKind(currentClass, student, starts[starts.length - 1], this.pickNextGardenPlant(currentClass, student, starts));
+        this.saveData();
+        this.renderChart(currentClass);
+      }
+
+      removeGardenBorderFlower(flowerId) {
+        const currentClass = this.getCurrentClass();
+        if (!currentClass || !Array.isArray(currentClass.gardenBorder)) return;
+        const flower = currentClass.gardenBorder.find(f => f && f.id === flowerId);
+        if (!flower) return;
+        const name = this.getStudentProfile(currentClass, flower.student).firstName || flower.student;
+        const label = this.getGardenPlantLabel(flower.plant).toLowerCase();
+        // Their latest flower goes back into their pot, undoing that replant
+        const theirs = currentClass.gardenBorder.filter(f => f && f.student === flower.student);
+        const isLatest = theirs[theirs.length - 1] === flower && (currentClass.classList || []).includes(flower.student);
+        const question = isLatest
+          ? `Remove ${name}'s ${label} from the flower bed outside the window? It goes back into ${name}'s pot, as if it had not been replanted.`
+          : `Remove ${name}'s ${label} from the flower bed outside the window?`;
+        if (!confirm(question)) return;
+        currentClass.gardenBorder = currentClass.gardenBorder.filter(f => f !== flower);
+        this.saveData();
+        this.renderChart(currentClass);
+      }
+
+      getGardenBloomImage(plant) {
+        return `garden/${plant}-bloom.webp`;
+      }
+
+      getGardenPlantLabel(plant) {
+        return plant === 'flytrap' ? 'Venus flytrap' : plant.charAt(0).toUpperCase() + plant.slice(1);
+      }
+
+      // The grass border along the top: every replanted flower, oldest first. As it fills,
+      // flowers crowd closer, then stand in up to three rows, each further back a little
+      // smaller and higher, behind its own strip of grass.
+      renderGardenBorder(currentClass, width, height) {
+        const border = document.createElement('div');
+        border.className = 'garden-border';
+        border.style.height = `${height}px`;
+        border.style.setProperty('--border-h', `${height}px`);
+
+        // The flowers grow inside the window frame
+        width = Math.max(40, width - 2 * GARDEN.frameX);
+        height = Math.max(40, height - GARDEN.frameTop - GARDEN.frameBottom);
+
+        const flowers = (Array.isArray(currentClass.gardenBorder) ? currentClass.gardenBorder : [])
+          .filter(f => f && f.id && GARDEN_PLANTS.includes(f.plant));
+        if (flowers.length === 0) {
+          const hint = document.createElement('div');
+          hint.className = 'garden-border-hint';
+          hint.textContent = 'Full-grown flowers can be replanted here';
+          border.appendChild(hint);
+        }
+
+        const flowerH = height * 0.9;
+        const flowerW = flowerH * GARDEN.bloomAspect;
+        const perRow = Math.max(1, Math.floor((width - flowerW) / (flowerW * 0.5)) + 1);
+        const rows = Math.max(1, Math.min(3, Math.ceil(flowers.length / perRow)));
+        const hash = str => [...str].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
+
+        for (let row = rows - 1; row >= 0; row--) {
+          const scale = 1 - 0.16 * row;
+          const lift = height * 0.14 * row;
+          // Each row's grass strip; a flower's soil line sits on the strip's solid base
+          const grassBottom = row ? Math.max(0, lift - height * 0.04) : 0;
+          const grassH = height * (row ? GARDEN.backGrass : GARDEN.frontGrass);
+          const groundTop = grassBottom + grassH * (row ? GARDEN.backGrassBase : GARDEN.frontGrassBase);
+          const h = flowerH * scale;
+          const w = h * GARDEN.bloomAspect;
+          const inRow = flowers.filter((f, i) => i % rows === row);
+          const step = inRow.length > 1 ? Math.min(w * 0.85, (width - w) / (inRow.length - 1 + (row ? 0.5 : 0))) : 0;
+          const start = (width - step * (inRow.length - 1)) / 2 + (row % 2 ? step / 2 : row ? -step / 4 : 0);
+
+          inRow.forEach((flower, i) => {
+            const seed = hash(flower.id);
+            const jitter = ((seed % 100) / 100 - 0.5) * step * 0.25;
+            const size = h * (0.92 + ((seed >> 7) % 13) / 100);
+            const x = Math.min(width - w / 2, Math.max(w / 2, start + step * i + jitter));
+            const img = document.createElement('img');
+            img.className = 'garden-border-flower' + (flower.id === this.gardenJustPlanted ? ' just-planted' : '');
+            img.src = this.getGardenBloomImage(flower.plant);
+            img.alt = '';
+            img.draggable = false;
+            img.style.left = `${(x / width * 100).toFixed(3)}%`;
+            img.style.bottom = `${groundTop - size * GARDEN.bloomSoil}px`;
+            img.style.height = `${size}px`;
+            img.style.marginLeft = `${-size * GARDEN.bloomAspect / 2}px`;
+            if ((seed >> 3) % 2) img.style.transform = 'scaleX(-1)';
+            const name = this.getStudentProfile(currentClass, flower.student).firstName || flower.student;
+            const when = new Date(flower.date);
+            img.title = `${name} · ${this.getGardenPlantLabel(flower.plant)}` + (isNaN(when) ? '' : ` · ${when.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`);
+            img.onclick = (e) => {
+              if (!this.isGardenEditing()) return;
+              e.stopPropagation();
+              this.removeGardenBorderFlower(flower.id);
+            };
+            border.appendChild(img);
+          });
+
+          const grass = document.createElement('div');
+          grass.className = 'garden-border-grass ' + (row ? 'back' : 'front');
+          grass.style.bottom = `${grassBottom}px`;
+          grass.style.height = `${grassH}px`;
+          border.appendChild(grass);
+        }
+        this.gardenJustPlanted = null;
+        return border;
       }
 
       renderFreeformLayout(container, currentClass) {
@@ -8580,7 +9706,6 @@ class SeatingChartApp {
         box.style.height = `${boxHeight}px`;
         box.style.minWidth = '320px';
         box.style.minHeight = '240px';
-        box.style.background = 'rgba(226, 232, 240, 0.5)';
         box.style.overflow = 'visible';
 
         this.makeResizable(box, sizeKey);
@@ -8609,7 +9734,7 @@ class SeatingChartApp {
 
         if (freeformStudents.length === 0) {
           const placeholder = document.createElement('div');
-          placeholder.style.cssText = 'position: absolute; top: 45%; left: 0; right: 0; text-align: center; color: var(--text-muted); font-size: 0.95rem; font-style: italic; user-select: none; pointer-events: none;';
+          placeholder.className = 'freeform-placeholder';
           placeholder.textContent = 'Drag students anywhere in this Free Form space';
           box.appendChild(placeholder);
         } else {
@@ -8709,7 +9834,7 @@ class SeatingChartApp {
           const lineDiv = document.createElement('div');
           lineDiv.className = 'line-column seat-drop-zone seat-drop-vertical';
           lineDiv.id = `line-col-${lIdx}`;
-          lineDiv.style.cssText = `flex: 1; min-width: 105px; min-height: 400px; background: rgba(226, 232, 240, 0.4); border: 2px dashed #cbd5e1; border-radius: 10px; padding: 24px ${colPaddingX}px 14px ${colPaddingX}px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 2px; position: relative; transition: background-color 0.2s, border-color 0.2s; box-sizing: border-box;`;
+          lineDiv.style.cssText = `flex: 1; min-width: 105px; min-height: 400px; border-radius: 12px; padding: 24px ${colPaddingX}px 14px ${colPaddingX}px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 2px; position: relative; transition: background-color 0.2s, border-color 0.2s; box-sizing: border-box;`;
 
           const sizeKey = `lines-${lIdx}`;
           const savedSize = (currentClass.containerSizes && currentClass.containerSizes[sizeKey]) || null;
@@ -8732,10 +9857,7 @@ class SeatingChartApp {
 
           if (lineStudents.length === 0) {
             const placeholder = document.createElement('div');
-            placeholder.style.color = 'var(--text-muted)';
-            placeholder.style.fontSize = '0.85rem';
-            placeholder.style.fontStyle = 'italic';
-            placeholder.style.textAlign = 'center';
+            placeholder.className = 'zone-placeholder';
             placeholder.style.marginTop = '20px';
             placeholder.textContent = 'Drag students here to add to Line ' + (lIdx + 1);
             lineDiv.appendChild(placeholder);
@@ -8862,11 +9984,7 @@ class SeatingChartApp {
 
             if (rowStudents.length === 0) {
               const placeholder = document.createElement('div');
-              placeholder.style.color = 'var(--text-muted)';
-              placeholder.style.fontSize = '0.85rem';
-              placeholder.style.fontStyle = 'italic';
-              placeholder.style.width = '100%';
-              placeholder.style.textAlign = 'center';
+              placeholder.className = 'zone-placeholder';
               placeholder.textContent = 'Drag students here to add them to Row ' + (rIndex + 1);
               rowDiv.appendChild(placeholder);
             } else {
@@ -8882,20 +10000,7 @@ class SeatingChartApp {
 
             const leftSec = document.createElement('div');
             leftSec.id = `seat-row-${rIndex}-sec-0`;
-            leftSec.className = 'seat-drop-zone';
-            leftSec.style.flex = '1';
-            leftSec.style.display = 'flex';
-            leftSec.style.flexWrap = 'wrap';
-            leftSec.style.columnGap = '10px';
-            leftSec.style.rowGap = '8px';
-            leftSec.style.justifyContent = 'flex-end';
-            leftSec.style.alignItems = 'center';
-            leftSec.style.alignContent = 'center';
-            leftSec.style.minHeight = '65px';
-            leftSec.style.padding = '6px';
-            leftSec.style.border = '1px dashed #cbd5e1';
-            leftSec.style.borderRadius = '6px';
-            leftSec.style.background = 'rgba(255,255,255,0.6)';
+            leftSec.className = 'seat-drop-zone row-section row-section-left';
 
             leftSec.ondragover = (e) => this.handleDragOver(e);
             leftSec.ondragenter = (e) => this.handleDragEnterGroup(e, `${rIndex}-sec-0`, 'seat-row');
@@ -8903,7 +10008,7 @@ class SeatingChartApp {
             leftSec.ondrop = (e) => this.handleDropOnRow(e, rIndex, 0);
 
             if (leftStudents.length === 0) {
-              leftSec.innerHTML = '<span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;">Left Section</span>';
+              leftSec.innerHTML = '<span class="row-section-hint">Left Section</span>';
             } else {
               leftStudents.forEach(studentName => {
                 const seatEl = this.createSeatElement(studentName, rIndex);
@@ -8912,27 +10017,11 @@ class SeatingChartApp {
             }
 
             const divider = document.createElement('div');
-            divider.style.width = '2px';
-            divider.style.height = '80%';
-            divider.style.background = 'var(--primary)';
-            divider.style.opacity = '0.5';
+            divider.className = 'row-aisle';
 
             const rightSec = document.createElement('div');
             rightSec.id = `seat-row-${rIndex}-sec-1`;
-            rightSec.className = 'seat-drop-zone';
-            rightSec.style.flex = '1';
-            rightSec.style.display = 'flex';
-            rightSec.style.flexWrap = 'wrap';
-            rightSec.style.columnGap = '10px';
-            rightSec.style.rowGap = '8px';
-            rightSec.style.justifyContent = 'flex-start';
-            rightSec.style.alignItems = 'center';
-            rightSec.style.alignContent = 'center';
-            rightSec.style.minHeight = '65px';
-            rightSec.style.padding = '6px';
-            rightSec.style.border = '1px dashed #cbd5e1';
-            rightSec.style.borderRadius = '6px';
-            rightSec.style.background = 'rgba(255,255,255,0.6)';
+            rightSec.className = 'seat-drop-zone row-section row-section-right';
 
             rightSec.ondragover = (e) => this.handleDragOver(e);
             rightSec.ondragenter = (e) => this.handleDragEnterGroup(e, `${rIndex}-sec-1`, 'seat-row');
@@ -8940,7 +10029,7 @@ class SeatingChartApp {
             rightSec.ondrop = (e) => this.handleDropOnRow(e, rIndex, 1);
 
             if (rightStudents.length === 0) {
-              rightSec.innerHTML = '<span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;">Right Section</span>';
+              rightSec.innerHTML = '<span class="row-section-hint">Right Section</span>';
             } else {
               rightStudents.forEach(studentName => {
                 const seatEl = this.createSeatElement(studentName, rIndex);
@@ -9103,7 +10192,7 @@ class SeatingChartApp {
       }
 
       renderGroupedLayout(container, currentClass, layoutType) {
-        container.className = 'chart-container group-rows-container';
+        container.className = 'chart-container table-floor-container';
 
         const groupTitles = {
           half: ['Group A', 'Group B'],
@@ -9116,18 +10205,14 @@ class SeatingChartApp {
         const titles = groupTitles[layoutType];
         const groups = currentClass.layoutsData[layoutType] || [];
 
-        // Initialize default row structure if not already stored or corrupted
+        // The old row arrangement: tables the teacher hasn't placed yet start out in these rows
         const rowKey = `${layoutType}Rows`;
         const expectedIndicesCount = titles ? titles.length : 0;
         const existingRowDef = currentClass.layoutsData[rowKey];
         const flatIndicesCount = Array.isArray(existingRowDef) ? existingRowDef.flat().length : 0;
 
         if (!existingRowDef || flatIndicesCount !== expectedIndicesCount) {
-          if (layoutType === 'half') currentClass.layoutsData[rowKey] = [[0, 1]];
-          else if (layoutType === 'third') currentClass.layoutsData[rowKey] = [[0, 1], [2]];
-          else if (layoutType === 'fourth') currentClass.layoutsData[rowKey] = [[0, 1], [2, 3]];
-          else if (layoutType === 'fifth') currentClass.layoutsData[rowKey] = [[0, 1], [4], [2, 3]];
-          else if (layoutType === 'sixth') currentClass.layoutsData[rowKey] = [[0, 1], [2, 3], [4, 5]];
+          currentClass.layoutsData[rowKey] = this.defaultTableRows(layoutType);
         }
 
         const rows = currentClass.layoutsData[rowKey];
@@ -9136,158 +10221,1898 @@ class SeatingChartApp {
           currentClass.layoutsData[alignKey] = {};
         }
 
-        rows.forEach((rowGroupIndices, rIdx) => {
-          const rowSlot = document.createElement('div');
-          rowSlot.className = 'group-row-slot';
-          rowSlot.id = `group-row-slot-${rIdx}`;
+        // The room's width in floor px. Worked out from the classroom area, because the chart's own
+        // width is still easing over from the last layout.
+        const roomW = Math.max(320, this.getChartContentWidth());
+        this.chartRoomW = Math.round(this.getChartContentWidth());
+        const card = this.getSeatCardSize(currentClass);
 
-          const savedAlign = currentClass.layoutsData[alignKey][rIdx] || 'center';
-          rowSlot.style.justifyContent = savedAlign;
-
-          // Alignment dots control container
-          const dotsContainer = document.createElement('div');
-          dotsContainer.className = 'row-align-dots';
-
-          const alignments = [
-            { val: 'flex-start', title: 'Align Row Left' },
-            { val: 'center', title: 'Align Row Center' },
-            { val: 'flex-end', title: 'Align Row Right' }
-          ];
-
-          alignments.forEach(a => {
-            const dot = document.createElement('div');
-            dot.className = 'align-dot' + (savedAlign === a.val ? ' active' : '');
-            dot.title = a.title;
-            dot.onclick = () => {
-              currentClass.layoutsData[alignKey][rIdx] = a.val;
-              this.saveData();
-              this.render();
-            };
-            dotsContainer.appendChild(dot);
+        // A table with no saved size takes its share of its row (an empty table a small one, the rest
+        // by group size), so the row's tables sit side by side when they can
+        const shareOf = {};
+        rows.forEach(rowGroupIndices => {
+          const inRow = rowGroupIndices.filter(g => g < titles.length);
+          const emptyCount = inRow.filter(g => !(groups[g] || []).length).length;
+          const seatedTotal = inRow.reduce((sum, g) => sum + (groups[g] || []).length, 0);
+          inRow.forEach(g => {
+            const count = (groups[g] || []).length;
+            const room = roomW - 20 - TABLE.space * (inRow.length - 1) - TABLE.emptyW * emptyCount;
+            shareOf[g] = count ? Math.max(TABLE.emptyW, room * count / Math.max(1, seatedTotal)) : TABLE.emptyW;
           });
-
-          rowSlot.appendChild(dotsContainer);
-
-          rowSlot.ondragover = (e) => {
-            if (this.draggedGroupIndex !== null) {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = 'move';
-              rowSlot.classList.add('row-drop-target');
-            }
-          };
-          rowSlot.ondragleave = (e) => {
-            if (this.draggedGroupIndex !== null && !rowSlot.contains(e.relatedTarget)) {
-              rowSlot.classList.remove('row-drop-target');
-            }
-          };
-          rowSlot.ondrop = (e) => {
-            if (this.draggedGroupIndex !== null) {
-              rowSlot.classList.remove('row-drop-target');
-              this.handleRowDrop(e, rIdx, layoutType);
-            }
-          };
-
-          rowGroupIndices.forEach((gIndex) => {
-            if (gIndex >= titles.length) return;
-
-            const title = titles[gIndex];
-            const groupStudents = groups[gIndex] || [];
-
-            const box = document.createElement('div');
-            box.className = 'group-box seat-drop-zone';
-            box.id = `group-box-${gIndex}`;
-
-            const sizeKey = `${layoutType}-${gIndex}`;
-            const savedSize = (currentClass.containerSizes && currentClass.containerSizes[sizeKey]) || null;
-            const legacyHeight = (currentClass.containerHeights && currentClass.containerHeights[sizeKey]) || null;
-
-            if (savedSize) {
-              if (savedSize.height) box.style.height = `${savedSize.height}px`;
-              if (savedSize.width) box.style.width = `${savedSize.width}px`;
-            } else if (legacyHeight) {
-              box.style.height = `${legacyHeight}px`;
-            }
-
-            const handHandle = document.createElement('div');
-            handHandle.className = 'group-drag-handle';
-            handHandle.title = 'Drag to move table or swap';
-            handHandle.innerHTML = '✋';
-            handHandle.draggable = true;
-            handHandle.ondragstart = (e) => this.handleGroupDragStart(e, gIndex);
-            box.appendChild(handHandle);
-
-            const badge = document.createElement('div');
-            badge.className = 'group-header-badge';
-            badge.textContent = `${title} (${groupStudents.length})`;
-            box.appendChild(badge);
-
-            box.ondragover = (e) => {
-              if (this.draggedGroupIndex !== null) this.handleGroupDragOver(e, gIndex);
-              else this.handleDragOver(e);
-            };
-            box.ondragenter = (e) => {
-              if (this.draggedGroupIndex !== null) this.handleGroupDragEnter(e, gIndex);
-              else this.handleDragEnterGroup(e, gIndex, 'group-box');
-            };
-            box.ondragleave = (e) => {
-              if (this.draggedGroupIndex !== null) this.handleGroupDragLeave(e, gIndex);
-              else this.handleDragLeaveGroup(e, gIndex, 'group-box');
-            };
-            box.ondrop = (e) => {
-              if (this.draggedGroupIndex !== null) this.handleGroupDrop(e, gIndex, layoutType);
-              else this.handleDropOnGroup(e, gIndex, layoutType);
-            };
-
-            this.makeResizable(box, sizeKey);
-
-            if (groupStudents.length === 0) {
-              const placeholder = document.createElement('div');
-              placeholder.style.color = 'var(--text-muted)';
-              placeholder.style.fontSize = '0.85rem';
-              placeholder.style.fontStyle = 'italic';
-              placeholder.style.width = '100%';
-              placeholder.style.textAlign = 'center';
-              placeholder.style.alignSelf = 'center';
-              placeholder.textContent = 'Drag students here';
-              box.appendChild(placeholder);
-            } else {
-              groupStudents.forEach((studentName) => {
-                const seatEl = this.createSeatElement(studentName, gIndex);
-                box.appendChild(seatEl);
-              });
-            }
-
-            rowSlot.appendChild(box);
-          });
-
-          container.appendChild(rowSlot);
         });
 
-        // Add bottom drop zone for creating new row at the bottom
-        const bottomZone = document.createElement('div');
-        bottomZone.className = 'row-add-bottom-zone';
-        bottomZone.innerHTML = '+ Drag table here to create a new row at bottom';
+        const floor = document.createElement('div');
+        floor.className = 'table-floor';
+        container.appendChild(floor);
 
-        bottomZone.ondragover = (e) => {
-          if (this.draggedGroupIndex !== null) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            bottomZone.classList.add('drag-over');
+        const tables = titles.map((title, gIndex) => {
+          const groupStudents = groups[gIndex] || [];
+          const sizeKey = `${layoutType}-${gIndex}`;
+          const savedSize = (currentClass.containerSizes && currentClass.containerSizes[sizeKey]) || null;
+          const legacyHeight = (currentClass.containerHeights && currentClass.containerHeights[sizeKey]) || null;
+          const shape = (savedSize && savedSize.shape === 'round') ? 'round' : 'rect';
+          const share = shareOf[gIndex] || roomW;
+
+          // The size to start from: the one the teacher dragged it to, else one that suits the group
+          let start;
+          if (savedSize && (savedSize.width || savedSize.height)) {
+            const auto = this.defaultTableSize(groupStudents.length, shape, card, share, roomW);
+            start = { W: savedSize.width || auto.W, H: savedSize.height || auto.H };
+          } else if (legacyHeight) {
+            const auto = this.defaultTableSize(groupStudents.length, shape, card, share, roomW);
+            start = { W: auto.W, H: legacyHeight };
+          } else {
+            start = this.defaultTableSize(groupStudents.length, shape, card, share, roomW);
           }
-        };
-        bottomZone.ondragleave = (e) => {
-          if (this.draggedGroupIndex !== null) {
-            bottomZone.classList.remove('drag-over');
+
+          const box = document.createElement('div');
+          box.className = 'group-box table-group seat-drop-zone seat-drop-table';
+          box.id = `group-box-${gIndex}`;
+
+          const handHandle = document.createElement('div');
+          handHandle.className = 'group-drag-handle';
+          handHandle.title = 'Drag to move the table (drop it on another table to swap their students)';
+          handHandle.innerHTML = '✋';
+          box.appendChild(handHandle);
+
+          const shapeBtn = document.createElement('button');
+          shapeBtn.type = 'button';
+          shapeBtn.className = 'table-shape-btn';
+          shapeBtn.textContent = shape === 'round' ? '▭ Square' : '◯ Round';
+          shapeBtn.title = shape === 'round' ? 'Make this a square table' : 'Make this a round table';
+          shapeBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.setTableShape(sizeKey, shape === 'round' ? 'rect' : 'round');
+          };
+          box.appendChild(shapeBtn);
+
+          const table = document.createElement('div');
+          table.className = 'group-table' + (shape === 'round' ? ' round' : '');
+          box.appendChild(table);
+
+          const badge = document.createElement('div');
+          badge.className = 'group-header-badge table-tent';
+          badge.style.setProperty('--tent', ['var(--red)', 'var(--blue)', 'var(--yellow)', 'var(--green)', 'var(--orange)', 'var(--purple)'][gIndex % 6]);
+          badge.innerHTML = `${this.escapeHtml(title)}<span class="tent-count">(${groupStudents.length})</span>`;
+          box.appendChild(badge);
+
+          box.ondragover = (e) => this.handleDragOver(e);
+          box.ondragenter = (e) => this.handleDragEnterGroup(e, gIndex, 'group-box');
+          box.ondragleave = (e) => this.handleDragLeaveGroup(e, gIndex, 'group-box');
+          box.ondrop = (e) => this.handleDropOnGroup(e, gIndex, layoutType);
+
+          const seats = [];
+          if (groupStudents.length === 0) {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'group-table-empty';
+            placeholder.textContent = 'Drag students here';
+            table.appendChild(placeholder);
+          } else {
+            groupStudents.forEach((studentName) => {
+              const seatEl = this.createSeatElement(studentName, gIndex);
+              seats.push(seatEl);
+              box.appendChild(seatEl);
+            });
           }
-        };
-        bottomZone.ondrop = (e) => {
-          if (this.draggedGroupIndex !== null) {
-            bottomZone.classList.remove('drag-over');
-            this.handleNewRowDrop(e, layoutType);
+
+          const fit = this.fitTableGroup(seats.length, shape, start.W, start.H, card);
+          const t = {
+            gIndex, sizeKey, shape, box, table, badge, seats, fit,
+            W: fit.W, H: fit.H,
+            saved: savedSize && Number.isFinite(savedSize.x) && Number.isFinite(savedSize.y) ? { x: savedSize.x, y: savedSize.y } : null
+          };
+          // Lays the seats around the table for a box size; resizing calls it again as the box changes
+          t.relayout = (W, H) => {
+            t.fit = this.fitTableGroup(seats.length, shape, W, H, card);
+            t.W = t.fit.W;
+            t.H = t.fit.H;
+            this.applyTableLayout(box, table, badge, seats, t.fit);
+          };
+          this.applyTableLayout(box, table, badge, seats, fit);
+          floor.appendChild(box);
+          return t;
+        });
+
+        // Where each table stands: where the teacher put it, else in its row as before
+        const flow = this.flowTablePositions(rows, currentClass.layoutsData[alignKey], tables, roomW);
+        tables.forEach(t => {
+          const p = t.saved || flow[t.gIndex] || { x: 0, y: 0 };
+          t.x = p.x;
+          t.y = p.y;
+        });
+        this.settleTables(tables, roomW);
+
+        const floorState = { container, floor, tables, roomW, layoutType, card };
+        this.placeTableFloor(floorState);
+        tables.forEach(t => this.makeTableMovable(t, floorState));
+      }
+
+      // How a table layout's tables stand in rows until the teacher moves them
+      defaultTableRows(layoutType) {
+        return {
+          half: [[0, 1]],
+          third: [[0, 1], [2]],
+          fourth: [[0, 1], [2, 3]],
+          fifth: [[0, 1], [4], [2, 3]],
+          sixth: [[0, 1], [2, 3], [4, 5]]
+        }[layoutType] || [[0]];
+      }
+
+      // The tables' spots in the old row arrangement: each row's tables side by side (wrapping when the
+      // room is too narrow), lined up left, centre or right by the row's alignment
+      flowTablePositions(rows, align, tables, roomW) {
+        const out = {};
+        const byIndex = {};
+        tables.forEach(t => { byIndex[t.gIndex] = t; });
+        const usable = roomW - 20;
+        let y = 0;
+        rows.forEach((rowGroupIndices, rIdx) => {
+          const inRow = rowGroupIndices.map(g => byIndex[g]).filter(Boolean);
+          const lines = [];
+          let line = [];
+          let lineW = 0;
+          inRow.forEach(t => {
+            const add = (line.length ? TABLE.space : 0) + t.W;
+            if (line.length && lineW + add > usable) {
+              lines.push(line);
+              line = [];
+              lineW = 0;
+            }
+            line.push(t);
+            lineW += line.length > 1 ? TABLE.space + t.W : t.W;
+          });
+          if (line.length) lines.push(line);
+          const a = (align && align[rIdx]) || 'center';
+          lines.forEach(ln => {
+            const w = ln.reduce((sum, t) => sum + t.W, 0) + TABLE.space * (ln.length - 1);
+            let x = 10 + (a === 'flex-end' ? usable - w : a === 'flex-start' ? 0 : (usable - w) / 2);
+            x = Math.max(0, x);
+            const h = Math.max(...ln.map(t => t.H));
+            ln.forEach(t => {
+              out[t.gIndex] = { x, y };
+              x += t.W + TABLE.space;
+            });
+            y += h + TABLE.space * 2;
+          });
+        });
+        return out;
+      }
+
+      // Tables never overlap: going down the room, a table that runs into one already placed (it grew
+      // with more students, say) moves to the nearest open spot. A room laid out wider than this
+      // screen keeps its width; placeTableFloor shrinks it to fit.
+      settleTables(tables, roomW) {
+        const width = Math.max(roomW, ...tables.map(t => t.x + t.W));
+        const placed = [];
+        tables.slice().sort((a, b) => (a.y - b.y) || (a.x - b.x)).forEach(t => {
+          let x = Math.max(0, Math.min(t.x, width - t.W));
+          let y = Math.max(0, t.y);
+          if (this.tableHits(x, y, t.W, t.H, placed)) {
+            const spot = this.findOpenTableSpot(x, y, t.W, t.H, placed, width);
+            x = spot.x;
+            y = spot.y;
           }
+          t.x = x;
+          t.y = y;
+          placed.push(t);
+        });
+      }
+
+      // Does a w x h table at x, y come within TABLE.space of any of the others?
+      tableHits(x, y, w, h, others) {
+        const s = TABLE.space;
+        return others.some(o => x < o.x + o.W + s && o.x < x + w + s && y < o.y + o.H + s && o.y < y + h + s);
+      }
+
+      // The open spot nearest to x, y for a w x h table: just clear of a neighbour's edge, or the room's
+      // edge, on either axis. Below everything always works.
+      findOpenTableSpot(x, y, w, h, others, roomW) {
+        const s = TABLE.space;
+        const maxX = Math.max(0, roomW - w);
+        const xs = new Set([x, 0, maxX]);
+        const ys = new Set([y, 0]);
+        others.forEach(o => {
+          xs.add(o.x + o.W + s);
+          xs.add(o.x - w - s);
+          ys.add(o.y + o.H + s);
+          ys.add(o.y - h - s);
+        });
+        let best = null;
+        xs.forEach(cx => {
+          if (cx < 0 || cx > maxX + 0.5) return;
+          ys.forEach(cy => {
+            if (cy < 0) return;
+            const d = (cx - x) * (cx - x) + (cy - y) * (cy - y);
+            if (best && d >= best.d) return;
+            if (!this.tableHits(cx, cy, w, h, others)) best = { x: cx, y: cy, d };
+          });
+        });
+        if (best) return best;
+        return { x: Math.max(0, Math.min(x, maxX)), y: Math.max(0, ...others.map(o => o.y + o.H + s)) };
+      }
+
+      // Puts the tables on the floor. A room laid out wider than the screen (say in full screen, now
+      // seen in the window) is shrunk to fit rather than rearranged.
+      placeTableFloor(fs) {
+        const { container, floor, tables } = fs;
+        tables.forEach(t => {
+          t.box.style.left = `${Math.round(t.x)}px`;
+          t.box.style.top = `${Math.round(t.y)}px`;
+        });
+        const roomW = Math.max(fs.roomW, ...tables.map(t => t.x + t.W));
+        const roomH = Math.max(160, ...tables.map(t => t.y + t.H)) + (this.isEditMode ? 90 : 20);
+        const k = Math.min(1, fs.roomW / roomW);
+        fs.floorW = roomW;
+        fs.floorH = roomH;
+        fs.scale = k;
+        floor.style.width = `${roomW}px`;
+        floor.style.height = `${roomH}px`;
+        floor.style.transform = k < 0.999 ? `scale(${k.toFixed(4)})` : '';
+        floor.style.marginBottom = k < 0.999 ? `${-roomH * (1 - k)}px` : '';
+        container.style.minHeight = '0';
+      }
+
+      // Edit mode: drag a table by its hand or its top to anywhere it fits, drop it on another table to
+      // swap their students, and size it from its bottom corners without running into its neighbours
+      makeTableMovable(t, fs) {
+        const others = () => fs.tables.filter(o => o !== t);
+        // Pointer px to floor px (the chart's zoom and the floor's own shrink-to-fit)
+        const perPx = () => fs.floorW / (fs.floor.getBoundingClientRect().width || fs.floorW);
+
+        const startMove = (e) => {
+          if (!this.isEditMode || e.button > 0) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const from = { x: t.x, y: t.y };
+          const k = perPx();
+          const sx = e.clientX;
+          const sy = e.clientY;
+          let moved = false;
+          let swapWith = null;
+
+          const onMove = (ev) => {
+            const dx = (ev.clientX - sx) * k;
+            const dy = (ev.clientY - sy) * k;
+            if (!moved && Math.hypot(dx, dy) < 4) return;
+            if (!moved) {
+              moved = true;
+              t.box.classList.add('table-moving');
+            }
+            const wantX = Math.max(0, Math.min(from.x + dx, fs.floorW - t.W));
+            const wantY = Math.max(0, from.y + dy);
+
+            // Over another table's top: swap students with it
+            const fr = fs.floor.getBoundingClientRect();
+            const px = (ev.clientX - fr.left) * k;
+            const py = (ev.clientY - fr.top) * k;
+            const target = others().find(o => {
+              const tr = o.fit.plan.table;
+              return px >= o.x + tr.x && px <= o.x + tr.x + tr.w && py >= o.y + tr.y && py <= o.y + tr.y + tr.h;
+            }) || null;
+            if (target !== swapWith) {
+              if (swapWith) swapWith.box.classList.remove('table-swap-target');
+              if (target) target.box.classList.add('table-swap-target');
+              swapWith = target;
+            }
+            t.box.classList.toggle('table-swapping', !!target);
+
+            let spot = { x: wantX, y: wantY };
+            if (!target && this.tableHits(wantX, wantY, t.W, t.H, others())) {
+              spot = this.findOpenTableSpot(wantX, wantY, t.W, t.H, others(), fs.floorW);
+            }
+            t.x = spot.x;
+            t.y = spot.y;
+            t.box.style.left = `${Math.round(t.x)}px`;
+            t.box.style.top = `${Math.round(t.y)}px`;
+            const needH = t.y + t.H + 90;
+            if (needH > fs.floorH) {
+              fs.floorH = needH;
+              fs.floor.style.height = `${needH}px`;
+            }
+          };
+
+          const onUp = () => {
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onUp);
+            document.removeEventListener('pointercancel', onUp);
+            t.box.classList.remove('table-moving', 'table-swapping');
+            if (swapWith) swapWith.box.classList.remove('table-swap-target');
+            if (!moved) return;
+            const currentClass = this.getCurrentClass();
+            if (!currentClass) return;
+            if (swapWith) {
+              t.x = from.x;
+              t.y = from.y;
+              const groups = currentClass.layoutsData[fs.layoutType];
+              if (groups) {
+                const temp = groups[t.gIndex] || [];
+                groups[t.gIndex] = groups[swapWith.gIndex] || [];
+                groups[swapWith.gIndex] = temp;
+              }
+            }
+            this.saveTablePlaces(currentClass, fs);
+            this.saveData();
+            this.render();
+          };
+
+          document.addEventListener('pointermove', onMove);
+          document.addEventListener('pointerup', onUp);
+          document.addEventListener('pointercancel', onUp);
         };
 
-        container.appendChild(bottomZone);
+        t.box.querySelector('.group-drag-handle').addEventListener('pointerdown', startMove);
+        t.table.addEventListener('pointerdown', startMove);
+        t.badge.addEventListener('pointerdown', startMove);
+
+        // Resize from the bottom corners; the left one keeps the right edge where it is
+        const startResize = (e, corner) => {
+          if (!this.isEditMode || e.button > 0) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const from = { x: t.x, W: t.W, H: t.H };
+          const k = perPx();
+          const sx = e.clientX;
+          const sy = e.clientY;
+          let last = { dx: 0, dy: 0 };
+
+          const tryAt = (dx, dy) => {
+            const reqW = Math.max(120, corner === 'br' ? from.W + dx : from.W - dx);
+            const reqH = Math.max(60, from.H + dy);
+            const fit = this.fitTableGroup(t.seats.length, t.shape, reqW, reqH, fs.card);
+            const x = corner === 'br' ? from.x : from.x + from.W - fit.W;
+            if (x < 0 || x + fit.W > fs.floorW + 0.5) return null;
+            if (this.tableHits(x, t.y, fit.W, fit.H, others())) return null;
+            return { x, fit };
+          };
+
+          const onMove = (ev) => {
+            const dx = (ev.clientX - sx) * k;
+            const dy = (ev.clientY - sy) * k;
+            let step = { dx, dy };
+            let r = tryAt(dx, dy);
+            if (!r) {
+              // Up against a neighbour or the room's edge: go as far as it allows on each axis
+              const reach = (a, b, at) => {
+                if (at(b)) return b;
+                for (let i = 0; i < 10; i++) {
+                  const mid = (a + b) / 2;
+                  if (at(mid)) a = mid; else b = mid;
+                }
+                return a;
+              };
+              const rx = reach(last.dx, dx, v => tryAt(v, last.dy));
+              const ry = reach(last.dy, dy, v => tryAt(rx, v));
+              step = { dx: rx, dy: ry };
+              r = tryAt(rx, ry);
+            }
+            if (!r) return;
+            last = step;
+            t.x = r.x;
+            t.fit = r.fit;
+            t.W = r.fit.W;
+            t.H = r.fit.H;
+            this.applyTableLayout(t.box, t.table, t.badge, t.seats, r.fit);
+            t.box.style.left = `${Math.round(t.x)}px`;
+            const needH = t.y + t.H + 90;
+            if (needH > fs.floorH) {
+              fs.floorH = needH;
+              fs.floor.style.height = `${needH}px`;
+            }
+          };
+
+          const onUp = () => {
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onUp);
+            document.removeEventListener('pointercancel', onUp);
+            const currentClass = this.getCurrentClass();
+            if (!currentClass) return;
+            if (!currentClass.containerSizes) currentClass.containerSizes = {};
+            currentClass.containerSizes[t.sizeKey] = {
+              ...(currentClass.containerSizes[t.sizeKey] || {}),
+              width: Math.round(t.W),
+              height: Math.round(t.H)
+            };
+            this.saveTablePlaces(currentClass, fs);
+            this.saveData();
+            this.render();
+          };
+
+          document.addEventListener('pointermove', onMove);
+          document.addEventListener('pointerup', onUp);
+          document.addEventListener('pointercancel', onUp);
+        };
+
+        [['br', '◢', 'Resize from Bottom-Right'], ['bl', '◣', 'Resize from Bottom-Left']].forEach(([corner, mark, title]) => {
+          const handle = document.createElement('div');
+          handle.className = `resize-handle resize-handle-${corner}`;
+          handle.title = title;
+          handle.innerHTML = mark;
+          handle.addEventListener('pointerdown', (e) => startResize(e, corner));
+          t.box.appendChild(handle);
+        });
+      }
+
+      // Once a table is moved or sized, every table in the layout keeps the spot it is in now, so
+      // the room stays as the teacher left it (x and y ride along with the size in containerSizes)
+      saveTablePlaces(currentClass, fs) {
+        if (!currentClass.containerSizes) currentClass.containerSizes = {};
+        fs.tables.forEach(o => {
+          currentClass.containerSizes[o.sizeKey] = {
+            ...(currentClass.containerSizes[o.sizeKey] || {}),
+            x: Math.round(o.x),
+            y: Math.round(o.y)
+          };
+        });
+      }
+
+      // ===== Special seating rules =====
+      // currentClass.seatingRules = [{ id, student, type, other? }], type one of SEATING_RULE_TYPES.
+      // They are only seen in the Special Seating Rules window, and Arrange Seating → Random follows them.
+
+      getSeatingRules(cls) {
+        return (cls && Array.isArray(cls.seatingRules)) ? cls.seatingRules : [];
+      }
+
+      normalizeSeatingRules(rules) {
+        if (!Array.isArray(rules)) return [];
+        return rules.filter(r => r && typeof r === 'object' && SEATING_RULE_TYPES[r.type] && typeof r.student === 'string' && r.student.trim()
+          && (!SEATING_RULE_TYPES[r.type].pair || (typeof r.other === 'string' && r.other.trim() && r.other !== r.student)))
+          .map(r => {
+            const out = { id: (typeof r.id === 'string' && r.id) ? r.id : this.newSeatingRuleId(), student: r.student.trim(), type: r.type };
+            if (SEATING_RULE_TYPES[r.type].pair) out.other = r.other.trim();
+            return out;
+          });
+      }
+
+      newSeatingRuleId() {
+        return 'r' + Math.random().toString(36).slice(2, 9);
+      }
+
+      // In words, for the window and for the note after arranging
+      describeSeatingRule(cls, rule, from) {
+        const nameOf = s => this.getStudentProfile(cls, s).rosterName || s;
+        const t = SEATING_RULE_TYPES[rule.type];
+        if (!t.pair) return from ? t.label : `${nameOf(rule.student)} ${t.phrase}`;
+        const other = from && rule.other === from ? rule.student : rule.other;
+        if (from) return `${t.label} ${nameOf(other)}`;
+        return `${nameOf(rule.student)} ${t.phrase} ${nameOf(rule.other)}`;
+      }
+
+      // --- The seats a Random arrangement fills, for the class's layout ---
+      // Each slot has x (0 left .. 1 right) and y (0 front .. 1 back) on the floor (null when the layout
+      // has no width or no depth, e.g. one row of tables: then left/right or front/back rules don't apply), end (an outside
+      // seat), and lock (players may only trade seats with the same lock: Band sections). side(a, b)
+      // says two slots are seat partners; near(a, b) that they sit close (beside, in front, behind).
+      // write(order) puts the students, in slot order, into the layout.
+      buildSeatSlots(cls, students) {
+        const n = students.length;
+        const layout = cls.layout || 'rows';
+        const roundRobin = (count) => Array.from({ length: count }, (_, k) => Math.floor(n / count) + (k < n % count ? 1 : 0));
+        const frac = (v, max) => max > 0 ? v / max : null;
+        const slots = [];
+
+        if (layout === 'band' && cls.band) {
+          const band = cls.band;
+          const lists = [...band.rows.map((row, r) => ({ row, r })), { row: band.perc, r: band.rows.length }];
+          const filled = [];
+          lists.forEach(({ row, r }) => {
+            row.forEach((ch, i) => {
+              if (!ch.student) return;
+              filled.push(ch);
+              slots.push({ x: frac(i, row.length - 1), y: frac(r, band.rows.length), end: i === 0 || i === row.length - 1, lock: ch.inst || '', r, i, len: row.length });
+            });
+          });
+          return {
+            slots,
+            students: filled.map(ch => ch.student),
+            side: (a, b) => slots[a].r === slots[b].r && Math.abs(slots[a].i - slots[b].i) === 1,
+            near: (a, b) => {
+              const p = slots[a];
+              const q = slots[b];
+              if (p.r === q.r) return Math.abs(p.i - q.i) === 1;
+              return Math.abs(p.r - q.r) === 1 && Math.abs((p.x ?? 0.5) - (q.x ?? 0.5)) <= 1.2 / Math.max(p.len, q.len);
+            },
+            write: (order) => { filled.forEach((ch, k) => { ch.student = order[k]; }); }
+          };
+        }
+
+        if (layout === 'circle') {
+          for (let i = 0; i < n; i++) {
+            const a = (i / n) * 2 * Math.PI - Math.PI / 2;
+            slots.push({ x: 0.5 + 0.5 * Math.cos(a), y: 0.5 + 0.5 * Math.sin(a), end: true, lock: '' });
+          }
+          const ring = (a, b) => n > 1 && (Math.abs(a - b) === 1 || Math.abs(a - b) === n - 1);
+          return { slots, students, side: ring, near: ring, write: (order) => { cls.circle = [...order]; } };
+        }
+
+        if (TABLE_LAYOUTS.includes(layout)) {
+          const G = TABLE_LAYOUTS.indexOf(layout) + 2;
+          const sizes = roundRobin(G);
+          // Where each table stands: where the teacher put it, else its place in the row arrangement
+          const sized = cls.containerSizes || {};
+          const placed = Array.from({ length: G }, (_, g) => sized[`${layout}-${g}`]);
+          let spots;
+          if (placed.every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))) {
+            spots = placed.map(p => ({ x: p.x + (p.width || 300) / 2, y: p.y + (p.height || 250) / 2 }));
+          } else {
+            const saved = cls.layoutsData && cls.layoutsData[`${layout}Rows`];
+            const rowDef = (Array.isArray(saved) && saved.flat().length === G) ? saved : this.defaultTableRows(layout);
+            spots = Array.from({ length: G }, () => ({ x: 0.5, y: 0 }));
+            rowDef.forEach((row, r) => row.forEach((g, p) => { if (g < G) spots[g] = { x: (p + 0.5) / row.length, y: r }; }));
+          }
+          const xs = spots.map(s => s.x);
+          const ys = spots.map(s => s.y);
+          const nx = v => (Math.max(...xs) > Math.min(...xs)) ? (v - Math.min(...xs)) / (Math.max(...xs) - Math.min(...xs)) : null;
+          const ny = v => (Math.max(...ys) > Math.min(...ys)) ? (v - Math.min(...ys)) / (Math.max(...ys) - Math.min(...ys)) : null;
+          sizes.forEach((m, g) => {
+            const x = nx(spots[g].x);
+            for (let i = 0; i < m; i++) slots.push({ x, y: ny(spots[g].y), end: G === 1 || x === null || x <= 0.25 || x >= 0.75, lock: '', g });
+          });
+          const same = (a, b) => slots[a].g === slots[b].g;
+          return {
+            slots, students, side: same, near: same,
+            write: (order) => {
+              let k = 0;
+              cls.layoutsData[layout] = sizes.map(m => order.slice(k, (k += m)));
+            }
+          };
+        }
+
+        if (layout === 'lines') {
+          const L = cls.linesCount || 4;
+          const sizes = roundRobin(L);
+          const maxLen = Math.max(1, ...sizes);
+          sizes.forEach((m, l) => {
+            for (let i = 0; i < m; i++) slots.push({ x: frac(l, L - 1), y: frac(i, maxLen - 1), end: l === 0 || l === L - 1, lock: '', l, i });
+          });
+          return {
+            slots, students,
+            side: (a, b) => slots[a].l === slots[b].l && Math.abs(slots[a].i - slots[b].i) === 1,
+            near: (a, b) => Math.abs(slots[a].l - slots[b].l) <= 1 && Math.abs(slots[a].i - slots[b].i) <= 1,
+            write: (order) => {
+              let k = 0;
+              cls.lines = sizes.map(m => order.slice(k, (k += m)));
+            }
+          };
+        }
+
+        if (layout === 'freeform') {
+          // A new random Free Form deals the cards onto a grid, 6 across (initInitialFreeformPositions)
+          const cols = Math.max(1, Math.floor((880 - 36) / (115 + 14)));
+          const rowsN = Math.max(1, Math.ceil(n / cols));
+          for (let k = 0; k < n; k++) {
+            const r = Math.floor(k / cols);
+            const c = k % cols;
+            const inRow = Math.min(cols, n - r * cols);
+            slots.push({ x: frac(c, cols - 1), y: frac(r, rowsN - 1), end: c === 0 || c === inRow - 1, lock: '', r, c });
+          }
+          return {
+            slots, students,
+            side: (a, b) => slots[a].r === slots[b].r && Math.abs(slots[a].c - slots[b].c) === 1,
+            near: (a, b) => Math.abs(slots[a].r - slots[b].r) <= 1 && Math.abs(slots[a].c - slots[b].c) <= 1,
+            write: (order) => {
+              cls.freeform = [...order];
+              cls.freeformPositions = {};
+              this.initInitialFreeformPositions(cls);
+            }
+          };
+        }
+
+        // Rows (and the Garden, which shows the Rows seating): rows are centred, so a seat's column is
+        // counted from the middle of its row
+        const R = cls.rowsCount || 4;
+        if (cls.divideRows) {
+          const sizes = roundRobin(R * 2);
+          const W = Math.max(1, ...sizes);
+          sizes.forEach((m, k) => {
+            const r = Math.floor(k / 2);
+            const s = k % 2;
+            for (let i = 0; i < m; i++) {
+              const cx = s === 0 ? i - m + 0.5 : i + 0.5;   // the aisle runs down the middle at 0
+              slots.push({ x: (cx + W) / (2 * W), y: frac(r, R - 1), end: (s === 0 && i === 0) || (s === 1 && i === m - 1), lock: '', r, k, i, cx });
+            }
+          });
+          return {
+            slots, students,
+            side: (a, b) => slots[a].k === slots[b].k && Math.abs(slots[a].i - slots[b].i) === 1,
+            near: (a, b) => Math.abs(slots[a].r - slots[b].r) <= 1 && Math.abs(slots[a].cx - slots[b].cx) <= 1,
+            write: (order) => {
+              let at = 0;
+              const secs = sizes.map(m => order.slice(at, (at += m)));
+              cls.dividedRowsData = [];
+              for (let r = 0; r < R; r++) cls.dividedRowsData.push([secs[r * 2] || [], secs[r * 2 + 1] || []]);
+            }
+          };
+        }
+        const sizes = roundRobin(R);
+        const maxN = Math.max(1, ...sizes);
+        sizes.forEach((m, r) => {
+          for (let i = 0; i < m; i++) {
+            const cx = i - (m - 1) / 2;
+            slots.push({ x: maxN > 1 ? (cx + (maxN - 1) / 2) / (maxN - 1) : null, y: frac(r, R - 1), end: i === 0 || i === m - 1, lock: '', r, i, cx });
+          }
+        });
+        return {
+          slots, students,
+          side: (a, b) => slots[a].r === slots[b].r && Math.abs(slots[a].i - slots[b].i) === 1,
+          near: (a, b) => Math.abs(slots[a].r - slots[b].r) <= 1 && Math.abs(slots[a].cx - slots[b].cx) <= 1 && a !== b,
+          write: (order) => {
+            let k = 0;
+            cls.rows = sizes.map(m => order.slice(k, (k += m)));
+          }
+        };
+      }
+
+      // How far a seating breaks a rule: 0 when it is kept
+      seatingRuleCost(rule, model, pos) {
+        const a = pos.get(rule.student);
+        if (a === undefined) return 0;
+        const p = model.slots[a];
+        switch (rule.type) {
+          case 'front': return (p.y === null || p.y <= 0.34) ? 0 : 1 + p.y;
+          case 'back': return (p.y === null || p.y >= 0.66) ? 0 : 2 - p.y;
+          case 'left': return (p.x === null || p.x <= 0.34) ? 0 : 1 + p.x;
+          case 'right': return (p.x === null || p.x >= 0.66) ? 0 : 2 - p.x;
+          case 'outside': return p.end ? 0 : 1;
+          case 'with': {
+            const b = pos.get(rule.other);
+            if (b === undefined || model.side(a, b)) return 0;
+            const q = model.slots[b];
+            return 1 + Math.hypot((p.x ?? 0.5) - (q.x ?? 0.5), (p.y ?? 0.5) - (q.y ?? 0.5));
+          }
+          case 'apart': {
+            const b = pos.get(rule.other);
+            return (b !== undefined && model.near(a, b)) ? 1 : 0;
+          }
+          default: return 0;
+        }
+      }
+
+      // A random seating that keeps the rules: a random deal, then seat trades (simulated annealing)
+      // until no rule is broken. Returns the order to write and the rules it could not keep.
+      solveSeatingRules(model, rules) {
+        const n = model.slots.length;
+        const names = model.students;
+        // Deal each lock group (a Band section) its own players at random
+        const groups = {};
+        model.slots.forEach((s, i) => { (groups[s.lock] = groups[s.lock] || []).push(i); });
+        const at = new Array(n);
+        if (Object.keys(groups).length === 1) {
+          this.shuffleArray([...names]).forEach((s, i) => { at[i] = s; });
+        } else {
+          Object.values(groups).forEach(idx => {
+            this.shuffleArray(idx.map(i => names[i])).forEach((s, k) => { at[idx[k]] = s; });
+          });
+        }
+        const pos = new Map(at.map((s, i) => [s, i]));
+        const live = rules.filter(r => pos.has(r.student) && (!SEATING_RULE_TYPES[r.type].pair || pos.has(r.other)));
+        const total = () => live.reduce((sum, r) => sum + this.seatingRuleCost(r, model, pos), 0);
+        let cost = total();
+        let best = { cost, at: [...at] };
+        const swap = (i, j) => {
+          const t = at[i];
+          at[i] = at[j];
+          at[j] = t;
+          pos.set(at[i], i);
+          pos.set(at[j], j);
+        };
+        const steps = 30000;
+        for (let step = 0; step < steps && best.cost > 0; step++) {
+          const temp = 1.2 * (1 - step / steps) + 0.02;
+          // Mostly move someone whose rule is broken
+          const broken = live.filter(r => this.seatingRuleCost(r, model, pos) > 0);
+          let who;
+          if (broken.length && Math.random() < 0.8) {
+            const r = broken[Math.floor(Math.random() * broken.length)];
+            who = SEATING_RULE_TYPES[r.type].pair && Math.random() < 0.5 ? r.other : r.student;
+          } else {
+            who = at[Math.floor(Math.random() * n)];
+          }
+          const i = pos.get(who);
+          const pool = groups[model.slots[i].lock];
+          if (pool.length < 2) continue;
+          const j = pool[Math.floor(Math.random() * pool.length)];
+          if (j === i) continue;
+          swap(i, j);
+          const next = total();
+          if (next <= cost || Math.random() < Math.exp((cost - next) / temp)) {
+            cost = next;
+            if (cost < best.cost) best = { cost, at: [...at] };
+          } else {
+            swap(i, j);
+          }
+        }
+        // The rules the best seating still breaks
+        const bestPos = new Map(best.at.map((s, i) => [s, i]));
+        const unmet = live.filter(r => this.seatingRuleCost(r, model, bestPos) > 0);
+        return { order: best.at, unmet, kept: live.length - unmet.length, live: live.length };
+      }
+
+      // Arrange Seating → Random for a class with rules; false when it has none that apply
+      arrangeRandomWithRules(cls, students) {
+        const rules = this.getSeatingRules(cls);
+        if (!rules.length || !students.length) return false;
+        const model = this.buildSeatSlots(cls, students);
+        if (!model.slots.length) return false;
+        const result = this.solveSeatingRules(model, rules);
+        if (!result.live) return false;
+        model.write(result.order);
+        if (!result.unmet.length) {
+          this.showBandNotice(`Seated at random, keeping all ${result.live} special seating rule${result.live === 1 ? '' : 's'}.`);
+        } else {
+          const list = result.unmet.slice(0, 2).map(r => this.describeSeatingRule(cls, r)).join('; ');
+          this.showBandNotice(`Seated at random. ${result.unmet.length} rule${result.unmet.length === 1 ? '' : 's'} couldn't be kept: ${list}${result.unmet.length > 2 ? '…' : ''}`);
+        }
+        return true;
+      }
+
+      // --- The Special Seating Rules window ---
+
+      openSeatingRulesModal() {
+        this.rulesClassId = this.currentClassId;
+        this.rulesStudent = null;
+        this.renderSeatingRulesModal();
+        document.getElementById('seatingRulesModal').classList.add('active');
+      }
+
+      setRulesClass(id) {
+        this.rulesClassId = id;
+        this.rulesStudent = null;
+        this.renderSeatingRulesModal();
+      }
+
+      selectRulesStudent(name) {
+        this.rulesStudent = this.rulesStudent === name ? null : name;
+        this.renderSeatingRulesModal();
+      }
+
+      getRulesClass() {
+        return this.classes.find(c => c.id === this.rulesClassId) || this.getCurrentClass();
+      }
+
+      // Place rules: front/back are one choice, left/right another; pressing the chosen one clears it
+      toggleSeatingPlaceRule(type) {
+        const cls = this.getRulesClass();
+        const who = this.rulesStudent;
+        if (!cls || !who || !SEATING_RULE_TYPES[type]) return;
+        if (!Array.isArray(cls.seatingRules)) cls.seatingRules = [];
+        const had = cls.seatingRules.some(r => r.student === who && r.type === type);
+        const clash = { front: 'back', back: 'front', left: 'right', right: 'left' }[type];
+        cls.seatingRules = cls.seatingRules.filter(r => !(r.student === who && (r.type === type || r.type === clash)));
+        if (!had) cls.seatingRules.push({ id: this.newSeatingRuleId(), student: who, type });
+        this.saveData();
+        this.renderSeatingRulesModal();
+      }
+
+      // Partner rules belong to the pair, whichever name they were added from
+      addSeatingPairRule(type) {
+        const cls = this.getRulesClass();
+        const who = this.rulesStudent;
+        const sel = document.getElementById(type === 'with' ? 'rulesWithSelect' : 'rulesApartSelect');
+        const other = sel ? sel.value : '';
+        if (!cls || !who || !other || other === who) return;
+        if (!Array.isArray(cls.seatingRules)) cls.seatingRules = [];
+        const samePair = r => SEATING_RULE_TYPES[r.type].pair && ((r.student === who && r.other === other) || (r.student === other && r.other === who));
+        cls.seatingRules = cls.seatingRules.filter(r => !samePair(r));
+        cls.seatingRules.push({ id: this.newSeatingRuleId(), student: who, type, other });
+        this.saveData();
+        this.renderSeatingRulesModal();
+      }
+
+      removeSeatingRule(id) {
+        const cls = this.getRulesClass();
+        if (!cls || !Array.isArray(cls.seatingRules)) return;
+        cls.seatingRules = cls.seatingRules.filter(r => r.id !== id);
+        this.saveData();
+        this.renderSeatingRulesModal();
+      }
+
+      renderSeatingRulesModal() {
+        const cls = this.getRulesClass();
+        const classSel = document.getElementById('rulesClassSelect');
+        if (classSel) {
+          classSel.innerHTML = this.classes.map(c => `<option value="${this.escapeHtml(c.id)}">${this.escapeHtml(c.name)}</option>`).join('');
+          if (cls) classSel.value = cls.id;
+        }
+        const listEl = document.getElementById('rulesStudentList');
+        const editor = document.getElementById('rulesEditor');
+        if (!listEl || !editor) return;
+        if (!cls) {
+          listEl.innerHTML = '';
+          editor.innerHTML = '';
+          return;
+        }
+        const names = Array.isArray(cls.classList) ? cls.classList : [];
+        const rules = this.getSeatingRules(cls).filter(r => names.includes(r.student) && (!r.other || names.includes(r.other)));
+        const nameOf = s => this.getStudentProfile(cls, s).rosterName || s;
+        const countFor = s => rules.filter(r => r.student === s || r.other === s).length;
+        if (this.rulesStudent && !names.includes(this.rulesStudent)) this.rulesStudent = null;
+
+        listEl.innerHTML = names.length ? '' : '<li class="rules-empty">This class has no students yet.</li>';
+        names.forEach(s => {
+          const li = document.createElement('li');
+          const n = countFor(s);
+          li.className = 'rules-student' + (s === this.rulesStudent ? ' selected' : '') + (n ? ' has-rules' : '');
+          li.innerHTML = `<span class="rules-student-name">${this.escapeHtml(nameOf(s))}</span>${n ? `<span class="rules-count">${n}</span>` : ''}`;
+          li.onclick = () => this.selectRulesStudent(s);
+          listEl.appendChild(li);
+        });
+
+        const summary = document.getElementById('rulesSummary');
+        if (summary) summary.textContent = rules.length ? `${rules.length} rule${rules.length === 1 ? '' : 's'} in this class` : 'No rules in this class yet';
+
+        const who = this.rulesStudent;
+        if (!who) {
+          editor.innerHTML = `<div class="rules-pick-hint">Pick a student to give them a special rule.</div>${rules.length ? `<div class="rules-all"><div class="rules-all-head">All rules in this class</div>${rules.map(r => `<div class="rules-all-item">${this.escapeHtml(this.describeSeatingRule(cls, r))}</div>`).join('')}</div>` : ''}`;
+          return;
+        }
+        const mine = rules.filter(r => r.student === who || r.other === who);
+        const has = type => mine.some(r => r.student === who && r.type === type);
+        const others = names.filter(s => s !== who);
+        const options = others.map(s => `<option value="${this.escapeHtml(s)}">${this.escapeHtml(nameOf(s))}</option>`).join('');
+        const placeBtn = (type) => `<button type="button" class="btn btn-small rules-place-btn${has(type) ? ' on' : ''}" onclick="app.toggleSeatingPlaceRule('${type}')">${SEATING_RULE_TYPES[type].icon} ${SEATING_RULE_TYPES[type].short}</button>`;
+        editor.innerHTML = `
+          <div class="rules-editor-head">${this.escapeHtml(nameOf(who))}</div>
+          <div class="rules-current">
+            ${mine.length ? mine.map(r => `<span class="rules-chip rules-chip-${r.type}">${this.escapeHtml(this.describeSeatingRule(cls, r, who))}<button type="button" title="Remove this rule" onclick="app.removeSeatingRule('${r.id}')">&times;</button></span>`).join('') : '<span class="rules-none">No rules yet</span>'}
+          </div>
+          <div class="rules-section-label">Where they sit</div>
+          <div class="rules-place-grid">
+            ${placeBtn('front')}${placeBtn('back')}${placeBtn('left')}${placeBtn('right')}${placeBtn('outside')}
+          </div>
+          <div class="rules-section-label">Who they sit with</div>
+          <div class="rules-pair-row">
+            <span class="rules-pair-label rules-pair-with">Sit with</span>
+            <select id="rulesWithSelect" class="subheader-select">${options}</select>
+            <button type="button" class="btn btn-small btn-primary" onclick="app.addSeatingPairRule('with')" ${others.length ? '' : 'disabled'}>Add</button>
+          </div>
+          <div class="rules-pair-row">
+            <span class="rules-pair-label rules-pair-apart">Don't sit with</span>
+            <select id="rulesApartSelect" class="subheader-select">${options}</select>
+            <button type="button" class="btn btn-small btn-red" onclick="app.addSeatingPairRule('apart')" ${others.length ? '' : 'disabled'}>Add</button>
+          </div>`;
+      }
+
+      // ===== Band seating =====
+      // currentClass.band = { rows: [[chair, ...], ...] (arcs, front first, chairs left to right as the
+      // podium sees them), perc: [chair, ...] (the percussion line, left to right) }
+      // chair = { id, inst: an id in BAND_INSTRUMENTS or '', student: a name or '' }
+
+      newBandChairId() {
+        return 'c' + Math.random().toString(36).slice(2, 9);
+      }
+
+      makeBandChair(inst = '', student = '') {
+        return { id: this.newBandChairId(), inst, student };
+      }
+
+      // A stored band made safe to use (bad chairs mended, sizes capped); null if there is nothing usable
+      normalizeBand(band) {
+        if (!band || typeof band !== 'object') return null;
+        const chair = ch => ({
+          id: (ch && typeof ch.id === 'string' && ch.id) ? ch.id : this.newBandChairId(),
+          inst: (ch && BAND_INSTRUMENTS[ch.inst]) ? ch.inst : '',
+          student: (ch && typeof ch.student === 'string') ? ch.student.trim() : ''
+        });
+        const rows = (Array.isArray(band.rows) ? band.rows : [])
+          .filter(r => Array.isArray(r) && r.length)
+          .slice(0, BAND.maxRows)
+          .map(r => r.slice(0, BAND.maxSeats).map(chair));
+        if (!rows.length) return null;
+        const perc = (Array.isArray(band.perc) ? band.perc : []).slice(0, BAND.maxPerc).map(chair);
+        return { ...band, rows, perc };
+      }
+
+      // A first band for a class: enough chairs on 1 to 4 arcs (more on the back arcs, which are longer),
+      // with the students seated front row first, in the order given
+      createDefaultBand(students) {
+        const n = Math.max(1, students.length);
+        const rowCount = n <= 10 ? 1 : n <= 24 ? 2 : n <= 42 ? 3 : 4;
+        const weights = Array.from({ length: rowCount }, (_, i) => i + 2);
+        const total = weights.reduce((a, b) => a + b, 0);
+        const counts = weights.map(w => Math.max(1, Math.min(BAND.maxSeats, Math.round(n * w / total))));
+        let sum = counts.reduce((a, b) => a + b, 0);
+        for (let i = rowCount - 1, guard = 0; sum < n && guard < 400; guard++, i = (i - 1 + rowCount) % rowCount) {
+          if (counts[i] < BAND.maxSeats) {
+            counts[i]++;
+            sum++;
+          }
+        }
+        const queue = [...students];
+        return {
+          rows: counts.map(c => Array.from({ length: c }, () => this.makeBandChair('', queue.shift() || ''))),
+          perc: []
+        };
+      }
+
+      getBandChairs(band) {
+        if (!band) return [];
+        return [...band.rows.flat(), ...band.perc];
+      }
+
+      findBandChair(band, student) {
+        if (!student) return null;
+        return this.getBandChairs(band).find(ch => ch.student === student) || null;
+      }
+
+      findBandChairById(band, id) {
+        return this.getBandChairs(band).find(ch => ch.id === id) || null;
+      }
+
+      // Where a chair is: { list, index, row } with row = arc number or 'perc'
+      locateBandChair(band, id) {
+        for (let r = 0; r < band.rows.length; r++) {
+          const index = band.rows[r].findIndex(ch => ch.id === id);
+          if (index > -1) return { list: band.rows[r], index, row: r };
+        }
+        const index = band.perc.findIndex(ch => ch.id === id);
+        return index > -1 ? { list: band.perc, index, row: 'perc' } : null;
+      }
+
+      // An instrument's section in chair order. The order snakes (front arc left to right, the next
+      // arc right to left, ...) so neighbours in the list are neighbours on the floor, and a shift
+      // along the section moves each player one chair over.
+      getBandSection(band, inst) {
+        const out = [];
+        band.rows.forEach((row, r) => {
+          const list = row.filter(ch => ch.inst === inst);
+          out.push(...(r % 2 ? list.reverse() : list));
+        });
+        const perc = band.perc.filter(ch => ch.inst === inst);
+        out.push(...(band.rows.length % 2 ? perc.reverse() : perc));
+        return out;
+      }
+
+      // Seats a student in a chair. 'swap' trades places with whoever is there (a student coming from
+      // To Be Placed sends them there); 'insert' slides the section along, toward its nearest open
+      // chair, so nobody leaves the section. Returns the name pushed out of a full section, or null.
+      placeInBand(band, name, target, mode) {
+        const source = this.findBandChair(band, name);
+        if (source === target) return null;
+        if (!target.student) {
+          if (source) source.student = '';
+          target.student = name;
+          return null;
+        }
+        if (mode !== 'insert' || !target.inst) {
+          const other = target.student;
+          target.student = name;
+          if (source) source.student = other;
+          return null;
+        }
+        if (source) source.student = '';
+        const section = this.getBandSection(band, target.inst);
+        const k = section.indexOf(target);
+        let open = -1;
+        for (let d = 1; d < section.length && open < 0; d++) {
+          if (k + d < section.length && !section[k + d].student) open = k + d;
+          else if (k - d >= 0 && !section[k - d].student) open = k - d;
+        }
+        let bumped = null;
+        if (open < 0) {
+          open = section.length - 1;
+          bumped = section[open].student;
+        }
+        if (open > k) for (let j = open; j > k; j--) section[j].student = section[j - 1].student;
+        else for (let j = open; j < k; j++) section[j].student = section[j + 1].student;
+        target.student = name;
+        return bumped;
+      }
+
+      instrumentTextColor(hex) {
+        const n = parseInt(hex.slice(1), 16);
+        const lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+        return lum > 0.62 ? '#2b2118' : '#fffdf3';
+      }
+
+      instrumentTint(hex, alpha) {
+        const n = parseInt(hex.slice(1), 16);
+        return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+      }
+
+      // Fills a <select> with every instrument, by family
+      fillInstrumentOptions(select, noneLabel, value) {
+        select.innerHTML = '';
+        const none = document.createElement('option');
+        none.value = '';
+        none.textContent = noneLabel;
+        select.appendChild(none);
+        BAND_FAMILIES.forEach(f => {
+          const group = document.createElement('optgroup');
+          group.label = f.name;
+          f.items.forEach(([id, name, abbr]) => {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = `${name} (${abbr})`;
+            group.appendChild(opt);
+          });
+          select.appendChild(group);
+        });
+        select.value = value || '';
+      }
+
+      // Where every chair goes. Chairs stay upright (names are read, not tilted) with their centres on
+      // the arcs; each arc's radius grows until its chairs clear each other and the arc in front.
+      // Local coordinates have the arcs' centre (the conductor) at 0, 0 and y pointing down.
+      planBandSeats(band, card) {
+        const w = card.w;
+        const h = card.h;
+        const seats = [];
+        const arcs = [];
+        const placed = [];
+        const clearOf = (x, y, list, gx, gy) => !list.some(p => Math.abs(p.x - x) < w + gx && Math.abs(p.y - y) < h + gy);
+        const gw = w + BAND.gap;
+        const gh = h + BAND.gap;
+        const apart = (R, a, b) => Math.abs(R * (Math.sin(b) - Math.sin(a))) >= gw || Math.abs(R * (Math.cos(b) - Math.cos(a))) >= gh;
+        // The angles (right half, from the top) of n chairs packed as close as upright cards allow on
+        // radius R, then spread out to an easy spacing (or the whole arc); null if they don't fit
+        const arcAngles = (R, n) => {
+          if (n === 1) return [0];
+          const half = [];
+          let t;
+          if (n % 2) {
+            half.push(0);
+            t = 0;
+          } else {
+            if (gw / (2 * R) >= 1) return null;
+            t = Math.asin(gw / (2 * R));
+            half.push(t);
+          }
+          while (half.length < Math.ceil(n / 2)) {
+            let dt = 0.002;
+            while (!apart(R, t, t + dt) && dt < Math.PI) dt += 0.002;
+            t += dt;
+            if (t > BAND.arc + 1e-9) return null;
+            half.push(t);
+          }
+          const end = half[half.length - 1];
+          const target = Math.min(BAND.arc, Math.max(end, (n - 1) * (gw + 24) / (2 * R)));
+          const k = end > 0 ? target / end : 1;
+          const spread = half.map(a => a * k);
+          const ok = spread.every((a, i) => i === 0 || apart(R, spread[i - 1], a));
+          const use = ok ? spread : half;
+          return [...use.slice(n % 2 ? 1 : 0).map(a => -a).reverse(), ...use];
+        };
+        let prevR = 0;
+        band.rows.forEach((row, r) => {
+          const n = row.length;
+          let R = r === 0 ? BAND.frontR : prevR + h * 0.7;
+          let pts = null;
+          let span = 0;
+          for (let i = 0; i < 800; i++, R += 4) {
+            const angles = arcAngles(R, n);
+            if (!angles) continue;
+            const tryPts = angles.map(t => ({ x: R * Math.sin(t), y: -R * Math.cos(t) }));
+            if (tryPts.every(p => clearOf(p.x, p.y, placed, BAND.rowGap, BAND.rowGap))) {
+              pts = tryPts;
+              span = angles[angles.length - 1];
+              break;
+            }
+          }
+          if (!pts) pts = row.map(() => ({ x: 0, y: -R }));
+          pts.forEach((p, j) => {
+            placed.push(p);
+            seats.push({ chair: row[j], row: r, x: p.x, y: p.y });
+          });
+          arcs.push({ R, span: span + (w * 0.75) / R });
+          prevR = R;
+        });
+
+        const top = Math.min(...placed.map(p => p.y));
+        // The percussion: one line behind the arcs, or two staggered lines when there are more than
+        // BAND.percPerLine stations (the first half on the nearer line), so a big section doesn't
+        // stretch the whole chart
+        const percLines = [];
+        if (band.perc.length) {
+          const n = band.perc.length;
+          const outer = arcs.length ? arcs[arcs.length - 1].R : BAND.frontR;
+          const perLine = n > BAND.percPerLine ? Math.ceil(n / 2) : n;
+          for (let start = 0, li = 0; start < n; start += perLine, li++) {
+            const chairs = band.perc.slice(start, start + perLine);
+            const m = chairs.length;
+            const y = top - h - BAND.percGap - li * (h + 30);
+            const width = m > 1 ? (n > BAND.percPerLine ? (m - 1) * (w + 26) : Math.max((m - 1) * (w + 30), Math.min(outer * 1.5, (m - 1) * w * 2))) : 0;
+            const shift = li % 2 ? (w + 26) / 2 : 0;   // the back line sits between the front line's players
+            chairs.forEach((chair, j) => {
+              const x = (m > 1 ? -width / 2 + j * width / (m - 1) : 0) + shift;
+              seats.push({ chair, row: 'perc', x, y });
+            });
+            percLines.push({ y, x0: -width / 2 - w + shift, x1: width / 2 + w + shift });
+          }
+        }
+        const perc = percLines.length ? percLines[percLines.length - 1] : null;
+
+        const podium = { x: -BAND.podiumW / 2, y: 14, w: BAND.podiumW, h: BAND.podiumH };
+        const xs = [podium.x, podium.x + podium.w];
+        const ys = [podium.y + podium.h];
+        seats.forEach(s => {
+          xs.push(s.x - w / 2, s.x + w / 2);
+          ys.push(s.y - h / 2, s.y + h / 2);
+        });
+        arcs.forEach(a => {
+          const reach = Math.min(Math.PI, a.span);
+          xs.push(-a.R * Math.sin(Math.min(Math.PI / 2, reach)), a.R * Math.sin(Math.min(Math.PI / 2, reach)));
+          ys.push(-a.R * Math.cos(reach));
+        });
+        percLines.forEach(l => xs.push(l.x0, l.x1));
+        const ox = BAND.pad - Math.min(...xs);
+        const oy = BAND.pad + 10 - Math.min(...ys);
+        return {
+          W: Math.ceil(Math.max(...xs) - Math.min(...xs) + 2 * BAND.pad),
+          H: Math.ceil(Math.max(...ys) - Math.min(...ys) + 2 * BAND.pad + 10),
+          ox, oy, w, h, seats, arcs, perc, percLines, podium
+        };
+      }
+
+      renderBandLayout(container, currentClass) {
+        container.className = 'chart-container band-floor-container';
+        if (!currentClass.band) {
+          currentClass.band = this.createDefaultBand(this.sortStudentsByName(this.getAllClassStudents(currentClass), 'last'));
+          this.saveData();
+        }
+        const band = currentClass.band;
+        const card = this.getSeatCardSize(currentClass);
+        const showFaces = card.w > 100;
+        const plan = this.planBandSeats(band, card);
+        const editing = this.isEditMode;
+        const painting = editing && this.bandPaint && this.bandPaint.on;
+        if (!editing) this.closeBandChairEditor();
+
+        const roomW = Math.max(320, this.getChartContentWidth());
+        this.chartRoomW = Math.round(this.getChartContentWidth());
+        const k = Math.min(1, roomW / plan.W);
+        const floor = document.createElement('div');
+        floor.className = 'band-floor' + (painting ? ' band-painting' : '');
+        floor.style.width = `${plan.W}px`;
+        floor.style.height = `${plan.H}px`;
+        // Centred in the room, whether shown full size or shrunk to fit (the shrink keeps the top left)
+        floor.style.marginLeft = `max(0px, calc((100% - ${(plan.W * k).toFixed(1)}px) / 2))`;
+        if (k < 0.999) {
+          floor.style.transform = `scale(${k.toFixed(4)})`;
+          floor.style.marginBottom = `${-plan.H * (1 - k)}px`;
+        }
+        container.appendChild(floor);
+
+        // The arcs and the percussion line the chairs sit on
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('class', 'band-lines');
+        svg.setAttribute('width', plan.W);
+        svg.setAttribute('height', plan.H);
+        svg.setAttribute('viewBox', `0 0 ${plan.W} ${plan.H}`);
+        const line = (d) => {
+          const path = document.createElementNS(svgNS, 'path');
+          path.setAttribute('d', d);
+          svg.appendChild(path);
+        };
+        plan.arcs.forEach(a => {
+          const s = Math.min(Math.PI * 0.62, a.span);
+          const x0 = plan.ox - a.R * Math.sin(s);
+          const x1 = plan.ox + a.R * Math.sin(s);
+          const y = plan.oy - a.R * Math.cos(s);
+          line(`M ${x0.toFixed(1)} ${y.toFixed(1)} A ${a.R} ${a.R} 0 ${2 * s > Math.PI ? 1 : 0} 1 ${x1.toFixed(1)} ${y.toFixed(1)}`);
+        });
+        plan.percLines.forEach(l => line(`M ${(plan.ox + l.x0).toFixed(1)} ${(plan.oy + l.y).toFixed(1)} H ${(plan.ox + l.x1).toFixed(1)}`));
+        floor.appendChild(svg);
+
+        const podium = document.createElement('div');
+        podium.className = 'band-podium';
+        podium.textContent = 'Podium';
+        podium.style.left = `${plan.ox + plan.podium.x}px`;
+        podium.style.top = `${plan.oy + plan.podium.y}px`;
+        podium.style.width = `${plan.podium.w}px`;
+        podium.style.height = `${plan.podium.h}px`;
+        floor.appendChild(podium);
+
+        if (plan.perc) {
+          const label = document.createElement('div');
+          label.className = 'band-perc-label';
+          label.textContent = 'Percussion';
+          label.style.left = `${plan.ox + plan.perc.x0}px`;
+          label.style.top = `${plan.oy + plan.perc.y - plan.h / 2 - 26}px`;
+          floor.appendChild(label);
+        }
+
+        plan.seats.forEach(spot => {
+          const chair = spot.chair;
+          const inst = BAND_INSTRUMENTS[chair.inst] || null;
+          let el;
+          if (chair.student) {
+            el = this.createSeatElement(chair.student, null);
+            el.classList.add('band-seat');
+          } else {
+            el = document.createElement('div');
+            el.className = 'band-chair-open' + (showFaces ? '' : ' no-faces') + (editing ? ' band-chair-editable' : '');
+            el.innerHTML = `<span class="band-open-label">${inst ? 'open' : (editing ? 'open chair' : '')}</span>`;
+            if (editing) el.title = 'Click to choose an instrument or seat a student';
+          }
+          el.dataset.chair = chair.id;
+          el.style.position = 'absolute';
+          el.style.left = `${plan.ox + spot.x - plan.w / 2}px`;
+          el.style.top = `${plan.oy + spot.y - plan.h / 2}px`;
+          el.style.margin = '0';
+          if (inst) {
+            el.classList.add('band-has-inst');
+            el.style.setProperty('--seat-color', inst.color);
+            el.style.setProperty('--inst-tint', this.instrumentTint(inst.color, chair.student ? 0.13 : 0.1));
+            el.style.setProperty('--inst-line', this.instrumentTint(inst.color, 0.75));
+          }
+          if (inst || editing) {
+            const tag = document.createElement('span');
+            tag.className = 'band-tag' + (inst ? '' : ' band-tag-none');
+            tag.textContent = inst ? inst.abbr : '+ instrument';
+            if (inst) {
+              tag.style.background = inst.color;
+              tag.style.color = this.instrumentTextColor(inst.color);
+              tag.title = inst.name + (editing ? ' (click to change this chair)' : '');
+            } else {
+              tag.title = 'Choose this chair\'s instrument';
+            }
+            if (editing) {
+              tag.onclick = (e) => {
+                e.stopPropagation();
+                if (!painting) this.openBandChairEditor(chair.id);
+              };
+            }
+            el.appendChild(tag);
+          }
+
+          if (editing) {
+            if (painting) {
+              el.draggable = false;
+              el.onpointerdown = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.bandPaintDown = true;
+                this.paintBandChair(chair.id);
+              };
+              el.onpointerenter = () => {
+                if (this.bandPaintDown) this.paintBandChair(chair.id);
+              };
+              el.onclick = (e) => e.stopPropagation();
+              el.ondblclick = (e) => e.stopPropagation();
+            } else {
+              if (!chair.student) el.onclick = (e) => {
+                e.stopPropagation();
+                this.openBandChairEditor(chair.id);
+              };
+              el.ondragover = (e) => this.handleBandDragOver(e, chair.id);
+              el.ondragenter = (e) => this.handleDragOver(e);
+              el.ondragleave = (e) => {
+                if (!el.contains(e.relatedTarget)) {
+                  el.classList.remove('drag-over', 'band-drop-insert');
+                  this.hideBandDropHint();
+                }
+              };
+              el.ondrop = (e) => this.handleBandDrop(e, chair.id);
+            }
+          }
+          floor.appendChild(el);
+        });
+
+        container.appendChild(this.renderBandLegend(band));
+      }
+
+      // Under the chart: each section's colour, name and how many of its chairs are filled
+      renderBandLegend(band) {
+        const legend = document.createElement('div');
+        legend.className = 'band-legend';
+        const counts = {};
+        let open = 0;
+        this.getBandChairs(band).forEach(ch => {
+          if (!ch.inst) {
+            if (!ch.student) open++;
+            return;
+          }
+          if (!counts[ch.inst]) counts[ch.inst] = { chairs: 0, filled: 0 };
+          counts[ch.inst].chairs++;
+          if (ch.student) counts[ch.inst].filled++;
+        });
+        const ids = Object.keys(counts).sort((a, b) => BAND_INSTRUMENTS[a].order - BAND_INSTRUMENTS[b].order);
+        if (!ids.length) {
+          legend.innerHTML = `<span class="band-legend-hint">${this.isEditMode
+            ? 'Give the chairs instruments: click a chair’s tag, or use 🖌 Paint chairs above.'
+            : 'Press EDIT to give the chairs instruments.'}</span>`;
+          return legend;
+        }
+        legend.innerHTML = ids.map(id => {
+          const inst = BAND_INSTRUMENTS[id];
+          const c = counts[id];
+          return `<span class="band-legend-item" title="${this.escapeHtml(inst.name)}: ${c.filled} of ${c.chairs} chairs filled"><span class="band-legend-dot" style="background:${inst.color}"></span>${this.escapeHtml(inst.name)} <b>${c.filled}/${c.chairs}</b></span>`;
+        }).join('') + (open ? `<span class="band-legend-item band-legend-open">Open chairs, no instrument <b>${open}</b></span>` : '');
+        return legend;
+      }
+
+      // Middle of a filled chair swaps, its edges insert into the section; an open chair just takes the student
+      getBandDropMode(el, clientX, chair) {
+        if (!chair.student) return 'place';
+        if (!chair.inst) return 'swap';
+        const r = el.getBoundingClientRect();
+        const frac = (clientX - r.left) / r.width;
+        return (frac < 0.28 || frac > 0.72) ? 'insert' : 'swap';
+      }
+
+      handleBandDragOver(e, chairId) {
+        if (!this.isEditMode || !this.draggedStudentName) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const currentClass = this.getCurrentClass();
+        const chair = currentClass && currentClass.band ? this.findBandChairById(currentClass.band, chairId) : null;
+        if (!chair || chair.student === this.draggedStudentName) {
+          this.hideBandDropHint();
+          return;
+        }
+        const el = e.currentTarget;
+        const mode = this.getBandDropMode(el, e.clientX, chair);
+        el.classList.toggle('drag-over', mode !== 'insert');
+        el.classList.toggle('band-drop-insert', mode === 'insert');
+        const inst = BAND_INSTRUMENTS[chair.inst];
+        const who = this.getStudentProfile(currentClass, chair.student).firstName || chair.student;
+        const text = mode === 'place'
+          ? (inst ? `Sit here (${inst.name})` : 'Sit here')
+          : mode === 'swap'
+            ? `Swap with ${who}`
+            : `Sit here: the ${inst.name} section moves over`;
+        let hint = document.getElementById('bandDropHint');
+        if (!hint) {
+          hint = document.createElement('div');
+          hint.id = 'bandDropHint';
+          hint.className = 'band-drop-hint';
+          document.body.appendChild(hint);
+        }
+        hint.textContent = text;
+        const r = el.getBoundingClientRect();
+        hint.style.left = `${r.left + r.width / 2}px`;
+        hint.style.top = `${r.top - 8}px`;
+        hint.style.display = 'block';
+      }
+
+      hideBandDropHint() {
+        const hint = document.getElementById('bandDropHint');
+        if (hint) hint.style.display = 'none';
+      }
+
+      handleBandDrop(e, chairId) {
+        if (!this.isEditMode) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const el = e.currentTarget;
+        el.classList.remove('drag-over', 'band-drop-insert');
+        this.hideBandDropHint();
+        const name = this.draggedStudentName;
+        const currentClass = this.getCurrentClass();
+        if (!name || !currentClass || currentClass.layout !== 'band' || !currentClass.band) {
+          this.resetDragState();
+          return;
+        }
+        const target = this.findBandChairById(currentClass.band, chairId);
+        if (!target || target.student === name) {
+          this.resetDragState();
+          return;
+        }
+        const mode = this.getBandDropMode(el, e.clientX, target);
+        const inst = BAND_INSTRUMENTS[target.inst];
+        const bumped = this.placeInBand(currentClass.band, name, target, mode);
+        this.resetDragState();
+        this.saveData();
+        this.render();
+        if (bumped) {
+          const who = this.getStudentProfile(currentClass, bumped).rosterName || bumped;
+          this.showBandNotice(`The ${inst ? inst.name : ''} section is full, so ${who} moved to To Be Placed.`);
+        }
+      }
+
+      showBandNotice(text) {
+        let el = document.getElementById('bandNotice');
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'bandNotice';
+          el.className = 'band-notice';
+          document.body.appendChild(el);
+        }
+        el.textContent = text;
+        el.classList.add('show');
+        clearTimeout(this.bandNoticeTimer);
+        this.bandNoticeTimer = setTimeout(() => el.classList.remove('show'), 4500);
+      }
+
+      // --- Band settings (the bar under Layout while editing) ---
+
+      updateBandSubheader(currentClass) {
+        const bar = document.getElementById('bandSubheader');
+        if (!bar) return;
+        const show = currentClass && this.isEditMode && (this.currentViewMode === 'chart' || !this.currentViewMode) && currentClass.layout === 'band' && currentClass.band;
+        if (!show) {
+          bar.style.display = 'none';
+          if (this.bandPaint) this.bandPaint.on = false;
+          return;
+        }
+        bar.style.display = 'flex';
+        const band = currentClass.band;
+        const rowsSel = document.getElementById('bandRowsCount');
+        if (rowsSel) rowsSel.value = String(band.rows.length);
+        const percSel = document.getElementById('bandPercCount');
+        if (percSel) percSel.value = String(band.perc.length);
+        const seatFields = document.getElementById('bandSeatFields');
+        if (seatFields) {
+          seatFields.innerHTML = '<span>Chairs:</span>' + band.rows.map((row, i) =>
+            `<label class="band-seat-count" title="Chairs on arc ${i + 1}${i === 0 ? ' (front)' : ''}">${i + 1}<input type="number" class="subheader-select band-seat-input" min="1" max="${BAND.maxSeats}" value="${row.length}" onchange="app.setBandRowSeats(${i}, this.value)"></label>`
+          ).join('');
+        }
+        if (!this.bandPaint) this.bandPaint = { on: false, inst: 'flute' };
+        const paintSel = document.getElementById('bandPaintInst');
+        if (paintSel) {
+          if (!paintSel.options.length) this.fillInstrumentOptions(paintSel, '✕ No instrument (clear)', this.bandPaint.inst);
+          paintSel.value = this.bandPaint.inst;
+        }
+        const paintBtn = document.getElementById('bandPaintBtn');
+        if (paintBtn) {
+          paintBtn.classList.toggle('btn-primary', this.bandPaint.on);
+          paintBtn.classList.toggle('btn-secondary', !this.bandPaint.on);
+          paintBtn.textContent = this.bandPaint.on ? '🖌 Painting… (Done)' : '🖌 Paint chairs';
+        }
+      }
+
+      getEditableBand() {
+        const currentClass = this.getCurrentClass();
+        return currentClass && currentClass.layout === 'band' && currentClass.band ? currentClass.band : null;
+      }
+
+      // Removes up to `count` chairs from the right end of a list, open chairs first
+      trimBandChairs(list, count) {
+        for (let n = 0; n < count && list.length; n++) {
+          let idx = -1;
+          for (let i = list.length - 1; i >= 0; i--) {
+            if (!list[i].student) {
+              idx = i;
+              break;
+            }
+          }
+          list.splice(idx > -1 ? idx : list.length - 1, 1);
+        }
+      }
+
+      setBandRowCount(value) {
+        const band = this.getEditableBand();
+        if (!band) return;
+        const n = Math.max(1, Math.min(BAND.maxRows, parseInt(value, 10) || 1));
+        while (band.rows.length < n) {
+          const last = band.rows[band.rows.length - 1];
+          const count = Math.min(BAND.maxSeats, (last ? last.length : 6) + 4);
+          band.rows.push(Array.from({ length: count }, () => this.makeBandChair()));
+        }
+        // Students on a removed arc go to To Be Placed
+        if (band.rows.length > n) band.rows.length = n;
+        this.saveData();
+        this.render();
+      }
+
+      setBandRowSeats(rowIdx, value) {
+        const band = this.getEditableBand();
+        if (!band || !band.rows[rowIdx]) return;
+        const row = band.rows[rowIdx];
+        const n = Math.max(1, Math.min(BAND.maxSeats, parseInt(value, 10) || 1));
+        // New chairs join the right end, carrying on its section
+        while (row.length < n) row.push(this.makeBandChair(row.length ? row[row.length - 1].inst : ''));
+        if (row.length > n) this.trimBandChairs(row, row.length - n);
+        this.saveData();
+        this.render();
+      }
+
+      setBandPercCount(value) {
+        const band = this.getEditableBand();
+        if (!band) return;
+        const n = Math.max(0, Math.min(BAND.maxPerc, parseInt(value, 10) || 0));
+        while (band.perc.length < n) {
+          const used = new Set(band.perc.map(ch => ch.inst));
+          band.perc.push(this.makeBandChair(BAND.percDefaults.find(id => !used.has(id)) || 'percussion'));
+        }
+        if (band.perc.length > n) this.trimBandChairs(band.perc, band.perc.length - n);
+        this.saveData();
+        this.render();
+      }
+
+      setBandPaintInstrument(id) {
+        if (!this.bandPaint) this.bandPaint = { on: false, inst: 'flute' };
+        this.bandPaint.inst = BAND_INSTRUMENTS[id] ? id : '';
+        if (!this.bandPaint.on) this.toggleBandPaint();
+        else this.render();
+      }
+
+      toggleBandPaint() {
+        if (!this.bandPaint) this.bandPaint = { on: false, inst: 'flute' };
+        this.bandPaint.on = !this.bandPaint.on;
+        this.closeBandChairEditor();
+        this.render();
+      }
+
+      // Paint mode: press on a chair (and drag across more) to give them the paint instrument
+      paintBandChair(chairId) {
+        const band = this.getEditableBand();
+        const chair = band ? this.findBandChairById(band, chairId) : null;
+        if (!chair || !this.bandPaint) return;
+        const inst = this.bandPaint.inst;
+        if (chair.inst === inst) return;
+        chair.inst = inst;
+        this.bandPaintDirty = true;
+        this.renderChart(this.getCurrentClass());
+      }
+
+      endBandPaint() {
+        if (!this.bandPaintDown) return;
+        this.bandPaintDown = false;
+        if (this.bandPaintDirty) {
+          this.bandPaintDirty = false;
+          this.saveData();
+          this.render();
+        }
+      }
+
+      // --- One chair's editor: its instrument, who sits in it, and adding or removing chairs ---
+
+      openBandChairEditor(chairId) {
+        const currentClass = this.getCurrentClass();
+        const band = this.getEditableBand();
+        const chair = band ? this.findBandChairById(band, chairId) : null;
+        if (!chair) return;
+        const where = this.locateBandChair(band, chairId);
+        this.bandEditorChairId = chairId;
+
+        let box = document.getElementById('bandChairEditor');
+        if (!box) {
+          box = document.createElement('div');
+          box.id = 'bandChairEditor';
+          box.className = 'band-chair-editor';
+          document.body.appendChild(box);
+        }
+        const inst = BAND_INSTRUMENTS[chair.inst];
+        const place = where.row === 'perc' ? 'Percussion line' : `Arc ${where.row + 1}${where.row === 0 ? ' (front)' : ''}`;
+        box.innerHTML = `
+          <div class="band-editor-head">
+            <span class="band-editor-swatch" style="background:${inst ? inst.color : 'transparent'}"></span>
+            <b>Chair ${where.index + 1}</b><span class="band-editor-where">${place}</span>
+            <button type="button" class="band-editor-close" title="Close">&times;</button>
+          </div>
+          <label class="band-editor-field">Instrument<select class="subheader-select" data-field="inst"></select></label>
+          <label class="band-editor-field">Student<select class="subheader-select" data-field="student"></select></label>
+          <div class="band-editor-actions">
+            <button type="button" class="btn btn-outline btn-small" data-act="left">+ Chair left</button>
+            <button type="button" class="btn btn-outline btn-small" data-act="right">+ Chair right</button>
+            <button type="button" class="btn btn-red btn-small" data-act="remove">Remove chair</button>
+          </div>`;
+
+        const instSel = box.querySelector('[data-field="inst"]');
+        this.fillInstrumentOptions(instSel, '— No instrument —', chair.inst);
+        instSel.onchange = () => {
+          chair.inst = BAND_INSTRUMENTS[instSel.value] ? instSel.value : '';
+          this.saveData();
+          this.render();
+          this.openBandChairEditor(chairId);
+        };
+
+        const studentSel = box.querySelector('[data-field="student"]');
+        const nameOf = s => this.getStudentProfile(currentClass, s).rosterName || s;
+        const opt = (value, text) => `<option value="${this.escapeHtml(value)}">${this.escapeHtml(text)}</option>`;
+        const unplaced = (currentClass.unplacedStudents || []).filter(s => s !== chair.student);
+        const seated = this.getBandChairs(band).filter(ch => ch.student && ch !== chair)
+          .map(ch => ({ s: ch.student, abbr: BAND_INSTRUMENTS[ch.inst] ? BAND_INSTRUMENTS[ch.inst].abbr : 'no instrument' }))
+          .sort((a, b) => nameOf(a.s).localeCompare(nameOf(b.s)));
+        studentSel.innerHTML = opt('', '— Open chair —')
+          + (chair.student ? opt(chair.student, nameOf(chair.student)) : '')
+          + (unplaced.length ? `<optgroup label="To Be Placed">${unplaced.map(s => opt(s, nameOf(s))).join('')}</optgroup>` : '')
+          + (seated.length ? `<optgroup label="Seated elsewhere (they swap chairs)">${seated.map(x => opt(x.s, `${nameOf(x.s)} (${x.abbr})`)).join('')}</optgroup>` : '');
+        studentSel.value = chair.student;
+        studentSel.onchange = () => {
+          const name = studentSel.value;
+          if (!name) chair.student = '';
+          else this.placeInBand(band, name, chair, 'swap');
+          this.saveData();
+          this.render();
+          this.openBandChairEditor(chairId);
+        };
+
+        box.querySelector('.band-editor-close').onclick = () => this.closeBandChairEditor();
+        box.querySelectorAll('[data-act]').forEach(btn => {
+          const act = btn.dataset.act;
+          if (act === 'remove' && where.row !== 'perc' && where.list.length <= 1) btn.disabled = true;
+          if (act !== 'remove' && where.list.length >= (where.row === 'perc' ? BAND.maxPerc : BAND.maxSeats)) btn.disabled = true;
+          btn.onclick = () => {
+            const pos = this.locateBandChair(band, chairId);
+            if (!pos) return;
+            if (act === 'remove') {
+              pos.list.splice(pos.index, 1);
+              this.closeBandChairEditor();
+            } else {
+              pos.list.splice(act === 'left' ? pos.index : pos.index + 1, 0, this.makeBandChair(chair.inst));
+            }
+            this.saveData();
+            this.render();
+            if (act !== 'remove') this.openBandChairEditor(chairId);
+          };
+        });
+
+        // Beside the chair, kept on screen
+        box.style.display = 'block';
+        const anchor = document.querySelector(`[data-chair="${chairId}"]`);
+        const r = anchor ? anchor.getBoundingClientRect() : { left: window.innerWidth / 2, right: window.innerWidth / 2, top: 120, bottom: 120 };
+        const bw = box.offsetWidth;
+        const bh = box.offsetHeight;
+        let left = r.right + 12;
+        if (left + bw > window.innerWidth - 8) left = r.left - bw - 12;
+        left = Math.max(8, Math.min(left, window.innerWidth - bw - 8));
+        const top = Math.max(8, Math.min(r.top - 10, window.innerHeight - bh - 8));
+        box.style.left = `${left}px`;
+        box.style.top = `${top}px`;
+        document.querySelectorAll('.band-chair-selected').forEach(el => el.classList.remove('band-chair-selected'));
+        if (anchor) anchor.classList.add('band-chair-selected');
+      }
+
+      closeBandChairEditor() {
+        this.bandEditorChairId = null;
+        const box = document.getElementById('bandChairEditor');
+        if (box) box.style.display = 'none';
+        document.querySelectorAll('.band-chair-selected').forEach(el => el.classList.remove('band-chair-selected'));
+      }
+
+      // A-Z / Z-A arranging keeps everyone in their section: each section's players are sorted
+      // over that section's filled chairs (chairs without an instrument count as one group)
+      arrangeBandByName(band, mode) {
+        const groups = {};
+        band.rows.forEach((row, r) => {
+          (r % 2 ? [...row].reverse() : row).forEach(ch => {
+            if (!groups[ch.inst]) groups[ch.inst] = [];
+            groups[ch.inst].push(ch);
+          });
+        });
+        band.perc.forEach(ch => {
+          if (!groups[ch.inst]) groups[ch.inst] = [];
+          groups[ch.inst].push(ch);
+        });
+        Object.values(groups).forEach(chairs => {
+          const filled = chairs.filter(ch => ch.student);
+          const names = this.sortStudentsByName(filled.map(ch => ch.student), mode);
+          filled.forEach((ch, i) => { ch.student = names[i]; });
+        });
+      }
+
+      // The chart's width in its own (zoomed) px: the classroom area's width, capped like .chart-container
+      getChartContentWidth() {
+        const viewport = document.querySelector('#seatingAppBody .viewport');
+        if (!viewport) return 1000;
+        const vs = getComputedStyle(viewport);
+        const inner = viewport.clientWidth - parseFloat(vs.paddingLeft) - parseFloat(vs.paddingRight);
+        const zoom = (this.chartZoom || 80) / 80;
+        return Math.min(this.isFullScreen ? Infinity : 1000, inner / zoom);
+      }
+
+      // The size of a seat card for the class: .seat (with initials) or .seat.no-faces
+      getSeatCardSize(currentClass) {
+        const showFaces = currentClass ? (currentClass.showFaces !== false && currentClass.showInitials !== false) : true;
+        return showFaces ? { w: 110, h: 75 } : { w: 85, h: 52 };
+      }
+
+      // Round or square table; kept with the table's size in containerSizes (an extra field older copies ignore)
+      setTableShape(sizeKey, shape) {
+        const currentClass = this.getCurrentClass();
+        if (!currentClass || !sizeKey) return;
+        if (!currentClass.containerSizes) currentClass.containerSizes = {};
+        const saved = currentClass.containerSizes[sizeKey] || {};
+        currentClass.containerSizes[sizeKey] = { ...saved, shape };
+        this.saveData();
+        this.render();
+      }
+
+      // Where the cards go around a table in a box of W x H (outer px), with cards scaled by s. Each
+      // card sits half on the table: the table's edge runs through the middle of the cards.
+      // Seats are listed clockwise from the top left, the order of the group's names.
+      // Returns null when they don't fit.
+      planTableSeats(n, shape, W, H, card, s) {
+        const iw = W - 2 * TABLE.border;
+        const ih = H - 2 * TABLE.border;
+        const sw = card.w * s;
+        const sh = card.h * s;
+        const g = TABLE.gap * s;
+        const pad = TABLE.pad;
+        const seats = [];
+
+        if (shape === 'round') {
+          // The table's edge is the path of the card centres
+          const a = iw / 2 - pad - sw / 2;
+          const b = ih / 2 - pad - sh / 2;
+          if (2 * a - sw < TABLE.freeW || 2 * b - sh < TABLE.freeH) return null;
+          const cx = iw / 2;
+          const cy = ih / 2;
+          const steps = 720;
+          const path = [];
+          let length = 0;
+          for (let i = 0; i <= steps; i++) {
+            const t = -Math.PI / 2 + (i / steps) * Math.PI * 2;
+            let nx = Math.cos(t) / a;
+            let ny = Math.sin(t) / b;
+            const nl = Math.hypot(nx, ny) || 1;
+            nx /= nl;
+            ny /= nl;
+            const pt = { x: cx + a * Math.cos(t), y: cy + b * Math.sin(t), nx, ny };
+            if (path.length) length += Math.hypot(pt.x - path[path.length - 1].x, pt.y - path[path.length - 1].y);
+            pt.len = length;
+            path.push(pt);
+          }
+          let j = 0;
+          for (let i = 0; i < n; i++) {
+            const target = (i / n) * length;
+            while (j < path.length - 1 && path[j + 1].len < target) j++;
+            const pt = path[j];
+            const side = Math.abs(pt.ny) >= Math.SQRT1_2 ? (pt.ny < 0 ? 'top' : 'bottom') : (pt.nx > 0 ? 'right' : 'left');
+            seats.push({ x: pt.x - sw / 2, y: pt.y - sh / 2, side });
+          }
+          // No two cards touch (across the table either), and the tent card in the middle stays clear
+          for (let i = 0; i < n; i++) {
+            const p1 = seats[i];
+            for (let k = i + 1; k < n; k++) {
+              const p2 = seats[k];
+              if (Math.abs(p1.x - p2.x) < sw + g / 2 && Math.abs(p1.y - p2.y) < sh + g / 2) return null;
+            }
+            if (Math.abs(p1.x + sw / 2 - cx) < (sw + TABLE.freeW) / 2 && Math.abs(p1.y + sh / 2 - cy) < (sh + TABLE.freeH) / 2) return null;
+          }
+          return { table: { x: cx - a, y: cy - b, w: a * 2, h: b * 2 }, seats, s };
+        }
+
+        // A long table: names along the top and bottom edges (hanging a little past the corners at most),
+        // and down the two ends when the table is tall enough or needs them
+        const ty = pad + sh / 2;
+        const th = ih - 2 * ty;
+        if (th - sh < TABLE.freeH) return null;
+        const band = th - sh - 2 * g;            // room down each end, between the top and bottom rows
+        const capEnd = band >= sh ? Math.floor((band + g) / (sh + g)) : 0;
+        const fits = (span) => Math.max(0, Math.floor((span + g) / (sw + g)));
+        const capFull = fits(iw - 2 * pad);
+        const twEnds = iw - 2 * pad - sw;        // the table when cards sit half on each end
+        const capOver = twEnds - sw >= TABLE.freeW ? fits(Math.min(iw - 2 * pad, twEnds + 0.6 * sw)) : 0;
+        let e = 0;
+        if (n >= 4 && capOver > 0) {
+          const eNeeded = Math.max(0, Math.ceil((n - 2 * capOver) / 2));
+          if (eNeeded <= capEnd) {
+            const ePref = Math.max(1, Math.round(n * band / (2 * (twEnds + band))));
+            e = Math.max(eNeeded, Math.min(ePref, Math.floor((n - 2) / 2), capEnd));
+          }
+        }
+        const rest = n - 2 * e;
+        const top = Math.ceil(rest / 2);
+        const bottom = rest - top;
+        if (top > (e > 0 ? capOver : capFull)) return null;
+        const tx = e > 0 ? pad + sw / 2 : pad;
+        const tw = iw - 2 * tx;
+        if (tw - (e > 0 ? sw : 0) < TABLE.freeW) return null;
+
+        // Cards share out the table's length, or a little past its corners when they need to
+        const along = (k) => {
+          const span = Math.min(iw - 2 * pad, Math.max(tw, k * (sw + g)));
+          const x0 = (iw - span) / 2;
+          return Array.from({ length: k }, (_, i) => x0 + (i + 0.5) * span / k - sw / 2);
+        };
+        const bandTop = ty + sh / 2 + g;
+        const down = (k) => Array.from({ length: k }, (_, i) => bandTop + (i + 0.5) * band / k - sh / 2);
+
+        along(top).forEach(x => seats.push({ x, y: ty - sh / 2, side: 'top' }));
+        down(e).forEach(y => seats.push({ x: tx + tw - sw / 2, y, side: 'right' }));
+        along(bottom).reverse().forEach(x => seats.push({ x, y: ty + th - sh / 2, side: 'bottom' }));
+        down(e).reverse().forEach(y => seats.push({ x: tx - sw / 2, y, side: 'left' }));
+        return { table: { x: tx, y: ty, w: tw, h: th }, seats, s };
+      }
+
+      // Fits n cards around a table in a box of W x H: full-size cards if they fit, smaller cards
+      // (down to TABLE.minScale) if the box is smaller than they need, and a bigger box after that.
+      fitTableGroup(n, shape, W, H, card) {
+        W = Math.max(W, 2 * TABLE.pad + 2 * TABLE.border + card.w * TABLE.minScale + TABLE.freeW);
+        H = Math.max(H, 2 * TABLE.pad + 2 * TABLE.border + card.h * TABLE.minScale + TABLE.freeH);
+        const tryAt = (w, h, s) => this.planTableSeats(n, shape, w, h, card, s);
+        let plan = tryAt(W, H, 1);
+        if (plan) return { W, H, plan };
+        if (tryAt(W, H, TABLE.minScale)) {
+          let lo = TABLE.minScale;
+          let hi = 1;
+          for (let i = 0; i < 14; i++) {
+            const mid = (lo + hi) / 2;
+            if (tryAt(W, H, mid)) lo = mid; else hi = mid;
+          }
+          return { W, H, plan: tryAt(W, H, lo) };
+        }
+        const stepW = (card.w + TABLE.gap) * TABLE.minScale / 2;
+        const stepH = (card.h + TABLE.gap) * TABLE.minScale / 2;
+        for (let i = 0; i < 400; i++) {
+          if (shape === 'round' || W / H < 1.6) W += stepW;
+          if (shape === 'round' || W / H >= 1.6 || i % 2) H += stepH;
+          plan = tryAt(W, H, TABLE.minScale);
+          if (plan) return { W, H, plan };
+        }
+        return { W, H, plan: { table: { x: 0, y: 0, w: W, h: H }, seats: [], s: 1 } };
+      }
+
+      // A good size for a table with no saved size: roughly square, and within its share of the row
+      // when full-size (or slightly smaller) cards allow it, else up to the whole row
+      defaultTableSize(n, shape, card, share, rowWidth) {
+        if (n === 0) return { W: TABLE.emptyW, H: 170 };
+        const pad = TABLE.pad;
+        const g = TABLE.gap;
+        const b = TABLE.border;
+        const sizeAt = (s, maxW) => {
+          const sw = card.w * s;
+          const sh = card.h * s;
+          const gg = g * s;
+          if (shape === 'round') {
+            let W = 2 * (pad + b) + 2 * sw + TABLE.freeW;
+            let H = 2 * (pad + b) + 2 * sh + TABLE.freeH;
+            for (let i = 0; i < 300 && !this.planTableSeats(n, shape, W, H, card, s); i++) {
+              W += 18 * s;
+              H += 12 * s;
+            }
+            return W <= maxW ? { W: Math.ceil(W), H: Math.ceil(H) } : null;
+          }
+          let best = null;
+          for (let e = 0; e <= Math.max(0, Math.floor((n - 2) / 2)); e++) {
+            const k = Math.max(1, Math.ceil((n - 2 * e) / 2));
+            const row = k * (sw + gg);
+            const tw = e ? Math.max(TABLE.freeW + sw, row) : Math.max(TABLE.freeW, row);
+            const th = e ? Math.max(sh + TABLE.freeH, e * (sh + gg) - gg + sh + 2 * gg) : sh + TABLE.freeH;
+            const W = Math.ceil(2 * (pad + b) + (e ? sw : 0) + tw);
+            const H = Math.ceil(2 * (pad + b) + sh + th);
+            if (W <= maxW && this.planTableSeats(n, shape, W, H, card, s)) {
+              const score = Math.max(W, H * 1.25);
+              if (!best || score < best.score) best = { W, H, score };
+            }
+          }
+          return best;
+        };
+        for (const s of [1, 0.92, 0.85, 0.78, 0.7]) {
+          const fit = sizeAt(s, share);
+          if (fit) return fit;
+        }
+        return sizeAt(1, Math.max(share, rowWidth)) || sizeAt(1, Infinity) || { W: share, H: 260 };
+      }
+
+      // Puts the table, its tent card and the seats where fitTableGroup placed them
+      applyTableLayout(box, table, badge, seats, fit) {
+        const { W, H, plan } = fit;
+        box.style.width = `${Math.round(W)}px`;
+        box.style.height = `${Math.round(H)}px`;
+        const t = plan.table;
+        table.style.left = `${t.x}px`;
+        table.style.top = `${t.y}px`;
+        table.style.width = `${t.w}px`;
+        table.style.height = `${t.h}px`;
+        badge.style.left = `${t.x + t.w / 2}px`;
+        badge.style.top = `${t.y + t.h / 2}px`;
+        seats.forEach((seatEl, i) => {
+          const spot = plan.seats[i];
+          if (!spot) return;
+          seatEl.style.position = 'absolute';
+          seatEl.style.left = `${spot.x}px`;
+          seatEl.style.top = `${spot.y}px`;
+          seatEl.style.margin = '0';
+          seatEl.style.transformOrigin = '0 0';
+          seatEl.style.scale = plan.s < 0.999 ? plan.s.toFixed(3) : '';
+          seatEl.dataset.side = spot.side;
+        });
       }
 
       getStudentProfile(currentClass, studentName) {
@@ -9406,38 +12231,7 @@ class SeatingChartApp {
           if (Array.isArray(currentClass.classList)) {
             currentClass.classList = currentClass.classList.map(n => n === oldKey ? newFirstName : n);
           }
-          if (Array.isArray(currentClass.rows)) {
-            currentClass.rows = currentClass.rows.map(r => Array.isArray(r) ? r.map(n => n === oldKey ? newFirstName : n) : []);
-          }
-          if (Array.isArray(currentClass.circle)) {
-            currentClass.circle = currentClass.circle.map(n => n === oldKey ? newFirstName : n);
-          }
-          if (Array.isArray(currentClass.freeform)) {
-            currentClass.freeform = currentClass.freeform.map(n => n === oldKey ? newFirstName : n);
-          }
-          if (currentClass.freeformPositions && currentClass.freeformPositions[oldKey]) {
-            currentClass.freeformPositions[newFirstName] = currentClass.freeformPositions[oldKey];
-            delete currentClass.freeformPositions[oldKey];
-          }
-          if (currentClass.layoutsData) {
-            ['half', 'third', 'fourth', 'fifth', 'sixth'].forEach(key => {
-              if (Array.isArray(currentClass.layoutsData[key])) {
-                currentClass.layoutsData[key] = currentClass.layoutsData[key].map(g => Array.isArray(g) ? g.map(n => n === oldKey ? newFirstName : n) : []);
-              }
-            });
-          }
-          if (Array.isArray(currentClass.unplacedStudents)) {
-            currentClass.unplacedStudents = currentClass.unplacedStudents.map(n => n === oldKey ? newFirstName : n);
-          }
-          if (Array.isArray(currentClass.dividedRowsData)) {
-            currentClass.dividedRowsData.forEach(rSecs => {
-              if (Array.isArray(rSecs)) {
-                rSecs.forEach((sec, idx) => {
-                  if (Array.isArray(sec)) rSecs[idx] = sec.map(n => n === oldKey ? newFirstName : n);
-                });
-              }
-            });
-          }
+          this.renameStudentSeating(currentClass, oldKey, newFirstName);
         }
 
         this.saveData();
@@ -9448,7 +12242,8 @@ class SeatingChartApp {
       createSeatElement(name, groupIndex) {
         const safeName = (name === null || name === undefined) ? '' : String(name);
         const currentClass = this.getCurrentClass();
-        const showFaces = currentClass ? (currentClass.showFaces !== false && currentClass.showInitials !== false) : true;
+        const isGarden = Boolean(currentClass && currentClass.layout === 'garden');
+        const showFaces = isGarden ? false : (currentClass ? (currentClass.showFaces !== false && currentClass.showInitials !== false) : true);
         const showFirstName = currentClass ? (currentClass.showFirstName !== false) : true;
         const showLastName = currentClass ? (currentClass.showLastName === true) : false;
         const isAbsent = this.isStudentAbsent(currentClass, safeName);
@@ -9466,15 +12261,11 @@ class SeatingChartApp {
         const lastName = profile.lastName || '';
         const initials = this.getStudentInitials(profile);
 
-        const streak = (safeName && !isCardAbsent) ? this.getAttendanceStreak(currentClass, safeName) : 0;
-        const streakTier = this.getAttendanceStreakTier(streak, currentClass);
-        // Each card twinkles on its own timing so a room full of them doesn't blink in step
-        const starDelay = ([...safeName].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) % 5200, 7) / 1000).toFixed(2);
-
         const seat = document.createElement('div');
-        seat.className = 'seat' + (showFaces ? '' : ' no-faces') + (isCardAbsent ? ' seat-absent' : '') + (streakTier ? ` streak-${streakTier}` : '');
+        seat.className = 'seat' + (isGarden ? ' seat-garden' : (showFaces ? '' : ' no-faces')) + (isCardAbsent ? ' seat-absent' : '') + (this.isGradeScoringActive ? ' seat-grading' : '');
         seat.dataset.student = safeName;
-        if (streakTier) seat.title = `Perfect attendance: ${streak} classes in a row`;
+        // Each student keeps the same crayon colour for their card's stripe and initials sticker
+        seat.style.setProperty('--seat-color', SEAT_COLORS[this.nameHash(safeName) % SEAT_COLORS.length]);
         seat.draggable = this.isEditMode;
         if (this.isAttendanceSessionActive || !this.isGradeScoringActive) {
           seat.style.cursor = 'pointer';
@@ -9488,22 +12279,54 @@ class SeatingChartApp {
           nameSpans.push(`<span class="student-last-name">${this.escapeHtml(lastName)}</span>`);
         }
 
+        // In the Garden the name tag shrinks its text to fit long names (see .seat-garden .student-name);
+        // on a card the name is written as big as the card has room for
+        const shownName = [showFirstName && firstName, showLastName && lastName].filter(Boolean).join(' ');
+        let nameStyle = '';
+        if (isGarden) {
+          nameStyle = ` style="--name-len: ${Math.max(4, shownName.length)}"`;
+        } else if (shownName) {
+          const fit = this.fitSeatNameSize(shownName, showFaces);
+          nameStyle = ` style="font-size: ${fit.size}px;${fit.wrap ? ' white-space: normal;' : ''}"`;
+        }
         const nameDisplayHTML = nameSpans.length > 0
-          ? `<div class="student-name">${nameSpans.join(' ')}</div>`
+          ? `<div class="student-name"${nameStyle}>${isGarden ? nameSpans.join(' ') : `<span class="student-name-text">${nameSpans.join(' ')}</span>`}</div>`
           : '';
+
+        let plantHTML = '';
+        if (isGarden && safeName) {
+          const { sessions, stage, starts } = this.getGardenGrowth(currentClass, safeName);
+          const plant = this.getGardenKind(currentClass, safeName, starts[starts.length - 1]) || GARDEN_PLANTS[0];
+          plantHTML = `<img class="garden-plant" src="${this.getGardenImage(plant, stage)}" data-plant="${plant}" alt="" draggable="false">`;
+          if (this.canReplantGarden(stage, isCardAbsent)) seat.classList.add('garden-ripe');
+          seat.title = stage === GARDEN_STAGES
+            ? 'Full bloom. Click the flower to replant it.'
+            : sessions === 0
+              ? 'New pot: it starts growing at the next class'
+              : `Stage ${stage} of ${GARDEN_STAGES} (${sessions} ${sessions === 1 ? 'class' : 'classes'} in a row)`;
+        }
 
         seat.innerHTML = `
           <button class="remove-btn" onclick="event.stopPropagation(); app.removeStudent('${this.escapeQuotes(safeName)}')" title="Remove">&times;</button>
           ${showFaces ? `<div class="avatar">${initials}</div>` : ''}
+          ${plantHTML}
           ${nameDisplayHTML}
-          ${streakTier === 3 ? `<span class="streak-badge" aria-hidden="true">★</span><span class="streak-twinkles" aria-hidden="true" style="--star-delay: -${starDelay}s"><i>✦</i><i>✦</i><i>✦</i><i>✦</i><i>✦</i><i>✦</i></span>` : ''}
         `;
+
+        const plantImg = seat.querySelector('.garden-plant');
+        if (plantImg) {
+          plantImg.onclick = (e) => {
+            if (!seat.classList.contains('garden-ripe')) return;
+            e.stopPropagation();
+            this.openGardenReplant(safeName);
+          };
+        }
 
         if (this.isAttendanceSessionActive && safeName) {
           const attBtn = document.createElement('button');
           attBtn.type = 'button';
           attBtn.className = `attendance-live-check-btn ${isAttAbsent ? 'is-absent' : 'is-present'}`;
-          attBtn.style.cssText = `position: absolute; top: 4px; right: 4px; z-index: 6; width: 24px; height: 24px; border-radius: 50%; border: 2px solid ${isAttAbsent ? '#94a3b8' : '#10b981'}; background: ${isAttAbsent ? '#f1f5f9' : '#dcfce7'}; color: ${isAttAbsent ? '#94a3b8' : '#15803d'}; font-size: 0.85rem; font-weight: 900; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.15s ease;`;
+          attBtn.style.cssText = `position: absolute; top: 4px; right: 4px; z-index: 6; width: 24px; height: 24px; border-radius: 50%; border: 2px solid ${isAttAbsent ? 'var(--ink-faint)' : 'var(--green)'}; background: ${isAttAbsent ? 'var(--paper-3)' : 'var(--green-soft)'}; color: ${isAttAbsent ? 'var(--ink-faint)' : 'var(--green-dark)'}; font-size: 0.85rem; font-weight: 900; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.15s ease;`;
           attBtn.innerHTML = isAttAbsent ? '&minus;' : '✓';
           attBtn.title = isAttAbsent ? 'Marked Absent (Click to mark Present)' : 'Marked Present (Click to mark Absent)';
           attBtn.onclick = (e) => {
@@ -9557,6 +12380,11 @@ class SeatingChartApp {
 
         let clickTimer = null;
         seat.onclick = (e) => {
+          if (isGarden && safeName && this.isGardenEditing()) {
+            e.stopPropagation();
+            this.advanceGardenPlant(safeName);
+            return;
+          }
           if (this.isAttendanceSessionActive && safeName) {
             e.stopPropagation();
             this.toggleLiveAttendanceStudent(safeName);
@@ -9604,6 +12432,32 @@ class SeatingChartApp {
         };
 
         return seat;
+      }
+
+      // The font size that makes a name fill its seat card on one line (measured in the handwriting
+      // font), or two lines when a long first + last name would otherwise be tiny
+      fitSeatNameSize(text, showFaces) {
+        const box = showFaces ? SEAT_NAME.faces : SEAT_NAME.plain;
+        const max = this.isGradeScoringActive ? SEAT_NAME.grading[showFaces ? 'faces' : 'plain'] : box.max;
+        if (!this.seatNameCtx) this.seatNameCtx = document.createElement('canvas').getContext('2d');
+        const ctx = this.seatNameCtx;
+        ctx.font = `100px ${SEAT_NAME.font}`;
+        const sizeFor = (str, cap) => Math.min(cap, box.w * 100 / Math.max(1, ctx.measureText(str).width));
+        const one = sizeFor(text, max);
+        const words = text.trim().split(/\s+/);
+        if (one < 14 && words.length > 1) {
+          let two = 0;
+          for (let i = 1; i < words.length; i++) {
+            const lines = [words.slice(0, i).join(' '), words.slice(i).join(' ')];
+            two = Math.max(two, Math.min(...lines.map(l => sizeFor(l, Math.min(max, box.two)))));
+          }
+          if (two > one) return { size: Math.max(SEAT_NAME.min, Math.floor(two * 10) / 10), wrap: true };
+        }
+        return { size: Math.max(SEAT_NAME.min, Math.floor(one * 10) / 10), wrap: false };
+      }
+
+      nameHash(str) {
+        return [...String(str || '')].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
       }
 
       escapeHtml(str) {
