@@ -50,7 +50,7 @@
     tempos: [60, 80, 100], practice: true, practiceStart: 'on', oneGo: false, flash: 0,   // practiceStart: 'off' = each melody starts in Test     // the metronome: Slow · Moderate · Fast (POINTS-AND-COUNT-IN.md)
     gold: 11,                                                          // a gold star from this many points (of 20): over 10
     game: 'round5', clockSecs: 60, song: null, songPicks: [], from: 'both', auto: true,   // songPicks: the Song format's songs ('ode', 'set:<id>'), in order
-    colour: 'always', letters: true, nums: true, glow: 'after2', labels: 'none',   // labels: 'none' · 'letters' · 'solfege'
+    colour: 'always', letters: true, nums: true, glow: 'after2', labels: 'none',   // colour: 'solid' · 'always' (transparent until played) · 'lit' · 'black'; labels: 'none' · 'letters' · 'solfege'
     playHidden: false, playLights: true,
     songs: [], set: null
   };
@@ -66,9 +66,10 @@
   const L = o => { if (o.time && !o.times) o.times = [o.time]; return Object.assign(RR.clone(RR.DEFAULTS), { from: 'made' }, o); };
   const LIT = { colour: 'lit', glow: 'never', auto: false };
   RR.LEVELS = [
-    L({ n: 1, band: 'red', name: 'Mi and So', notes: ['E4', 'G4'], rhythms: R1, grey: true }),
-    L({ n: 2, band: 'red', name: 'Add La', notes: ['E4', 'G4', 'A4'], rhythms: R1, grey: true, focus: ['A4'] }),
-    L({ n: 3, band: 'red', name: 'Add Do', notes: ['C4', 'E4', 'G4', 'A4'], rhythms: R2, focus: ['C4', 'qr'] }),
+    // the first levels' notes in solid colour from the start (2026-10-11, the user's: the clearest to read)
+    L({ n: 1, band: 'red', name: 'Mi and So', notes: ['E4', 'G4'], rhythms: R1, grey: true, colour: 'solid' }),
+    L({ n: 2, band: 'red', name: 'Add La', notes: ['E4', 'G4', 'A4'], rhythms: R1, grey: true, focus: ['A4'], colour: 'solid' }),
+    L({ n: 3, band: 'red', name: 'Add Do', notes: ['C4', 'E4', 'G4', 'A4'], rhythms: R2, focus: ['C4', 'qr'], colour: 'solid' }),
     L({ n: 4, band: 'orange', name: 'Add Re', notes: PENTA, rhythms: R2, bars: 2, colour: 'lit', focus: ['D4'] }),
     L({ n: 5, band: 'orange', name: 'High Do', notes: PENTA.concat('C5'), rhythms: R3, bars: 2, colour: 'lit', focus: ['C5', 'h'] }),
     L({ n: 6, band: 'orange', name: 'Add Fa', notes: ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'C5'], rhythms: R3, bars: 2, colour: 'lit', focus: ['F4'] }),
@@ -148,7 +149,7 @@
     p.set = typeof raw.set === 'string' && raw.set ? raw.set.slice(0, 80) : null;
     // the Melody Source: 'set' = My Melodies, the set in `set` (2026-10-08: a session's or level's own)
     p.from = oneOf(raw.from, ['both', 'made', 'songbook', 'set'], D.from);
-    p.colour = oneOf(raw.colour, ['always', 'lit', 'black'], D.colour);
+    p.colour = oneOf(raw.colour, ['solid', 'always', 'lit', 'black'], D.colour);   // 'solid' since 2026-10-11
     p.glow = oneOf(raw.glow, ['never', 'after2', 'always'], D.glow);
     p.labels = oneOf(raw.labels, ['none', 'letters', 'solfege'], D.labels);   // rhythm syllables were retired 2026-10-06
     p.practiceStart = oneOf(raw.practiceStart, ['on', 'off'], D.practiceStart);
@@ -173,7 +174,7 @@
       'C4 D4 E4 F4 G4 A4 C5': 'C to high C, no B', 'C4 D4 E4 G4 A4 C5 D5 E5 G5': 'Two-octave pentatonic'
     };
     named[RR.TWELVE.slice(0, 11).join(' ')] = 'C to high F'; named[RR.TWELVE.slice(2).join(' ')] = 'E to high G'; named[RR.TWELVE.slice(1).join(' ')] = 'D to high G';
-    named[RR.TEN.join(' ')] = 'All ten'; named[RR.TWELVE.join(' ')] = 'All twelve';
+    named[RR.TEN.join(' ')] = 'All ten'; named[RR.TWELVE.join(' ')] = 'All twelve'; named[RR.ALL.join(' ')] = 'All thirteen';
     return named[key] || ids.slice().sort((a, b) => RR.BAR[a].step - RR.BAR[b].step).map(id => id[0]).join(' ');
   };
   RR.summary = function (p) {

@@ -90,6 +90,7 @@
     key() {
       const m = G.mode;
       if (m.kind === 'lesson') return 'lesson:' + m.name;
+      if (m.kind === 'teach') return 'teach:' + m.id;           // Teach Me to Read keeps no scores (its marks: teach-data.js)
       // a melody set played just this time — or on its own, from the home page — is its own score board (a session's own set is the session's)
       if ((G.over.set || m.kind === 'custom') && G.playingSet()) return 'set:' + G.setup.set;
       return m.kind === 'level' ? RR.levelKey(m.n) : m.kind === 'session' ? 'session:' + m.id : m.gen ? 'gen' : 'custom';
@@ -146,6 +147,7 @@
     const s = G.sessions[name] || { points: 0, streak: 0, bestStreak: 0 };
     G.points = s.points; G.streak = s.streak; G.bestStreak = s.bestStreak;
     G.fresh = true;                            // a new player starts with Practice on
+    if (G.mode.kind === 'teach') { RR.Teach.start(G.mode.id); return; }   // their own marks: their own place in it
     G.newRound();
   };
   const nextNote = from => { for (let i = from; i < G.evs.length; i++) if (!G.evs[i].rest) return i; return -1; };
@@ -155,6 +157,7 @@
     if (m.kind === 'level') return 'Level ' + m.n + ' · ' + RR.LEVELS[m.n - 1].name;
     if (m.kind === 'session') return (G.battle ? '⚔️ ' : '') + m.name;
     if (m.kind === 'lesson') return 'Lesson · ' + m.name;
+    if (m.kind === 'teach') return 'Teach Me to Read · ' + (RR.teachLevel(m.id) || {}).title;
     if (m.label) return m.label;                          // the home page's Generated, or a set of My melodies (2026-10-08)
     return 'Custom' + (m.from ? ' (from ' + m.from + ')' : '');
   }
@@ -166,7 +169,7 @@
   };
   // a set played just this time is named first ("Week 3 · Level 4"); a session's own set is the session's
   G.modeLabel = () => { const set = G.over.set ? G.playingSet() : null; return (set && G.mode.kind !== 'lesson' ? set.title + ' · ' : '') + modeLabel(G.mode); };
-  G.modeColour = () => G.mode.kind === 'level' ? RR.bandOf(G.mode.n).colour : G.mode.kind === 'lesson' ? '#7c3aed' : G.mode.kind === 'session' ? RR.SESSION_COLOUR : '#8a7563';
+  G.modeColour = () => G.mode.kind === 'level' ? RR.bandOf(G.mode.n).colour : G.mode.kind === 'lesson' ? '#7c3aed' : G.mode.kind === 'session' ? RR.SESSION_COLOUR : G.mode.kind === 'teach' ? RR.TEACH_COLOUR : '#8a7563';
 
   /* ---------------- choosing what to play (2026-10-08) ----------------
      The user's rule: "all the session's rules apply to that session, and
@@ -210,6 +213,7 @@
     if (m.kind === 'level') { RR.device.level = m.n; RR.device.practice = { kind: 'level', n: m.n, over }; }
     else if (m.kind === 'session') RR.device.practice = { kind: 'session', id: m.id, over };
     else if (m.kind === 'custom') RR.device.practice = { kind: 'custom', from: m.from || null, label: m.label || undefined, gen: m.gen || undefined, practice: G.base, over };
+    else if (m.kind === 'teach') RR.device.practice = { kind: 'teach', id: m.id, at: RR.Teach.at };
     else return;
     RR.saveDevice();
   }
@@ -265,6 +269,8 @@
 
   /* just this time: a My melodies set (or none), a format (or none), tricky notes — a new round */
   G.playOnce = function (kind, value) {
+    // Teach Me to Read has no "just this time": a set or a format from elsewhere plays over the level last played
+    if (G.mode.kind === 'teach') { if (!value) return; G.selectLevel(RR.device.level || 1, kind === 'set' ? { set: value } : kind === 'game' ? { game: value } : {}); return; }
     if (kind === 'set') { if (value) G.over.set = value; else delete G.over.set; }
     else if (kind === 'game') {
       if (value) {
@@ -343,8 +349,8 @@
   }
   function applyInstrument() {
     const s = G.setup, live = liveBars();
-    const twelve = Array.from(live).some(id => BAR[id].i >= 10);
-    if (RR.Xylo.count() !== (twelve ? 12 : 10)) RR.Xylo.build(twelve ? 12 : 10);
+    const n = RR.barsFor(live);                        // ten bars, twelve to high G, thirteen to high A
+    if (RR.Xylo.count() !== n) RR.Xylo.build(n);
     RR.Xylo.setGreyed(s.grey ? live : null);
     RR.Xylo.setLabels(s.letters, s.nums);
     const app = $('#app');
@@ -352,6 +358,8 @@
     app.classList.toggle('game-clock', s.game === 'clock');
     app.classList.toggle('game-open', s.game === 'endless' || s.game === 'clock');
     app.classList.toggle('in-lesson', G.mode.kind === 'lesson');
+    app.classList.toggle('teach-on', G.mode.kind === 'teach');
+    if (G.mode.kind !== 'teach') app.classList.remove('kbd-on');
   }
   G.applyInstrument = applyInstrument;
 
@@ -464,6 +472,7 @@
     if (G.battle && RR.battleAt(G.battle, G.round.length).q === 0) G.openTest = false;   // each team's turn starts afresh: Practice (if any)
     G.metro = 'off';                                       // every melody: tap the metronome and pick a tempo (the user's, 2026-10-06)
     syncTick();
+    if (!card && G.mode.kind === 'teach') card = RR.Teach.card();     // Teach Me to Read: the exercise it is on
     if (!card && G.battle && G.battlePlan) card = RR.clone(G.battlePlan[Math.min(G.round.length, G.roundN - 1)]);
     if (!card) { if (!G.queue.length) refill(); card = G.queue.shift(); }
     G.card = card; G.dealt.push(card);
@@ -478,7 +487,7 @@
      note in Practice here → the next card opens in Test too; practised,
      then tested (or still in Practice) → Practice again */
   function leaveCard() {
-    if (!G.card || !G.setup.practice || G.clock) return;
+    if (!G.card || !G.setup.practice || G.clock || G.mode.kind === 'teach') return;
     G.openTest = G.stage === 'game' && !G.practisedHere;
   }
   /* a card opens in Practice, unless the player has chosen to play without
@@ -519,13 +528,14 @@
     if (!keepMark) $('#praise').className = 'praise';
     RR.Xylo.setGlow(G.setup.glow === 'always' && G.idx >= 0 ? G.evs[G.idx].p : null);
     $('#btn-next').classList.remove('ready');
+    $('#btn-restart').classList.remove('ready');
   }
   G.resetCard = resetCard;
 
   /* Practice → Test: the notes dark again and live; with the metronome on,
      the count-in starts at once */
   G.toGame = function () {
-    if (G.overlay || G.stage !== 'practice') return;
+    if (G.overlay || G.stage !== 'practice' || G.mode.kind === 'teach') return;   // Teach Me to Read: no Test (the metronome is its way)
     stopHear(true); if (RR.Beat) RR.Beat.stop();
     clearTimeout(G.autoT);
     resetCard('game'); syncTick(); draw();
@@ -535,7 +545,7 @@
   /* Test → Practice, at any point: a try under way is called off (it never
      counts), a pending move to the next card too — this card, in Practice */
   G.toPractice = function () {
-    if (G.overlay || G.stage !== 'game' || !canPractise()) return;
+    if (G.overlay || G.stage !== 'game' || !canPractise() || G.mode.kind === 'teach') return;
     stopHear(true); if (RR.Beat) RR.Beat.stop();
     clearTimeout(G.autoT);
     resetCard('practice'); draw(); syncTick();
@@ -548,6 +558,8 @@
   G.stopCountIn = function () {
     if (G.phase !== 'countin') return;
     RR.Beat.stop();
+    // Teach Me to Read: the metronome goes off — back to playing on your own
+    if (G.mode.kind === 'teach') { G.metro = 'off'; resetCard('practice'); draw(); announce('Stopped. The metronome is off.'); return; }
     const practice = G.setup.practice && !G.clock;
     resetCard(practice ? 'practice' : undefined); draw(); syncTick();
     announce(practice ? 'Stopped. Practice: nothing counts.' : 'Stopped.');
@@ -564,8 +576,9 @@
     if (G.overlay || G.clock) return;
     if (pickOpen()) { closePick(); return; }
     const s = G.setup, pick = $('#metro-pick');
+    $('#btn-metro').classList.remove('hint');
     pick.innerHTML = (metroOn() ? '<button type="button" data-metro="off" class="off">Off</button>' : '') +
-      RR.Points.PACES.map(p => '<button type="button" data-metro="' + p.id + '" class="' + (G.metro === p.id ? 'on' : '') + '">' +
+      RR.Points.PACES.filter(p => G.mode.kind !== 'teach' || p.id !== 'fast').map(p => '<button type="button" data-metro="' + p.id + '" class="' + (G.metro === p.id ? 'on' : '') + '">' +
         '<b>' + p.name + '</b><small>' + RR.beatTempo(s, p.id, G.card.time) + ' BPM</small></button>').join('');
     pick.hidden = false;
     $('#btn-metro').setAttribute('aria-expanded', 'true');
@@ -585,6 +598,15 @@
     if (G.overlay || G.clock) return;
     G.metro = ['off', 'slow', 'moderate', 'fast'].includes(id) ? id : 'off';
     if (G.hearing) stopHear(true);
+    // Teach Me to Read: a tempo picked counts in at once (a play for a gold star); Off — playing on your own
+    if (G.mode.kind === 'teach') {
+      if (G.metro === 'fast') G.metro = 'moderate';
+      RR.Beat.stop(); clearTimeout(G.practiceT);
+      resetCard(metroOn() ? 'game' : 'practice'); draw();
+      if (metroOn()) RR.Beat.start();
+      announce(metroOn() ? 'Metronome: ' + RR.Points.paceOf(G.metro).name + '. Play along for a gold star.' : 'Metronome off.');
+      return;
+    }
     if (G.stage === 'game' && G.phase !== 'done' && !(G.setup.oneGo && G.started)) {
       RR.Beat.stop(); resetCard(); draw();
       if (metroOn()) RR.Beat.start();
@@ -597,7 +619,7 @@
      metronome on, the music on screen and nothing over it — no count-in; a Test counts in instead */
   function syncTick() {
     if (!RR.Beat || !RR.Beat.tickStart) return;
-    const want = metroOn() && G.card && G.stage === 'practice' && !G.clock && !G.overlay &&
+    const want = metroOn() && G.card && G.stage === 'practice' && !G.clock && !G.overlay && G.mode.kind !== 'teach' &&
       G.phase !== 'countin' && G.phase !== 'running' && (!RR.View || RR.View.current === 'play') &&
       !windowOpen() && !(RR.Maker && RR.Maker.active);
     const now = RR.Beat.ticking();
@@ -619,6 +641,7 @@
   const canRestartCard = () => !(G.setup.oneGo && G.stage === 'game' && G.started);
   G.restart = function () {
     if (G.overlay) return;
+    if (G.mode.kind === 'teach') { RR.Teach.again(); return; }
     if (cardTouched()) {
       if (!canRestartCard()) return;
       stopHear(true); if (RR.Beat) RR.Beat.stop();
@@ -647,7 +670,10 @@
 
   /* ---------------- a bar is struck ---------------- */
   function strike(id, e) {
+    if (RR.Teach && RR.Teach.kbdOn()) { RR.Teach.kbdHit(id); return; }   // the computer keyboard's picture: just for playing
     if (G.overlay) return;
+    // Teach Me to Read: a play with the metronome that never got going (the sound didn't wake) — on your own instead
+    if (G.mode.kind === 'teach' && G.stage === 'game' && G.phase === 'ready') { G.metro = 'off'; resetCard('practice'); }
     // Practice, the melody just found: the next bar struck starts it again at once, as its first note —
     // the check floats on over the music. (The user, 2026-10-08: with the practice metronome clicking,
     // strikes were ignored for 1.5 s, so the next downbeat was lost and the clear landed mid-melody.)
@@ -660,6 +686,7 @@
   RR.Xylo.onHit = strike;
 
   function record(note, first) {
+    if (G.mode.kind === 'teach') return;             // Teach Me to Read keeps no scores
     const me = Scores.me();
     [me.stats, G.rstats].forEach(st => {
       const x = st[note] = (st[note] && typeof st[note] === 'object') ? st[note] : { n: 0, first: 0 };
@@ -672,6 +699,7 @@
   }
   G.record = record;
   function mixup(target, played) {
+    if (G.mode.kind === 'teach') return;
     const mix = Scores.me().mix, key = target + '>' + played;
     mix[key] = (mix[key] | 0) + 1;
   }
@@ -722,6 +750,7 @@
      bar struck clears them at once (strike), so a player keeping the beat goes straight round again */
   function practiceFound() {
     G.phase = 'review';
+    if (G.mode.kind === 'teach') { RR.Teach.found(); practiceClear(1500); return; }   // a check for the exercise
     showMark(true, false, 0);
     announce('Got it! Go again, or tap Practice for the Test.');
     $('#btn-mode').classList.add('ready');
@@ -752,6 +781,13 @@
   function finish() {
     const s = G.setup;
     G.phase = 'done';
+    // Teach Me to Read: no points — the missed notes show, and the exercise gets its mark (teach.js)
+    if (G.mode.kind === 'teach') {
+      if (G.run) noteIdx().forEach(i => { if (!G.judge[i] || G.judge[i] === 'Missed') { G.judge[i] = 'Missed'; G.states[i] = 'missed'; } });
+      RR.Xylo.setGlow(null);
+      RR.Teach.runDone();
+      return;
+    }
     let r;
     if (G.run) {
       // a count-in run: the missed notes show now (nothing showed while it ran), and count as slips
@@ -804,9 +840,21 @@
     else $('#btn-next').classList.add('ready');
   }
   G.finish = finish;
+  /* Teach Me to Read with the metronome goes round and round (beat.js, 2026-10-11): each time round is marked
+     like a play of its own (RR.Teach.runDone), then the notes go dark for the next — the run, its click and
+     its count carry on */
+  G.passDone = function () {
+    noteIdx().forEach(i => { if (!G.judge[i] || G.judge[i] === 'Missed') { G.judge[i] = 'Missed'; G.states[i] = 'missed'; } });
+    RR.Teach.runDone(true);
+    G.states = G.evs.map(() => 'todo'); G.judge = G.evs.map(() => null); G.times = G.evs.map(() => null); G.tries = G.evs.map(() => 0);
+    G.idx = nextNote(0); G.clean = true; G.slips = 0; G.slipsHere = 0; G.ghosts = []; G.justLit = -1;
+    if (G.run) G.run.wrong = 0;
+    draw();
+  };
 
   function next() {
     if (G.overlay) return;
+    if (G.mode.kind === 'teach') { RR.Teach.next(); return; }
     if (G.cardEntry < 0) {                       // never finished in a Test: skipped
       const e = { stars: 0, pts: 0, made: false, gold: false, skip: true, label: 'Skipped' };
       if (G.battle) e.team = G.battleNow().team;
@@ -844,14 +892,25 @@
   /* Practice's (unless Listen in Practice is off), and after a try — never
      during one. At the metronome's pace — and with the metronome on, its
      clicks too: a bar of them first, then on every beat (Off: Slow, no clicks) */
-  const canHear = () => !G.setup.playHidden && (G.phase === 'done' || G.stage === 'practice');   // Play button Disabled: never
+  // Play button Disabled: never. Teach Me to Read: any time (playing along with the metronome stops for it), but not
+  // while the computer keyboard shows
+  const canHear = () => !G.setup.playHidden && (G.mode.kind === 'teach' ? !(RR.Teach && RR.Teach.kbdOn()) : G.phase === 'done' || G.stage === 'practice');
   G.canHear = canHear;
   function hearIt() {
-    if (G.hearing) { stopHear(true); return; }
-    if (G.overlay || G.phase === 'countin' || G.phase === 'running' || !canHear()) return;
+    const teach = G.mode.kind === 'teach';
+    if (G.hearing) {
+      stopHear(true);
+      if (teach && metroOn() && G.stage === 'game') $('#btn-restart').classList.add('ready');   // ↻ to play along again
+      return;
+    }
+    if (G.overlay || (!teach && (G.phase === 'countin' || G.phase === 'running')) || !canHear()) return;
     if (!RR.Sound.ctx) return;
+    // Teach Me to Read: Listen while playing along with the metronome — the play-along stops, Listen plays
+    // with the metronome's clicks; ↻ comes back to playing along
+    if (teach && (RR.Beat.running() || G.phase === 'countin' || G.phase === 'running')) { RR.Beat.stop(); resetCard('game'); G.phase = 'done'; }
     const s = G.setup, spt = 60 / RR.paceTempo(s, RR.listenPace()) / 4;
-    const M = RR.meter(G.card.time), pick = G.card.pickup || 0, beat = M.beatTicks * spt;
+    const M = RR.meter(G.card.time), pick = G.card.pickup || 0;
+    const total = G.evs.reduce((a, e) => a + e.t, 0);
     // the practice metronome clicking: come in on its next bar line, with no clicks of Listen's own
     const join = RR.Beat.tickNextBar ? RR.Beat.tickNextBar(0.15 + pick * spt) : null;
     const lead = metroOn() && join == null ? M.barTicks - pick : 0;   // ticks of clicks before the music (a pick-up shortens it)
@@ -859,25 +918,36 @@
     G.hearing = true; $('#btn-play').classList.add('playing');
     $('#btn-play').setAttribute('aria-label', 'Stop');
     G.hearTimers = [];
-    if (metroOn() && join == null) {
-      // clicks aren't stoppable once made, so each is made just before it is due — on the bar's beats, from a bar before
-      const total = G.evs.reduce((a, e) => a + e.t, 0);
-      for (let tk = pick - M.barTicks; tk < total; tk += M.beatTicks) {
-        const t = t0 + tk * spt, b = Math.round((tk - pick) / M.beatTicks), accent = ((b % M.beats) + M.beats) % M.beats === 0;
-        G.hearTimers.push(setTimeout(() => RR.Sound.click(t, accent, false), Math.max(0, (t - RR.Sound.now() - 0.15) * 1000)));
+    // Teach Me to Read (2026-10-11, the user's: "do not stop it after 1 round, let it repeat" — a class can
+    // read the board and play along on real xylophones): round and round, each time straight after the
+    // last, until Listen is pressed again. Elsewhere it plays once
+    const loop = teach;
+    let prev = [];
+    function pass(k, tStart) {
+      const mine = [];
+      if (metroOn() && join == null) {
+        // clicks aren't stoppable once made, so each is made just before it is due — on the bar's beats, from a bar before
+        for (let tk = k ? 0 : pick - M.barTicks; tk < total; tk += M.beatTicks) {
+          const t = tStart + tk * spt, b = Math.round((tk - pick) / M.beatTicks), accent = ((b % M.beats) + M.beats) % M.beats === 0;
+          mine.push(setTimeout(() => RR.Sound.click(t, accent, false), Math.max(0, (t - RR.Sound.now() - 0.15) * 1000)));
+        }
       }
+      G.evs.forEach((ev, i) => {
+        const t = tStart + ev.start * spt;
+        if (!ev.rest) RR.Sound.playAt(ev.p, t);
+        mine.push(setTimeout(() => {
+          // Animates music and bars: the note glows and its bar lights; Plays sounds only: neither
+          if (s.playLights) { G.hearIdx = i; if (!ev.rest) RR.Xylo.flash(ev.p, 'demo', Math.min(380, ev.t * spt * 900)); }
+          draw();
+        }, Math.max(0, RR.Sound.heardAt(t) - RR.now())));
+      });
+      const end = tStart + total * spt;
+      if (loop) mine.push(setTimeout(() => pass(k + 1, end), Math.max(0, RR.Sound.heardAt(end) - RR.now() - 600)));   // the next time round, a little ahead
+      else mine.push(setTimeout(() => stopHear(false), Math.max(0, RR.Sound.heardAt(end) - RR.now()) + 60));
+      // the timers still to come: this time round's and the last's (every earlier one has gone off)
+      G.hearTimers = prev.concat(mine); prev = mine;
     }
-    G.evs.forEach((ev, i) => {
-      const t = t0 + ev.start * spt;
-      if (!ev.rest) RR.Sound.playAt(ev.p, t);
-      G.hearTimers.push(setTimeout(() => {
-        // Animates music and bars: the note glows and its bar lights; Plays sounds only: neither
-        if (s.playLights) { G.hearIdx = i; if (!ev.rest) RR.Xylo.flash(ev.p, 'demo', Math.min(380, ev.t * spt * 900)); }
-        draw();
-      }, Math.max(0, RR.Sound.heardAt(t) - RR.now())));
-    });
-    const total = G.evs.reduce((a, e) => a + e.t, 0);
-    G.hearTimers.push(setTimeout(() => stopHear(false), Math.max(0, RR.Sound.heardAt(t0 + total * spt) - RR.now()) + 60));
+    pass(0, t0);
   }
   function stopHear(silence) {
     G.hearTimers.forEach(clearTimeout); G.hearTimers = [];
@@ -893,7 +963,11 @@
   G.pause = function () {
     stopHear(true); closePick();
     if (RR.Beat && RR.Beat.tickStop) RR.Beat.tickStop();
-    if (RR.Beat && (RR.Beat.running() || G.phase === 'countin' || G.phase === 'running')) { RR.Beat.stop(); resetCard(); draw(); }
+    if (RR.Beat && (RR.Beat.running() || G.phase === 'countin' || G.phase === 'running')) {
+      RR.Beat.stop();
+      if (G.mode.kind === 'teach') { G.metro = 'off'; resetCard('practice'); } else resetCard();
+      draw();
+    }
   };
   G.hearIt = hearIt;
   G.stopHear = stopHear;
@@ -933,7 +1007,10 @@
     if (fitW && fitH) {
       const card = G.card, barTicks = RR.meter(card.time).barTicks, pick = card.pickup || 0;
       const total = G.evs.reduce((a, e) => a + e.t, 0);
-      const rowH = 2.7 + 4 + 2.9 + (s.labels !== 'none' ? 1.5 : 0);
+      // Teach Me to Read (2026-10-11, the user's: "make the notation larger and clearer"): less room above and
+      // below the staff, the notes a little closer, and one row or two — whichever draws it bigger
+      const teach = !!card.teach;
+      const rowH = RR.Eng.rowSpaces(teach, s.labels !== 'none');
       const age = RR.now() - G.justAt;
       const nextIdx = (G.phase === 'ready' && !G.hearing) ? G.idx : -1;
       const justLit = age < 450 ? G.justLit : -1;
@@ -941,11 +1018,17 @@
       // a two-bar melody on a narrow screen (a phone held upright) is drawn one bar above the other
       // (a pick-up stays with the first bar)
       const cutTick = pick + barTicks, cut = G.evs.findIndex(e => e.start >= cutTick);
-      const split = fitW < 560 && total === 2 * barTicks && cut > 0 && G.evs[cut].start === cutTick;
-      const ranges = split ? [[0, cut], [cut, G.evs.length]] : [[0, G.evs.length]];
-      const subs = ranges.map(([a, b], r) => ({ a, b, startTick: r ? cutTick : 0, card: { time: card.time, pickup: r ? 0 : pick, notes: card.notes.slice(a, b) }, noTime: r > 0, endBar: split && r === 0 ? 'single' : 'final' }));
-      const widest = Math.max.apply(null, subs.map(x => { const m = RR.Eng.measure(x.card, false, x.noTime); return m.prefix + m.notes * 0.95 + m.fixed; }));
-      const ss = Math.max(8, Math.min(fitH / (rowH * subs.length), fitW / widest, split ? 26 : 46));   // 46: a smartboard's big staff
+      const canSplit = total === 2 * barTicks && cut > 0 && G.evs[cut].start === cutTick;
+      const fill = teach ? 0.8 : 0.95;
+      const plan = sp => {
+        const ranges = sp ? [[0, cut], [cut, G.evs.length]] : [[0, G.evs.length]];
+        const subs = ranges.map(([a, b], r) => ({ a, b, startTick: r ? cutTick : 0, card: { time: card.time, pickup: r ? 0 : pick, notes: card.notes.slice(a, b) }, noTime: r > 0, endBar: sp && r === 0 ? 'single' : 'final' }));
+        const widest = Math.max.apply(null, subs.map(x => { const m = RR.Eng.measure(x.card, false, x.noTime); return m.prefix + m.notes * fill + m.fixed; }));
+        return { split: sp, subs, ss: Math.max(8, Math.min(fitH / (rowH * subs.length), fitW / widest, sp && !teach ? 26 : 46)) };   // 46: a smartboard's big staff
+      };
+      let lay = plan(canSplit && fitW < 560);
+      if (teach && canSplit) { const other = plan(!lay.split); if (other.ss > lay.ss * 1.04) lay = other; }
+      const split = lay.split, subs = lay.subs, ss = lay.ss;
       const shift = (i, a, b) => (i >= a && i < b ? i - a : -1);
       // a count-in run shows nothing but the notes lighting: no playhead, no judgement words, no ghosts
       G.rows = subs.map(x => Object.assign(x, {
@@ -953,7 +1036,7 @@
           ss, maxW: fitW, maxStretch: split ? 3 : 1.9, noTime: x.noTime, endBar: x.endBar,
           colour: s.colour, states: G.states.slice(x.a, x.b),
           nextIdx: shift(nextIdx, x.a, x.b), hearIdx: shift(G.hearIdx, x.a, x.b), justLit: shift(justLit, x.a, x.b), justAge: age,
-          labels: s.labels,
+          labels: s.labels, lines: teach ? RR.Teach.level().lines : null, ledgers: teach ? RR.Teach.level().ledgers : null, tight: teach,
           ghosts: ghosts.filter(g => g.col >= x.a && g.col < x.b).map(g => Object.assign({}, g, { col: g.col - x.a })),
           hidden: G.hidden
         })
@@ -967,13 +1050,18 @@
     const c = G.card;
     const bn = G.battleNow();
     $('#tune-name').textContent = bn ? 'Round ' + (bn.round + 1) + ' of ' + G.battle.rounds :
+      c.teach ? 'Exercise ' + c.part + ' of ' + c.of :
       c.title ? c.title + ' · ' + (c.sub ? c.sub + ' · ' : '') + c.part + ' of ' + c.of : 'A made-up melody';
     // the round's dots, top centre: the card being played rings (a counted one being tried again too)
     const dots = [], here = G.cardEntry >= 0 ? G.cardEntry : G.round.length;
     // a battle: the team whose turn it is, and its melodies this turn; the music card wears its colour
     const stand = $('#stand');
     stand.classList.toggle('battle-on', !!bn);
-    if (bn) {
+    const dotsEl = $('#dots');
+    dotsEl.classList.toggle('teach-dots', G.mode.kind === 'teach');
+    if (G.mode.kind === 'teach') dotsEl.removeAttribute('aria-hidden'); else dotsEl.setAttribute('aria-hidden', 'true');
+    if (G.mode.kind === 'teach') dots.push(RR.Teach.dotsHtml());       // the five exercises: check, gold star, or not yet — a tap goes to one
+    else if (bn) {
       const t = G.battle.teams[bn.team], first = here - bn.q;
       stand.style.setProperty('--tc', t.colour);
       dots.push('<span class="turn-tag" style="--tc:' + t.colour + '">' + RR.esc(t.name) + '</span>');
@@ -1000,9 +1088,9 @@
     const c = G.card, total = G.evs.reduce((a, e) => a + e.t, 0);
     const notes = G.evs.filter(e => !e.rest).length, lit = G.states.filter(x => x === 'lit').length;
     const bars = Math.round(total / RR.meter(c.time).barTicks);
-    const name = c.title ? c.title + ', ' + (c.sub ? c.sub + ', ' : '') + c.part + ' of ' + c.of : 'A made-up melody';
+    const name = c.teach ? 'exercise ' + c.part + ' of ' + c.of : c.title ? c.title + ', ' + (c.sub ? c.sub + ', ' : '') + c.part + ' of ' + c.of : 'A made-up melody';
     const bn = G.battleNow();
-    return (bn ? G.battle.teams[bn.team].name + '’s turn. ' : '') + (G.stage === 'practice' ? 'Practice. ' : 'Test. ') + 'The music: ' + name + '. ' + RR.meterText(c.time) + ', ' + (c.pickup ? 'a pick-up and ' : '') + bars + (bars === 1 ? ' bar' : ' bars') + ', ' + notes + ' notes' +
+    return (bn ? G.battle.teams[bn.team].name + '’s turn. ' : '') + (G.mode.kind === 'teach' ? '' : G.stage === 'practice' ? 'Practice. ' : 'Test. ') + 'The music: ' + name + '. ' + RR.meterText(c.time) + ', ' + (c.pickup ? 'a pick-up and ' : '') + bars + (bars === 1 ? ' bar' : ' bars') + ', ' + notes + ' notes' +
       (lit ? ', ' + lit + ' played' : '') + (G.clean ? '' : ', with slips') + '.';
   }
 
@@ -1050,6 +1138,10 @@
     r.disabled = touched && !canRestartCard();
     r.title = touched ? 'Start this melody over' : 'Start the round over, from the first melody';
     r.setAttribute('aria-label', r.title);
+    const nx = $('#btn-next');
+    nx.disabled = false; nx.classList.remove('teach-ok');
+    $('.next-label').textContent = 'Next';
+    if (G.mode.kind === 'teach') RR.Teach.drawSides();       // no Test, no score; Next once the exercise is played through
   }
   G.drawSides = drawSides;
 
@@ -1100,6 +1192,7 @@
     sparkAt(r.left + ev.cx, r.top + row.geo.yOf(ev.step), BAR[ev.p].colour, 8);
   }
   G.sparkAtNote = sparkAtNote;
+  G.sparkAt = sparkAt;
   /* after a try: a gold star for a high score, or else a green check if it was
      played through — one or the other, never both — floating up and fading
      (2026-10-05; the words went to the screen reader). The points still fly

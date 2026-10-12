@@ -14,7 +14,7 @@
    value that doesn't fit what is left of the bar is greyed out. The empty
    part of the bars is drawn faintly, with the next-note glow where the
    next note will go. A melody that isn't full can still be saved: the
-   gap is filled with rests (asked first). All twelve bars are live while
+   gap is filled with rests (asked first). All thirteen bars are live while
    making, with their letters and numbers.
    ========================================================================== */
 (function () {
@@ -79,7 +79,7 @@
     $('#app').classList.add('making');
     $('#mk-set').textContent = set.title + (M.index !== null ? ' · melody ' + (M.index + 1) : ' · a new melody');
     $('#mk-title').value = M.melody.title || '';
-    if (RR.Xylo.count() !== 12) RR.Xylo.build(12);
+    if (RR.Xylo.count() !== 13) RR.Xylo.build(13);
     RR.Xylo.setGreyed(null); RR.Xylo.setLabels(true, true); RR.Xylo.setGlow(null);
     render();
     const f = $('#mk-values .mk-val.on'); if (f) f.focus();

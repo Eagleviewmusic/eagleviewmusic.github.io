@@ -211,8 +211,7 @@
       const from = B[0].from, span = Math.round((h.parseDay(B[B.length - 1].to) - h.parseDay(from)) / 864e5) + 1;
       before = h.between(me.days, h.addDays(from, -span), h.addDays(from, -1)).nt;
     }
-    const twelve = Object.keys(now).some(id => RR.BAR[id] && RR.BAR[id].i >= 10);
-    const bars = RR.BARS.slice(0, twelve ? 12 : 10);
+    const bars = RR.BARS.slice(0, RR.barsFor(Object.keys(now)));
     if (!Object.keys(now).length) return empty('Read some notes in a Test and each bar shows how often you got it right first time.');
     if (tables.notes) return tableHtml(['Note', 'Read', 'First time', '%'].concat(before ? ['Before'] : []),
       bars.filter(b => now[b.id]).map(b => [b.id, String(now[b.id][0]), String(now[b.id][1]), pct(now[b.id][1], now[b.id][0]) + '%'].concat(before ? [before[b.id] && before[b.id][0] ? pct(before[b.id][1], before[b.id][0]) + '%' : '–'] : [])));

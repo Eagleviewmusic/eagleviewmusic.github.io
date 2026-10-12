@@ -25,13 +25,14 @@
   function build(n) {
     count = n;
     el.classList.toggle('twelve', n > 10);
+    el.classList.toggle('thirteen', n > 12);
     const shortest = 100 - (n - 1) * 4;
     const topR = Math.round(50 - shortest / 2 + 6), botR = Math.round(50 + shortest / 2 - 6);
     el.innerHTML =
       '<svg class="rails" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="3" y1="13" x2="97" y2="' + topR + '"/><line x1="3" y1="87" x2="97" y2="' + botR + '"/></svg>' +
       '<div class="bars">' + RR.BARS.slice(0, n).map(b =>
-        '<div class="bar" data-id="' + b.id + '" style="--c:' + b.colour + ';--len:' + b.len + '%" role="button" tabindex="' + (b.i === 0 ? 0 : -1) + '" aria-label="' + b.letter + b.octave + ', key ' + (b.key === '-' ? 'minus' : b.key === '=' ? 'equals' : b.key) + '">' +
-        '<i class="bolt top"></i><b class="letter">' + b.letter + '</b><span class="num">' + (b.key === '-' ? '−' : b.key) + '</span><i class="bolt bottom"></i></div>').join('') + '</div>' +
+        '<div class="bar" data-id="' + b.id + '" style="--c:' + b.colour + ';--len:' + b.len + '%" role="button" tabindex="' + (b.i === 0 ? 0 : -1) + '" aria-label="' + b.letter + b.octave + ', key ' + RR.keyName(b.key) + '">' +
+        '<i class="bolt top"></i><b class="letter">' + b.letter + '</b><span class="num">' + RR.keyShow(b.key) + '</span><i class="bolt bottom"></i></div>').join('') + '</div>' +
       '<div class="frame-end left"></div><div class="frame-end right"></div>';
   }
   const barEl = id => el.querySelector('.bar[data-id="' + id + '"]');

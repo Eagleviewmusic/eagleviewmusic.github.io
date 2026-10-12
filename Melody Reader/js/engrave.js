@@ -10,14 +10,21 @@
    the playhead, words under the notes, judgement words.
 
    render(card, o) → { svg, W, H, evs, total, yOf, xAtTick, ss }
-     o: { ss, maxW, maxStretch, colour: 'always'|'lit'|'black',
+     o: { ss, maxW, maxStretch, colour: 'solid'|'always'|'lit'|'black',
+                                (solid: full colour from the start; always:
+                                 see-through until played — 2026-10-11)
           states[], judge[], nextIdx, hearIdx, justLit, justAge,
           labels: 'none'|'letters'|'solfege'|'syllables', judgeRow, ghosts[],
           playTick, hidden, bare, noTime, endBar: 'final'|'single',
-          noHalo, faintFrom }   (Make a melody: solid colours; the bars'
+          noHalo, faintFrom,    (Make a melody: solid colours; the bars'
                                  empty rest drawn faintly from faintFrom)
+          lines, ledgers, tight }  (Teach Me to Read: the five lines, bottom
+                                 to top, each a bar colour — lit — or 'dim';
+                                 ledgers: { step: colour } a ledger line lit;
+                                 tight: less room above and below the staff,
+                                 for music that stays between D4 and G5)
    measure(card, bare, noTime) → widths in staff spaces, for fitting
-   picker(selected)            → the Notes tab's twelve tappable notes
+   picker(selected)            → the Notes tab's thirteen tappable notes
    events(card)                → the notes with their start ticks
 
    A card's meter can be 2/4 3/4 4/4 or 6/8 (RR.meter: in 6/8 the eighths
@@ -54,6 +61,9 @@
   const FILL = 'fill="' + INK + '"';
   // judgement words, each at least 4.5:1 on the paper (WCAG AA)
   const JUDGE_COLOUR = { Perfect: '#15803d', Good: '#0f766e', Early: '#c2410c', Late: '#c2410c', Off: '#c2410c', Missed: '#78716c' };
+  // Teach Me to Read's staff: a greyed line, and a lit line's deeper edge (by its bar colour)
+  const DIM_LINE = '#ddd3c3';
+  const LINE_EDGE = { '#facc15': '#ca8a04', '#2dd4bf': '#0d9488', '#22c55e': '#15803d', '#f97316': '#c2410c', '#a855f7': '#7e22ce', '#3b82f6': '#1d4ed8' };
 
   function events(card) {
     const evs = []; let tick = 0;
@@ -78,6 +88,11 @@
     groups.forEach((g, gi) => g.forEach(ev => { ev.beam = gi; }));
     return groups;
   }
+  /* a row's height in staff spaces (above the top line, the staff, below it — and the words under the
+     notes): what game.js fits to the music card */
+  const ROWS = { full: { top: 2.7, below: 2.9, labels: 4.4 }, tight: { top: 1.8, below: 1.6, labels: 2.9 } };
+  const rowSpaces = (tight, labels) => { const r = tight ? ROWS.tight : ROWS.full; return r.top + 4 + (labels ? r.labels : r.below); };
+  const BEAM = 1.5, BEAM_GAP = 0.4;          // beam thickness and the space between two beams, in staff spaces
   const headFor = t => t >= 16 ? 'noteheadWhole' : t >= 8 ? 'noteheadHalf' : 'noteheadBlack';
   const restFor = t => t >= 16 ? 'restWhole' : t >= 8 ? 'restHalf' : t >= 4 ? 'restQuarter' : t >= 2 ? 'rest8th' : 'rest16th';
   const dotted = t => t === 3 || t === 6 || t === 12;
@@ -115,12 +130,14 @@
     const hasLabels = o.labels && o.labels !== 'none';
 
     // vertical
-    const topLine = ss * (o.bare ? 1.6 : 2.7);
+    // tight (Teach Me to Read, 2026-10-11): its notes stay between D4 and G5 — no ledger lines, nothing far
+    // above or below — so the staff can take more of the height (RR.Eng.ROWS gives the heights to fit)
+    const topLine = ss * (o.bare ? 1.6 : o.tight ? ROWS.tight.top : ROWS.full.top);
     const bottom = topLine + 4 * ss;
     const yOf = st => bottom - (st - E4) * ss / 2;
-    let H = bottom + ss * (o.bare ? 1.2 : 2.9);
-    const labelY = bottom + ss * 3.0;
-    if (hasLabels) H = labelY + ss * 0.8;
+    let H = bottom + ss * (o.bare ? 1.2 : o.tight ? ROWS.tight.below : ROWS.full.below);
+    const labelY = bottom + ss * (o.tight ? 2.35 : 3.0);
+    if (hasLabels) H = labelY + ss * (o.tight ? 0.55 : 0.8);
     const judgeY = hasLabels ? labelY + ss * 1.45 : bottom + ss * 3.1;
     if (o.judgeRow) H = Math.max(H, judgeY + ss * 1.8);
 
@@ -164,7 +181,14 @@
     if (o.hearIdx >= 0 && evs[o.hearIdx]) glow(evs[o.hearIdx], 'hear-glow');
 
     if (!o.bare) {
-      for (let i = 0; i < 5; i++) p.push(rect(0, bottom - i * ss - lineW / 2, endX, lineW, FILL));
+      // Teach Me to Read (2026-10-11): a line can be lit in its bar's colour (thicker, with a deeper edge so
+      // yellow still reads on the paper) or greyed out; o.lines, bottom to top
+      for (let i = 0; i < 5; i++) {
+        const y = bottom - i * ss, c = o.lines && o.lines[i];
+        if (c === 'dim') p.push(rect(0, y - lineW / 2, endX, lineW, 'fill="' + DIM_LINE + '"'));
+        else if (c) { const w = Math.max(3, ss * 0.3); p.push(rect(0, y - w / 2, endX, w, 'fill="' + c + '" stroke="' + (LINE_EDGE[c] || INK) + '" stroke-width="' + r2(Math.max(0.8, ss * 0.045)) + '"')); }
+        else p.push(rect(0, y - lineW / 2, endX, lineW, FILL));
+      }
       p.push(at('gClef', clefX, yOf(G4), k, FILL));
       if (!o.noTime) {
         p.push(boxAt(top, tsX + (tsW - gw(top, k)) / 2, yOf(B4) - gh(top, k), k, FILL));
@@ -182,8 +206,15 @@
 
     const ledger = (x0, st, attrs) => {
       const out = [];
-      for (let s = 28; s >= st; s -= 2) out.push(rect(x0 - ss * 0.4, yOf(s) - lineW / 2, hw + ss * 0.8, lineW, attrs || FILL));
-      for (let s = 40; s <= st; s += 2) out.push(rect(x0 - ss * 0.4, yOf(s) - lineW / 2, hw + ss * 0.8, lineW, attrs || FILL));
+      const one = s => {
+        const c = !attrs && o.ledgers && o.ledgers[s];
+        if (!c) return rect(x0 - ss * 0.4, yOf(s) - lineW / 2, hw + ss * 0.8, lineW, attrs || FILL);
+        // Teach Me to Read: lit like the staff's own lines (a ghost's stays grey)
+        const w = Math.max(3, ss * 0.3);
+        return rect(x0 - ss * 0.5, yOf(s) - w / 2, hw + ss, w, 'fill="' + c + '" stroke="' + (LINE_EDGE[c] || INK) + '" stroke-width="' + r2(Math.max(0.8, ss * 0.045)) + '"');
+      };
+      for (let s = 28; s >= st; s -= 2) out.push(one(s));
+      for (let s = 40; s <= st; s += 2) out.push(one(s));
       return out.join('');
     };
 
@@ -199,7 +230,7 @@
         if (dotted(ev.t)) q.push(boxAt('augmentationDot', rx + gw(name, k) + ss * 0.3, yOf(D5) + ss * 0.5 - gh('augmentationDot', k) / 2, k, FILL));
       } else {
         const b = BAR[ev.p];
-        const coloured = o.colour === 'always' || (o.colour === 'lit' && lit);
+        const coloured = o.colour === 'solid' || o.colour === 'always' || (o.colour === 'lit' && lit);
         // a coloured note not yet played is pale; lit, it is full colour with a halo
         const pale = o.colour === 'always' && !lit;
         const attrs = coloured
@@ -255,25 +286,29 @@
       p.push('<g class="col' + (hidden ? ' hidden-note' : '') + (faint ? ' faint' : '') + '">' + q.join('') + '</g>');
     });
 
-    // beamed groups: stems and beams, slanted with the melody, no stem under 3 spaces
+    // beamed groups: stems and beams, slanted with the melody, no stem under 3 spaces.
+    // The beams are BEAM spaces thick (2026-10-11, the user's: three times the usual half space, easier to
+    // see); a sixteenth's second beam sits clear of the first, and its stems are longer to make room for both
     groups.forEach(g => {
       const lo = Math.min.apply(null, g.map(e => e.step)), hi = Math.max.apply(null, g.map(e => e.step));
       const up = (B4 - lo) > (hi - B4);
       const sx = ev => up ? ev.x + hw - stemW : ev.x;
       const first = g[0], last = g[g.length - 1];
-      const L = ss * 3.25;
+      const two = g.some((ev, j) => ev.t === 1 && g[j + 1] && g[j + 1].t === 1);       // a second beam somewhere
+      const bt = ss * BEAM, gap = bt + ss * BEAM_GAP;
+      const reachSS = two ? BEAM * 2 + BEAM_GAP + 0.9 : 3;      // the beams' inner edge stays this far from the heads
+      const L = ss * (reachSS + 0.25);
       let y1 = up ? yOf(first.step) - L : yOf(first.step) + L;
       const y2 = up ? yOf(last.step) - L : yOf(last.step) + L;
       const dy = Math.max(-ss * 0.75, Math.min(ss * 0.75, y2 - y1));
       const x1 = sx(first), x2 = sx(last) + stemW;
       const beamAt = xx => y1 + dy * (xx - x1) / Math.max(1, x2 - x1);
       g.forEach(ev => {
-        const need = up ? yOf(ev.step) - ss * 3 : yOf(ev.step) + ss * 3;
+        const need = up ? yOf(ev.step) - ss * reachSS : yOf(ev.step) + ss * reachSS;
         const y = beamAt(sx(ev));
         if (up && y > need) y1 += need - y;
         if (!up && y < need) y1 += need - y;
       });
-      const bt = ss * 0.5, gap = ss * 0.75;
       const q = [];
       g.forEach(ev => {
         const xx = sx(ev), by = beamAt(xx);
@@ -319,7 +354,7 @@
     return { svg, W, H, evs, total, yOf, xAtTick, ss };
   }
 
-  /* the Notes tab: twelve whole notes on a staff, each one a tap target */
+  /* the Notes tab: thirteen whole notes on a staff (C4 to A5), each one a tap target */
   function picker(selected) {
     const ss = 12, k = ss / UNITS, hw = gw('noteheadWhole', k);
     const topLine = ss * 2.4, bottom = topLine + 4 * ss, yOf = st => bottom - (st - E4) * ss / 2;
@@ -334,10 +369,11 @@
       p.push('<g class="pick ' + (on ? 'on' : 'off') + '" data-note="' + b.id + '" role="button" aria-pressed="' + on + '" aria-label="' + b.id + '">' +
         rect(x - gap * 0.3, 0, gap * 0.95, H, 'fill="transparent"') +
         (b.step <= 28 ? rect(x - ss * 0.4, yOf(28) - lineW / 2, hw + ss * 0.8, lineW, FILL) : '') +
+        (b.step >= 40 ? rect(x - ss * 0.4, yOf(40) - lineW / 2, hw + ss * 0.8, lineW, FILL) : '') +
         at('noteheadWhole', x, yOf(b.step), k, attrs) + '</g>');
     });
     return '<svg class="pick-staff" width="' + r2(W) + '" height="' + r2(H) + '" viewBox="0 0 ' + r2(W) + ' ' + r2(H) + '">' + p.join('') + '</svg>';
   }
 
-  RR.Eng = { render, events, measure, picker, sylOf, available: !!GL };
+  RR.Eng = { render, events, measure, picker, sylOf, rowSpaces, available: !!GL };
 })();

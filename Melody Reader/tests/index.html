@@ -29,6 +29,7 @@
   <script src="../js/songbook.js"></script>
   <script src="../js/melody.js"></script>
   <script src="../js/levels.js"></script>
+  <script src="../js/teach-data.js"></script>
   <script src="../js/points.js"></script>
   <script src="../lib/evm-library.js"></script>
   <script src="../js/sets.js"></script>
@@ -524,6 +525,84 @@
         (svg.match(/class="hit"/g) || []).length === 4 && (svg.match(/class="mark"/g) || []).length === 3 && /data-tl="Day 3"/.test(svg) &&
         (line.match(/class="mark dot"/g) || []).length === 2 && (st.match(/class="mark"/g) || []).length === 2 && /75%/.test(st) &&
         C.niceMax(13) === 20 && C.niceMax(201) === 250 && C.niceMax(0) === 1);
+    })();
+
+    // Teach Me to Read (2026-10-11): the six levels' written exercises, the staff's lines, the marks
+    (function () {
+      const want = { L1: ['E4', 'G4'], A1: ['E4', 'G4', 'E5', 'G5'], L2: ['E4', 'G4', 'A4'], A2: ['E4', 'G4', 'A4', 'E5', 'G5', 'A5'],
+        L3: ['D4', 'E4', 'G4', 'A4'], A3: ['D4', 'E4', 'G4', 'A4', 'D5', 'E5', 'G5', 'A5'] };
+      check('Teach Me to Read: three levels, each followed by its Advanced level, with the notes asked for (Advanced 2 and 3 with the high A)',
+        RR.TEACH.map(x => x.id).join() === 'L1,A1,L2,A2,L3,A3' && RR.TEACH.every(x => x.notes.join() === want[x.id].join()));
+      // high A (2026-10-11): the thirteenth bar, key + (Shift and =); the fifteen levels keep their range
+      const a5 = RR.Eng.render(RR.teachCards(RR.teachLevel('A2'))[0], { ss: 20, maxW: 900, colour: 'solid', ledgers: RR.teachLevel('A2').ledgers }).svg;
+      check('High A: a thirteenth bar (A5, key +, blue), on a ledger line lit blue in Teach Me to Read; the levels still stop at G (RR.TWELVE)',
+        RR.BARS.length === 13 && RR.BAR.A5 && RR.BAR.A5.key === '+' && RR.BAR.A5.colour === RR.COLOUR.A && RR.BAR.A5.step === 40 &&
+        RR.TWELVE.length === 12 && RR.TWELVE[11] === 'G5' && RR.ALL.length === 13 && RR.barsFor(['E4', 'A5']) === 13 && RR.barsFor(['G5']) === 12 && RR.barsFor(['E5']) === 10 &&
+        a5.includes('fill="#3b82f6" stroke="#1d4ed8"') && RR.sanitize({ notes: ['A5', 'E4'] }).notes.includes('A5') && !RR.LEVELS.some(l => l.notes.includes('A5')) &&
+        (RR.Eng.picker([]).match(/class="pick /g) || []).length === 13);
+      RR.TEACH.forEach(L => {
+        const cards = RR.teachCards(L), problems = [], used = new Set();
+        cards.forEach((c, k) => {
+          const ev = RR.Eng.events(c);
+          if (ev.total !== 32) problems.push('#' + (k + 1) + ' is ' + ev.total + ' ticks');
+          ev.evs.forEach((e, i) => {
+            if (!e.p) problems.push('#' + (k + 1) + ' has a rest');
+            else if (!L.notes.includes(e.p)) problems.push('#' + (k + 1) + ' has ' + e.p);
+            else used.add(e.p);
+            if (e.t !== 4 && e.t !== 2) problems.push('#' + (k + 1) + ' has a ' + e.t + '-tick note');
+            if (e.t === 2 && e.start % 4 === 0 && !(ev.evs[i + 1] && ev.evs[i + 1].t === 2)) problems.push('#' + (k + 1) + ' has a lone eighth');
+            if (Math.floor(e.start / 16) !== Math.floor((e.start + e.t - 1) / 16)) problems.push('#' + (k + 1) + ' crosses the bar line');
+          });
+          if (!c.time || c.time.join('/') !== '4/4' || c.part !== k + 1 || c.of !== 5 || c.teach !== L.id) problems.push('#' + (k + 1) + ' card fields');
+        });
+        L.notes.forEach(n => { if (!used.has(n)) problems.push(n + ' never used'); });
+        const quarters = RR.teachCards(L)[0].notes.every(n => n.t === 4);
+        const eighths = cards.some(c => c.notes.some(n => n.t === 2));
+        const distinct = new Set(L.ex).size === L.ex.length;
+        if (!quarters) problems.push('the first exercise is not all quarters');
+        if (!eighths) problems.push('no eighths');
+        if (!distinct) problems.push('two exercises the same');
+        // Advanced: the high notes and the low ones in the same exercise, somewhere
+        if (L.adv && !cards.some(c => c.notes.some(n => n.p[1] === '5') && c.notes.some(n => n.p[1] === '4'))) problems.push('no exercise mixes high and low');
+        check('Teach ' + L.long + ': five different exercises, each two bars of 4/4, quarters and paired eighths only, every note of the level used',
+          !problems.length && cards.length === 5, problems.slice(0, 4).join('; '));
+      });
+      const C = RR.COLOUR, lines = id => RR.teachLevel(id).lines.join(' ');
+      check('The staff: E and G lit (yellow, turquoise) and the rest greyed; Advanced adds the green F line; Advanced 3 the orange D line too',
+        lines('L1') === [C.E, C.G, 'dim', 'dim', 'dim'].join(' ') && lines('L2') === lines('L1') && lines('L3') === lines('L1') &&
+        lines('A1') === [C.E, C.G, 'dim', 'dim', C.F].join(' ') && lines('A2') === lines('A1') && lines('A3') === [C.E, C.G, 'dim', C.D, C.F].join(' '));
+      const svg = RR.Eng.render(RR.teachCards(RR.teachLevel('A3'))[0], { ss: 20, maxW: 900, colour: 'always', labels: 'letters', lines: RR.teachLevel('A3').lines }).svg;
+      const plain = RR.Eng.render(RR.teachCards(RR.teachLevel('A3'))[0], { ss: 20, maxW: 900, colour: 'always', labels: 'letters' }).svg;
+      check('The engraver draws lit lines in their colours and greyed ones pale (and the usual black lines without them)',
+        svg.includes('fill="#22c55e" stroke="#15803d"') && svg.includes('fill="#f97316" stroke="#c2410c"') && (svg.match(/fill="#ddd3c3"/g) || []).length === 1 && !plain.includes('#ddd3c3'));
+      // Note Colors (2026-10-11): Solid Color beside Transparent Color; the first levels and Teach Me to Read solid
+      const solidSvg = RR.Eng.render(RR.teachCards(RR.teachLevel('L1'))[0], { ss: 20, maxW: 900, colour: 'solid' }).svg;
+      const paleSvg = RR.Eng.render(RR.teachCards(RR.teachLevel('L1'))[0], { ss: 20, maxW: 900, colour: 'always' }).svg;
+      check('Note Colors: Solid Color is full colour from the start (Transparent Color is see-through until played); Levels 1–3 are solid, later ones as before',
+        RR.sanitize({ colour: 'solid' }).colour === 'solid' && !solidSvg.includes('fill-opacity=".42"') && paleSvg.includes('fill-opacity=".42"') &&
+        [1, 2, 3].every(n => RR.originalLevel(n).colour === 'solid') && RR.originalLevel(4).colour === 'lit' && RR.DEFAULTS.colour === 'always');
+      check('Teach Me to Read draws its staff in a tighter row (less room above and below) — the same as before everywhere else',
+        [[true, true, 8.7], [false, true, 11.1], [false, false, 9.6]].every(x => Math.abs(RR.Eng.rowSpaces(x[0], x[1]) - x[2]) < 1e-9) &&
+        RR.Eng.render(RR.teachCards(RR.teachLevel('A3'))[4], { ss: 20, maxW: 900, colour: 'solid', labels: 'letters', tight: true }).H < 20 * 8.8);
+      const M = RR.teachMark;
+      check('A gold star is the metronome, every note and no wrong bar; a slip or playing on your own is a check; a missed note is nothing yet',
+        M({ run: true, missed: 0, wrong: 0 }) === 2 && M({ run: true, missed: 0, wrong: 1 }) === 1 && M({ run: false, missed: 0, wrong: 0 }) === 1 &&
+        M({ run: true, missed: 1, wrong: 0 }) === 0);
+      // the marks, kept per player (the key is put back as it was)
+      const KEY = 'rainbow_reader_teach_v1', was = localStorage.getItem(KEY), dev = RR.device.player;
+      try {
+        localStorage.removeItem(KEY); RR.TeachMarks.load(); RR.device.player = 'Test kid';
+        const T = RR.TeachMarks;
+        const fresh = T.get('L2').join('');
+        T.set('L2', 1, 1); T.set('L2', 1, 2); const down = T.set('L2', 1, 1); T.set('L2', 4, 1);
+        RR.device.player = 'Other kid';
+        const other = T.get('L2').join('');
+        RR.device.player = 'Test kid'; RR.TeachMarks.load();
+        check('Marks: the best kept (a check never replaces a gold star), each player their own, saved', fresh === '00000' && !down && T.get('L2').join('') === '02001' && other === '00000' && T.get('nope').length === 0);
+      } finally {
+        if (was == null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, was);
+        RR.device.player = dev; RR.TeachMarks.load();
+      }
     })();
 
     document.getElementById('sum').innerHTML = '<span class="' + (fail ? 'fail' : 'pass') + '">' + pass + ' passed, ' + fail + ' failed</span>';

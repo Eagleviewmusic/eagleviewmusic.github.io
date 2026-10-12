@@ -50,6 +50,15 @@
    Practice with the metronome on (game.js syncTick decides). Listen joins
    it, coming in on its next bar line. A Test still counts in (above). It
    runs on the same 25 ms timer, each click placed 120 ms ahead.
+
+   Teach Me to Read goes round and round (2026-10-11, the user's: "do not
+   stop it after 1 round, let it repeat"): after the count-in the melody
+   comes back straight after its last bar, again and again, the click going
+   on, until the metronome is turned off (or ↻, Listen, another exercise).
+   Each time round is followed and marked on its own (G.passDone): half a
+   beat before the next one starts — or once the last note's window has
+   closed, if that is later — the notes not found are missed, the mark
+   given, and a fresh follower takes the next time round.
    ========================================================================== */
 (function () {
   'use strict';
@@ -94,8 +103,15 @@
     const okW = Math.max(0.26, 0.38 * quarter);
     const last = G.evs.reduce((a, e) => e.rest ? a : Math.max(a, e.start), 0);
     const perfect = Math.max(0.075, 0.11 * quarter), good = Math.max(0.15, 0.22 * quarter);
+    const notes = G.evs.map(e => ({ p: e.p, start: e.start, rest: e.rest })), at = { spt, beat, perfect, good, ok: okW };
+    const loop = G.mode.kind === 'teach';
     B = {
       my, n, beat, spt, t0, startT, clicks, ci: 0, timer: null,
+      // Teach Me to Read: round and round — the clicks made as they come (bi), each time round passDur long,
+      // closed at `close` after its start (half a beat before the next, or the last note's window if later)
+      loop, bi: 0, beats: M.beats, passStart: startT, passDur: total * spt,
+      close: Math.max(last * spt + okW, total * spt - Math.min(beat, quarter) * 0.5),
+      newFollow: from => RR.Points.follower(notes, Object.assign({ startT: from }, at)),
       // the metronome's end: the last note's length, or its window if that is longer (a short last note)
       metroEnd: Math.max(startT + total * spt, startT + last * spt + okW) + 0.12,
       cap: startT + total * spt * 2 + 4,                          // however slow: the run ends by then
@@ -110,11 +126,29 @@
   function tick() {
     if (!B) return;
     const now = RR.Sound.now();
-    while (B.ci < B.clicks.length && B.clicks[B.ci].t < now + 0.12) {
+    if (B.loop) {
+      // round and round: the click goes on for as long as the run does
+      while (B.t0 + B.bi * B.beat < now + 0.12) {
+        const t = B.t0 + B.bi * B.beat, accent = B.bi % B.beats === 0;
+        B.bi++;
+        if (t >= now - 0.03) RR.Sound.click(t, accent, false);      // a throttled timer fell behind: skip, never a burst
+      }
+    } else while (B.ci < B.clicks.length && B.clicks[B.ci].t < now + 0.12) {
       const c = B.clicks[B.ci++];
       RR.Sound.click(c.t, c.accent, false);
     }
     const heard = RR.Sound.heardNow();
+    if (B.loop) {
+      if (G.phase === 'countin' && heard >= B.startT - Math.min(B.beat, 4 * B.spt) * 0.45) { G.phase = 'running'; G.drawSides(); }
+      // a time round over: marked, and the next one followed afresh — the music doesn't stop
+      if (G.phase === 'running' && heard > B.passStart + B.close) {
+        B.follow.judge.forEach((j, i) => { if (j && !G.judge[i]) G.judge[i] = j; });
+        B.passStart += B.passDur;
+        B.follow = B.newFollow(B.passStart);
+        G.passDone();
+      }
+      return;
+    }
     if (G.phase === 'countin' && heard >= B.startT - Math.min(B.beat, 4 * B.spt) * 0.45) { G.phase = 'running'; G.drawSides(); }
     if (B.flashAt && RR.now() >= B.flashAt && !G.hidden) { G.hidden = true; B.flashAt = null; G.draw(); }
     // the end: just after the last note — or, the player having stopped, once the next note is well overdue
@@ -194,6 +228,6 @@
     start, stop, strike, running: () => !!B,
     tickStart, tickStop, tickNextBar, ticking: () => (T ? T.pace : tPending),
     /* for tests: when the music starts (audio time) and how long a tick is */
-    info: () => B && { startT: B.startT, spt: B.spt, beat: B.beat, metroEnd: B.metroEnd, endAt: B.follow.endAt(B.metroEnd) }
+    info: () => B && { startT: B.startT, spt: B.spt, beat: B.beat, metroEnd: B.metroEnd, endAt: B.follow.endAt(B.metroEnd), loop: B.loop, passStart: B.passStart, passDur: B.passDur }
   };
 })();

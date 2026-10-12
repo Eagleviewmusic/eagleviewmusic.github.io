@@ -11,8 +11,8 @@ and shared links all still work.*
 
 A treble-clef reading game on the Rainbow Xylophone. One or two bars of
 music on the top half, the xylophone on the bottom half: read the notes,
-ring the bars — with **1 2 3 4 5 6 7 8 9 0** (and **− =** for F5 and G5) or
-a finger.
+ring the bars — with **1 2 3 4 5 6 7 8 9 0** (and **− =** for F5 and G5,
+**+** — Shift and = — for high A) or a finger.
 
 The design is in `../Melody Reader Design/` (README → DECISIONS → DESIGN →
 LEVELS → ENGINE → IMPLEMENTATION). Every decision there was taken as
@@ -36,7 +36,8 @@ stats' history and charts, the new ladder: 300 melodies a level against
 its notes, moves, leaps, meters and pick-ups; metronome runs played in
 time, slow, fast, late in, with a note skipped or a wrong bar; level changes kept and reset, a
 session's own melody set, lesson links carrying every setting, Song sets and a battle) — 107 of
-them, all passing as of 2026-10-08.
+them, all passing as of 2026-10-08; with Teach Me to Read's 11 (its six levels' exercises, the
+staff's lines, the gold-star rule, the saved marks, Solid Color, the tighter staff, high A) 121, all passing on 2026-10-11.
 
 The Teacher Library shelf reads `../Teacher Library/index.json`, which only
 exists on the live site; served from its own folder (8815/8816) it can't be
@@ -47,6 +48,74 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 — and delete it afterwards.
 
 ## What's built (all six phases)
+
+- **Teach Me to Read** (2026-10-11, the user's design for Level 1; Levels 2
+  and 3 made the same way at their ask) — a card on the home page like the
+  others, in Make your own to the right of A new session (2026-10-11, the
+  user's; it began as a section of its own under the top). Its ▶ Play opens
+  a window, as the other cards do — **which level** (the six tiles, each
+  with its five marks), **Start at** (any exercise reached; the first not
+  yet played to begin with), **↺ Clear its checks and stars** (asked first),
+  then ▶ Play Level n. The card's foot says how far this player has come
+  ("8 of 30 played · ★ 3"). Three levels, each with an Advanced level, five
+  written exercises each (`js/teach-data.js`: the same five every time, two
+  bars of 4/4, quarters and eighths only; written as tokens, `GG` a pair of
+  eighths, `G'` the octave up).
+
+  **The music card** (2026-10-11, the user's: the notation had become the
+  smallest thing on it): from a tablet up, Listen · the metronome ·
+  Keyboard stand in a column on the left and ↻ · Next on the right (the
+  tempo choice opens beside the metronome), so the staff has the card's
+  whole height; the staff is drawn tighter (`tight`: 1.8 spaces above the
+  top line, the letters 2.35 below the bottom — its notes never leave D4 to
+  G5), the notes a little closer (fitted at 0.8 of their width, not 0.95),
+  and on one row or two, whichever draws it bigger. About 40% bigger at
+  1280×800. A phone keeps its row of buttons under the music. The notes are
+  in Solid Color.
+
+  | | Notes | The staff's lines lit | Keys lit |
+  |---|---|---|---|
+  | Level 1 · Mi and So | E G | E yellow, G turquoise | 3 5 |
+  | Advanced 1 | E G, low and high | + F green (the high pair sits either side of it) | 3 5 0 = |
+  | Level 2 · Add La | E G A | E, G | 3 5 6 |
+  | Advanced 2 | E G A, low and high (high A since 2026-10-11 — the low A stood in before) | E, G, F + A's ledger line blue | 3 5 6 0 = + |
+  | Level 3 · Add Re | D E G A | E, G | 2 3 5 6 |
+  | Advanced 3 | D E G A, low and high | E, G, D orange, F + A's ledger line blue | 2 3 5 6 9 0 = + |
+
+  The other lines are greyed (`RR.teachLines`: a line is lit when its
+  note is in the level, F too when the high E or G is; the engraver's
+  `lines` option draws them thicker, with a deeper edge so yellow reads on
+  the paper). Only the level's bars are live, letter names under the
+  notes, the next-bar hint after two slips. **No Practice / Test and no
+  score** (the score chip is hidden): play an exercise on your own and it
+  gets a **green check**; pick the **metronome — Slow or Moderate, no
+  Fast** — and it counts in at once, then **goes round and round**
+  (2026-10-11, the user's: "do not stop it after 1 round, let it repeat" —
+  a class can read the board and play along on real xylophones): the
+  melody comes back straight after its last bar, the click going on, until
+  the metronome is turned Off (or Escape, ↻ to count in again, Listen,
+  another exercise, a window). Each time round is marked on its own: every
+  note and no wrong bar, a **gold star** (a slip: a check; a missed note:
+  nothing) — the mark floats up each time, the sound and the words only
+  when it goes up. **▶ Listen goes round and round too** until pressed
+  again — with the metronome on, with its clicks (playing along stops for
+  it; ↻ goes back to it). **Free to move** (2026-10-11, the user's:
+  "teachers need to move more freely"): **Next** works any time (it lights
+  gold once the exercise has its check), every dot at the top goes to its
+  exercise, and the window's Start at offers all five. After the fifth, a
+  card with the five marks (a dashed circle for one not played): **▶ The
+  ones left** if any, else **Try again for gold stars** (unless all five
+  are gold — it goes to the first without one and points out the
+  metronome), **Advanced Level n ▸** and/or **Level n+1 ▸**, Home. **⌨ Keyboard** (beside the metronome) puts a computer
+  keyboard in the music's place — the number row, the level's keys lit in
+  their bars' colours with the letter (low/high in Advanced), the letters
+  row greyed under it when there's room; they play (tapped, or the real
+  keys, or the bars — key and bar light together) but nothing counts.
+  ♪ Back to the music, the button again or Escape. Marks are kept per
+  player, the best of each (`rainbow_reader_teach_v1`); a reload comes
+  back to the exercise it was on. The level box's drop-down lists the six;
+  Settings shows only Level · Points · Sound. Nothing here goes into
+  scores, the ladder or My stats.
 
 - **Each level and session is its own** (2026-10-08, the user's report:
   settings "over lapping each other", a battle's score carrying into a
@@ -199,9 +268,17 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 
 - **The xylophone** — Rainbow Xylophone's look and both sounds (Vibraphone,
   Marimba), touch with glissando, mouse and pen (either button), keys 1–0
-  − = and the number pad; ten bars, twelve when a practice uses F5 or G5;
-  bars not in the music greyed out at the first levels.
-- **The music** — Leland engraving of one or two bars; coloured notes (pale
+  − = + and the number pad; ten bars, twelve when a practice uses F5 or G5,
+  **thirteen with high A** (2026-10-11, the user's: most school xylophones
+  go up to high A — its key is **+**, Shift and =; blue, on a ledger line
+  above the staff; Make a melody has all thirteen; the Notes picker offers
+  it; `RR.ALL` is all thirteen, `RR.TWELVE` stays C4–G5 so the fifteen
+  levels keep their range, `RR.barsFor` picks 10/12/13); bars not in the
+  music greyed out at the first levels.
+- **The music** — Leland engraving of one or two bars (beams three times the
+  usual thickness since 2026-10-11, the user's — 1.5 staff spaces, `BEAM` in
+  engrave.js; a sixteenth's second beam sits 0.4 spaces clear of the first,
+  on longer stems); coloured notes (pale
   until played), lit when played, or black; the next note's glow; ghost
   notes where a slip landed; letter names or rhythm syllables under the
   notes; two rows on a phone held upright.
@@ -422,8 +499,11 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   own songs in); a session's is saved as Generated. Songbook as a source
   with no songs of its own plays every song that fits the notes.
 - **The Helps, in the user's words** (2026-10-06; the same table on a
-  session's and a battle's page): **Note Colors** Always / When Played /
-  Black · **Xylophone Bar** Letter Name / Number / Both / Neither (sets
+  session's and a battle's page): **Note Colors** Solid Color / Transparent
+  Color / When Played / Black (2026-10-11: Solid Color is new — full colour
+  from the start, a halo when played; Transparent Color is the old Always,
+  see-through until played; Levels 1–3 and Teach Me to Read are solid, the
+  default for anything else stays Transparent) · **Xylophone Bar** Letter Name / Number / Both / Neither (sets
   `letters` + `nums`) · **Xylophone hint** Never / After 2 slips / Always ·
   **Grey out unused bars** On / Off (moved here from Notes) · **Text below
   the notes** Letter Name / Solfege Name (C = Do, tinted like the letters) /
@@ -529,6 +609,8 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 | `js/stats.js` | the My stats page |
 | `js/home.js` | the home page, and the three views (`RR.View`: home · play · stats) with the browser's Back |
 | `js/drop.js` | the level box's drop-down: what can be changed about what is playing (2026-10-08) |
+| `js/teach-data.js` | Teach Me to Read's six levels and their exercises, the staff's lit lines, the gold-star rule, each player's marks (pure, tested) |
+| `js/teach.js` | Teach Me to Read on the music card: checks and gold stars, Next, the end card, the computer keyboard, the home card's window and the drop-down |
 | `lib/` | vendored copies — see `lib/README.md` |
 | `assets/MA4A-rainbow-reader-cover.jpg` | the hub card's cover (400×400) |
 | `tests/index.html` | the engine checks |
@@ -544,6 +626,7 @@ rounds, the ladder's stars, first-try counts per note, mix-ups, totals —
 and since 2026-10-07 My stats' `days`, `log`, `games`, `rec`, `since`, with
 totals `points` `gold` `made` `rounds` `secs` beside the old three; an
 older file just lacks them and gains them on first use, so no new key),
+`rainbow_reader_teach_v1` (Teach Me to Read's marks per player, `{ L1: [0|1|2 × 5] … }`, 2026-10-11),
 `rainbow_reader_sessions_v1` (My sessions; `rainbow_reader_mine_v1`, the old
 Mine band, is read once into it and left alone), `rainbow_reader_sets_v1` (My
 melodies, an id map of EVM items). The device also keeps the set being
@@ -551,6 +634,28 @@ played and the player names. Every read is checked and
 falls back to defaults; a change of shape gets a new `_v2` key.
 
 ## Traps (found while building)
+
+- **Teach Me to Read rides on the card machinery (2026-10-11).** Playing on
+  your own is the `practice` stage (its "found" is the check); a play with
+  the metronome is the `game` stage with a count-in run, and `finish()`
+  hands it to `RR.Teach.runDone` before anything is scored. game.js asks
+  `G.mode.kind === 'teach'` in a handful of places — record/mixup (no
+  scores), leaveCard (never opens in Test), syncTick (no free-running
+  click), setMetro/stopCountIn/pause (Off = back to playing on your own),
+  next/restart/drawSides/dots. `drawSides` resets Next's label and
+  `teach-ok` for every other mode, so nothing leaks out of it. While the
+  computer keyboard shows, every strike goes to `RR.Teach.kbdHit` first
+  (`strike`), so nothing can count. **Round and round** (2026-10-11): in
+  a Teach run beat.js makes the clicks as they come (`B.loop`, no list)
+  and, at each time round's close (`B.close` after its start: half a beat
+  before the next, or the last note's window), hands the judging to
+  `G.passDone` (marks, then the notes dark again — the run, `G.phase =
+  'running'` and the click carry on) and starts a fresh follower at the
+  next time round. Listen's loop schedules each time round 0.6 s before the
+  last ends and keeps only the timers of the last two in `G.hearTimers`
+  (every earlier one has gone off). The main game still plays and runs
+  once. The keyboard picture's sizes come from container queries on
+  `.kbd-view` (a short music card: the number row alone).
 
 - **Each level and session is its own (2026-10-08).** `G.base` is the
   saved settings (the ✎ page reads and changes it, through `P()` in

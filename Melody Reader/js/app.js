@@ -41,8 +41,10 @@
     if (e.key === 'Escape') {
       if (RR.View.current !== 'play') { if (!anyWindow() && RR.View.current === 'stats') RR.View.back(); else closeWindows(); return; }
       if (G.pickOpen()) { G.closePick(); $('#btn-metro').focus(); }
+      else if (RR.Teach.kbdOn() && !anyWindow()) RR.Teach.kbd(false);   // the computer keyboard's picture: back to the music
       else if (RR.Maker.active && !anyWindow()) RR.Maker.cancel();
       else if (G.phase === 'countin' && !anyWindow()) G.stopCountIn();
+      else if (G.mode.kind === 'teach' && G.phase === 'running' && !anyWindow()) G.setMetro('off');   // Teach Me to Read's round and round: stop
       else closeWindows();
       return;
     }
@@ -60,7 +62,7 @@
       if (!e.repeat && i < RR.Xylo.count()) RR.Xylo.press(RR.BARS[i].id, e);
       return;
     }
-    if (e.repeat || RR.Maker.active) return;
+    if (e.repeat || RR.Maker.active || RR.Teach.kbdOn()) return;
     // Space and Enter on a focused button belong to the button
     if ((e.key === ' ' || e.key === 'Enter') && tag === 'BUTTON') return;
     if (e.key === ' ') {
@@ -70,6 +72,7 @@
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (G.overlay) { const b = $('#rounddone .pill-btn.go') || $('#rounddone .pill-btn'); if (b) b.click(); }
+      else if (G.mode.kind === 'teach') G.next();     // Teach Me to Read: Next, once the exercise is played through
       else if (G.stage === 'practice') G.toGame();   // Practice → Test
       else if (G.phase === 'done') G.next();          // never mid-try: Enter, Enter would skip the melody
     }
@@ -124,7 +127,8 @@
     if (RR.oldDeviceSet) { if (!over.set) over.set = RR.oldDeviceSet; RR.oldDeviceSet = null; }
     // a session (an old Mine practice: the session it became)
     const ses = d && (d.kind === 'session' ? RR.Sessions.get(d.id) : d.kind === 'mine' ? RR.Sessions.list().find(x => x.name === String(d.name || '').trim().slice(0, 40)) : null);
-    if (ses) G.selectSession(ses.id, over);
+    if (d && d.kind === 'teach' && RR.teachLevel(d.id)) RR.Teach.start(d.id, d.at);     // Teach Me to Read, at the exercise it was on
+    else if (ses) G.selectSession(ses.id, over);
     else if (d && d.practice && (d.kind === 'custom' || d.kind === 'mine' || d.kind === 'session')) {
       G.usePractice(d.practice, { kind: 'custom', from: d.kind === 'custom' ? d.from || null : d.name || null,
         label: typeof d.label === 'string' ? d.label.slice(0, 60) : undefined, gen: d.gen === true || undefined }, null, over);

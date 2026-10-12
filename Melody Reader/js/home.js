@@ -40,6 +40,7 @@
     if (RR.Drop && RR.Drop.isOpen()) RR.Drop.close();
     if (songsOpen()) closeSongs();
     if (pickOpen()) closePick();
+    if (RR.Teach && RR.Teach.windowOpen()) RR.Teach.closeWindow();
   }
   /* a round that is over (Round done, Time's up, a battle won) or a clock left part-way: a new one */
   const roundOver = () => G.needNew || (isFinite(G.roundN) && G.round.length >= G.roundN);
@@ -96,7 +97,7 @@
 
   /* ================= the home page ================= */
   // each card's colour; white text on every one passes WCAG AA (4.5:1)
-  const MODE_COL = { round: '#2563eb', song: '#7c3aed', clock: '#c2410c', endless: '#0f766e', battle: '#dc2626', mel: '#15803d', ses: '#0f766e', link: '#6d28d9' };
+  const MODE_COL = { round: '#2563eb', song: '#7c3aed', clock: '#c2410c', endless: '#0f766e', battle: '#dc2626', mel: '#15803d', ses: '#0f766e', link: '#6d28d9', teach: RR.TEACH_COLOUR };
   const ICON = {
     round: '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="9" cy="24" r="5" fill="#ef4444"/><circle cx="24" cy="24" r="5" fill="#facc15"/><circle cx="39" cy="24" r="5" fill="#22c55e"/><circle cx="16.5" cy="24" r="5" fill="#f97316"/><circle cx="31.5" cy="24" r="5" fill="#2dd4bf"/></svg>',
     song: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M18 34V12l20-5v22" fill="none" stroke="#fff" stroke-width="3.4" stroke-linejoin="round"/><path d="M18 17.5l20-5" stroke="#fff" stroke-width="3.4"/><ellipse cx="13.5" cy="34.5" rx="5.6" ry="4.4" fill="#fff"/><ellipse cx="33.5" cy="29.5" rx="5.6" ry="4.4" fill="#fff"/></svg>',
@@ -105,6 +106,7 @@
     battle: '<svg viewBox="0 0 48 48" aria-hidden="true"><g stroke="#fff" stroke-linecap="round" fill="none"><path d="M9 9l22 22M39 9L17 31" stroke-width="3.8"/><path d="M26.5 35.5l9-9M21.5 35.5l-9-9" stroke-width="3.6"/><path d="M31 31l6.5 6.5M17 31l-6.5 6.5" stroke-width="4.4"/></g><circle cx="39.4" cy="39.4" r="2.6" fill="#fff"/><circle cx="8.6" cy="39.4" r="2.6" fill="#fff"/></svg>',
     mel: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 39l2.4-8.6L31 10.8a3 3 0 0 1 4.2 0l2 2a3 3 0 0 1 0 4.2L17.6 36.6z" fill="none" stroke="#fff" stroke-width="3.4" stroke-linejoin="round"/><path d="M27.5 14.3l6.2 6.2" stroke="#fff" stroke-width="3.4"/></svg>',
     ses: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 14h20M8 24h14M8 34h20" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/><circle cx="34" cy="14" r="4.4" fill="#fff"/><circle cx="28" cy="24" r="4.4" fill="#fff"/><circle cx="34" cy="34" r="4.4" fill="#fff"/><path d="M38.5 14H41M32.5 24H41M38.5 34H41" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/></svg>',
+    teach: RR.TEACH_ICON,
     link: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M21 27a7 7 0 0 0 10 0l6.5-6.5a7 7 0 0 0-10-10L24 14" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/><path d="M27 21a7 7 0 0 0-10 0l-6.5 6.5a7 7 0 0 0 10 10L24 34" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/></svg>'
   };
 
@@ -118,7 +120,7 @@
   }
 
   /* what the format cards play: the selection, or (a battle chosen) the level this browser was last on */
-  const readingKey = () => G.battle ? RR.levelKey(RR.device.level || 1) : RR.Scores.key();
+  const readingKey = () => G.battle || G.mode.kind === 'teach' ? RR.levelKey(RR.device.level || 1) : RR.Scores.key();
   function bestRound(len) {
     const e = RR.Scores.me().levels[readingKey()];
     const b = e && Array.isArray(e.bests) ? e.bests.filter(x => x.game === 'round' + len) : [];
@@ -143,7 +145,11 @@
     const me = RR.History.me(), streak = RR.History.dayStreak(me.days);
     const over = roundOver();
     let go = '▶ Play', sub = '';
-    if (G.battle) {
+    if (G.mode.kind === 'teach') {
+      // Teach Me to Read: its level and the exercise it is on
+      if (RR.TeachMarks.get(G.mode.id).some(Boolean)) go = '▶ Carry on';
+      sub = esc(G.modeLabel()) + ' · ' + esc(RR.Teach.where());
+    } else if (G.battle) {
       const part = G.round.length > 0 && !over;
       go = part ? '▶ Carry on the battle' : '▶ Start the battle';
       sub = '⚔️ ' + esc(G.mode.name) + (part ? ' · round ' + (G.battleNow().round + 1) + ' of ' + G.battle.rounds : '');
@@ -174,7 +180,7 @@
 
   /* ---- How to play: the format cards ---- */
   function card(id, title, about, opt, foot, btn) {
-    return '<article class="mode-card" style="--mc:' + MODE_COL[id] + '"><div class="mc-top"><span class="mc-ico' + (id === 'round' ? ' light' : '') + '">' + ICON[id] + '</span><h3>' + title + '</h3></div>' +
+    return '<article class="mode-card" style="--mc:' + MODE_COL[id] + '"><div class="mc-top"><span class="mc-ico' + (id === 'round' || id === 'teach' ? ' light' : '') + '">' + ICON[id] + '</span><h3>' + title + '</h3></div>' +
       '<p class="mc-about">' + about + '</p>' + (opt ? '<div class="mc-opt">' + opt + '</div>' : '') +
       '<div class="mc-foot">' + (foot ? '<span class="mc-best">' + foot + '</span>' : '<span></span>') + (btn || '') + '</div></article>';
   }
@@ -212,6 +218,8 @@
     return '<section class="h-sec" aria-labelledby="h-make"><div class="h-head"><h2 id="h-make">Make your own</h2></div><div class="mode-grid make">' +
       card('mel', 'My melodies', 'Write your own melodies on the xylophone, in sets — then play them.', '', sets.length ? plural(sets.length, 'set') + ' · ' + plural(mel, 'melody', 'melodies') : '', '<button type="button" class="mc-play" data-h="melodies">Open</button>') +
       card('ses', 'A new session', 'Choose your own notes, rhythms and helps — new melodies every time.', '', '', '<button type="button" class="mc-play" data-h="new-session">+ New session</button>') +
+      // Teach Me to Read (2026-10-11, the user's: a card like the others, to the right of A new session — its ▶ Play opens its window)
+      card('teach', 'Teach Me to Read', 'The very first notes, with their lines lit on the staff — a check for each exercise, a gold star with the metronome.', '', RR.Teach.progressWords(), '<button type="button" class="mc-play" data-h="teach">▶ Play</button>') +
       card('link', 'A lesson link', 'Send what you’re playing to a class or a family as a link.', '', '', '<button type="button" class="mc-play" data-h="share">Make a link</button>') +
       '</div></section>';
   }
@@ -294,7 +302,7 @@
     const f = songsEl.querySelector('[data-pick]'); if (f) f.focus();
   }
   function closeSongs() { if (!songsOpen()) return; songsEl.hidden = true; RR.windowClosed(songsEl); }
-  View.songsOpen = () => songsOpen() || pickOpen();
+  View.songsOpen = () => songsOpen() || pickOpen() || !!(RR.Teach && RR.Teach.windowOpen());
 
   /* ---- the Rounds, Beat the Clock and Endless windows (2026-10-08, the user's design) ----
      A card's ▶ Play opens its window — it never starts what happens to be loaded (the user: "ask
@@ -458,7 +466,7 @@
   function start(fmt) {
     if (G.mode.kind === 'lesson') { go('play'); return; }
     if (fmt === 'song' && !P.picks.length) { openSongs(); return; }
-    if (G.battle) G.selectLevel(RR.device.level || 1);
+    if (G.battle || G.mode.kind === 'teach') G.selectLevel(RR.device.level || 1);
     G.playOnce('game', { game: 'song', songPicks: P.picks.slice() });
     go('play');
   }
@@ -496,6 +504,7 @@
     else if (a === 'secs') { P.secs = +b.dataset.v; render(); const f = home.querySelector('[data-h="secs"][data-v="' + b.dataset.v + '"]'); if (f) f.focus(); }
     else if (a === 'play') { if (b.dataset.fmt === 'song') openSongs(); else openPick(b.dataset.fmt); }   // a window first: nothing starts until its ▶ Play
     else if (a === 'battle') { if (G.selectSession(b.dataset.id)) go('play'); }
+    else if (a === 'teach') RR.Teach.openWindow();      // Teach Me to Read: its window first — which level, which exercise
     else if (a === 'new-battle') newBattle();
     else if (a === 'melodies') RR.Melodies.open();
     else if (a === 'share') RR.Settings.open('share');      // a battle's link carries its teams too (2026-10-08)

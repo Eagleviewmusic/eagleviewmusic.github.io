@@ -206,7 +206,7 @@
     helps() {
       const s = P();
       return '<div class="sec"><h3>Look &amp; Feel</h3><table class="helps"><tbody>' +
-        '<tr><td>Note Colors</td><td>' + seg('colour', [['always', 'Always'], ['lit', 'When Played'], ['black', 'Black']], s.colour) + '</td></tr>' +
+        '<tr><td>Note Colors</td><td>' + seg('colour', [['solid', 'Solid Color'], ['always', 'Transparent Color'], ['lit', 'When Played'], ['black', 'Black']], s.colour) + '</td></tr>' +
         '<tr><td>Xylophone Bar</td><td>' + seg('barText', [['letters', 'Letter Name'], ['numbers', 'Number'], ['both', 'Both'], ['neither', 'Neither']], barText(s)) + '</td></tr>' +
         '<tr><td>Xylophone hint</td><td>' + seg('glow', [['never', 'Never'], ['after2', 'After 2 slips'], ['always', 'Always']], s.glow) + '</td></tr>' +
         '<tr><td>Grey out unused bars</td><td>' + seg('grey', [['true', 'On'], ['false', 'Off']], String(!!s.grey)) + '</td></tr>' +
@@ -253,7 +253,8 @@
      tabs were the same sections, and changing them made a Custom practice */
   const TABS_LESSON = [['leave', 'Lesson'], ['points', 'Points'], ['sound', 'Sound']];
   const pageName = () => G.battle ? '⚔️ Battle' : G.mode.kind === 'session' ? '✎ Session' : G.mode.kind === 'level' ? '✎ Level ' + G.mode.n : G.mode.gen ? '✎ Generated' : G.mode.label ? '✎ My Melodies' : '✎ Custom';
-  const tabs = () => G.mode.kind === 'lesson' ? TABS_LESSON : [['level', 'Level'], ['session', pageName()], ['points', 'Points'], ['sound', 'Sound'], ['share', 'Share']];
+  // Teach Me to Read: nothing of its own to change — the levels (to leave it), the players, the sound
+  const tabs = () => G.mode.kind === 'lesson' ? TABS_LESSON : G.mode.kind === 'teach' ? [['level', 'Level'], ['points', 'Points'], ['sound', 'Sound']] : [['level', 'Level'], ['session', pageName()], ['points', 'Points'], ['sound', 'Sound'], ['share', 'Share']];
   const OLD_TABS = ['notes', 'rhythms', 'play', 'helps'];
   const lessonLink = name => RR.Lesson.link(name, G.setup, G.playingSet(), G.battle);
 

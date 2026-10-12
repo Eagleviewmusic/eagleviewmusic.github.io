@@ -3,8 +3,10 @@
    --------------------------------------------------------------------------
    The RR namespace and what every other file leans on:
 
-     the bars      twelve of them, C4 to G5 — id, letter, key, colour,
-                   frequency, staff step, height (ENGINE §2.1)
+     the bars      thirteen of them, C4 to A5 — id, letter, key, colour,
+                   frequency, staff step, height (ENGINE §2.1). High A
+                   joined 2026-10-11 (the user's: most school xylophones
+                   go up to it): its key is + (Shift and =)
      storage       versioned localStorage keys, every read and write in
                    try/catch; a missing or unreadable key means defaults,
                    never an error (ENGINE §2.4)
@@ -24,7 +26,7 @@
   const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
   // Rainbow Xylophone's own bar colours (Tailwind red-500 … purple-500)
   const COLOUR = { C: '#ef4444', D: '#f97316', E: '#facc15', F: '#22c55e', G: '#2dd4bf', A: '#3b82f6', B: '#a855f7' };
-  const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='];
+  const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '+'];
   const SEMI = [0, 2, 4, 5, 7, 9, 11];
   RR.LETTERS = LETTERS;
   RR.COLOUR = COLOUR;
@@ -43,7 +45,13 @@
   RR.BAR = {};
   RR.BARS.forEach(b => { RR.BAR[b.id] = b; });
   RR.TEN = RR.BARS.slice(0, 10).map(b => b.id);
-  RR.TWELVE = RR.BARS.map(b => b.id);
+  RR.TWELVE = RR.BARS.slice(0, 12).map(b => b.id);   // C4–G5: the range the fifteen levels were made in (kept as it was)
+  RR.ALL = RR.BARS.map(b => b.id);                     // all thirteen, to high A
+  /* a bar's key, shown (a real minus) and said */
+  RR.keyShow = k => k === '-' ? '−' : k;
+  RR.keyName = k => ({ '-': 'minus', '=': 'equals', '+': 'plus (Shift and equals)' })[k] || k;
+  /* how many bars the xylophone needs for these notes: ten (to E5), twelve (to G5), or thirteen (high A) */
+  RR.barsFor = ids => { const top = Math.max.apply(null, Array.from(ids).map(id => RR.BAR[id] ? RR.BAR[id].i : 0).concat(0)); return top >= 12 ? 13 : top >= 10 ? 12 : 10; };
   RR.STEP = { C4: 28, E4: 30, G4: 32, B4: 34, D5: 36, F5: 38, A5: 40 };
 
   /* ---- meters (2026-10-07: 6/8 joined 2/4 3/4 4/4) ----

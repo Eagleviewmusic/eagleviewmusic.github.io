@@ -312,6 +312,7 @@ html.ci-tap .evm-count.open .evm-count-card { pointer-events: auto; cursor: poin
   padding: 18px 26px; touch-action: none;
 }
 .xylo.twelve { max-width: 1160px; }
+.xylo.thirteen { max-width: 1240px; }       /* to high A (2026-10-11) */
 .xylo .rails { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: .4; mix-blend-mode: multiply; }
 .xylo .rails line { stroke: var(--rail); stroke-width: 16; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .frame-end { position: absolute; top: 50%; transform: translateY(-50%); width: 14px; background: #4e342e; border: 1px solid rgba(0,0,0,.2); box-shadow: 0 4px 10px rgba(0,0,0,.35); }
@@ -732,6 +733,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, .bar:focus-visible, 
   .stand, .rounddone { max-width: 80vw; }
   .xylo { max-width: 70vw; }
   .xylo.twelve { max-width: 78vw; }
+  .xylo.thirteen { max-width: 82vw; }
   .bar { max-width: 124px; }
   .bar .letter { font-size: clamp(30px, 2.4vw, 46px); }
   .bar .num { font-size: clamp(14px, 1vw, 19px); }
@@ -1251,3 +1253,185 @@ html.view-home .app-home { display: none; }
   .dd-head { padding: 10px 10px 8px 14px; }
   .dd-foot { padding: 8px 10px 10px 14px; }
 }
+
+/* ==========================================================================
+   Teach Me to Read (teach.js, 2026-10-11): no Practice / Test and no score;
+   a Keyboard button beside the metronome; the five exercises' dots are
+   buttons; the computer keyboard in the music's place; the home page's
+   section of six; the card after the fifth exercise.
+   ========================================================================== */
+.app:not(.teach-on) .teach-only { display: none; }
+.app.teach-on .ctl-mode, .app.teach-on #score-chip { display: none; }
+/* Next lit once the exercise is played through; ↻ nudges after a play with the metronome */
+#btn-next.teach-ok { background: var(--gold); }
+#btn-next.teach-ok svg { fill: #3b2306; }
+#btn-restart.ready { background: var(--gold); color: #3b2306; animation: nudge 1.2s ease-in-out infinite; }
+/* Try again for gold stars: the metronome pointed out until it is tapped */
+#btn-metro.hint { animation: metro-hint 1.4s ease-in-out infinite; }
+@keyframes metro-hint { 0%, 100% { box-shadow: 0 4px 0 #d9c9ad, 0 0 0 0 rgba(21,128,61,.55); } 60% { box-shadow: 0 4px 0 #d9c9ad, 0 0 0 12px rgba(21,128,61,0); } }
+/* the Keyboard button: white like the metronome; lit while the keyboard shows */
+.kbd-btn { background: #fff; box-shadow: 0 4px 0 #d9c9ad, 0 6px 12px rgba(62,39,35,.15); }
+.kbd-btn:active { box-shadow: 0 2px 0 #d9c9ad; }
+.kbd-btn svg { stroke: var(--ink-soft); }
+.kbd-btn svg .keys { fill: var(--ink-soft); stroke: none; }
+.kbd-btn.on { background: #be185d; box-shadow: 0 5px 0 #831843, 0 0 0 4px rgba(190,24,93,.25); }
+.kbd-btn.on svg { stroke: #fff; }
+.kbd-btn.on svg .keys { fill: #fff; }
+.kbd-btn.on + .ctl-label { color: #be185d; }
+/* the five dots are buttons here: back to any exercise reached */
+.dots.teach-dots { pointer-events: auto; gap: 9px; }
+.dots button.dot { padding: 0; width: 19px; height: 19px; cursor: pointer; appearance: none; -webkit-appearance: none; }
+.dots button.dot[disabled] { cursor: default; opacity: .55; }
+.dots button.dot:not([disabled]):hover { transform: scale(1.15); }
+
+/* the music card (2026-10-11, the user's: the notation had become the smallest thing on it): from a tablet up,
+   the controls stand in columns either side of the music — Listen · the metronome · Keyboard on the left,
+   ↻ · Next on the right — so the staff gets the card's whole height and nearly all of its width (game.js
+   draws it tighter too). A phone keeps its row of buttons under the music: there the width is what counts */
+.app.teach-on .stand { padding-top: 32px; }        /* the five dots get their own strip: the staff is drawn up to its edge */
+@media (min-width: 701px) {
+  .app.teach-on .stand-row { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr); column-gap: 16px; }
+  .app.teach-on .controls { grid-column: 1; grid-row: 1; flex-direction: column; justify-content: center; align-items: center; gap: 12px; padding: 0; }
+  .app.teach-on .side-right { grid-column: 3; grid-row: 1; align-self: stretch; flex-direction: column; justify-content: center; align-items: center; gap: 14px; }
+  .app.teach-on .music { grid-column: 2; grid-row: 1; }
+  .app.teach-on.kbd-on .kbd-view { grid-column: 2; }
+  /* the tempo choice opens beside the metronome, pointing at it */
+  .app.teach-on .metro-pick { bottom: auto; top: 50%; left: calc(100% + 12px); transform: translateY(-50%); }
+  .app.teach-on .metro-pick::after { top: 50%; left: auto; right: 100%; margin: -8px 0 0; border-color: transparent; border-right-color: #fff; }
+}
+/* a shorter screen: smaller buttons, so the three on the left fit beside the staff */
+@media (min-width: 701px) and (max-height: 820px) {
+  .app.teach-on .round-btn.ctl-btn { width: 48px !important; height: 48px !important; }
+  .app.teach-on .round-btn.ctl-btn svg { width: 25px !important; height: 25px !important; }
+  .app.teach-on .round-btn.small { width: 48px; height: 48px; }
+  .app.teach-on .round-btn.small svg { width: 24px; height: 24px; }
+  .app.teach-on .controls { gap: 6px; }
+  .app.teach-on .ctl { gap: 2px; }
+  .app.teach-on .ctl-label { font-size: 12.5px; }
+}
+@media (min-width: 701px) and (max-height: 640px) {
+  .app.teach-on .stand { padding-top: 28px; padding-bottom: 8px; }
+  .app.teach-on .round-btn.ctl-btn { width: 42px !important; height: 42px !important; }
+  .app.teach-on .round-btn.ctl-btn svg { width: 22px !important; height: 22px !important; }
+  .app.teach-on .controls { gap: 3px; }
+  .app.teach-on .ctl-label { font-size: 11.5px; }
+}
+
+/* the computer keyboard, in the music's place */
+.kbd-view { display: none; }
+.app.kbd-on .kbd-view { grid-column: 1 / -1; grid-row: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; container-type: size; padding: 4px 0; }
+.app.kbd-on .music, .app.kbd-on .side-right, .app.kbd-on .dots, .app.kbd-on .praise { display: none; }
+.kbd-head { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+.kbd-head b { font-size: 21px; line-height: 1.15; }
+.kbd-head span { font-size: 16px; font-weight: 600; color: var(--ink-soft); display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 6px; }
+.kbd-head span em { font-style: normal; white-space: nowrap; margin: 0 6px; }
+.kbd-head span i { font-style: normal; display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 5px; border-radius: 7px; background: var(--c); color: var(--ink); font-weight: 700; box-shadow: 0 2px 0 color-mix(in srgb, var(--c) 62%, #000); margin-right: 2px; }
+.kbd-board { container-type: inline-size; width: min(100%, 900px, calc((100cqh - 150px) * 6.6)); background: #cfc7ba; border-radius: 18px; padding: 10px; display: flex; flex-direction: column; gap: 7px; box-shadow: inset 0 2px 6px rgba(0,0,0,.18), 0 2px 0 #fff; }
+.kbd-row { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)) minmax(0, 1.55fr); gap: 6px; }
+.kbd-row.r2 { grid-template-columns: minmax(0, 1.55fr) repeat(13, minmax(0, 1fr)); }
+.kk { aspect-ratio: 1; min-width: 0; border: 0; border-radius: 9px; background: #f4f1ec; color: #b4a998; box-shadow: 0 3px 0 #a99f90;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; font: 600 clamp(11px, 2.6cqw, 22px)/1 'Fredoka', sans-serif; padding: 0; }
+.kk.wide { aspect-ratio: auto; font-size: clamp(9px, 1.6cqw, 14px); }
+.kbd-row.r2 .kk { opacity: .7; }
+.kk.num { color: #a2968a; }
+.kk.lit { background: var(--c); color: var(--ink); cursor: pointer; box-shadow: 0 4px 0 color-mix(in srgb, var(--c) 58%, #000), 0 0 0 3px #fff, 0 6px 14px rgba(0,0,0,.25);
+  position: relative; z-index: 1; transform: translateY(-2px); transition: transform .06s, box-shadow .06s; }
+.kk.lit b { font-size: clamp(16px, 4cqw, 34px); font-weight: 700; line-height: 1; }
+.kk.lit small { font-size: clamp(9px, 1.55cqw, 14px); font-weight: 700; margin-top: 2px; white-space: nowrap; }
+.kk.lit.hit, .kk.lit:active { transform: translateY(2px); box-shadow: 0 1px 0 color-mix(in srgb, var(--c) 58%, #000), 0 0 0 3px #fff, 0 0 0 9px color-mix(in srgb, var(--c) 45%, transparent); }
+.kk.lit:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+/* = and + share a key (+ is Shift and =): with high A in the level, the key shows both — + on top, = under it */
+.kk.split { padding: 0; gap: 0; overflow: hidden; justify-content: stretch; position: relative; z-index: 1; transform: translateY(-2px);
+  box-shadow: 0 4px 0 #a99f90, 0 0 0 3px #fff, 0 6px 14px rgba(0,0,0,.25); }
+.kk-half { flex: 1 1 0; min-height: 0; width: 100%; border: 0; padding: 0 2px; display: flex; align-items: center; justify-content: center; gap: 3px;
+  font: inherit; color: #a2968a; background: transparent; }
+.kk-half.top { border-bottom: 2px solid rgba(43,29,22,.28); }
+.kk-half.lit { background: var(--c); color: var(--ink); cursor: pointer; }
+.kk-half b { font-size: clamp(12px, 2.6cqw, 23px); font-weight: 700; line-height: 1; }
+.kk-half small { font-size: clamp(8px, 1.25cqw, 12px); font-weight: 700; white-space: nowrap; }
+.kk-half.lit.hit, .kk-half.lit:active { filter: brightness(1.12); box-shadow: inset 0 0 0 3px #fff; }
+.kk-half.lit:focus-visible { outline: 3px solid var(--ink); outline-offset: -3px; }
+.kbd-head span em small { font-size: .82em; font-weight: 600; }
+.kbd-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 14px; }
+.kbd-note { font-size: 14px; color: var(--ink-soft); font-weight: 600; }
+.kbd-foot .pill-btn { padding: 8px 18px; }
+/* a narrow phone: just the number keys 1 to = */
+@container (max-width: 520px) {
+  .kbd-row.r2, .kk.edge { display: none; }
+  .kbd-row { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; }
+  .kbd-board { padding: 7px; border-radius: 12px; }
+  .kk { border-radius: 6px; }
+  .kk.lit small .oct, .kk-half small .oct { display: none; }      /* "high G" doesn't fit a phone's key: the line above says it */
+  .kk-half small { display: none; }
+  .kk.lit { box-shadow: 0 3px 0 color-mix(in srgb, var(--c) 58%, #000), 0 0 0 2px #fff, 0 4px 10px rgba(0,0,0,.25); }
+  .kbd-head b { font-size: 17px; }
+  .kbd-head span { font-size: 14px; }
+  .kbd-note { display: none; }
+}
+/* a short music card: the number row alone, as big as the height allows */
+@container (max-height: 320px) {
+  .kbd-row.r2, .kbd-note { display: none; }
+  .kbd-board { width: min(100%, 900px, calc((100cqh - 108px) * 12)); }
+}
+@container (max-height: 240px) {
+  .kbd-head span { display: none; }
+  .kbd-view { gap: 8px; }
+  .kbd-board { width: min(100%, 900px, calc((100cqh - 84px) * 12)); }
+}
+
+/* the home page's section: three levels, each with its Advanced level under it */
+.tw-levels { container-type: inline-size; }
+.teach-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto auto; grid-auto-flow: column; gap: 10px 14px; }
+.teach-grid.in-drop { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-auto-flow: row; }
+@container (max-width: 760px) { .teach-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-auto-flow: row; } }
+@container (max-width: 470px) { .teach-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 520px) { .teach-grid.in-drop { grid-template-columns: minmax(0, 1fr); } }
+.tt { --mc: #be185d; display: flex; align-items: center; gap: 12px; min-width: 0; border: 0; border-radius: 16px; padding: 10px 14px 10px 10px; text-align: left; color: var(--ink);
+  background: #fff; box-shadow: inset 0 0 0 2px #efe5d3, 0 2px 0 #e7dcc7; transition: transform .08s; }
+.tt:hover { background: #fffaf3; transform: translateY(-1px); }
+.tt:active { transform: translateY(1px); }
+.tt.adv { background: #fbf6ec; }
+.tt.on { box-shadow: inset 0 0 0 3px var(--mc), 0 2px 0 #e7dcc7; }
+.tt-staff { flex: none; width: 92px; height: 52px; background: #fffdf6; border-radius: 10px; box-shadow: inset 0 0 0 1.5px #efe5d3; padding: 2px 4px; }
+.tt-staff svg { width: 100%; height: 100%; }
+.tt-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tt-txt b { font-size: 17px; line-height: 1.15; }
+.tt.adv .tt-txt b::before { content: '↳ '; color: var(--mc); }
+.tt-txt small { font-size: 13.5px; color: var(--ink-soft); font-weight: 600; line-height: 1.2; }
+.tt-marks { display: flex; gap: 5px; margin-top: 4px; }
+.tt-marks i { width: 13px; height: 13px; border-radius: 50%; border: 2.5px solid #d6c6a8; }
+.tt-marks i.c { background: #22c55e; border-color: #15803d; }
+.tt-marks i.g { background: var(--gold); border-color: var(--gold-deep); }
+@media (prefers-reduced-motion: reduce) { .tt, .kk.lit { transition: none; } #btn-metro.hint, #btn-restart.ready { animation: none; } }
+
+/* the home page card's window: which level, where to start */
+.teach-sheet .note { margin: 0 0 4px; }
+.tw-now { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 14px; background: #fbf6ec; border-radius: 16px; padding: 12px 16px; }
+.tw-what { display: flex; flex-direction: column; gap: 2px; flex: 1 1 260px; min-width: 0; }
+.tw-what b { font-size: 18px; }
+.tw-what span { font-size: 14px; color: var(--ink-soft); line-height: 1.35; }
+.tw-start { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tw-start .lbl { font-size: 14px; font-weight: 700; color: var(--ink-soft); }
+.tw-exs { display: flex; gap: 6px; }
+.tw-ex { border: 0; background: #fff; border-radius: 12px; padding: 5px 5px 3px; width: 46px; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  box-shadow: inset 0 0 0 2px #e6dac4; color: var(--ink); }
+.tw-ex svg { width: 28px; height: 28px; }
+.tw-ex small { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.tw-ex .tw-none { display: block; width: 28px; height: 28px; border-radius: 50%; border: 3px solid #d6c6a8; box-sizing: border-box; }
+.tw-ex.on { box-shadow: inset 0 0 0 3px var(--mc), 0 0 0 3px color-mix(in srgb, var(--mc) 18%, transparent); background: color-mix(in srgb, var(--mc) 7%, #fff); }
+.tw-ex[disabled] { opacity: .45; cursor: default; }
+.tw-clear { margin-left: auto; }
+@media (max-width: 520px) { .tw-ex { width: 40px; } .tw-ex svg, .tw-ex .tw-none { width: 24px; height: 24px; } .tw-clear { margin-left: 0; } }
+
+/* after the fifth exercise */
+.te-card { --mc: #be185d; }
+.te-kicker { font-size: 13px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--mc); margin-bottom: 2px; }
+.te-marks { display: flex; justify-content: center; gap: 12px; margin: 12px 0 8px; }
+.te-mk { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.te-mk svg { width: 50px; height: 50px; filter: drop-shadow(0 3px 4px rgba(62,39,35,.2)); }
+.te-mk small { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.te-mk .te-none { display: block; width: 50px; height: 50px; border-radius: 50%; border: 4px dashed #d6c6a8; box-sizing: border-box; }   /* not played yet */
+.te-say { margin: 4px auto 14px; font-size: 17px; max-width: 420px; line-height: 1.35; }
+.te-say.small { font-size: 15px; color: var(--ink-soft); margin-top: -8px; }
+.te-card .pill-btn svg.mk-star { display: inline-block; width: 20px; height: 20px; vertical-align: -4px; margin-right: 6px; }
+@media (max-width: 700px) { .te-mk svg, .te-mk .te-none { width: 40px; height: 40px; } .te-marks { gap: 8px; } }
