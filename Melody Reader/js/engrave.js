@@ -63,7 +63,7 @@
   const JUDGE_COLOUR = { Perfect: '#15803d', Good: '#0f766e', Early: '#c2410c', Late: '#c2410c', Off: '#c2410c', Missed: '#78716c' };
   // Teach Me to Read's staff: a greyed line, and a lit line's deeper edge (by its bar colour)
   const DIM_LINE = '#ddd3c3';
-  const LINE_EDGE = { '#facc15': '#ca8a04', '#2dd4bf': '#0d9488', '#22c55e': '#15803d', '#f97316': '#c2410c', '#a855f7': '#7e22ce', '#3b82f6': '#1d4ed8' };
+  const LINE_EDGE = { '#facc15': '#ca8a04', '#2dd4bf': '#0d9488', '#22c55e': '#15803d', '#f97316': '#c2410c', '#a855f7': '#7e22ce', '#3b82f6': '#1d4ed8', '#ef4444': '#b91c1c' };
 
   function events(card) {
     const evs = []; let tick = 0;
@@ -92,7 +92,14 @@
      notes): what game.js fits to the music card */
   const ROWS = { full: { top: 2.7, below: 2.9, labels: 4.4 }, tight: { top: 1.8, below: 1.6, labels: 2.9 } };
   const rowSpaces = (tight, labels) => { const r = tight ? ROWS.tight : ROWS.full; return r.top + 4 + (labels ? r.labels : r.below); };
-  const BEAM = 1.5, BEAM_GAP = 0.4;          // beam thickness and the space between two beams, in staff spaces
+  // beam thickness and the space between two beams, in staff spaces: 1.5 (three times the usual half space,
+  // 2026-10-11), then halved (2026-10-12, the user's: "half as thick as they are right now")
+  const BEAM = 0.75, BEAM_GAP = 0.4;
+  const PAPER = '#fffdf6';                    // the music card's paper (style.css --paper)
+  let clipN = 0;                              // clip-path ids, unique across every drawing on the page
+  // a stem's thickness: twice the usual (2026-10-12, the user's), drawn BEHIND its head — the stems and beams
+  // go down first, the heads over them
+  const STEM = 0.26, STEM_MIN = 2.6, FLAG_STEM = 0.12;   // FLAG_STEM: the stem a flag glyph was drawn for
   const headFor = t => t >= 16 ? 'noteheadWhole' : t >= 8 ? 'noteheadHalf' : 'noteheadBlack';
   const restFor = t => t >= 16 ? 'restWhole' : t >= 8 ? 'restHalf' : t >= 4 ? 'restQuarter' : t >= 2 ? 'rest8th' : 'rest16th';
   const dotted = t => t === 3 || t === 6 || t === 12;
@@ -172,7 +179,9 @@
 
     const p = [];
     const lineW = Math.max(1, ss * 0.11);
-    const stemW = Math.max(1.3, ss * 0.13);
+    const stemW = Math.max(STEM_MIN, ss * STEM);
+    const flagX = sx => sx + Math.max(0, stemW - ss * FLAG_STEM);   // a flag on the stem's far edge, as on a thin one
+    const stemXOf = ev => ev.stemX !== undefined ? ev.stemX : ev.step < B4 ? ev.x + hw - stemW : ev.x;   // beamed: set below
     const glow = (ev, cls) => {
       const y0 = topLine - ss * 1.7;
       p.push('<rect class="' + cls + '" x="' + r2(ev.cx - ss * 1.4) + '" y="' + r2(y0) + '" width="' + r2(ss * 2.8) + '" height="' + r2(bottom + ss * 2.3 - y0) + '" rx="' + r2(ss * 0.8) + '"/>');
@@ -219,84 +228,18 @@
     };
 
     // the columns
-    let lastJudge = null;
-    evs.forEach((ev, i) => {
-      const lit = states[i] === 'lit';
-      const q = [];
-      if (ev.rest) {
-        const name = restFor(ev.t);
-        const rx = ev.x + (ev.t >= 16 ? 0 : (hw - gw(name, k)) / 2);
-        q.push(at(name, rx, name === 'restWhole' ? yOf(D5) : yOf(B4), k, FILL));
-        if (dotted(ev.t)) q.push(boxAt('augmentationDot', rx + gw(name, k) + ss * 0.3, yOf(D5) + ss * 0.5 - gh('augmentationDot', k) / 2, k, FILL));
-      } else {
-        const b = BAR[ev.p];
-        const coloured = o.colour === 'solid' || o.colour === 'always' || (o.colour === 'lit' && lit);
-        // a coloured note not yet played is pale; lit, it is full colour with a halo
-        const pale = o.colour === 'always' && !lit;
-        const attrs = coloured
-          ? 'fill="' + b.colour + '"' + (pale ? ' fill-opacity=".42"' : '') + ' stroke="' + INK + '" stroke-width="44" paint-order="stroke" stroke-linejoin="round"'
-          : FILL;
-        if (lit && o.colour !== 'black' && !o.noHalo) q.push('<circle cx="' + r2(ev.cx) + '" cy="' + r2(yOf(ev.step)) + '" r="' + r2(ss * 1.05) + '" fill="' + b.colour + '" fill-opacity=".3"/>');
-        q.push(ledger(ev.x, ev.step));
-        const pop = i === o.justLit;
-        q.push('<g class="head-wrap' + (pop ? ' pop' : '') + '"' + (pop && o.justAge ? ' style="animation-delay:-' + Math.round(o.justAge) + 'ms"' : '') + '>' +
-          at(headFor(ev.t), ev.x, yOf(ev.step), k, attrs) + '</g>');
-        if (dotted(ev.t)) {
-          const dy = (ev.step - E4) % 2 === 0 ? -ss * 0.5 : 0;
-          q.push(boxAt('augmentationDot', ev.x + gw(headFor(ev.t), k) + ss * 0.35, yOf(ev.step) + dy - gh('augmentationDot', k) / 2, k, FILL));
-        }
-        if (ev.t < 16 && ev.beam === null) {
-          const up = ev.step < B4;
-          const flag = ev.t <= 2 ? (ev.t === 1 ? '16th' : '8th') : null;
-          const len = ss * (flag ? 3.8 : 3.5);
-          if (up) {
-            const sx = ev.x + hw - stemW, y1 = yOf(ev.step) - ss * 0.17, y0 = yOf(ev.step) - len;
-            q.push(rect(sx, y0, stemW, y1 - y0, FILL));
-            if (flag) q.push(boxAt('flag' + flag + 'Up', sx, y0, k, FILL));
-          } else {
-            const sx = ev.x, y0 = yOf(ev.step) + ss * 0.17, y1 = yOf(ev.step) + len;
-            q.push(rect(sx, y0, stemW, y1 - y0, FILL));
-            if (flag) q.push(boxAt('flag' + flag + 'Down', sx, y1 - gh('flag' + flag + 'Down', k), k, FILL));
-          }
-        }
-        if (lit && o.colour === 'black') q.push('<circle cx="' + r2(ev.cx) + '" cy="' + r2(bottom + ss * 2.25) + '" r="' + r2(ss * 0.36) + '" fill="' + b.colour + '" stroke="' + INK + '" stroke-width="1"/>');
-      }
-      const faint = o.faintFrom !== undefined && o.faintFrom >= 0 && i >= o.faintFrom;
-      // words under the notes
-      if (faint) { /* the empty part of the bar: no words */ }
-      else if (o.labels === 'letters' && !ev.rest) {
-        const b = BAR[ev.p];
-        p.push('<rect x="' + r2(ev.cx - ss * 0.75) + '" y="' + r2(labelY - ss * 0.95) + '" width="' + r2(ss * 1.5) + '" height="' + r2(ss * 1.3) + '" rx="' + r2(ss * 0.4) + '" fill="' + b.colour + '" fill-opacity=".3"/>');
-        p.push('<text class="label-letter" x="' + r2(ev.cx) + '" y="' + r2(labelY) + '" font-size="' + r2(ss * 1.05) + '" text-anchor="middle" fill="' + INK + '">' + b.letter + '</text>');
-      } else if (o.labels === 'solfege' && !ev.rest) {
-        // the solfège name (C is Do — the xylophone's own key), tinted with its bar's colour like the letters
-        const b = BAR[ev.p], name = SOLFEGE[b.letter];
-        p.push('<rect x="' + r2(ev.cx - ss * 0.95) + '" y="' + r2(labelY - ss * 0.95) + '" width="' + r2(ss * 1.9) + '" height="' + r2(ss * 1.3) + '" rx="' + r2(ss * 0.4) + '" fill="' + b.colour + '" fill-opacity=".3"/>');
-        p.push('<text class="label-letter" x="' + r2(ev.cx) + '" y="' + r2(labelY) + '" font-size="' + r2(ss * 0.92) + '" text-anchor="middle" fill="' + INK + '">' + name + '</text>');
-      } else if (o.labels === 'syllables') {
-        p.push('<text class="label-syl" x="' + r2(ev.cx) + '" y="' + r2(labelY) + '" font-size="' + r2(ss * 0.95) + '" text-anchor="middle">' + sylOf(ev) + '</text>');
-      }
-      if (judge[i]) {
-        // words for notes close together take turns on two lines
-        const tight = lastJudge && ev.cx - lastJudge.x < ss * 3.4 && lastJudge.row === 0;
-        lastJudge = { x: ev.cx, row: tight ? 1 : 0 };
-        p.push('<text class="judge-word" x="' + r2(ev.cx) + '" y="' + r2(judgeY + (tight ? ss * 0.95 : 0)) + '" font-size="' + r2(ss * 0.8) + '" text-anchor="middle" fill="' + JUDGE_COLOUR[judge[i]] + '">' + judge[i] + '</text>');
-      }
-      const hidden = o.hidden && !lit;
-      p.push('<g class="col' + (hidden ? ' hidden-note' : '') + (faint ? ' faint' : '') + '">' + q.join('') + '</g>');
-    });
-
     // beamed groups: stems and beams, slanted with the melody, no stem under 3 spaces.
-    // The beams are BEAM spaces thick (2026-10-11, the user's: three times the usual half space, easier to
-    // see); a sixteenth's second beam sits clear of the first, and its stems are longer to make room for both
+    // The beams are BEAM spaces thick; a sixteenth's second beam sits clear of the first (its stems longer when
+    // the two need it). Drawn before the columns, so the heads sit over their stems (2026-10-12)
     groups.forEach(g => {
       const lo = Math.min.apply(null, g.map(e => e.step)), hi = Math.max.apply(null, g.map(e => e.step));
       const up = (B4 - lo) > (hi - B4);
       const sx = ev => up ? ev.x + hw - stemW : ev.x;
+      g.forEach(ev => { ev.stemX = sx(ev); });
       const first = g[0], last = g[g.length - 1];
       const two = g.some((ev, j) => ev.t === 1 && g[j + 1] && g[j + 1].t === 1);       // a second beam somewhere
       const bt = ss * BEAM, gap = bt + ss * BEAM_GAP;
-      const reachSS = two ? BEAM * 2 + BEAM_GAP + 0.9 : 3;      // the beams' inner edge stays this far from the heads
+      const reachSS = two ? Math.max(3, BEAM * 2 + BEAM_GAP + 0.9) : 3;      // the beams' inner edge stays this far from the heads
       const L = ss * (reachSS + 0.25);
       let y1 = up ? yOf(first.step) - L : yOf(first.step) + L;
       const y2 = up ? yOf(last.step) - L : yOf(last.step) + L;
@@ -326,6 +269,81 @@
       const hidden = o.hidden && g.some(ev => states[ev.i] !== 'lit');
       const faintG = o.faintFrom !== undefined && o.faintFrom >= 0 && g.some(ev => ev.i >= o.faintFrom);
       p.push('<g class="beams' + (hidden ? ' hidden-note' : '') + (faintG ? ' faint' : '') + '">' + q.join('') + '</g>');
+    });
+
+    let lastJudge = null;
+    evs.forEach((ev, i) => {
+      const lit = states[i] === 'lit';
+      const q = [];
+      if (ev.rest) {
+        const name = restFor(ev.t);
+        const rx = ev.x + (ev.t >= 16 ? 0 : (hw - gw(name, k)) / 2);
+        q.push(at(name, rx, name === 'restWhole' ? yOf(D5) : yOf(B4), k, FILL));
+        if (dotted(ev.t)) q.push(boxAt('augmentationDot', rx + gw(name, k) + ss * 0.3, yOf(D5) + ss * 0.5 - gh('augmentationDot', k) / 2, k, FILL));
+      } else {
+        const b = BAR[ev.p];
+        const coloured = o.colour === 'solid' || o.colour === 'always' || (o.colour === 'lit' && lit);
+        // a coloured note not yet played is pale; lit, it is full colour with a halo
+        const pale = o.colour === 'always' && !lit;
+        const attrs = coloured
+          ? 'fill="' + b.colour + '"' + (pale ? ' fill-opacity=".42"' : '') + ' stroke="' + INK + '" stroke-width="44" paint-order="stroke" stroke-linejoin="round"'
+          : FILL;
+        if (lit && o.colour !== 'black' && !o.noHalo) q.push('<circle cx="' + r2(ev.cx) + '" cy="' + r2(yOf(ev.step)) + '" r="' + r2(ss * 1.05) + '" fill="' + b.colour + '" fill-opacity=".3"/>');
+        q.push(ledger(ev.x, ev.step));
+        // the stem (and flag) first, so the head sits over it (2026-10-12)
+        if (ev.t < 16 && ev.beam === null) {
+          const up = ev.step < B4;
+          const flag = ev.t <= 2 ? (ev.t === 1 ? '16th' : '8th') : null;
+          const len = ss * (flag ? 3.8 : 3.5);
+          if (up) {
+            const sx = ev.x + hw - stemW, y1 = yOf(ev.step) - ss * 0.17, y0 = yOf(ev.step) - len;
+            q.push(rect(sx, y0, stemW, y1 - y0, FILL));
+            if (flag) q.push(boxAt('flag' + flag + 'Up', flagX(sx), y0, k, FILL));
+          } else {
+            const sx = ev.x, y0 = yOf(ev.step) + ss * 0.17, y1 = yOf(ev.step) + len;
+            q.push(rect(sx, y0, stemW, y1 - y0, FILL));
+            if (flag) q.push(boxAt('flag' + flag + 'Down', flagX(sx), y1 - gh('flag' + flag + 'Down', k), k, FILL));
+          }
+        }
+        // a see-through head (Transparent Color, not yet played) would show the stem through it: the paper under
+        // the head, just where the stem is (the staff line still shows through the rest of it)
+        if (pale && ev.t < 16) {
+          const id = 'rr-st' + (++clipN), x0 = stemXOf(ev);
+          q.push('<clipPath id="' + id + '"><rect x="' + r2(x0 - 0.5) + '" y="' + r2(yOf(ev.step) - ss) + '" width="' + r2(stemW + 1) + '" height="' + r2(ss * 2) + '"/></clipPath>' +
+            at(headFor(ev.t), ev.x, yOf(ev.step), k, 'fill="' + PAPER + '" clip-path="url(#' + id + ')"'));
+        }
+        const pop = i === o.justLit;
+        q.push('<g class="head-wrap' + (pop ? ' pop' : '') + '"' + (pop && o.justAge ? ' style="animation-delay:-' + Math.round(o.justAge) + 'ms"' : '') + '>' +
+          at(headFor(ev.t), ev.x, yOf(ev.step), k, attrs) + '</g>');
+        if (dotted(ev.t)) {
+          const dy = (ev.step - E4) % 2 === 0 ? -ss * 0.5 : 0;
+          q.push(boxAt('augmentationDot', ev.x + gw(headFor(ev.t), k) + ss * 0.35, yOf(ev.step) + dy - gh('augmentationDot', k) / 2, k, FILL));
+        }
+        if (lit && o.colour === 'black') q.push('<circle cx="' + r2(ev.cx) + '" cy="' + r2(bottom + ss * 2.25) + '" r="' + r2(ss * 0.36) + '" fill="' + b.colour + '" stroke="' + INK + '" stroke-width="1"/>');
+      }
+      const faint = o.faintFrom !== undefined && o.faintFrom >= 0 && i >= o.faintFrom;
+      // words under the notes
+      if (faint) { /* the empty part of the bar: no words */ }
+      else if (o.labels === 'letters' && !ev.rest) {
+        const b = BAR[ev.p];
+        p.push('<rect x="' + r2(ev.cx - ss * 0.75) + '" y="' + r2(labelY - ss * 0.95) + '" width="' + r2(ss * 1.5) + '" height="' + r2(ss * 1.3) + '" rx="' + r2(ss * 0.4) + '" fill="' + b.colour + '" fill-opacity=".3"/>');
+        p.push('<text class="label-letter" x="' + r2(ev.cx) + '" y="' + r2(labelY) + '" font-size="' + r2(ss * 1.05) + '" text-anchor="middle" fill="' + INK + '">' + b.letter + '</text>');
+      } else if (o.labels === 'solfege' && !ev.rest) {
+        // the solfège name (C is Do — the xylophone's own key), tinted with its bar's colour like the letters
+        const b = BAR[ev.p], name = SOLFEGE[b.letter];
+        p.push('<rect x="' + r2(ev.cx - ss * 0.95) + '" y="' + r2(labelY - ss * 0.95) + '" width="' + r2(ss * 1.9) + '" height="' + r2(ss * 1.3) + '" rx="' + r2(ss * 0.4) + '" fill="' + b.colour + '" fill-opacity=".3"/>');
+        p.push('<text class="label-letter" x="' + r2(ev.cx) + '" y="' + r2(labelY) + '" font-size="' + r2(ss * 0.92) + '" text-anchor="middle" fill="' + INK + '">' + name + '</text>');
+      } else if (o.labels === 'syllables') {
+        p.push('<text class="label-syl" x="' + r2(ev.cx) + '" y="' + r2(labelY) + '" font-size="' + r2(ss * 0.95) + '" text-anchor="middle">' + sylOf(ev) + '</text>');
+      }
+      if (judge[i]) {
+        // words for notes close together take turns on two lines
+        const tight = lastJudge && ev.cx - lastJudge.x < ss * 3.4 && lastJudge.row === 0;
+        lastJudge = { x: ev.cx, row: tight ? 1 : 0 };
+        p.push('<text class="judge-word" x="' + r2(ev.cx) + '" y="' + r2(judgeY + (tight ? ss * 0.95 : 0)) + '" font-size="' + r2(ss * 0.8) + '" text-anchor="middle" fill="' + JUDGE_COLOUR[judge[i]] + '">' + judge[i] + '</text>');
+      }
+      const hidden = o.hidden && !lit;
+      p.push('<g class="col' + (hidden ? ' hidden-note' : '') + (faint ? ' faint' : '') + '">' + q.join('') + '</g>');
     });
 
     // ghost notes: where the struck bar would be, in the column it was aimed at

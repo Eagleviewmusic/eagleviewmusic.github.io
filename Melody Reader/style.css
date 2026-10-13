@@ -579,32 +579,79 @@ button:focus-visible, .bar:focus-visible { outline: 3px solid #2563eb; outline-o
   --accent: #d97706; --surface: var(--paper); --font: 'Fredoka', ui-rounded, system-ui, sans-serif;
   --ink-2: var(--ink-soft); --ink-3: #a8957a; --hairline: #efe5d3; --hairline-2: #e2d4bb; --paper-2: #fbf6ec;
 }
-.app.in-lesson #mel-btn { display: none; }
 .score-chip .sc-player { font-weight: 700; color: var(--ink); max-width: 9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .score-chip .sc-player[hidden] { display: none; }
 
-/* ---------- Make a melody ---------- */
+/* ---------- Make a melody ----------
+   relaid 2026-10-12 (the user's: "you simply make the staff get smaller and smaller as we add more and more
+   rows to the already vertically small window"): the music card keeps one slim line — the set, its slides,
+   + New slide, what is left — and the staff, drawn as big as it fits; the writing tools are ONE bar between
+   the card and the xylophone (`.maker-dock`, the stage's middle row), so their height comes out of the
+   xylophone, which has room to spare; a slide's name, time and length (set once a slide) pop up from their
+   button in the dock (`.mk-pop`) */
 .maker-part { display: none; }
 .app.making .maker-part { display: flex; }
 .app.making .stand-row .side, .app.making .controls, .app.making .dots, .app.making .praise, .app.making .clock { display: none !important; }
 .app.making .stand { box-shadow: 0 10px 28px rgba(62,39,35,.28), inset 0 0 0 3px var(--gold); }
-.maker-top { flex: none; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 4px 6px; }
-.mk-set { font-weight: 700; font-size: 15px; color: var(--gold-deep); white-space: nowrap; }
-#mk-title { flex: 1 1 200px; min-width: 140px; padding: 7px 11px; border-radius: 12px; border: 2px solid #e6dac4; font: inherit; font-size: 15px; background: #fff; color: var(--ink); }
-.mk-status { font-weight: 600; font-size: 15px; color: var(--ink-soft); min-width: 9em; }
-.maker-bottom { flex: none; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 4px 2px; border-top: 2px dashed #efe5d3; }
-.mk-values { display: flex; gap: 5px; flex-wrap: wrap; }
-.mk-val { border: 2px solid #e6dac4; background: #fff; border-radius: 12px; padding: 3px 7px 2px; display: flex; flex-direction: column; align-items: center; min-width: 56px; }
-.mk-val .pic { height: 30px; display: flex; align-items: center; }
+.app.making #stand { padding: 8px 14px 6px; }
+.app.making .stand-row { grid-template-rows: minmax(0, 1fr); }
+.app.making .music { grid-column: 1 / -1; }
+.app.making .stage { grid-template-rows: minmax(0, 60fr) auto minmax(0, 40fr); }
+.app.making .xylo-wrap { grid-row: 3; }
+/* the slim line: the set · its slides (one chip a melody, the one being written ringed, a new one dashed) ·
+   + New slide · what is left of the bar */
+.maker-head { flex: none; align-items: center; gap: 8px; padding: 0 2px 4px; min-width: 0; }
+.mk-set { flex: 0 1 auto; max-width: 28%; font-weight: 700; font-size: 15px; color: var(--gold-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mk-slides { display: flex; gap: 5px; overflow-x: auto; min-width: 0; flex: 0 1 auto; padding: 3px; scrollbar-width: thin; }
+.mk-slide { flex: none; min-width: 32px; height: 30px; padding: 0 6px; border-radius: 10px; border: 2px solid #e6dac4; background: #fff; font-size: 15px; font-weight: 700; color: var(--ink-soft); }
+.mk-slide:hover { border-color: #d9c9ad; color: var(--ink); }
+.mk-slide.on { border-color: var(--gold); background: #fffbeb; color: #92400e; box-shadow: 0 0 0 2px rgba(251,191,36,.35); }
+.mk-slide.new { border-style: dashed; }
+#mk-new { flex: none; padding: 5px 13px; font-size: 14.5px; background: #fff; box-shadow: inset 0 0 0 2px #e6dac4; }
+#mk-new.ready { background: var(--gold); color: #fff; box-shadow: 0 3px 0 var(--gold-deep); }
+.mk-status { flex: 0 1 auto; margin-left: auto; min-width: 0; font-weight: 600; font-size: 14px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.maker-head #mk-cancel, .maker-head #mk-save { flex: none; padding: 5px 15px; font-size: 14.5px; }
+.mk-status-dock { display: none; }
+/* the dock: the note values, Rest ⌫ ▶, the slide's button */
+.maker-dock { grid-row: 2; grid-column: 1; position: relative; z-index: 6; width: auto; max-width: min(100%, 1180px); justify-self: center; align-items: center; gap: 6px 8px; flex-wrap: wrap;
+  background: var(--paper); border-radius: 20px; padding: 7px 10px; box-shadow: 0 6px 18px rgba(62,39,35,.22), inset 0 0 0 3px var(--gold); }
+.mk-values { display: flex; gap: 4px; flex-wrap: wrap; }
+.mk-val { border: 2px solid #e6dac4; background: #fff; border-radius: 12px; padding: 2px 5px 1px; display: flex; flex-direction: column; align-items: center; min-width: 50px; }
+.mk-val .pic { height: 26px; display: flex; align-items: center; }
 .mk-val b { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
 .mk-val.on { border-color: var(--gold); background: #fffbeb; box-shadow: 0 0 0 2px rgba(251,191,36,.35); }
 .mk-val.on b { color: #92400e; }
 .mk-val.no { opacity: .35; }
-.maker-bottom .pill-btn { padding: 9px 16px; }
-.maker-bottom .pill-btn[disabled] { opacity: .4; pointer-events: none; }
+.maker-dock .pill-btn { padding: 8px 14px; }
+.maker-dock .pill-btn[disabled] { opacity: .4; pointer-events: none; }
 #mk-hear.playing { background: #f59e0b; color: #fff; }
 #mk-save.ready { animation: nudge 1.2s ease-in-out infinite; }
-.mk-gap { flex: 1; }
+/* the slide's button and its little window, popping up over the music */
+.mk-opts-wrap { position: relative; display: flex; }
+.maker-dock .mk-opts { background: #fff; box-shadow: inset 0 0 0 2px #e6dac4; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; padding: 8px 13px; }
+.maker-dock .mk-opts[aria-expanded="true"] { background: #fffbeb; box-shadow: inset 0 0 0 2px var(--gold); }
+.mk-pop { position: absolute; bottom: calc(100% + 14px); left: 50%; transform: translateX(-50%); z-index: 8; width: 350px; display: flex; flex-direction: column; gap: 10px;
+  background: #fff; border-radius: 18px; padding: 14px 16px 12px; box-shadow: 0 14px 40px rgba(43,29,22,.32), 0 0 0 2px #efe5d3; }
+.mk-pop[hidden] { display: none; }
+.mk-pop::after { content: ''; position: absolute; top: 100%; left: 50%; margin-left: -10px; border: 10px solid transparent; border-top-color: #fff; }
+.mk-pop-row { display: grid; grid-template-columns: 62px minmax(0, 1fr); align-items: center; gap: 10px; margin: 0; }
+.mk-pop-row > span { font-size: 12.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-soft); }
+#mk-title { width: 100%; min-width: 0; padding: 7px 11px; border-radius: 12px; border: 2px solid #e6dac4; font: inherit; font-size: 15px; background: #fff; color: var(--ink); }
+.mk-pop .seg { justify-self: start; }
+.mk-pop-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
+#mk-del { background: #f3ede1; box-shadow: none; padding: 5px 12px; font-size: 13.5px; }
+.mk-pop-foot .pill-btn { padding: 7px 18px; }
+@media (min-width: 701px) and (max-width: 940px) {
+  .mk-val { min-width: 44px; padding: 2px 3px 1px; }
+  .mk-val b { font-size: 11px; }
+  .maker-dock .pill-btn { padding: 8px 11px; }
+}
+/* the xylophone, shorter while writing (its height went to the tools): a slimmer frame, no bolts, the bars
+   nearer one length, the number under the letter in the bar's middle — so nothing runs into anything */
+.app.making .xylo { padding: 10px 22px; }
+.app.making .bar { height: calc(62% + var(--len) * .38); }
+.app.making .bar .bolt { display: none; }
+.app.making .bar .num { position: static; margin-top: 3px; }
 .col.faint, .beams.faint { opacity: .16; }
 
 /* ---------- the My melodies window ---------- */
@@ -640,6 +687,33 @@ button:focus-visible, .bar:focus-visible { outline: 3px solid #2563eb; outline-o
 .mel-tools button[disabled] { opacity: .35; }
 .mel-add { border: 2px dashed #d9c9ad; box-shadow: none; background: transparent; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: var(--ink-soft); }
 .mel-add span { font-size: 34px; line-height: 1; color: var(--gold-deep); }
+.mel-add small { font-size: 12.5px; font-weight: 600; opacity: .85; text-align: center; }
+/* a set's page: Teach Me to Read (2026-10-12) — the set played as one of its units */
+.mel-tag.teach { background: #fce7f3; color: #9d174d; }
+.mel-tag.song { background: #e0f2fe; color: #075985; }
+.mel-teach { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; background: #fdf2f8; border-radius: 16px; padding: 10px 14px; margin: 2px 0 12px; box-shadow: inset 0 0 0 2px #fbcfe8; }
+.mel-teach-ico { flex: none; width: 44px; height: 44px; border-radius: 12px; background: #fff; display: grid; place-items: center; box-shadow: inset 0 0 0 2.5px #be185d; }
+.mel-teach-ico svg { width: 32px; height: 32px; }
+.mel-teach-txt { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mel-teach-txt b { font-size: 16px; }
+.mel-teach-txt span { font-size: 14px; color: var(--ink-soft); line-height: 1.3; }
+.mel-teach-btns { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.mel-teach-btns .h-link { background: #fff; box-shadow: none; padding: 5px 13px; font-size: 14px; }
+/* ⧉ Copy melodies in: each source folds open; a melody is tapped to pick it */
+.mel-copy-bar { position: sticky; top: -14px; z-index: 2; background: var(--paper); padding: 8px 0; margin: 0 0 8px; align-items: center; }
+.mel-room { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.mel-src { background: #fff; border-radius: 14px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(62,39,35,.08); }
+.mel-src-head { width: 100%; border: 0; background: none; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 11px 14px; text-align: left; color: var(--ink); }
+.mel-src-head b { font-size: 16px; }
+.mel-src-head .mel-meta { width: auto; }
+.mel-src-head em { font-style: normal; font-weight: 700; color: #15803d; }
+.mel-src-head i { margin-left: auto; font-style: normal; color: var(--ink-soft); }
+.mel-src .mel-grid { padding: 0 12px 12px; margin-top: 0; }
+.mel-pick { position: relative; border: 0; text-align: left; color: var(--ink); background: #fbf8f2; }
+.mel-pick.on { background: #fff; box-shadow: 0 0 0 3px #15803d; }
+.mel-check { position: absolute; top: 7px; right: 7px; width: 24px; height: 24px; border-radius: 50%; border: 2.5px solid #d6c6a8; background: #fff;
+  display: grid; place-items: center; font-size: 14px; font-weight: 700; color: #fff; }
+.mel-pick.on .mel-check { background: #15803d; border-color: #15803d; }
 
 /* ---------- players ---------- */
 .players { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 10px; }
@@ -650,14 +724,24 @@ button:focus-visible, .bar:focus-visible { outline: 3px solid #2563eb; outline-o
 .player.on button { color: #92400e; }
 
 @media (max-width: 700px) {
-  .maker-top { gap: 6px; padding-bottom: 4px; }
+  /* a phone: the set's name goes; the dock wraps (the values a row of their own), the slide's window drops
+     from the top of the screen */
+  .app.making .stage { grid-template-rows: minmax(0, 50fr) auto minmax(0, 50fr); }
   .mk-set { display: none; }
-  .mk-status { min-width: 0; font-size: 13px; }
-  .maker-bottom { gap: 5px; }
-  .mk-val { min-width: 44px; padding: 2px 4px; }
-  .mk-val .pic { height: 24px; }
-  .mk-gap { display: none; }
-  .maker-bottom .pill-btn { padding: 7px 11px; font-size: 14px; }
+  .maker-head { gap: 5px; }
+  #mk-new { padding: 4px 9px; font-size: 13px; }
+  .maker-head .mk-status { display: none; }
+  .mk-status-dock { display: block; font-size: 13px; }
+  .maker-head #mk-cancel, .maker-head #mk-save { padding: 4px 9px; font-size: 13px; }
+  .maker-dock { width: 100%; gap: 5px; padding: 6px 7px; border-radius: 16px; }
+  .mk-values { width: 100%; flex-wrap: nowrap; gap: 3px; }
+  .mk-val { flex: 1 1 0; min-width: 0; padding: 2px 1px 1px; }
+  .mk-val .pic { height: 22px; }
+  .mk-val b { font-size: 10.5px; }
+  .maker-dock .pill-btn { padding: 7px 10px; font-size: 14px; }
+  .maker-dock .mk-opts { max-width: 128px; padding: 7px 10px; }
+  .mk-pop { position: fixed; left: 8px; right: 8px; top: 64px; bottom: auto; transform: none; width: auto; }
+  .mk-pop::after { display: none; }
   .mel-body { padding: 10px 12px 18px; }
   .mel-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
   .score-chip .sc-player { max-width: 5em; }
@@ -1256,65 +1340,135 @@ html.view-home .app-home { display: none; }
 
 /* ==========================================================================
    Teach Me to Read (teach.js, 2026-10-11): no Practice / Test and no score;
-   a Keyboard button beside the metronome; the five exercises' dots are
-   buttons; the computer keyboard in the music's place; the home page's
-   section of six; the card after the fifth exercise.
+   Tools beside Listen (2026-10-12: the metronome, the keyboard and the
+   colours on a panel that pops up); the exercises' dots are buttons; the
+   computer keyboard in the music's place; the home page's section of six;
+   your units; the card after the last exercise.
    ========================================================================== */
 .app:not(.teach-on) .teach-only { display: none; }
 .app.teach-on .ctl-mode, .app.teach-on #score-chip { display: none; }
+/* the buttons beside the music, in every mode (2026-10-12, the user's): ▶ Listen · Practice · Tools, no words under
+   them; the metronome is in Tools — beside the music only in a battle, which can also turn Tools off; no
+   Practice button where a practice has none (Disabled, Levels 14–15, Beat the clock) */
+.controls .ctl-label { display: none; }
+.app:not(.battle-mode) .ctl-metro, .app.no-tools .ctl-tools, .app.no-practice .ctl-mode { display: none; }
 /* Next lit once the exercise is played through; ↻ nudges after a play with the metronome */
 #btn-next.teach-ok { background: var(--gold); }
 #btn-next.teach-ok svg { fill: #3b2306; }
 #btn-restart.ready { background: var(--gold); color: #3b2306; animation: nudge 1.2s ease-in-out infinite; }
-/* Try again for gold stars: the metronome pointed out until it is tapped */
-#btn-metro.hint { animation: metro-hint 1.4s ease-in-out infinite; }
-@keyframes metro-hint { 0%, 100% { box-shadow: 0 4px 0 #d9c9ad, 0 0 0 0 rgba(21,128,61,.55); } 60% { box-shadow: 0 4px 0 #d9c9ad, 0 0 0 12px rgba(21,128,61,0); } }
-/* the Keyboard button: white like the metronome; lit while the keyboard shows */
-.kbd-btn { background: #fff; box-shadow: 0 4px 0 #d9c9ad, 0 6px 12px rgba(62,39,35,.15); }
-.kbd-btn:active { box-shadow: 0 2px 0 #d9c9ad; }
-.kbd-btn svg { stroke: var(--ink-soft); }
-.kbd-btn svg .keys { fill: var(--ink-soft); stroke: none; }
-.kbd-btn.on { background: #be185d; box-shadow: 0 5px 0 #831843, 0 0 0 4px rgba(190,24,93,.25); }
-.kbd-btn.on svg { stroke: #fff; }
-.kbd-btn.on svg .keys { fill: #fff; }
-.kbd-btn.on + .ctl-label { color: #be185d; }
+/* Tools (2026-10-12): white like the metronome was; green, with a dot and the tempo under it, while the
+   metronome plays; pink while the computer keyboard shows */
+.tools-btn { position: relative; background: #fff; box-shadow: 0 4px 0 #d9c9ad, 0 6px 12px rgba(62,39,35,.15); }
+.tools-btn:active { box-shadow: 0 2px 0 #d9c9ad; }
+.tools-btn svg { stroke: var(--ink-soft); fill: var(--ink-soft); }
+.tools-btn svg circle { fill: #fff; stroke: var(--ink-soft); stroke-width: 2; }
+.tools-btn[aria-expanded="true"] { background: #fce7f3; box-shadow: 0 2px 0 #f9a8d4, 0 0 0 4px rgba(190,24,93,.2); }
+.tools-dot { display: none; position: absolute; top: 1px; right: 1px; width: 14px; height: 14px; border-radius: 50%; background: #22c55e; border: 2.5px solid #fff; }
+.tools-btn.metro-on { box-shadow: 0 4px 0 #14532d, 0 0 0 4px rgba(34,197,94,.35); }
+.tools-btn.metro-on .tools-dot { display: block; animation: tools-tick 1s ease-in-out infinite; }
+.tools-btn.metro-on + .ctl-label { color: #15803d; }
+.tools-btn.kbd-on + .ctl-label { color: #be185d; }
+@keyframes tools-tick { 0%, 100% { transform: scale(1); } 50% { transform: scale(.7); } }
+
+/* the Tools panel: beside its button (a phone: over the xylophone), its point at the button's middle */
+.teach-tools { position: fixed; z-index: 30; width: 336px; max-height: calc(100vh - 16px); display: flex; flex-direction: column; color: var(--ink);
+  background: #fff; border-radius: 20px; box-shadow: 0 16px 44px rgba(43,29,22,.34), 0 0 0 2px #efe5d3; }
+.teach-tools::before { content: ''; position: absolute; left: -10px; top: var(--ay, 50%); margin-top: -10px; border: 10px solid transparent; border-left: 0; border-right-color: #fff;
+  filter: drop-shadow(-2px 0 0 #efe5d3); }
+.tl-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 0 18px; }
+.tl-head b { font-size: 19px; }
+.tl-head .icon-btn { width: 38px; height: 38px; }
+.tl-body { overflow-y: auto; min-height: 0; padding: 2px 16px 14px; display: flex; flex-direction: column; gap: 11px; }
+.tl-sec h4 { margin: 0 0 5px; font-size: 12.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink-soft); }
+.tl-metros { display: grid; grid-template-columns: .8fr 1fr 1fr; gap: 6px; }
+.tl-metro { border: 0; border-radius: 12px; padding: 7px 4px 6px; background: #f3ede1; color: #15803d; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  line-height: 1.1; box-shadow: 0 3px 0 #d9c9ad; }
+.tl-metro b { font-size: 16px; font-weight: 700; }
+.tl-metro small { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); }
+.tl-metro.off { color: var(--ink); }
+.tl-metro.on { background: #15803d; color: #fff; box-shadow: 0 3px 0 #14532d, 0 0 0 3px #fde047; }
+.tl-metro.on small { color: #fff; opacity: .9; }
+.tl-metro.off.on { background: #e7dcc7; color: var(--ink); box-shadow: 0 3px 0 #cbb994; }
+.tl-metro:active { transform: translateY(2px); box-shadow: none; }
+.tl-say { margin: 6px 0 0; font-size: 13px; color: var(--ink-soft); line-height: 1.3; }
+.tl-sec.hint .tl-metros { border-radius: 14px; animation: tl-hint 1.4s ease-in-out infinite; }
+@keyframes tl-hint { 0%, 100% { box-shadow: 0 0 0 0 rgba(21,128,61,.55); } 60% { box-shadow: 0 0 0 10px rgba(21,128,61,0); } }
+/* Computer Keyboard · Auto-Next Slide, side by side (2026-10-12, the user's: "Computer Keyboard — with computer on
+   top and keyboard below it, and a little keyboard next to it … Right next to it, write Auto-Next Slide on/off") */
+.tl-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.tl-big { display: flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 12px; background: #f3ede1; padding: 8px 10px; color: var(--ink); min-width: 0; }
+.tl-big:hover { background: #ebe2d1; }
+.tl-two { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.12; }
+.tl-two b { font-size: 14.5px; font-weight: 700; white-space: nowrap; }
+.tl-kbd svg { flex: none; width: 30px; height: 30px; stroke: var(--ink-soft); fill: none; }
+.tl-kbd svg .keys { fill: var(--ink-soft); stroke: none; }
+.tl-kbd.on { background: #be185d; color: #fff; }
+.tl-kbd.on svg { stroke: #fff; }
+.tl-kbd.on svg .keys { fill: #fff; }
+.tl-sw { flex: none; font-style: normal; font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 3px 9px; background: #fff; color: var(--ink-soft); box-shadow: inset 0 0 0 2px #d9c9ad; }
+.tl-auto.on { background: #dcfce7; }
+.tl-auto.on .tl-sw { background: #15803d; color: #fff; box-shadow: none; }
+.tl-metros.n4 { grid-template-columns: .7fr 1fr 1fr 1fr; }
+.tl-choices { display: grid; gap: 6px; }
+.tl-choices.n4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tl-choices.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tl-opt { border: 0; border-radius: 12px; background: #f6f1e7; padding: 6px 3px 5px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--ink); min-width: 0; }
+.tl-opt svg { width: 42px; height: 30px; flex: none; }
+.tl-opt > span:last-child { font-size: 12px; font-weight: 600; line-height: 1.15; text-align: center; }
+.tl-opt .tl-word { display: grid; place-items: center; height: 30px; font: 700 21px/1 'Fredoka', sans-serif; color: var(--ink); }
+.tl-opt:hover { background: #efe7d8; }
+.tl-opt.on { background: #fff; box-shadow: inset 0 0 0 3px #be185d; }
+.tl-reset { align-self: flex-start; background: #f3ede1; box-shadow: none; padding: 5px 13px; font-size: 14px; }
+@media (max-width: 700px) {
+  .teach-tools { left: 8px; right: 8px; bottom: 8px; top: auto; width: auto; max-height: 72vh; }
+  .teach-tools::before { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .tools-btn.metro-on .tools-dot, .tl-sec.hint .tl-metros { animation: none; } }
 /* the five dots are buttons here: back to any exercise reached */
 .dots.teach-dots { pointer-events: auto; gap: 9px; }
 .dots button.dot { padding: 0; width: 19px; height: 19px; cursor: pointer; appearance: none; -webkit-appearance: none; }
 .dots button.dot[disabled] { cursor: default; opacity: .55; }
 .dots button.dot:not([disabled]):hover { transform: scale(1.15); }
+/* a long unit (more than twelve): ‹ 3 of 20 › and what is done */
+.dots .dot-step { border: 0; width: 26px; height: 26px; border-radius: 50%; background: #fff; color: var(--ink-soft); font-size: 19px; font-weight: 700; line-height: 1;
+  display: grid; place-items: center; padding: 0 0 2px; box-shadow: 0 1px 3px rgba(62,39,35,.2); cursor: pointer; }
+.dots .dot-step[disabled] { opacity: .35; cursor: default; }
+.teach-dots .dots-count { display: flex; align-items: center; gap: 7px; font-size: 15px; color: var(--ink); }
+.teach-dots .dots-count .dot { width: 15px; height: 15px; }
+.teach-dots .dots-count small { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 
-/* the music card (2026-10-11, the user's: the notation had become the smallest thing on it): from a tablet up,
-   the controls stand in columns either side of the music — Listen · the metronome · Keyboard on the left,
+/* the music card (2026-10-11 in Teach Me to Read, every mode since 2026-10-12 — the user's: the notation had become
+   the smallest thing on it): from a tablet up, the controls stand in columns either side of the music — Listen ·
+   (Practice ·) (the metronome in a battle ·) Tools on the left,
    ↻ · Next on the right — so the staff gets the card's whole height and nearly all of its width (game.js
    draws it tighter too). A phone keeps its row of buttons under the music: there the width is what counts */
-.app.teach-on .stand { padding-top: 32px; }        /* the five dots get their own strip: the staff is drawn up to its edge */
+.app:not(.making) .stand { padding-top: 32px; }        /* the dots get their own strip: the staff is drawn up to its edge */
 @media (min-width: 701px) {
-  .app.teach-on .stand-row { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr); column-gap: 16px; }
-  .app.teach-on .controls { grid-column: 1; grid-row: 1; flex-direction: column; justify-content: center; align-items: center; gap: 12px; padding: 0; }
-  .app.teach-on .side-right { grid-column: 3; grid-row: 1; align-self: stretch; flex-direction: column; justify-content: center; align-items: center; gap: 14px; }
-  .app.teach-on .music { grid-column: 2; grid-row: 1; }
-  .app.teach-on.kbd-on .kbd-view { grid-column: 2; }
+  .app .stand-row { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr); column-gap: 16px; }
+  .app .controls { grid-column: 1; grid-row: 1; flex-direction: column; justify-content: center; align-items: center; gap: 12px; padding: 0; }
+  .app .side-right { grid-column: 3; grid-row: 1; align-self: stretch; flex-direction: column; justify-content: center; align-items: center; gap: 14px; }
+  .app .music { grid-column: 2; grid-row: 1; }
+  .app.kbd-on .kbd-view { grid-column: 2; }
   /* the tempo choice opens beside the metronome, pointing at it */
-  .app.teach-on .metro-pick { bottom: auto; top: 50%; left: calc(100% + 12px); transform: translateY(-50%); }
-  .app.teach-on .metro-pick::after { top: 50%; left: auto; right: 100%; margin: -8px 0 0; border-color: transparent; border-right-color: #fff; }
+  .app .metro-pick { bottom: auto; top: 50%; left: calc(100% + 12px); transform: translateY(-50%); }
+  .app .metro-pick::after { top: 50%; left: auto; right: 100%; margin: -8px 0 0; border-color: transparent; border-right-color: #fff; }
 }
 /* a shorter screen: smaller buttons, so the three on the left fit beside the staff */
 @media (min-width: 701px) and (max-height: 820px) {
-  .app.teach-on .round-btn.ctl-btn { width: 48px !important; height: 48px !important; }
-  .app.teach-on .round-btn.ctl-btn svg { width: 25px !important; height: 25px !important; }
-  .app.teach-on .round-btn.small { width: 48px; height: 48px; }
-  .app.teach-on .round-btn.small svg { width: 24px; height: 24px; }
-  .app.teach-on .controls { gap: 6px; }
-  .app.teach-on .ctl { gap: 2px; }
-  .app.teach-on .ctl-label { font-size: 12.5px; }
+  .app .round-btn.ctl-btn { width: 48px !important; height: 48px !important; }
+  .app .round-btn.ctl-btn svg { width: 25px !important; height: 25px !important; }
+  .app .round-btn.small { width: 48px; height: 48px; }
+  .app .round-btn.small svg { width: 24px; height: 24px; }
+  .app .controls { gap: 6px; }
+  .app .ctl { gap: 2px; }
+  .app .ctl-label { font-size: 12.5px; }
 }
 @media (min-width: 701px) and (max-height: 640px) {
-  .app.teach-on .stand { padding-top: 28px; padding-bottom: 8px; }
-  .app.teach-on .round-btn.ctl-btn { width: 42px !important; height: 42px !important; }
-  .app.teach-on .round-btn.ctl-btn svg { width: 22px !important; height: 22px !important; }
-  .app.teach-on .controls { gap: 3px; }
-  .app.teach-on .ctl-label { font-size: 11.5px; }
+  .app .stand { padding-top: 28px; padding-bottom: 8px; }
+  .app .round-btn.ctl-btn { width: 42px !important; height: 42px !important; }
+  .app .round-btn.ctl-btn svg { width: 22px !important; height: 22px !important; }
+  .app .controls { gap: 3px; }
+  .app .ctl-label { font-size: 11.5px; }
 }
 
 /* the computer keyboard, in the music's place */
@@ -1386,6 +1540,16 @@ html.view-home .app-home { display: none; }
 @container (max-width: 760px) { .teach-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-auto-flow: row; } }
 @container (max-width: 470px) { .teach-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 520px) { .teach-grid.in-drop { grid-template-columns: minmax(0, 1fr); } }
+/* your units (2026-10-12): row by row, the + Make a unit tile last */
+.teach-grid.units { grid-template-rows: none; grid-auto-flow: row; }
+.tt.unit .tt-txt b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt.unit .tt-txt b::before { content: '♫ '; color: var(--mc); }
+.tt-count { font-size: 12.5px; font-weight: 700; color: var(--ink-soft); margin-top: 3px; }
+.tt-new { background: transparent; box-shadow: none; border: 2px dashed #d9c9ad; }
+.tt-new:hover { background: #fffaf3; border-color: var(--mc); }
+.tt-plus { flex: none; width: 92px; height: 52px; border-radius: 10px; display: grid; place-items: center; font-size: 34px; font-weight: 600; color: var(--mc); background: #fff; box-shadow: inset 0 0 0 1.5px #efe5d3; }
+.dd-teach-make { margin: 12px 0 0; }
+.dd-teach-make .h-link { background: #f3ede1; box-shadow: none; padding: 6px 14px; font-size: 14.5px; }
 .tt { --mc: #be185d; display: flex; align-items: center; gap: 12px; min-width: 0; border: 0; border-radius: 16px; padding: 10px 14px 10px 10px; text-align: left; color: var(--ink);
   background: #fff; box-shadow: inset 0 0 0 2px #efe5d3, 0 2px 0 #e7dcc7; transition: transform .08s; }
 .tt:hover { background: #fffaf3; transform: translateY(-1px); }
@@ -1398,7 +1562,7 @@ html.view-home .app-home { display: none; }
 .tt-txt b { font-size: 17px; line-height: 1.15; }
 .tt.adv .tt-txt b::before { content: '↳ '; color: var(--mc); }
 .tt-txt small { font-size: 13.5px; color: var(--ink-soft); font-weight: 600; line-height: 1.2; }
-.tt-marks { display: flex; gap: 5px; margin-top: 4px; }
+.tt-marks { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
 .tt-marks i { width: 13px; height: 13px; border-radius: 50%; border: 2.5px solid #d6c6a8; }
 .tt-marks i.c { background: #22c55e; border-color: #15803d; }
 .tt-marks i.g { background: var(--gold); border-color: var(--gold-deep); }
@@ -1412,7 +1576,7 @@ html.view-home .app-home { display: none; }
 .tw-what span { font-size: 14px; color: var(--ink-soft); line-height: 1.35; }
 .tw-start { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .tw-start .lbl { font-size: 14px; font-weight: 700; color: var(--ink-soft); }
-.tw-exs { display: flex; gap: 6px; }
+.tw-exs { display: flex; flex-wrap: wrap; gap: 6px; }
 .tw-ex { border: 0; background: #fff; border-radius: 12px; padding: 5px 5px 3px; width: 46px; display: flex; flex-direction: column; align-items: center; gap: 1px;
   box-shadow: inset 0 0 0 2px #e6dac4; color: var(--ink); }
 .tw-ex svg { width: 28px; height: 28px; }
@@ -1420,8 +1584,20 @@ html.view-home .app-home { display: none; }
 .tw-ex .tw-none { display: block; width: 28px; height: 28px; border-radius: 50%; border: 3px solid #d6c6a8; box-sizing: border-box; }
 .tw-ex.on { box-shadow: inset 0 0 0 3px var(--mc), 0 0 0 3px color-mix(in srgb, var(--mc) 18%, transparent); background: color-mix(in srgb, var(--mc) 7%, #fff); }
 .tw-ex[disabled] { opacity: .45; cursor: default; }
-.tw-clear { margin-left: auto; }
-@media (max-width: 520px) { .tw-ex { width: 40px; } .tw-ex svg, .tw-ex .tw-none { width: 24px; height: 24px; } .tw-clear { margin-left: 0; } }
+.tw-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.tw-acts:empty { display: none; }
+.tw-acts .h-link { background: #fff; box-shadow: none; padding: 5px 13px; font-size: 14px; }
+@media (max-width: 520px) { .tw-ex { width: 40px; } .tw-ex svg, .tw-ex .tw-none { width: 24px; height: 24px; } .tw-acts { margin-left: 0; } }
+/* + Make a unit: the sets you have, or a new one */
+.tw-sets { display: flex; flex-direction: column; gap: 6px; }
+.tw-set { display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 14px; padding: 8px 10px 8px 14px; box-shadow: inset 0 0 0 2px #efe5d3; }
+.tw-set-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.tw-set-txt b { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tw-set-txt small { font-size: 13px; color: var(--ink-soft); }
+.tw-set .pill-btn { padding: 7px 16px; font-size: 15px; }
+.tw-in { flex: none; font-size: 13px; font-weight: 700; color: #15803d; }
+.tw-newrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.tw-newrow input { flex: 1 1 260px; min-width: 0; padding: 9px 12px; border-radius: 12px; border: 2px solid #e6dac4; font: inherit; font-size: 16px; background: #fff; color: var(--ink); }
 
 /* after the fifth exercise */
 .te-card { --mc: #be185d; }
@@ -1435,3 +1611,158 @@ html.view-home .app-home { display: none; }
 .te-say.small { font-size: 15px; color: var(--ink-soft); margin-top: -8px; }
 .te-card .pill-btn svg.mk-star { display: inline-block; width: 20px; height: 20px; vertical-align: -4px; margin-right: 6px; }
 @media (max-width: 700px) { .te-mk svg, .te-mk .te-none { width: 40px; height: 40px; } .te-marks { gap: 8px; } }
+/* a unit's card: more marks, smaller, in rows */
+.te-marks.many { flex-wrap: wrap; gap: 6px 8px; max-width: 540px; margin-left: auto; margin-right: auto; }
+.te-marks.many .te-mk svg, .te-marks.many .te-mk .te-none { width: 32px; height: 32px; }
+.te-marks.many .te-mk .te-none { border-width: 3px; }
+
+/* ==========================================================================
+   The landing page's redesign (2026-10-12, the user's): Practice · Rounds ·
+   Songs · Games · Battle Mode — Practice's three tabs, the Songs window and
+   Songs on the music card, the Games choice, the Battle Mode window
+   ========================================================================== */
+/* Songs on the music card: the Practice button is back (on: each slide goes round; off: straight through) */
+.app.teach-on.song-on .ctl-mode { display: flex; }
+/* the slides at the top: the ones played faded in, those outside the section greyed */
+.dot.seen { background: #d8cab0; border-color: #b7a585; }
+.dot.out { opacity: .3; }
+.tt.unit.song .tt-txt b::before { content: '♪ '; }
+.tw-tabs { margin-top: 2px; }
+/* the Songs window */
+.sw-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.sw-list .mc-row b { white-space: normal; }
+.sw-sub { margin: 10px 0 6px; font-size: 14px; color: var(--ink-soft); }
+.sw-what { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.sw-range { display: flex; gap: 10px; align-items: center; font-weight: 600; color: var(--ink-soft); }
+.sw-range select { font: inherit; font-weight: 700; color: var(--ink); padding: 5px 8px; border-radius: 10px; border: 2px solid #e6dac4; background: #fff; margin-left: 4px; }
+.sw-slides { display: flex; gap: 8px; overflow-x: auto; padding: 10px 2px 6px; scrollbar-width: thin; }
+.sw-slide { flex: none; border: 0; border-radius: 12px; background: #fff; padding: 6px 8px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; box-shadow: inset 0 0 0 2px #efe5d3; opacity: .45; }
+.sw-slide.in { opacity: 1; box-shadow: inset 0 0 0 3px var(--mc); }
+.sw-slide small { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.sw-pic svg { display: block; max-width: 170px; height: auto; }
+.sw-how td small { display: block; margin-top: 4px; font-size: 13px; color: var(--ink-soft); }
+.song-card h3 { color: #6d28d9; }
+/* the Games window: the two games side by side */
+.gw-games { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.gw-game { display: flex; align-items: center; gap: 12px; border: 2px solid #e6dac4; background: #fff; border-radius: 18px; padding: 12px 14px; text-align: left; color: var(--ink); }
+.gw-game:hover { border-color: color-mix(in srgb, var(--gc) 45%, #fff); }
+.gw-game.on { border-color: var(--gc); background: color-mix(in srgb, var(--gc) 8%, #fff); box-shadow: 0 0 0 2px var(--gc); }
+.gw-ico { flex: none; width: 48px; height: 48px; border-radius: 14px; background: var(--gc); display: grid; place-items: center; }
+.gw-ico svg { width: 34px; height: 34px; }
+.gw-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gw-txt b { font-size: 18px; }
+.gw-txt small { font-size: 13.5px; color: var(--ink-soft); line-height: 1.3; }
+.gw-txt em { font-style: normal; font-size: 13px; font-weight: 700; color: var(--gc); }
+@media (max-width: 560px) { .gw-games { grid-template-columns: 1fr; } }
+/* the Battle Mode window */
+.bw-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.bw-row { display: flex; gap: 6px; align-items: stretch; }
+.bw-row .mc-row { flex: 1; min-width: 0; }
+.bw-row .h-link { background: #f3ede1; box-shadow: none; padding: 0 14px; font-size: 16px; border-radius: 12px; }
+
+/* ==========================================================================
+   The Library (2026-10-12, the user's: the ♫ My melodies and the gear Settings became one Library button,
+   laid out as Song Writer 2.5's Library — library.js). In the window that was My melodies (#melodies):
+   Now playing · the buttons · + New session · the folders (My sessions · My melodies · Songs · Practice ·
+   Levels · Settings), each a Song Writer group head that folds
+   ========================================================================== */
+.lib-btn { height: 44px; border: 0; border-radius: 14px; background: #fff; box-shadow: var(--shadow); display: inline-flex; align-items: center; gap: 8px;
+  padding: 0 16px 0 13px; font: inherit; font-size: 16px; font-weight: 600; color: var(--ink); }
+.lib-btn svg { width: 22px; height: 22px; fill: none; stroke: var(--gold-deep); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.lib-btn:hover { background: var(--cream); }
+@media (max-width: 700px) { .lib-btn { height: 38px; padding: 0 11px 0 9px; font-size: 14.5px; gap: 6px; } .lib-btn svg { width: 20px; height: 20px; } }
+@media (max-width: 480px) { .lib-btn { width: 38px; padding: 0; justify-content: center; } .lib-btn span { display: none; } }
+
+#melodies .mel-sheet { width: min(860px, 100%); }
+.lb-i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* Now playing (Song Writer's "Now open") */
+.lb-now { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; background: color-mix(in srgb, var(--band) 10%, #fff); border-radius: 18px; padding: 12px 16px; margin: 2px 0 14px;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--band) 26%, #fff); }
+.lb-now .band-dot { width: 14px; height: 14px; }
+.lb-now-txt { flex: 1 1 240px; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+.lb-now-k { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+.lb-now-txt b { font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.lb-now-txt small { width: 100%; font-size: 13.5px; color: var(--ink-soft); }
+.lb-now-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+/* the buttons: Song Writer's row — white with a line, the first one filled */
+.lb-btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.lb-btn { display: inline-flex; align-items: center; gap: 8px; background: #fff; box-shadow: inset 0 0 0 2px #e6dac4; padding: 10px 17px; font-size: 15.5px; }
+.lb-btn:hover { background: #fffaf3; filter: none; }
+.lb-btn.primary { background: var(--gold); color: #fff; box-shadow: 0 3px 0 var(--gold-deep); }
+.lb-btn .lb-i { width: 19px; height: 19px; }
+.lb-soon { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #92400e; background: #fef3c7; border-radius: 999px; padding: 1px 8px; margin-left: 2px; }
+/* + New session: a name, or none */
+.lb-newses { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 4px; }
+.lb-newses input, .lb-inline input { flex: 1 1 240px; min-width: 0; padding: 10px 13px; border-radius: 14px; border: 2px solid #e6dac4; font: inherit; font-size: 16px; background: #fff; color: var(--ink); }
+.lb-newses input::placeholder { color: #a8957a; }
+.lb-ses-btn { display: inline-flex; align-items: center; gap: 7px; padding: 10px 20px; }
+.lb-newses + .note, .lb-newses + .note-folded { margin-bottom: 6px; }
+/* the folders: Song Writer's group heads (icon · NAME · a rule), with a count and a fold arrow */
+.lb-folder { margin-top: 12px; }
+.lb-fold { width: 100%; border: 0; background: none; display: flex; align-items: center; gap: 9px; padding: 8px 4px; color: var(--gold-deep); text-align: left; border-radius: 10px; }
+.lb-fold:hover { background: #fbf3e4; }
+.lb-fold .lb-i { width: 19px; height: 19px; }
+.lb-fold-t { font-size: 14px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+.lb-count { font-size: 12.5px; font-weight: 700; color: var(--ink-soft); background: #f3ede1; border-radius: 999px; padding: 1px 9px; }
+.lb-rule { flex: 1; height: 2px; background: #efe5d3; border-radius: 1px; }
+.lb-chev { width: 18px; height: 18px; flex: none; fill: none; stroke: var(--ink-soft); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+.lb-folder.open .lb-chev { transform: rotate(90deg); }
+.lb-fold-body { padding: 4px 0 2px; }
+.lb-sub { display: flex; align-items: center; gap: 8px; margin: 12px 4px 6px; font-size: 14px; color: var(--ink-soft); }
+.lb-sub .band-dot { width: 11px; height: 11px; }
+/* a row (Song Writer's library-song-item) */
+.lb-row { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 14px; padding: 8px 10px; margin-bottom: 6px; box-shadow: inset 0 0 0 2px #efe5d3; }
+.lb-row.on { box-shadow: inset 0 0 0 2.5px var(--gold); background: #fffbeb; }
+.lb-badge { flex: none; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--bc); }
+.lb-badge svg { width: 30px; height: 30px; }
+.lb-badge.light { background: #fff; box-shadow: inset 0 0 0 2.5px var(--bc); }
+.lb-badge.txt { color: #fff; font-weight: 700; font-size: 17px; }
+.lb-badge.ring { background: #fff; color: var(--ink); box-shadow: inset 0 0 0 3px var(--bc); border-radius: 50%; }
+.lb-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.lb-txt b { font-size: 16px; font-weight: 600; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.lb-txt small { font-size: 13px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-txt .mel-tag, .lb-txt .ses-tag { font-size: 11.5px; }
+.lb-txt .bt-dots { margin-left: 0; }
+.lb-stars { flex: none; color: var(--gold); font-size: 15px; letter-spacing: 1px; }
+.lb-stars .off { color: #e6dac4; }
+.lb-acts { flex: none; display: flex; gap: 6px; align-items: center; }
+.lb-act { border: 0; border-radius: 10px; background: #f3ede1; color: var(--ink); font: inherit; font-size: 14.5px; font-weight: 600; padding: 7px 13px; white-space: nowrap; }
+.lb-act:hover { background: #ebe2d1; }
+.lb-act.go { background: #22c55e; color: #fff; box-shadow: 0 2px 0 #15803d; }
+.lb-act.go:hover { background: #1fb455; }
+.lb-act.ic { width: 34px; padding: 7px 0; text-align: center; font-size: 16px; }
+.lb-act.x { color: var(--ink-soft); font-size: 19px; line-height: 1; }
+.lb-act.soft { background: #fff; box-shadow: inset 0 0 0 2px #e6dac4; }
+.lb-empty { border: 2px dashed #e2d4bb; border-radius: 14px; padding: 16px; text-align: center; color: var(--ink-soft); font-size: 14.5px; }
+.lb-inline { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }
+.lb-more { margin: 8px 0 2px; }
+.lb-more .h-link { background: #f3ede1; box-shadow: none; padding: 6px 14px; font-size: 14.5px; }
+.lb-prefs { padding: 4px 6px 0; }
+.lb-prefs .sec { margin-bottom: 10px; }
+.lb-prefs .save-mine input { min-width: 160px; }
+.lb-prefs input[type=range] { width: min(280px, 60vw); accent-color: var(--gold-deep); }
+.lb-lesson { margin: 0 0 16px; }
+/* New melody: which set */
+.lb-into { --mc: #15803d; max-width: 560px; }
+.lb-into .mc-row { padding: 10px 14px; }
+.lb-narrow { max-width: 560px; }
+.lb-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; max-width: 560px; }
+@media (max-width: 700px) {
+  .lb-btn { padding: 8px 12px; font-size: 14px; gap: 6px; }
+  .lb-row { gap: 9px; padding: 7px 8px; flex-wrap: wrap; }
+  .lb-txt { flex-basis: calc(100% - 50px); }
+  .lb-acts { width: 100%; justify-content: flex-end; }
+  .lb-stars { display: none; }
+  .lb-badge { width: 34px; height: 34px; }
+  .lb-badge svg { width: 26px; height: 26px; }
+}
+
+/* the session page's Format (2026-10-12): first on the page, the five of them, then their own choices and Points */
+.ses-format .sf-seg button { padding: 8px 16px; font-size: 15.5px; }
+.ses-format .sf-about { margin: 8px 0 10px; }
+.sf-q { margin: 14px 0 8px; font-size: 15px; color: var(--ink-soft); }
+.sf-tabs { margin-bottom: 10px; }
+.teach-grid.in-ses .tt { padding: 8px 12px 8px 8px; }
+.sf-songs { --mc: #7c3aed; max-width: 520px; max-height: 260px; overflow-y: auto; padding: 2px; margin-bottom: 6px; }
+.sf-points { margin-top: 14px; }
+.ses-format .note { max-width: 680px; }

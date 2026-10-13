@@ -54,11 +54,10 @@
           <span class="sc-points"><b id="sc-points">0</b><small>pts</small></span>
           <span class="sc-streak"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.6 2c.4 3.2 3.9 5 4.9 8.6 1.2 4.3-1.6 9.4-5.6 9.4-3.7 0-6.4-3-5.9-6.8.3-2.3 1.7-3.6 2.6-4.9.2 1.5.9 2.7 2 3.2-.6-3.6.4-6.9 2-9.5z"/></svg><b id="sc-streak">0</b></span>
         </button>
-        <button class="icon-btn" id="mel-btn" type="button" aria-label="My melodies" title="My melodies">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17.5V6.2l10-2.2v11.3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><ellipse cx="6.6" cy="17.6" rx="2.9" ry="2.2"/><ellipse cx="16.6" cy="15.4" rx="2.9" ry="2.2"/></svg>
-        </button>
-        <button class="icon-btn" id="gear" type="button" aria-label="Settings">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4zM13 15.2a3.2 3.2 0 1 1 0-6.4 3.2 3.2 0 0 1 0 6.4z" transform="translate(-1 0)"/></svg>
+        <!-- the Library (2026-10-12, the user's: the ♫ My melodies and the gear Settings, one button — library.js) -->
+        <button class="lib-btn" id="lib-btn" type="button" aria-haspopup="dialog" title="Library — your sessions, melodies, songs, levels and settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v14"/><path d="M9 19V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v11"/><path d="m14.5 8.6 2.9-.8a1 1 0 0 1 1.2.7l2.7 10.1"/><path d="M3 19h18"/></svg>
+          <span>Library</span>
         </button>
       </div>
     </header>
@@ -70,12 +69,17 @@
 
     <main class="stage">
       <section class="stand" id="stand" aria-label="The music">
-        <div class="maker-part maker-top">
+        <!-- Make a melody (2026-10-12, relaid at the user's: "the staff gets smaller and smaller as we add more and
+             more rows"): the music card keeps ONE slim line — the set, its slides, + New slide, what is left,
+             Cancel, Save — and the staff; the writing tools are in the dock under the card (they take the
+             xylophone's height) -->
+        <div class="maker-part maker-head">
           <span class="mk-set" id="mk-set"></span>
-          <input type="text" id="mk-title" maxlength="60" placeholder="A name for this melody (if you like)" aria-label="The melody’s name">
-          <div class="seg" id="mk-time" role="group" aria-label="Time"><button type="button" data-v="2">2/4</button><button type="button" data-v="3">3/4</button><button type="button" data-v="4">4/4</button></div>
-          <div class="seg" id="mk-bars" role="group" aria-label="Length"><button type="button" data-v="1">1 bar</button><button type="button" data-v="2">2 bars</button></div>
+          <div class="mk-slides" id="mk-slides" role="group" aria-label="The set’s slides"></div>
+          <button type="button" class="pill-btn" id="mk-new" title="Save this slide and start a new one (Enter)">+ New slide</button>
           <span class="mk-status" id="mk-status" aria-live="polite"></span>
+          <button type="button" class="pill-btn" id="mk-cancel">Cancel</button>
+          <button type="button" class="pill-btn primary" id="mk-save">Save</button>
         </div>
         <!-- the round's progress, top centre -->
         <div class="dots" id="dots" aria-hidden="true"></div>
@@ -113,7 +117,7 @@
               </button>
               <span class="ctl-label mode-label" id="mode-label">Practice</span>
             </div>
-            <div class="ctl">
+            <div class="ctl ctl-metro">
               <!-- the weight slides up the arm for Slow, down for Fast, as on a real one -->
               <button class="round-btn ctl-btn metro-btn" id="btn-metro" type="button" aria-label="Metronome off">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path class="body" d="M9.2 3.2h5.6l4 17.3H5.2z" stroke-width="2" stroke-linejoin="round"/><path d="M6.6 15.2h10.8" stroke-width="1.8"/><path class="arm" d="M12 15.2L17.6 3.6" stroke-width="2" stroke-linecap="round"/><rect class="mw" id="metro-weight" x="-2.2" y="-1.4" width="4.4" height="2.8" rx=".7" transform="translate(14.3 9.6) rotate(25.8)"/></svg>
@@ -122,23 +126,15 @@
               <!-- Battle Mode: the metronome opens a choice of tempo; picking one counts in at once (game.js metroTap) -->
               <div class="metro-pick" id="metro-pick" role="group" aria-label="Pick a tempo" hidden></div>
             </div>
-            <div class="ctl teach-only">
-              <!-- Teach Me to Read: the computer keyboard's number keys, to play with (teach.js) -->
-              <button class="round-btn ctl-btn kbd-btn" id="btn-kbd" type="button" aria-label="The computer keyboard" title="See which computer keys play the bars" aria-pressed="false">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12.5" rx="2.4" fill="none" stroke-width="2"/><g class="keys"><rect x="5" y="9" width="2.4" height="2.2" rx=".5"/><rect x="8.6" y="9" width="2.4" height="2.2" rx=".5"/><rect x="12.2" y="9" width="2.4" height="2.2" rx=".5"/><rect x="15.8" y="9" width="2.4" height="2.2" rx=".5"/><rect x="7" y="13.6" width="10" height="2.2" rx=".6"/></g></svg>
+            <div class="ctl ctl-tools">
+              <!-- Tools — the metronome (beside the music in a battle), the computer keyboard, Auto-Next, the colours: a panel that pops up (tools.js) -->
+              <button class="round-btn ctl-btn tools-btn" id="btn-tools" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="teach-tools" aria-label="Tools">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><g stroke-width="2.2" stroke-linecap="round"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></g><circle cx="15.5" cy="6.5" r="2.6"/><circle cx="8.5" cy="12" r="2.6"/><circle cx="13" cy="17.5" r="2.6"/></svg>
+                <i class="tools-dot" aria-hidden="true"></i>
               </button>
-              <span class="ctl-label">Keyboard</span>
+              <span class="ctl-label tools-label" id="tools-label">Tools</span>
             </div>
           </div>
-        </div>
-        <div class="maker-part maker-bottom">
-          <div class="mk-values" id="mk-values" role="group" aria-label="The note value"></div>
-          <button type="button" class="pill-btn" id="mk-rest">Rest</button>
-          <button type="button" class="pill-btn" id="mk-undo" aria-label="Take the last one back">⌫</button>
-          <button type="button" class="pill-btn" id="mk-hear" aria-label="Hear it">▶</button>
-          <span class="mk-gap"></span>
-          <button type="button" class="pill-btn" id="mk-cancel">Cancel</button>
-          <button type="button" class="pill-btn primary" id="mk-save">Save</button>
         </div>
         <div class="clock" id="clock" hidden><i></i></div>
         <div class="praise" id="praise"></div>
@@ -146,6 +142,25 @@
       <!-- over the music card, but outside it: the music card clips, and a short window made it cut off the card's top -->
       <div class="rounddone" id="rounddone" hidden></div>
 
+      <!-- Make a melody's tools: one bar between the music and the xylophone (maker.js). The slide's name, time and
+           length — set once a slide — are behind its button, in a little window that pops up over the music -->
+      <section class="maker-part maker-dock" id="maker-dock" aria-label="Writing tools">
+        <div class="mk-values" id="mk-values" role="group" aria-label="The note value"></div>
+        <button type="button" class="pill-btn" id="mk-rest" title="A rest (R)">Rest</button>
+        <button type="button" class="pill-btn" id="mk-undo" aria-label="Take the last one back" title="Take the last one back (Backspace)">⌫</button>
+        <button type="button" class="pill-btn" id="mk-hear" aria-label="Hear it" title="Hear it (Space)">▶</button>
+        <div class="mk-opts-wrap">
+          <button type="button" class="pill-btn mk-opts" id="mk-opts" aria-haspopup="dialog" aria-expanded="false" aria-controls="mk-pop"></button>
+          <div class="mk-pop" id="mk-pop" role="dialog" aria-label="This slide" hidden>
+            <label class="mk-pop-row"><span>Name</span><input type="text" id="mk-title" maxlength="60" placeholder="If you like — Hot Cross Buns 1, say" aria-label="The slide’s name"></label>
+            <div class="mk-pop-row"><span>Time</span><div class="seg" id="mk-time" role="group" aria-label="Time"><button type="button" data-v="2">2/4</button><button type="button" data-v="3">3/4</button><button type="button" data-v="4">4/4</button></div></div>
+            <div class="mk-pop-row"><span>Length</span><div class="seg" id="mk-bars" role="group" aria-label="Length"><button type="button" data-v="1">1 bar</button><button type="button" data-v="2">2 bars</button></div></div>
+            <div class="mk-pop-foot"><button type="button" class="h-link" id="mk-del">Delete this slide</button><button type="button" class="pill-btn go" id="mk-pop-done">Done</button></div>
+          </div>
+        </div>
+        <!-- a phone: what is left of the bar shows here (the card's top line has no room for it) -->
+        <span class="mk-status mk-status-dock" id="mk-status2" aria-hidden="true"></span>
+      </section>
       <section class="xylo-wrap" aria-label="The xylophone">
         <div class="xylo" id="xylo" role="group" aria-label="Xylophone: number keys 1 to 0 play the bars; or Tab here, then the arrow keys and Enter"></div>
       </section>
@@ -180,11 +195,12 @@
     </div>
   </div>
 
+  <!-- the Library (library.js) — and a melody set's page in it (melodies.js); the window was My melodies until 2026-10-12 -->
   <div class="modal" id="melodies" hidden>
     <div class="sheet mel-sheet" role="dialog" aria-modal="true" aria-labelledby="mel-title">
       <header class="sheet-head">
-        <button class="icon-btn back" id="mel-back" type="button" aria-label="Back to all the sets" hidden>‹</button>
-        <h2 id="mel-title">My melodies</h2>
+        <button class="icon-btn back" id="mel-back" type="button" aria-label="Back to the Library" hidden>‹</button>
+        <h2 id="mel-title">Library</h2>
         <span class="custom-tag" id="mel-tag"></span>
         <button class="icon-btn close" data-close type="button" aria-label="Close">×</button>
       </header>
@@ -193,6 +209,8 @@
     </div>
   </div>
 
+  <!-- Teach Me to Read's Tools: beside its button, over the music (teach.js) -->
+  <div class="teach-tools" id="teach-tools" role="dialog" aria-labelledby="tl-title" hidden></div>
   <div class="fx" id="fx" aria-hidden="true"></div>
   <div class="sr-only" id="announce" aria-live="polite"></div>
 
@@ -218,11 +236,13 @@
   <script src="js/board.js"></script>
   <script src="js/lesson.js"></script>
   <script src="js/melodies.js"></script>
+  <script src="js/library.js"></script>
   <script src="js/maker.js"></script>
   <script src="js/charts.js"></script>
   <script src="js/stats.js"></script>
   <script src="js/home.js"></script>
   <script src="js/drop.js"></script>
+  <script src="js/tools.js"></script>
   <script src="js/teach.js"></script>
   <script src="js/app.js"></script>
 </body>

@@ -5,9 +5,9 @@
    mid-game) and the three views the app moves between:
 
      home    where the app opens. Carry on (or Play) what was playing ·
-             How to play: Rounds, Songs, Beat the Clock, Endless, Battle ·
-             Make your own: My melodies, a new session, a lesson link · My
-             stats, in brief
+             How to play (2026-10-12, the user's): Practice · Rounds · Songs
+             · Games · Battle Mode · Make your own: My melodies, a new
+             session, a lesson link · My stats, in brief
      play    the music and the xylophone (as before)
      stats   My stats (stats.js)
 
@@ -21,10 +21,12 @@
    — the ladder and the session chips — is gone; the levels are in the
    windows below, the sessions in Settings → Level). A card's ▶ Play opens
    a window and nothing starts until the window's own ▶ Play (the user:
-   "ask first"): Songs — the songs, in order; Rounds, Beat the Clock and
-   Endless — Generate · Leveled Challenges · My Melodies (pickBody). A
-   level is played that way just this time (G.over); Generated and a set
-   are played as themselves. A battle is chosen from its card, as before.
+   "ask first"): Practice — Lessons · Songs · Exercises (teach.js); Rounds
+   — Generate · Leveled Challenges · My Melodies (pickBody); Songs — a
+   song, the whole of it or a section (teach.js); Games — Beat the Clock or
+   Endless, then what to read; Battle Mode — your battles (no longer listed
+   on the card) and + New battle. A level is played that way just this
+   time (G.over); Generated and a set are played as themselves.
    ========================================================================== */
 (function () {
   'use strict';
@@ -38,9 +40,10 @@
     if (RR.Board.isOpen()) RR.Board.close();
     if (RR.Melodies.isOpen()) RR.Melodies.close();
     if (RR.Drop && RR.Drop.isOpen()) RR.Drop.close();
-    if (songsOpen()) closeSongs();
     if (pickOpen()) closePick();
+    if (battlesOpen()) closeBattles();
     if (RR.Teach && RR.Teach.windowOpen()) RR.Teach.closeWindow();
+    if (RR.Teach && RR.Teach.songsOpen()) RR.Teach.closeSongs();
   }
   /* a round that is over (Round done, Time's up, a battle won) or a clock left part-way: a new one */
   const roundOver = () => G.needNew || (isFinite(G.roundN) && G.round.length >= G.roundN);
@@ -97,12 +100,15 @@
 
   /* ================= the home page ================= */
   // each card's colour; white text on every one passes WCAG AA (4.5:1)
-  const MODE_COL = { round: '#2563eb', song: '#7c3aed', clock: '#c2410c', endless: '#0f766e', battle: '#dc2626', mel: '#15803d', ses: '#0f766e', link: '#6d28d9', teach: RR.TEACH_COLOUR };
+  const MODE_COL = { round: '#2563eb', song: '#7c3aed', clock: '#c2410c', endless: '#0f766e', games: '#c2410c', battle: '#dc2626', mel: '#15803d', ses: '#0f766e', link: '#6d28d9', teach: RR.TEACH_COLOUR };
   const ICON = {
     round: '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="9" cy="24" r="5" fill="#ef4444"/><circle cx="24" cy="24" r="5" fill="#facc15"/><circle cx="39" cy="24" r="5" fill="#22c55e"/><circle cx="16.5" cy="24" r="5" fill="#f97316"/><circle cx="31.5" cy="24" r="5" fill="#2dd4bf"/></svg>',
     song: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M18 34V12l20-5v22" fill="none" stroke="#fff" stroke-width="3.4" stroke-linejoin="round"/><path d="M18 17.5l20-5" stroke="#fff" stroke-width="3.4"/><ellipse cx="13.5" cy="34.5" rx="5.6" ry="4.4" fill="#fff"/><ellipse cx="33.5" cy="29.5" rx="5.6" ry="4.4" fill="#fff"/></svg>',
     clock: '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="27" r="15" fill="none" stroke="#fff" stroke-width="3.6"/><path d="M24 27V18.5M24 27l6 4" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/><path d="M19.5 6.5h9M24 6.5V12M36 11.5l3 3" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/></svg>',
     endless: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 24c-4.6-5.8-7.6-8.4-11.4-8.4a8.4 8.4 0 0 0 0 16.8c3.8 0 6.8-2.6 11.4-8.4zm0 0c4.6 5.8 7.6 8.4 11.4 8.4a8.4 8.4 0 0 0 0-16.8c-3.8 0-6.8 2.6-11.4 8.4z" fill="none" stroke="#fff" stroke-width="3.6" stroke-linejoin="round"/></svg>',
+    // Games: the stopwatch and the never-ending loop together
+    games: '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="17" cy="22" r="10.5" fill="none" stroke="#fff" stroke-width="3.2"/><path d="M17 22v-6M17 22l4 2.6M13.5 7.5h7M17 7.5v4" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>' +
+      '<path d="M36 36c-2.6-3.3-4.3-4.8-6.5-4.8a4.8 4.8 0 0 0 0 9.6c2.2 0 3.9-1.5 6.5-4.8zm0 0c2.6 3.3 4.3 4.8 6.5 4.8a4.8 4.8 0 0 0 0-9.6c-2.2 0-3.9 1.5-6.5 4.8z" fill="none" stroke="#fff" stroke-width="2.8" stroke-linejoin="round"/></svg>',
     battle: '<svg viewBox="0 0 48 48" aria-hidden="true"><g stroke="#fff" stroke-linecap="round" fill="none"><path d="M9 9l22 22M39 9L17 31" stroke-width="3.8"/><path d="M26.5 35.5l9-9M21.5 35.5l-9-9" stroke-width="3.6"/><path d="M31 31l6.5 6.5M17 31l-6.5 6.5" stroke-width="4.4"/></g><circle cx="39.4" cy="39.4" r="2.6" fill="#fff"/><circle cx="8.6" cy="39.4" r="2.6" fill="#fff"/></svg>',
     mel: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 39l2.4-8.6L31 10.8a3 3 0 0 1 4.2 0l2 2a3 3 0 0 1 0 4.2L17.6 36.6z" fill="none" stroke="#fff" stroke-width="3.4" stroke-linejoin="round"/><path d="M27.5 14.3l6.2 6.2" stroke="#fff" stroke-width="3.4"/></svg>',
     ses: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 14h20M8 24h14M8 34h20" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/><circle cx="34" cy="14" r="4.4" fill="#fff"/><circle cx="28" cy="24" r="4.4" fill="#fff"/><circle cx="34" cy="34" r="4.4" fill="#fff"/><path d="M38.5 14H41M32.5 24H41M38.5 34H41" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/></svg>',
@@ -111,12 +117,11 @@
   };
 
   /* the format cards' choices, kept here until ▶ Play */
-  const P = { len: 5, secs: 60, picks: [] };
+  const P = { len: 5, secs: 60 };
   function resetPicks() {
     const s = G.setup;
     P.len = RR.roundLen(s.game) || 5;
     P.secs = s.clockSecs || 60;
-    P.picks = G.songPicks().slice();
   }
 
   /* what the format cards play: the selection, or (a battle chosen) the level this browser was last on */
@@ -146,8 +151,8 @@
     const over = roundOver();
     let go = '▶ Play', sub = '';
     if (G.mode.kind === 'teach') {
-      // Teach Me to Read: its level and the exercise it is on
-      if (RR.TeachMarks.get(G.mode.id).some(Boolean)) go = '▶ Carry on';
+      // Practice: its lesson and the exercise it is on; Songs: the song and the slide
+      if (G.mode.song ? RR.Teach.at > (G.mode.from | 0) : RR.TeachMarks.get(G.mode.id).some(Boolean)) go = '▶ Carry on';
       sub = esc(G.modeLabel()) + ' · ' + esc(RR.Teach.where());
     } else if (G.battle) {
       const part = G.round.length > 0 && !over;
@@ -193,22 +198,17 @@
       '<button type="button" data-h="len" data-v="-1" aria-label="One melody fewer"' + (P.len <= 1 ? ' disabled' : '') + '>−</button>' +
       '<input type="number" id="h-len" min="1" max="' + RR.ROUND_MAX + '" step="1" inputmode="numeric" value="' + P.len + '" aria-label="How many melodies">' +
       '<button type="button" data-h="len" data-v="1" aria-label="One melody more"' + (P.len >= RR.ROUND_MAX ? ' disabled' : '') + '>+</button></div><span class="mc-unit">' + (P.len === 1 ? 'melody' : 'melodies') + '</span>';
-    const titles = P.picks.map(id => id.indexOf('set:') === 0 ? (RR.Sets.get(id.slice(4)) || {}).title : RR.SONGS[id] && RR.SONGS[id].title).filter(Boolean);
-    const songs = '<span class="mc-songs">' + (titles.length ? titles.map(t => '<b>' + esc(t) + '</b>').join(', ') : 'Pick the songs when you press Play') + '</span>';
-    const secs = '<div class="seg" role="group" aria-label="How long">' + [[30, '30 s'], [60, '60 s'], [120, '2 min']].map(o =>
-      '<button type="button" data-h="secs" data-v="' + o[0] + '" class="' + (P.secs === o[0] ? 'on' : '') + '" aria-pressed="' + (P.secs === o[0]) + '">' + o[1] + '</button>').join('') + '</div>';
-    const ck = R.clock && R.clock[P.secs];
+    const lastSong = RR.device.songPick && RR.teachLevel(RR.device.songPick);
+    const ck = R.clock && (R.clock[60] || R.clock[30] || R.clock[120]);
+    const gameRec = [ck ? '⏱ <b>' + plural(ck.notes, 'note') + '</b>' : '', R.endless ? '∞ <b>' + plural(R.endless.n, 'melody', 'melodies') + '</b>' : ''].filter(Boolean).join(' · ');
     const battles = RR.Sessions.list().filter(x => x.kind === 'battle');
-    const part = RR.device.battle && RR.device.battle.id;
-    const battleList = battles.length ? '<div class="mc-list">' + battles.map(x => '<button type="button" class="mc-row' + (G.battle && G.mode.id === x.id ? ' on' : '') + '" data-h="battle" data-id="' + esc(x.id) + '">' +
-      '<b>' + esc(x.name) + '</b><span class="bt-dots">' + x.battle.teams.map(t => '<i style="--tc:' + t.colour + '" title="' + esc(t.name) + '"></i>').join('') + '</span>' +
-      '<small>' + plural(x.battle.teams.length, 'team') + ' · ' + plural(x.battle.rounds, 'round') + (part === x.id ? ' · <em>part-way</em>' : '') + '</small></button>').join('') + '</div>' : '';
+    // the user's order (2026-10-12): Practice · Rounds · Songs · Games · Battle Mode
     return '<section class="h-sec" aria-labelledby="h-how"><div class="h-head"><h2 id="h-how">How to play</h2></div><div class="mode-grid">' +
-      card('round', 'Rounds', 'Read a round of melodies, then see how you did.', stepper, roundBest, playBtn('round')) +
-      card('song', 'Songs', 'Play a real song, a little at a time — then hear the whole thing.', songs, '', playBtn('song')) +
-      card('clock', 'Beat the Clock', 'How many notes can you read before the time runs out?', secs, ck ? 'Record: <b>' + plural(ck.notes, 'note') + '</b>' : '', playBtn('clock')) +
-      card('endless', 'Endless', 'No end and no clock — read as many as you like.', '', R.endless ? 'Longest run: <b>' + plural(R.endless.n, 'melody', 'melodies') + '</b>' : '', playBtn('endless')) +
-      card('battle', 'Battle', 'Teams take turns at the xylophone, for points — a class or a family.', battleList, '', '<button type="button" class="mc-play outline" data-h="new-battle">+ New battle</button>') +
+      card('teach', 'Practice', 'Lessons, songs and your own exercises — their lines lit, round and round. A check for each, a gold star with the metronome.', '', RR.Teach.progressWords(), '<button type="button" class="mc-play" data-h="teach">▶ Play</button>') +
+      card('round', 'Rounds', 'Read a round of melodies for points, then see how you did.', stepper, roundBest, playBtn('round')) +
+      card('song', 'Songs', 'A whole song, slide after slide — keep a steady beat all the way through. No points: just the music.', '', lastSong ? 'Last: <b>' + esc(lastSong.title) + '</b>' : '', '<button type="button" class="mc-play" data-h="songs">▶ Play</button>') +
+      card('games', 'Games', 'Beat the Clock or Endless — how many melodies can you read?', '', gameRec, '<button type="button" class="mc-play" data-h="games">▶ Play</button>') +
+      card('battle', 'Battle Mode', 'Teams take turns at the xylophone, for points — a class or a family.', '', battles.length ? plural(battles.length, 'battle') : '', '<button type="button" class="mc-play" data-h="battles">▶ Play</button>') +
       '</div></section>';
   }
 
@@ -217,9 +217,7 @@
     const sets = RR.Sets.list().filter(x => !x.received), mel = sets.reduce((a, x) => a + x.melodies.length, 0);
     return '<section class="h-sec" aria-labelledby="h-make"><div class="h-head"><h2 id="h-make">Make your own</h2></div><div class="mode-grid make">' +
       card('mel', 'My melodies', 'Write your own melodies on the xylophone, in sets — then play them.', '', sets.length ? plural(sets.length, 'set') + ' · ' + plural(mel, 'melody', 'melodies') : '', '<button type="button" class="mc-play" data-h="melodies">Open</button>') +
-      card('ses', 'A new session', 'Choose your own notes, rhythms and helps — new melodies every time.', '', '', '<button type="button" class="mc-play" data-h="new-session">+ New session</button>') +
-      // Teach Me to Read (2026-10-11, the user's: a card like the others, to the right of A new session — its ▶ Play opens its window)
-      card('teach', 'Teach Me to Read', 'The very first notes, with their lines lit on the staff — a check for each exercise, a gold star with the metronome.', '', RR.Teach.progressWords(), '<button type="button" class="mc-play" data-h="teach">▶ Play</button>') +
+      card('ses', 'A new session', 'Practice, Rounds, Songs, Games or a Battle — set up your way, and kept by name in the Library.', '', '', '<button type="button" class="mc-play" data-h="new-session">+ New session</button>') +
       card('link', 'A lesson link', 'Send what you’re playing to a class or a family as a link.', '', '', '<button type="button" class="mc-play" data-h="share">Make a link</button>') +
       '</div></section>';
   }
@@ -258,51 +256,49 @@
   }
   new ResizeObserver(() => { if (View.current === 'home') fillCharts(); }).observe($('#home'));
 
-  /* ---- the song chooser (Songs ▸ Choose…) ---- */
-  let songsEl = null;
-  const songsOpen = () => !!(songsEl && !songsEl.hidden);
-  function songsHtml() {
-    const at = id => P.picks.indexOf(id);
-    const btn = (id, title) => '<button type="button" data-pick="' + esc(id) + '" class="' + (at(id) >= 0 ? 'on' : '') + '" aria-pressed="' + (at(id) >= 0) + '">' +
-      (at(id) >= 0 ? '<b class="ord">' + (at(id) + 1) + '</b>' : '') + esc(title) + '</button>';
-    const sets = RR.Sets.list().filter(x => x.melodies.length);
-    return '<div class="sheet songs-sheet" role="dialog" aria-modal="true" aria-labelledby="songs-title"><header class="sheet-head"><h2 id="songs-title">Choose the songs</h2>' +
-      '<button class="icon-btn close" data-songs="close" type="button" aria-label="Close">×</button></header><div class="songs-body">' +
-      '<p class="note">Tap the songs to play, in the order you want them.</p>' +
-      '<div class="picks-head">The Songbook</div><div class="picks song-picks">' + Object.keys(RR.SONGS).map(id => btn(id, RR.SONGS[id].title)).join('') + '</div>' +
-      (sets.length ? '<div class="picks-head">My melodies</div><div class="picks song-picks">' + sets.map(x => btn('set:' + x.id, x.title)).join('') + '</div>' : '') +
-      '</div><footer class="sheet-foot"><button type="button" class="pill-btn" data-songs="close">Done</button><button type="button" class="pill-btn go" data-songs="play"' + (P.picks.length ? '' : ' disabled') + '>▶ Play ' + (P.picks.length === 1 ? 'it' : 'them') + '</button></footer></div>';
+  /* ---- Battle Mode's window (2026-10-12, the user's: "Do not include all the battle mode sessions on the landing
+     button. Put those in the menu somehow") — your battles, and + New battle ---- */
+  let batEl = null;
+  const battlesOpen = () => !!(batEl && !batEl.hidden);
+  function battlesHtml() {
+    const list = RR.Sessions.list().filter(x => x.kind === 'battle'), part = RR.device.battle && RR.device.battle.id;
+    const rows = list.map(x => '<div class="bw-row"><button type="button" class="mc-row" data-bw="play" data-id="' + esc(x.id) + '">' +
+        '<b>⚔️ ' + esc(x.name) + '</b><span class="bt-dots">' + x.battle.teams.map(t => '<i style="--tc:' + t.colour + '" title="' + esc(t.name) + '"></i>').join('') + '</span>' +
+        '<small>' + plural(x.battle.teams.length, 'team') + ' · ' + plural(x.battle.rounds, 'round') + ' · ' + plural(x.battle.per, 'melody', 'melodies') + ' a turn' + (part === x.id ? ' · <em>part-way</em>' : '') + '</small></button>' +
+      '<button type="button" class="h-link" data-bw="edit" data-id="' + esc(x.id) + '" aria-label="Change ' + esc(x.name) + '">✎</button></div>').join('');
+    return '<div class="sheet pick-sheet battles-sheet" role="dialog" aria-modal="true" aria-labelledby="bw-title" style="--mc:' + MODE_COL.battle + '">' +
+      '<header class="sheet-head"><span class="mc-ico">' + ICON.battle + '</span><h2 id="bw-title">Battle Mode</h2>' +
+      '<button class="icon-btn close" data-bw="close" type="button" aria-label="Close">×</button></header>' +
+      '<div class="pick-body">' + RR.note('bw', 'Teams take turns at the xylophone, for points. Tap a battle to play it — ✎ changes its teams, rounds and melodies.') +
+        '<h3 class="w-q">Your battles</h3>' + (rows ? '<div class="bw-list">' + rows + '</div>' : '<p class="note">No battles yet — make the first one.</p>') +
+        '<div class="row"><button type="button" class="pill-btn primary" data-bw="new">⚔️ + New battle</button></div></div>' +
+      '<footer class="sheet-foot"><button type="button" class="pill-btn" data-bw="close">Close</button></footer></div>';
   }
-  function openSongs() {
-    if (!songsEl) {
-      songsEl = document.createElement('div');
-      songsEl.className = 'modal songs-modal'; songsEl.hidden = true;
-      document.body.appendChild(songsEl);
-      songsEl.addEventListener('click', e => {
-        if (e.target === songsEl) { closeSongs(); return; }
-        const p = e.target.closest('[data-pick]');
-        if (p) {
-          const id = p.dataset.pick, i = P.picks.indexOf(id);
-          if (i >= 0) P.picks.splice(i, 1); else P.picks.push(id);
-          const y = songsEl.querySelector('.songs-body').scrollTop;
-          songsEl.innerHTML = songsHtml(); songsEl.querySelector('.songs-body').scrollTop = y;
-          const again = songsEl.querySelector('[data-pick="' + CSS.escape(id) + '"]'); if (again) again.focus();
-          return;
-        }
-        const a = e.target.closest('[data-songs]'); if (!a) return;
-        closeSongs();
-        if (a.dataset.songs === 'play') start('song');
-        else render();
+  function openBattles() {
+    if (G.mode.kind === 'lesson') { go('play'); return; }
+    if (!batEl) {
+      batEl = document.createElement('div');
+      batEl.className = 'modal pick-modal battles-modal'; batEl.hidden = true;
+      document.body.appendChild(batEl);
+      batEl.addEventListener('click', e => {
+        if (e.target === batEl) { closeBattles(); return; }
+        if (RR.foldClick(e)) return;
+        const b = e.target.closest('[data-bw]'); if (!b) return;
+        const a = b.dataset.bw;
+        if (a === 'close') closeBattles();
+        else if (a === 'play') { closeBattles(); if (G.selectSession(b.dataset.id)) go('play'); }
+        else if (a === 'edit') { closeBattles(); G.selectSession(b.dataset.id); RR.Settings.open('session'); }
+        else if (a === 'new') { closeBattles(); newBattle(); }
       });
-      songsEl.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); closeSongs(); render(); } });
+      batEl.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); closeBattles(); } });
     }
-    songsEl.innerHTML = songsHtml();
-    RR.windowOpened(songsEl);
-    songsEl.hidden = false;
-    const f = songsEl.querySelector('[data-pick]'); if (f) f.focus();
+    batEl.innerHTML = battlesHtml();
+    RR.windowOpened(batEl);
+    batEl.hidden = false;
+    const f = batEl.querySelector('[data-bw="play"]') || batEl.querySelector('[data-bw="new"]'); if (f) f.focus();
   }
-  function closeSongs() { if (!songsOpen()) return; songsEl.hidden = true; RR.windowClosed(songsEl); }
-  View.songsOpen = () => songsOpen() || pickOpen() || !!(RR.Teach && RR.Teach.windowOpen());
+  function closeBattles() { if (!battlesOpen()) return; batEl.hidden = true; RR.windowClosed(batEl); render(); }
+  View.songsOpen = () => pickOpen() || battlesOpen() || !!(RR.Teach && (RR.Teach.windowOpen() || RR.Teach.songsOpen()));
 
   /* ---- the Rounds, Beat the Clock and Endless windows (2026-10-08, the user's design) ----
      A card's ▶ Play opens its window — it never starts what happens to be loaded (the user: "ask
@@ -314,8 +310,18 @@
      with the round's length or the clock's (kept in step with the card), and its own ▶ Play. A level
      is played that way just this time (its own format stays as its page says); Generated and a set
      are played as themselves (Custom, named "Generated" / "♫ Week 3", with their own scores). */
-  const W = { fmt: 'round', src: 'level', level: 1, set: null, gen: null };
+  const W = { fmt: 'round', src: 'level', level: 1, set: null, gen: null, games: false };
   const FMT_TITLE = { round: 'Rounds', clock: 'Beat the Clock', endless: 'Endless' };
+  /* Games (2026-10-12, the user's: "this will be the beat the Clock Game and Endless — I'll let you design a way to
+     choose between the two"): the two side by side at the top of the window, each with its record */
+  function gamesChoice() {
+    const R = RR.History.me().rec || {}, ck = R.clock && R.clock[P.secs];
+    const opt = (fmt, title, about, rec) => '<button type="button" role="radio" class="gw-game' + (W.fmt === fmt ? ' on' : '') + '" data-w="game" data-v="' + fmt + '" aria-checked="' + (W.fmt === fmt) + '" style="--gc:' + MODE_COL[fmt] + '">' +
+      '<span class="gw-ico">' + ICON[fmt] + '</span><span class="gw-txt"><b>' + title + '</b><small>' + about + '</small>' + (rec ? '<em>' + rec + '</em>' : '') + '</span></button>';
+    return '<h3 class="w-q">Which game?</h3><div class="gw-games" role="radiogroup" aria-label="Which game">' +
+      opt('clock', 'Beat the Clock', 'Read as many notes as you can before the time runs out.', ck ? 'Record: ' + plural(ck.notes, 'note') : '') +
+      opt('endless', 'Endless', 'No end and no clock — read as many melodies as you like.', R.endless ? 'Longest run: ' + plural(R.endless.n, 'melody', 'melodies') : '') + '</div>';
+  }
   const SOURCES = [
     ['gen', 'Generate', 'Choose the notes and rhythms — new melodies every time'],
     ['level', 'Leveled Challenges', 'The fifteen levels, a step at a time'],
@@ -365,10 +371,10 @@
         (sets.length ? '<button type="button" class="pill-btn" data-w="melodies">Open My Melodies…</button>' : '') + '</div>';
     }
     const can = W.src !== 'mel' || !!RR.Sets.get(W.set);
-    return '<div class="sheet pick-sheet" role="dialog" aria-modal="true" aria-labelledby="pick-title" style="--mc:' + MODE_COL[W.fmt] + '">' +
-      '<header class="sheet-head"><span class="mc-ico' + (W.fmt === 'round' ? ' light' : '') + '">' + ICON[W.fmt] + '</span><h2 id="pick-title">' + FMT_TITLE[W.fmt] + '</h2>' +
+    return '<div class="sheet pick-sheet" role="dialog" aria-modal="true" aria-labelledby="pick-title" style="--mc:' + MODE_COL[W.games ? 'games' : W.fmt] + '">' +
+      '<header class="sheet-head"><span class="mc-ico' + (W.fmt === 'round' ? ' light' : '') + '">' + ICON[W.games ? 'games' : W.fmt] + '</span><h2 id="pick-title">' + (W.games ? 'Games' : FMT_TITLE[W.fmt]) + '</h2>' +
       '<button class="icon-btn close" data-w="close" type="button" aria-label="Close">×</button></header>' +
-      '<div class="pick-body">' + opt + '<h3 class="w-q">What do you want to read?</h3>' + tabs + '<div class="src-pane">' + pane + '</div></div>' +
+      '<div class="pick-body">' + (W.games ? gamesChoice() : '') + opt + '<h3 class="w-q">What do you want to read?</h3>' + tabs + '<div class="src-pane">' + pane + '</div></div>' +
       '<footer class="sheet-foot"><button type="button" class="pill-btn" data-w="close">Cancel</button>' +
       '<button type="button" class="pill-btn go" data-w="play"' + (can ? '' : ' disabled') + '>▶ Play</button></footer></div>';
   }
@@ -398,7 +404,9 @@
     // where it starts: what was picked here last (still asked — nothing starts until ▶ Play)
     const last = RR.device.homePick && typeof RR.device.homePick === 'object' ? RR.device.homePick : {};
     const m = G.mode;
-    W.fmt = fmt;
+    // Games: Beat the Clock or Endless — the one played last
+    W.games = fmt === 'games';
+    W.fmt = W.games ? (RR.device.homeGame === 'endless' ? 'endless' : 'clock') : fmt;
     W.src = ['gen', 'level', 'mel'].includes(last.src) ? last.src : m.kind === 'custom' && m.gen ? 'gen' : 'level';
     W.level = m.kind === 'level' ? m.n : Math.max(1, Math.min(RR.LEVELS.length, RR.device.level | 0 || 1));
     const sets = playableSets();
@@ -418,19 +426,20 @@
     const a = b.dataset.w;
     if (a === 'close') { closePick(); render(); }
     else if (a === 'src') { W.src = b.dataset.v; drawPick('.src-tabs .on'); }
+    else if (a === 'game') { W.fmt = b.dataset.v; drawPick('.gw-game.on'); }
     else if (a === 'len') { P.len = Math.max(1, Math.min(RR.ROUND_MAX, P.len + (+b.dataset.v || 0))); drawPick('[data-w="len"][data-v="' + b.dataset.v + '"]:not([disabled])'); }
     else if (a === 'secs') { P.secs = +b.dataset.v; drawPick('[data-w="secs"].on'); }
     else if (a === 'level') { W.level = +b.dataset.n; drawPick('[data-w="level"].on'); }
     else if (a === 'set') { W.set = b.dataset.id; drawPick('[data-w="set"].on'); }
     else if (a === 'edit-level') {
       // its page, then back here: changing a level picks it
-      reopen = { fmt: W.fmt, src: 'level' };
+      reopen = { fmt: W.fmt, games: W.games, src: 'level' };
       closePick(); G.selectLevel(W.level); RR.Settings.open('session');
     }
     else if (a === 'new-set' || a === 'melodies') {
-      reopen = { fmt: W.fmt, src: 'mel' };
-      closePick(); RR.Melodies.open();
-      if (a === 'new-set') { const nb = document.querySelector('#melodies [data-act="new"]'); if (nb) nb.click(); }
+      reopen = { fmt: W.fmt, games: W.games, src: 'mel' };
+      closePick();
+      if (a === 'new-set') RR.Library.newMelody(); else RR.Library.open('mel');
     }
     else if (a === 'play') playPick();
   }
@@ -444,7 +453,9 @@
       const set = RR.Sets.get(W.set); if (!set) return;
       G.usePractice(Object.assign(genBase(), { from: 'set', set: set.id }, g), { kind: 'custom', label: '♫ ' + set.title });
     }
-    RR.device.homePick = { src: W.src, set: W.set }; RR.saveDevice();
+    RR.device.homePick = { src: W.src, set: W.set };
+    if (W.games) RR.device.homeGame = W.fmt;
+    RR.saveDevice();
     closePick();
     go('play');
   }
@@ -453,7 +464,8 @@
     const r = reopen; reopen = null;
     if (!r || View.current !== 'home') return;
     const keep = { level: W.level, set: W.set, gen: W.gen };
-    openPick(r.fmt);
+    openPick(r.games ? 'games' : r.fmt);
+    W.fmt = r.fmt;
     W.src = r.src; W.gen = keep.gen;
     if (r.src === 'level') W.level = G.mode.kind === 'level' ? G.mode.n : keep.level;
     const sets = playableSets();
@@ -462,26 +474,13 @@
   }
 
   /* ---- starting things ---- */
-  /* the Songs window's ▶ Play: the songs picked, played with what is chosen (just this time) */
-  function start(fmt) {
-    if (G.mode.kind === 'lesson') { go('play'); return; }
-    if (fmt === 'song' && !P.picks.length) { openSongs(); return; }
-    if (G.battle || G.mode.kind === 'teach') G.selectLevel(RR.device.level || 1);
-    G.playOnce('game', { game: 'song', songPicks: P.picks.slice() });
-    go('play');
-  }
-  /* a name not yet used: "My session 2", "Battle 3" */
+  /* a name not yet used: "Battle 3" */
   function freshName(base) {
     const names = RR.Sessions.list().map(x => x.name.toLowerCase());
     for (let i = 1; ; i++) { const n = base + ' ' + i; if (!names.includes(n.toLowerCase())) return n; }
   }
-  function newSession() {
-    const rec = RR.Sessions.add(freshName('My session'), G.readingPractice());
-    G.selectSession(rec.id);
-    RR.Settings.open('session');
-    const f = $('#session-name'); if (f) { f.focus(); f.select(); }
-    RR.toast('Name it, then choose its notes, rhythms and helps');
-  }
+  /* + New session: the Library's (2026-10-12) — no name needed: "Tuesday's Xylo Workout" */
+  function newSession() { RR.Library.newSession(''); }
   function newBattle() {
     const p = G.readingPractice(); p.practice = false;     // a battle is for points: straight to the Test
     const rec = RR.Sessions.add(freshName('Battle'), p, { teams: [], per: 1, rounds: 3 });
@@ -502,12 +501,14 @@
     else if (a === 'new-session') newSession();
     else if (a === 'len') { P.len = Math.max(1, Math.min(RR.ROUND_MAX, P.len + (+b.dataset.v || 0))); render(); const f = home.querySelector('[data-h="len"][data-v="' + b.dataset.v + '"]'); if (f && !f.disabled) f.focus(); }
     else if (a === 'secs') { P.secs = +b.dataset.v; render(); const f = home.querySelector('[data-h="secs"][data-v="' + b.dataset.v + '"]'); if (f) f.focus(); }
-    else if (a === 'play') { if (b.dataset.fmt === 'song') openSongs(); else openPick(b.dataset.fmt); }   // a window first: nothing starts until its ▶ Play
-    else if (a === 'battle') { if (G.selectSession(b.dataset.id)) go('play'); }
-    else if (a === 'teach') RR.Teach.openWindow();      // Teach Me to Read: its window first — which level, which exercise
+    else if (a === 'play') openPick(b.dataset.fmt);    // a window first: nothing starts until its ▶ Play
+    else if (a === 'teach') RR.Teach.openWindow();      // Practice: its window first — Lessons · Songs · Exercises
+    else if (a === 'songs') RR.Teach.openSongs();       // Songs: which song, the whole of it or a section
+    else if (a === 'games') openPick('games');          // Games: Beat the Clock or Endless, then what to read
+    else if (a === 'battles') openBattles();            // Battle Mode: your battles, + New battle
     else if (a === 'new-battle') newBattle();
-    else if (a === 'melodies') RR.Melodies.open();
-    else if (a === 'share') RR.Settings.open('share');      // a battle's link carries its teams too (2026-10-08)
+    else if (a === 'melodies') RR.Library.open('mel');      // the Library, at My melodies (2026-10-12)
+    else if (a === 'share') RR.Library.open(null, 'share');  // the Library's Share & backup: the lesson link (a battle's carries its teams too)
     else if (a === 'stats') go('stats');
     else if (a === 'leave-lesson') { RR.Lesson.leave(); resetPicks(); render(); }
   });
@@ -527,5 +528,5 @@
   }).observe($(sel), { attributes: true, attributeFilter: ['hidden'] }));
 
   View.render = render;
-  RR.Home = { render, start };
+  RR.Home = { render, ICON, COL: MODE_COL };      // the Library's sessions wear the cards' pictures (library.js)
 })();

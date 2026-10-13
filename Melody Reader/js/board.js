@@ -150,7 +150,7 @@
       (ready ? '<div class="rd-ready">Ready for the next level!</div>' : '') +
       '<div class="rd-btns">' + (whole ? '<button type="button" class="pill-btn go" data-rd="song" data-label="' + (set ? '▶ Hear the whole set' : items.length > 1 ? '▶ Hear your songs' : '▶ Hear your song') + '">' + (set ? '▶ Hear the whole set' : items.length > 1 ? '▶ Hear your songs' : '▶ Hear your song') + '</button>' : '') +
       '<button type="button" class="pill-btn" data-rd="again">Play again</button>' +
-      (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn" data-rd="settings">Settings</button>') + HOME_BTN +
+      (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn" data-rd="settings">Library</button>') + HOME_BTN +
       (ready ? '<button type="button" class="pill-btn go" data-rd="next">Level ' + (G.mode.n + 1) + ' ▸</button>' : '') + '</div></div>');
     G.announce((whole ? 'You played all of ' + whole + '. ' : 'Round done. ') + (RR.device.stars ? golds + (golds === 1 ? ' gold star. ' : ' gold stars. ') : '') + (RR.device.points ? total + ' points. ' : '') + (ready ? 'Ready for the next level.' : ''));
   }
@@ -164,7 +164,7 @@
       '<div class="rd-stats"><div><b>' + c.notes + '</b>notes</div><div><b>' + c.melodies + '</b>melodies</div><div><b>' + c.clean + '</b>clean</div>' +
       (RR.device.points ? '<div><b>' + pts + '</b>points</div>' : '') + '</div>' +
       '<div class="rd-btns"><button type="button" class="pill-btn go" data-rd="again">Go again</button>' +
-      (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn" data-rd="settings">Settings</button>') + HOME_BTN + '</div></div>');
+      (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn" data-rd="settings">Library</button>') + HOME_BTN + '</div></div>');
     G.announce('Time’s up. ' + c.notes + ' notes, ' + c.melodies + ' melodies, ' + c.clean + ' clean.');
   }
 
@@ -180,7 +180,7 @@
     }
     if (a === 'again') G.newRound();
     else if (a === 'next') G.selectLevel(G.mode.n + 1);
-    else if (a === 'settings') { G.newRound(); RR.Settings.open('level'); }
+    else if (a === 'settings') { G.newRound(); RR.Melodies.open(); }     // the Library: the sessions, levels and the rest (2026-10-12)
     else if (a === 'battle-go') { hideRound(); G.draw(); }
     else if (a === 'battle-new') { G.clearBattle(); G.newRound(); }
     else if (a === 'battle-edit') { G.clearBattle(); G.newRound(); RR.Settings.open('session'); }

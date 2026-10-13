@@ -79,7 +79,9 @@
     }
     return lib;
   }
-  function save(lib) { RR.save(KEY, lib); }
+  // every save moves `rev` on: Teach Me to Read's units are built from sets, and rebuilt only when one changed
+  let rev = 0;
+  function save(lib) { RR.save(KEY, lib); rev++; }
   function get(id) {
     if (id === 'lesson') return RR.Lesson && RR.Lesson.set;
     // a lesson's Song sets (2026-10-08): 'lesson_1', 'lesson_2' … in memory, from the link
@@ -212,6 +214,7 @@
   }
 
   RR.Sets = {
+    get rev() { return rev; },
     KEY, APP, normalize, normalizeMelody, key, load, save, get, update, create, remove, saveMyCopy, list,
     shareLink, receiveFromUrl, download, restore, startShelf, notesOf,
     isShelf: rec => !!(rec && rec.received && rec.book)

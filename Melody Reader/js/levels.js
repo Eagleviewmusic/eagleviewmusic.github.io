@@ -51,6 +51,7 @@
     gold: 11,                                                          // a gold star from this many points (of 20): over 10
     game: 'round5', clockSecs: 60, song: null, songPicks: [], from: 'both', auto: true,   // songPicks: the Song format's songs ('ode', 'set:<id>'), in order
     colour: 'always', letters: true, nums: true, glow: 'after2', labels: 'none',   // colour: 'solid' · 'always' (transparent until played) · 'lit' · 'black'; labels: 'none' · 'letters' · 'solfege'
+    staff: 'plain',             // Staff Color (2026-10-12, Tools): 'plain' black lines · 'notes' its notes' lines lit · 'all' five in colour
     playHidden: false, playLights: true,
     songs: [], set: null
   };
@@ -152,6 +153,7 @@
     p.colour = oneOf(raw.colour, ['solid', 'always', 'lit', 'black'], D.colour);   // 'solid' since 2026-10-11
     p.glow = oneOf(raw.glow, ['never', 'after2', 'always'], D.glow);
     p.labels = oneOf(raw.labels, ['none', 'letters', 'solfege'], D.labels);   // rhythm syllables were retired 2026-10-06
+    p.staff = oneOf(raw.staff, ['plain', 'notes', 'all'], D.staff);
     p.practiceStart = oneOf(raw.practiceStart, ['on', 'off'], D.practiceStart);
     ['endDo', 'tricky', 'grey', 'endLong', 'practice', 'oneGo', 'auto', 'letters', 'nums',
       'playHidden', 'playLights', 'pickup', 'endLa'].forEach(k => { p[k] = bool(raw[k], D[k]); });
@@ -212,7 +214,8 @@
     while (teams.length < 2) { const c = RR.freeColour(teams); teams.push({ name: c[1] + ' team', colour: c[0] }); }
     const per = [1, 2, 3].includes(b && b.per) ? b.per : 1;
     const rounds = b && Number.isInteger(b.rounds) && b.rounds >= 1 && b.rounds <= RR.BATTLE_ROUNDS_MAX ? b.rounds : 3;
-    return { teams, per, rounds };
+    // Tools (2026-10-12, the user's: "allow Battles to turn off all tools") — on unless the battle turned it off
+    return { teams, per, rounds, tools: !(b && b.tools === false) };
   };
   /* where melody k (from 0) falls: which round, whose turn, which of the turn's melodies */
   RR.battleAt = function (b, k) {
@@ -259,6 +262,40 @@
      is never kept: it is "just this time". */
   const newId = () => 'ses_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
   const own = p => { const c = RR.sanitize(p); c.endDo = false; c.endLa = false; c.focus = []; if (c.from === 'both') c.from = 'made'; return keepSet(c); };
+
+  /* ---- a session's Format (2026-10-12, the user's: "under format it will include practice, rounds, songs,
+     games, and Battle") — the home page's five cards, kept with a name:
+       practice   one of Practice's lessons, songs or exercises (`teach`: { id }) — played the Practice way
+       rounds     a round of the session's own melodies (its practice's game: 'round<n>')
+       songs      a song, the whole of it or a section (`song`: { id, part, from, to, practice, auto }) — the
+                  Songs card's way, slide by slide
+       games      Beat the Clock or Endless (its practice's game: 'clock' / 'endless')
+       battle     teams in turns (kind: 'battle', its `battle`)
+     and whether it shows points (`points`): a format chosen sets it — off for Practice and Songs, which
+     have none to count, on for the rest — and it can be changed any time after (the user's rule). A
+     session saved before formats takes one from what it was: a battle, a Song (its first song, the
+     Songs way), Beat the Clock or Endless, else Rounds. ---- */
+  RR.SESSION_FORMATS = [['practice', 'Practice'], ['rounds', 'Rounds'], ['songs', 'Songs'], ['games', 'Games'], ['battle', 'Battle']];
+  const FORMATS = RR.SESSION_FORMATS.map(f => f[0]);
+  RR.formatPoints = f => f !== 'practice' && f !== 'songs';
+  function formatOf(x) {
+    if (FORMATS.includes(x.format)) return x.format;
+    if (x.kind === 'battle') return 'battle';
+    const g = x.practice && x.practice.game;
+    return g === 'song' ? 'songs' : g === 'clock' || g === 'endless' ? 'games' : 'rounds';
+  }
+  /* Practice's pick: a lesson, a song or an exercise unit ('L1' … 'A3', 'S:<song>', 'U:<set>') */
+  const cleanTeach = t => ({ id: t && typeof t.id === 'string' && /^([LA][1-9]|[SU]:[\w-]{1,80})$/.test(t.id) ? t.id : 'L1' });
+  /* the Songs pick: the Songbook's ('S:<song>') or a set of yours as a song ('M:<set>'); an old Song session's first song */
+  function cleanSong(s, practice) {
+    let id = s && typeof s.id === 'string' && /^[SM]:[\w-]{1,80}$/.test(s.id) ? s.id : null;
+    if (!id) {
+      const first = practice && practice.songPicks && practice.songPicks[0];
+      id = first ? (/^set:/.test(first) ? 'M:' + first.slice(4) : 'S:' + first) : 'S:hot-cross-buns';
+    }
+    const from = Math.max(0, Number(s && s.from) | 0), to = Math.max(from, Number(s && s.to) | 0);
+    return { id, part: !!(s && s.part), from, to, practice: !!(s && s.practice), auto: !(s && s.auto === false) };
+  }
   function readSessions() {
     let v = RR.load(RR.KEY.sessions, null);
     if (!Array.isArray(v)) {
@@ -268,18 +305,33 @@
       RR.save(RR.KEY.sessions, v);
     }
     return v.filter(x => x && typeof x.id === 'string' && typeof x.name === 'string')
-      .map(x => Object.assign({ id: x.id, name: x.name.slice(0, 40) || 'My session', practice: own(x.practice) },
-        x.kind === 'battle' ? { kind: 'battle', battle: RR.cleanBattle(x.battle) } : {},
-        typeof x.legacy === 'string' ? { legacy: x.legacy } : {}));
+      .map(x => {
+        const practice = own(x.practice), format = formatOf(x);
+        // the battle is kept when the format moves away from it, so coming back finds the same teams
+        return Object.assign({ id: x.id, name: x.name.slice(0, 40) || 'My session', practice, format,
+          points: typeof x.points === 'boolean' ? x.points : RR.formatPoints(format), teach: cleanTeach(x.teach), song: cleanSong(x.song, practice) },
+        format === 'battle' ? { kind: 'battle', battle: RR.cleanBattle(x.battle) } : x.battle ? { battle: RR.cleanBattle(x.battle) } : {},
+        typeof x.legacy === 'string' ? { legacy: x.legacy } : {});
+      });
   }
   const write = list => RR.save(RR.KEY.sessions, list);
+  /* change one session and save: fn(x) on the stored list's own record */
+  function edit(id, fn) {
+    const list = readSessions(), x = list.find(y => y.id === id); if (!x) return null;
+    fn(x); write(list); return RR.Sessions.get(id);
+  }
   RR.Sessions = {
     list: readSessions,
     get: id => readSessions().find(x => x.id === id) || null,
-    add(name, practice, battle) {
+    /* `battle`: a battle session; `extra`: { format, teach, song } — a session made from Practice or a song */
+    add(name, practice, battle, extra) {
       const list = readSessions(), rec = { id: newId(), name: String(name).trim().slice(0, 40), practice: own(practice) };
       if (battle) { rec.kind = 'battle'; rec.battle = RR.cleanBattle(battle); }
-      list.push(rec); write(list); return rec;
+      rec.format = battle ? 'battle' : formatOf(Object.assign({}, rec, extra && FORMATS.includes(extra.format) ? { format: extra.format } : {}));
+      rec.points = RR.formatPoints(rec.format);
+      if (extra && extra.teach) rec.teach = cleanTeach(extra.teach);
+      if (extra && extra.song) rec.song = cleanSong(extra.song);
+      list.push(rec); write(list); return RR.Sessions.get(rec.id);
     },
     update(id, practice) { const list = readSessions(), x = list.find(y => y.id === id); if (x) { x.practice = own(practice); write(list); } },
     updateBattle(id, battle) {
@@ -287,6 +339,28 @@
       if (x && x.kind === 'battle') { x.battle = RR.cleanBattle(battle); write(list); return x.battle; }
       return null;
     },
+    /* another format: what it needs is filled in, and the points go to the format's own (on or off) */
+    setFormat(id, format) {
+      if (!FORMATS.includes(format)) return null;
+      return edit(id, x => {
+        const was = x.format;
+        x.format = format;
+        x.points = RR.formatPoints(format);
+        const p = x.practice;
+        if (format === 'rounds' && !RR.roundLen(p.game)) p.game = 'round5';
+        if (format === 'games' && p.game !== 'clock' && p.game !== 'endless') p.game = 'clock';
+        if (format === 'battle') {
+          x.kind = 'battle'; x.battle = RR.cleanBattle(x.battle || { teams: [], per: 1, rounds: 3 });
+          if (was !== 'battle') p.practice = false;              // a battle is for points: straight to the Test (as + New battle)
+        } else {
+          delete x.kind;
+          if (was === 'battle') p.practice = true;
+        }
+      });
+    },
+    setPoints(id, on) { return edit(id, x => { x.points = !!on; }); },
+    setTeach(id, teach) { return edit(id, x => { x.teach = cleanTeach(teach); }); },
+    setSong(id, song) { return edit(id, x => { x.song = cleanSong(song, x.practice); }); },
     rename(id, name) {
       const n = String(name).trim().slice(0, 40); if (!n) return false;
       const list = readSessions(), x = list.find(y => y.id === id); if (!x) return false;
@@ -294,5 +368,19 @@
     },
     remove(id) { write(readSessions().filter(x => x.id !== id)); },
     dropLegacy(id) { const list = readSessions(), x = list.find(y => y.id === id); if (x) { delete x.legacy; write(list); } }
+  };
+
+  /* ---- a name for a session left unnamed (2026-10-12, the user's: "generate a name that includes the day of
+     the week, like 'Tuesday's Xylo Workout', 'Friday's Xylo Bootcamp', or something silly like that"): today's
+     day and one of five titles — one not already taken, if there is one ---- */
+  RR.SESSION_TITLES = ['Xylo Workout', 'Xylo Bootcamp', 'Mallet Madness', 'Note Safari', 'Rainbow Jam'];
+  RR.sessionName = function (taken, date, pick) {
+    const day = (date || new Date()).toLocaleDateString('en-US', { weekday: 'long' });
+    const used = new Set((taken || []).map(n => String(n).toLowerCase()));
+    const all = RR.SESSION_TITLES.map(t => day + '’s ' + t);
+    const free = all.filter(n => !used.has(n.toLowerCase()));
+    const r = typeof pick === 'number' ? pick : Math.random();
+    if (free.length) return free[Math.floor(r * free.length) % free.length];
+    for (let i = 2; ; i++) { const n = all[Math.floor(r * all.length) % all.length] + ' ' + i; if (!used.has(n.toLowerCase())) return n; }
   };
 })();

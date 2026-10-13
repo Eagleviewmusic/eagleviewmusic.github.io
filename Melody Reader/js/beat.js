@@ -7,33 +7,26 @@
    the music since 2026-10-05; the practice's three tempos) → the family
    count-in (EVMCountIn: prime the sound, the "Get ready 1 2 3 4" card, one
    bar — two in 2/4), then the metronome — the first beat of each bar
-   higher — through the melody. The music does not wait. Nothing is drawn
-   but the notes lighting as their bars are struck in time: no playhead,
-   no words, no ghost notes. The run is the try (tier 3, points.js).
-   (Practice has no count-in any more: its metronome is Listen's.)
+   higher — for as long as the run lasts. The run is the try (tier 3,
+   points.js).
 
-   A 25 ms timer does all the timing — it places clicks 120 ms ahead on the
-   audio clock, marks notes Missed once their window has passed (shown only
-   at the end), and ends the run. (Animation frames stop when the tab or
-   the app's pane is hidden; a loop run on them froze the mockup's count-in
-   for good.)
+   FOLLOWING THE PLAYER (2026-10-12, the user's: "it wants the user to play
+   exactly at the correct moment in the metronome … I don't want it that
+   strong — I just want it to click and to light the notes up in order").
+   It used to match each strike to the note its click said was due
+   (RR.Points.follower): coming in two beats late made the first strike
+   note 3, notes 1 and 2 Missed. Now a strike in a run goes where any other
+   does — game.js judgeFind: the next note lights when its bar is struck,
+   any other bar is a slip — and nothing is ever missed by the clock. The
+   click keeps going until the melody is played through (then the run is
+   scored: the player's tempo against the metronome's, wherever they came
+   in) or the player stops it (Off, ↻, Practice, Next, a window).
+   (Practice has no count-in: its metronome is the free-running click
+   below.)
 
-   A strike is timed by the audio time being *heard* when it happened
-   (RR.Sound.eventTime — the event's timeStamp through the output
-   timestamp): a child plays to what they hear. Which note it is comes
-   from RR.Points.follower (2026-10-07): by where the player is — each
-   note expected a written length after the last one found, at their own
-   tempo — so a player drifting a little behind is followed and every
-   note counts (it used to be the clock alone, and a slow player's later
-   notes were all Missed). Against the click, each note found is
-
-     Perfect  ≤ max(75 ms, 0.11 beat)    Good  ≤ max(150 ms, 0.22 beat)
-     Early / Late  ≤ max(260 ms, 0.38 beat)    beyond that: Off
-
-   (a beat = a quarter here). A note passed over is Missed; any other
-   strike is a wrong bar, counted against the note nearest it. The run
-   ends just after the last note — or, if the player stops, once the next
-   note is well overdue.
+   A 25 ms timer does the timing — it places clicks 120 ms ahead on the
+   audio clock. (Animation frames stop when the tab or the app's pane is
+   hidden; a loop run on them froze the mockup's count-in for good.)
 
    Meters and pick-ups (2026-10-07): the clicks are the meter's beats — a
    quarter, or in 6/8 a dotted quarter (two to the bar, so the count is
@@ -52,13 +45,9 @@
    runs on the same 25 ms timer, each click placed 120 ms ahead.
 
    Teach Me to Read goes round and round (2026-10-11, the user's: "do not
-   stop it after 1 round, let it repeat"): after the count-in the melody
-   comes back straight after its last bar, again and again, the click going
-   on, until the metronome is turned off (or ↻, Listen, another exercise).
-   Each time round is followed and marked on its own (G.passDone): half a
-   beat before the next one starts — or once the last note's window has
-   closed, if that is later — the notes not found are missed, the mark
-   given, and a fresh follower takes the next time round.
+   stop it after 1 round, let it repeat"): the click goes on and each time
+   the melody is played through it is marked (G.passDone) and the notes go
+   dark for the next time round — whenever the player starts it.
    ========================================================================== */
 (function () {
   'use strict';
@@ -75,7 +64,7 @@
     if (G.phase !== 'ready' || G.states.some(x => x !== 'todo')) G.resetCard();
     const pace = G.metro, tempo = RR.paceTempo(s, pace);
     G.phase = 'countin';
-    G.run = { pace, tempo, wrong: 0 };
+    G.run = { pace, tempo };
     G.started = true;                                     // the run is the try
     RR.Xylo.setGlow(null);
     const my = ++token;
@@ -94,31 +83,15 @@
       RR.toast("The sound isn't coming through — check the volume, then try again.");
       return;
     }
-    const total = G.evs.reduce((a, e) => a + e.t, 0);
-    const spt = 60 / tempo / 4, beat = M.beatTicks * spt, quarter = 4 * spt;
+    const spt = 60 / tempo / 4, beat = M.beatTicks * spt;
     const t0 = RR.Sound.now() + 0.12, startT = t0 + lead * spt;
-    // every beat from the count's first to the melody's end, on the bar's grid; the first of each bar higher
-    const clicks = [];
-    for (let b = 0; t0 + b * beat < startT + total * spt - 1e-6; b++) clicks.push({ t: t0 + b * beat, accent: b % M.beats === 0 });
-    const okW = Math.max(0.26, 0.38 * quarter);
-    const last = G.evs.reduce((a, e) => e.rest ? a : Math.max(a, e.start), 0);
-    const perfect = Math.max(0.075, 0.11 * quarter), good = Math.max(0.15, 0.22 * quarter);
-    const notes = G.evs.map(e => ({ p: e.p, start: e.start, rest: e.rest })), at = { spt, beat, perfect, good, ok: okW };
-    const loop = G.mode.kind === 'teach';
-    B = {
-      my, n, beat, spt, t0, startT, clicks, ci: 0, timer: null,
-      // Teach Me to Read: round and round — the clicks made as they come (bi), each time round passDur long,
-      // closed at `close` after its start (half a beat before the next, or the last note's window if later)
-      loop, bi: 0, beats: M.beats, passStart: startT, passDur: total * spt,
-      close: Math.max(last * spt + okW, total * spt - Math.min(beat, quarter) * 0.5),
-      newFollow: from => RR.Points.follower(notes, Object.assign({ startT: from }, at)),
-      // the metronome's end: the last note's length, or its window if that is longer (a short last note)
-      metroEnd: Math.max(startT + total * spt, startT + last * spt + okW) + 0.12,
-      cap: startT + total * spt * 2 + 4,                          // however slow: the run ends by then
-      follow: RR.Points.follower(G.evs.map(e => ({ p: e.p, start: e.start, rest: e.rest })), { startT, spt, beat, perfect, good, ok: okW }),
-      flashAt: s.flash ? RR.now() + s.flash * 1000 : null
-    };
-    if (CI) CI.run(clicks.slice(0, shown).map(c => RR.Sound.heardAt(c.t)), RR.Sound.heardAt(startT));
+    // the count's clicks for the card; then every beat on the bar's grid, the first of each bar higher, made as
+    // they come (`bi`) — for as long as the run goes on
+    const counts = [];
+    for (let b = 0; b < shown; b++) counts.push(t0 + b * beat);
+    B = { my, beat, spt, t0, startT, bi: 0, beats: M.beats, loop: G.mode.kind === 'teach', timer: null,
+      flashAt: s.flash ? RR.now() + s.flash * 1000 : null };
+    if (CI) CI.run(counts.map(t => RR.Sound.heardAt(t)), RR.Sound.heardAt(startT));
     B.timer = setInterval(tick, 25);
     tick();
   }
@@ -126,57 +99,14 @@
   function tick() {
     if (!B) return;
     const now = RR.Sound.now();
-    if (B.loop) {
-      // round and round: the click goes on for as long as the run does
-      while (B.t0 + B.bi * B.beat < now + 0.12) {
-        const t = B.t0 + B.bi * B.beat, accent = B.bi % B.beats === 0;
-        B.bi++;
-        if (t >= now - 0.03) RR.Sound.click(t, accent, false);      // a throttled timer fell behind: skip, never a burst
-      }
-    } else while (B.ci < B.clicks.length && B.clicks[B.ci].t < now + 0.12) {
-      const c = B.clicks[B.ci++];
-      RR.Sound.click(c.t, c.accent, false);
+    while (B.t0 + B.bi * B.beat < now + 0.12) {
+      const t = B.t0 + B.bi * B.beat, accent = B.bi % B.beats === 0;
+      B.bi++;
+      if (t >= now - 0.03) RR.Sound.click(t, accent, false);      // a throttled timer fell behind: skip, never a burst
     }
     const heard = RR.Sound.heardNow();
-    if (B.loop) {
-      if (G.phase === 'countin' && heard >= B.startT - Math.min(B.beat, 4 * B.spt) * 0.45) { G.phase = 'running'; G.drawSides(); }
-      // a time round over: marked, and the next one followed afresh — the music doesn't stop
-      if (G.phase === 'running' && heard > B.passStart + B.close) {
-        B.follow.judge.forEach((j, i) => { if (j && !G.judge[i]) G.judge[i] = j; });
-        B.passStart += B.passDur;
-        B.follow = B.newFollow(B.passStart);
-        G.passDone();
-      }
-      return;
-    }
-    if (G.phase === 'countin' && heard >= B.startT - Math.min(B.beat, 4 * B.spt) * 0.45) { G.phase = 'running'; G.drawSides(); }
+    if (G.phase === 'countin' && heard >= B.startT - B.beat * 0.45) { G.phase = 'running'; G.drawSides(); }
     if (B.flashAt && RR.now() >= B.flashAt && !G.hidden) { G.hidden = true; B.flashAt = null; G.draw(); }
-    // the end: just after the last note — or, the player having stopped, once the next note is well overdue
-    // (missed notes are only noted; nothing shows until then)
-    if (G.phase === 'running' && heard > Math.min(B.cap, B.follow.endAt(B.metroEnd))) {
-      stop(true);
-      G.hidden = false;
-      G.finish();
-    }
-  }
-
-  function strike(id, e) {
-    if (!B) return;
-    const at = RR.Sound.eventTime(e);
-    const game = G.stage === 'game';
-    const res = B.follow.strike(id, at);
-    if (res.i !== undefined) {
-      B.follow.judge.forEach((j, i) => { if (j && !G.judge[i]) G.judge[i] = j; });   // this note, and any passed over (Missed)
-      G.times[res.i] = at;
-      G.lightNote(res.i);
-      if (game) G.record(id, G.tries[res.i] === 0);
-      G.draw(); G.sparkAtNote(res.i);
-    } else if (res.wrong !== undefined) {
-      // a wrong bar: it only sounds, and counts against the note it was nearest
-      G.run.wrong++; G.slips++; G.clean = false;
-      G.tries[res.wrong]++;
-      if (game) G.mixup(G.evs[res.wrong].p, id);
-    }
   }
 
   /* stop a run (or a count-in still waking the sound); finishing keeps the card */
@@ -225,9 +155,9 @@
   }
 
   RR.Beat = {
-    start, stop, strike, running: () => !!B,
+    start, stop, running: () => !!B,
     tickStart, tickStop, tickNextBar, ticking: () => (T ? T.pace : tPending),
     /* for tests: when the music starts (audio time) and how long a tick is */
-    info: () => B && { startT: B.startT, spt: B.spt, beat: B.beat, metroEnd: B.metroEnd, endAt: B.follow.endAt(B.metroEnd), loop: B.loop, passStart: B.passStart, passDur: B.passDur }
+    info: () => B && { startT: B.startT, spt: B.spt, beat: B.beat, loop: B.loop }
   };
 })();

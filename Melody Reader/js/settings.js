@@ -90,8 +90,9 @@
         '<button type="button" data-bt="rounds" data-v="-1" aria-label="One round fewer"' + (b.rounds <= 1 ? ' disabled' : '') + '>−</button>' +
         '<input type="number" id="battle-rounds" min="1" max="' + RR.BATTLE_ROUNDS_MAX + '" step="1" inputmode="numeric" value="' + b.rounds + '" aria-label="Rounds">' +
         '<button type="button" data-bt="rounds" data-v="1" aria-label="One round more"' + (b.rounds >= RR.BATTLE_ROUNDS_MAX ? ' disabled' : '') + '>+</button></div></div>' +
+      row('Tools', '<div class="seg" role="group">' + [[true, 'On'], [false, 'Off']].map(([v, w]) => '<button type="button" data-bt="tools" data-v="' + v + '" class="' + (b.tools === v ? 'on' : '') + '" aria-pressed="' + (b.tools === v) + '">' + w + '</button>').join('') + '</div>') +
       '<p class="note bt-sum">' + b.teams.length + ' teams × ' + b.per + (b.per === 1 ? ' melody' : ' melodies') + ' × ' + b.rounds + (b.rounds === 1 ? ' round' : ' rounds') + ' = <b>' + total + ' melodies</b></p>' +
-      RR.note('bt-how', 'Each team plays its melodies, then the next team has a turn; when every team has had one, that is a round. Points go to the team playing. Changing the teams, the melodies a turn or the rounds starts the battle again.') + '</div>';
+      RR.note('bt-how', 'Each team plays its melodies, then the next team has a turn; when every team has had one, that is a round. Points go to the team playing. Changing the teams, the melodies a turn or the rounds starts the battle again. Tools Off takes the Tools button away while the battle plays (the colours, names under the notes, the computer keyboard); the metronome stays beside the music.') + '</div>';
   }
   /* change the battle being played: saved at once; the names and colours show at once */
   function changeBattle(fn) {
@@ -102,48 +103,86 @@
     if (saved) G.setBattle(saved);
   }
 
+  /* ---- a session's Format (2026-10-12, the user's: "under format it will include practice, rounds, songs, games,
+     and Battle — and depending on what they pick, more appropriate choices will be given"). It comes first on
+     the page now, since it decides what the rest is: Practice — which lesson, song or exercise; Rounds — how
+     many melodies; Songs — which song, the whole of it or a section; Games — Beat the Clock or Endless; Battle
+     — the teams, turns and rounds. Then Points, which the format sets (off for Practice and Songs, on for the
+     rest) and can be changed any time. Rounds, Games and Battle go on to the notes, rhythms, look and source;
+     Practice and Songs play what they picked, the way their home cards do ---- */
+  const FORMAT_ABOUT = {
+    practice: 'One of Practice’s lessons, songs or exercises — big, round and round, its lines lit. A check for each melody, a gold star with the metronome.',
+    rounds: 'A round of new melodies made from the notes and rhythms below, for points.',
+    songs: 'A song, slide after slide — the whole of it or a section — keeping a steady beat all the way through.',
+    games: 'How many melodies can you read? Beat the Clock, or Endless.',
+    battle: 'Teams take turns at the xylophone, for points.'
+  };
+  let ptab = null;                            // Practice's pick: the tab showing (Lessons · Songs · Exercises)
+  const teachTab = id => /^S:/.test(id) ? 'songs' : /^[UM]:/.test(id) ? 'exercises' : 'lessons';
+  function practicePick(x) {
+    const tab = ptab || teachTab(x.teach.id), us = RR.TeachUnits.levels();
+    const tabs = [['lessons', 'Lessons'], ['songs', 'Songs'], ['exercises', 'Exercises']];
+    const list = tab === 'lessons' ? RR.TEACH : tab === 'songs' ? RR.teachSongs() : us;
+    return '<h4 class="sf-q">What to practise</h4><div class="seg sf-tabs" role="group" aria-label="What to practise">' + tabs.map(t => '<button type="button" data-stab="' + t[0] + '" class="' + (tab === t[0] ? 'on' : '') + '" aria-pressed="' + (tab === t[0]) + '">' + t[1] + '</button>').join('') + '</div>' +
+      '<div class="tw-levels"><div class="teach-grid in-ses' + (tab === 'lessons' ? '' : ' units') + '">' + list.map(L => RR.Teach.tileHtml(L, 'st', x.teach.id)).join('') + '</div></div>' +
+      (tab === 'exercises' && !us.length ? '<p class="note">No exercises yet — a melody set of yours becomes one: Library → My melodies → a set → ▶ Practice.</p>' : '');
+  }
+  function songPick(x) {
+    const s = x.song, all = RR.teachSongs().concat(RR.Sets.list().filter(y => y.melodies.length && !/^lesson/.test(y.id)).map(y => RR.teachLevel('M:' + y.id)).filter(Boolean));
+    const L = RR.teachLevel(s.id), n = L ? L.ex.length : 0;
+    const row = y => '<button type="button" class="mc-row' + (y.id === s.id ? ' on' : '') + '" data-ss="song" data-id="' + RR.esc(y.id) + '" aria-pressed="' + (y.id === s.id) + '">' +
+      '<b>' + (y.kind === 'song' ? '♪ ' : '♫ ') + RR.esc(y.title) + '</b><span class="mc-n">' + y.ex.length + (y.ex.length === 1 ? ' slide' : ' slides') + '</span></button>';
+    const opts = v => Array.from({ length: n }, (_, i) => '<option value="' + i + '"' + (i === v ? ' selected' : '') + '>' + (i + 1) + '</option>').join('');
+    const ssg = (k, list, cur) => '<div class="seg" role="group">' + list.map(([v, w]) => '<button type="button" data-ss="' + k + '" data-v="' + v + '" class="' + (cur === v ? 'on' : '') + '" aria-pressed="' + (cur === v) + '">' + w + '</button>').join('') + '</div>';
+    const what = !L ? '' : '<div class="row"><span class="lbl">What to play</span>' + ssg('part', [['whole', 'The whole song'], ['part', 'A section']], s.part ? 'part' : 'whole') +
+      (s.part ? '<span class="sw-range"><label>Slide <select id="ses-from" aria-label="From slide">' + opts(Math.min(s.from, n - 1)) + '</select></label>' +
+        '<label>to <select id="ses-to" aria-label="To slide">' + opts(Math.min(s.to, n - 1)) + '</select></label></span>' : '') + '</div>';
+    return '<h4 class="sf-q">Which song</h4><div class="mc-list sf-songs">' + all.map(row).join('') + '</div>' + what +
+      '<div class="row"><span class="lbl">Practice</span>' + ssg('practice', [['false', 'Off'], ['true', 'On']], String(s.practice)) + '</div>' +
+      '<div class="row"><span class="lbl">Auto-Next Slide</span>' + ssg('auto', [['true', 'On'], ['false', 'Off']], String(s.auto)) + '</div>';
+  }
+  function formatHtml(x) {
+    const f = x.format, s = P(), len = RR.roundLen(s.game);
+    let h = '<div class="sec ses-format"><h3>Format</h3><div class="seg sf-seg" role="group" aria-label="Format">' + RR.SESSION_FORMATS.map(o =>
+      '<button type="button" data-sf="' + o[0] + '" class="' + (f === o[0] ? 'on' : '') + '" aria-pressed="' + (f === o[0]) + '">' + (o[0] === 'battle' ? '⚔️ ' : '') + o[1] + '</button>').join('') + '</div>' +
+      '<p class="note sf-about">' + FORMAT_ABOUT[f] + '</p>';
+    if (f === 'practice') h += practicePick(x);
+    else if (f === 'songs') h += songPick(x);
+    else if (f === 'rounds') h += '<div class="row count-row"><span class="lbl">How many melodies</span><div class="stepper" role="group" aria-label="How many melodies">' +
+      '<button type="button" data-k="count" data-v="-1" aria-label="One melody fewer"' + (len <= 1 ? ' disabled' : '') + '>−</button>' +
+      '<input type="number" id="round-count" min="1" max="' + RR.ROUND_MAX + '" step="1" inputmode="numeric" value="' + (len || 5) + '" aria-label="How many melodies">' +
+      '<button type="button" data-k="count" data-v="1" aria-label="One melody more"' + (len >= RR.ROUND_MAX ? ' disabled' : '') + '>+</button></div></div>';
+    else if (f === 'games') h += row('Which game', seg('game', [['clock', 'Beat the Clock'], ['endless', 'Endless']], s.game === 'endless' ? 'endless' : 'clock')) +
+      (s.game !== 'endless' ? row('How long', seg('clockSecs', [['30', '30 s'], ['60', '60 s'], ['120', '2 min']], s.clockSecs)) : '');
+    h += '<div class="row sf-points"><span class="lbl">Points</span><div class="seg" role="group" aria-label="Points">' + [[true, 'On'], [false, 'Off']].map(([v, w]) =>
+      '<button type="button" data-spts="' + v + '" class="' + (x.points === v ? 'on' : '') + '" aria-pressed="' + (x.points === v) + '">' + w + '</button>').join('') + '</div></div>' +
+      RR.note('sf-pts', 'Choosing a format sets the points: off for Practice and Songs, on for Rounds, Games and Battles. Change it any time — the session keeps what you choose.' +
+        (f === 'practice' || f === 'songs' ? ' (Practice and Songs don’t count points yet, so On shows nothing there.)' : '')) + '</div>';
+    if (f === 'battle') h += battlePage();
+    return h;
+  }
+
   const TAB = {
-    level() {
-      const cur = G.mode;
-      const list = RR.Sessions.list();
-      // My sessions first: your own, then the ladder
-      return '<div class="band ses-band" style="--bc:' + RR.SESSION_COLOUR + '"><div class="band-head"><b>My sessions</b><span>Your own practices — new melodies made from your choices every time</span></div>' +
-        list.map(x => '<div class="lvl-wrap two' + (x.kind === 'battle' ? ' bt' : '') + '"><button type="button" class="lvl' + (cur.kind === 'session' && cur.id === x.id ? ' on' : '') + '" data-session="' + x.id + '">' +
-          (x.kind === 'battle'
-            ? '<span class="n">⚔️</span><span class="t"><b>' + RR.esc(x.name) + ' <span class="ses-tag">Battle</span></b><span>' + battleText(x.battle) + ' · ' + RR.notesText(x.practice.notes) + '</span>' +
-              '<span class="bt-dots">' + x.battle.teams.map(t => '<i style="--tc:' + t.colour + '" title="' + RR.esc(t.name) + '"></i>').join('') + '</span></span>'
-            : '<span class="n">♪</span><span class="t"><b>' + RR.esc(x.name) + '</b><span>' + RR.summary(x.practice) + ' · ' + RR.gameText(x.practice) + '</span></span>') +
-          '<span class="s" aria-label="best ' + RR.Scores.levelStars('session:' + x.id) + ' stars">' + RR.starsHtml(RR.Scores.levelStars('session:' + x.id), 3) + '</span></button>' +
-          '<button type="button" class="x-btn ed-btn" data-edit-session="' + x.id + '" aria-label="Change ' + RR.esc(x.name) + '" title="Change this session">✎</button>' +
-          '<button type="button" class="x-btn" data-unsession="' + x.id + '" aria-label="Delete ' + RR.esc(x.name) + '" title="Delete this session">×</button></div>').join('') +
-        '<div class="save-mine"><input type="text" id="new-session" maxlength="40" placeholder="A name for a new session — Week 3, Lines and spaces…">' +
-        '<button type="button" class="pill-btn primary" data-act="new-session">+ New session</button>' +
-        '<button type="button" class="pill-btn bt-new" data-act="new-battle">⚔️ + New battle</button></div>' +
-        (list.length ? '' : RR.note('ses-new', 'Name a session, then choose its notes, rhythms, colours, letters, helps and gold star. It starts as a copy of what is playing now. A battle is a session that teams play in turns, for points.')) + '</div>' +
-        RR.note('lv', 'Or pick a level to play it. Each one is ready-made — ✎ changes it to suit you, and it plays your way every time you pick it (Reset gives it back as it was).') +
-        RR.BANDS.map(b => '<div class="band" style="--bc:' + b.colour + '"><div class="band-head"><b>' + b.name + ' · ' + b.title + '</b><span>' + b.about + '</span></div>' +
-          RR.LEVELS.filter(l => l.band === b.id).map(l => {
-            const p = RR.practiceOfLevel(l.n), ed = RR.LevelEdits.edited(l.n);
-            return '<div class="lvl-wrap"><button type="button" class="lvl' + (cur.kind === 'level' && l.n === cur.n ? ' on' : '') + '" data-level="' + l.n + '">' +
-              '<span class="n">' + l.n + '</span><span class="t"><b>' + l.name + (ed ? ' <span class="ses-tag ed-tag">Yours</span>' : '') + '</b><span>' + RR.summary(p) + ' · ' + RR.gameText(p) + '</span></span>' +
-              '<span class="s" aria-label="best ' + RR.Scores.levelStars(RR.levelKey(l.n)) + ' stars">' + RR.starsHtml(RR.Scores.levelStars(RR.levelKey(l.n)), 3) + '</span></button>' +
-              '<button type="button" class="x-btn ed-btn" data-edit-level="' + l.n + '" aria-label="Change Level ' + l.n + '" title="Change this level">✎</button></div>';
-          }).join('') +
-          '</div>').join('');
-    },
     /* a session's (or a battle's) page — every choice on one page, saved as you go; laid out by the user (2026-10-06):
-       Name + Play · Choose the Notes · Choose the Rhythm · Look & Feel · Format · Melody Source */
+       Name + Play · Choose the Notes · Choose the Rhythm · Look & Feel · Format · Melody Source.
+       2026-10-12: Format first (above), with Points; Melody Source after Look & Feel */
     /* …and a level's (2026-10-08, the user's ask): the same page, its changes kept for that level */
     session() {
-      const m = G.mode;
+      const m = G.mode, sid = G.sessionId();
       let head;
-      if (m.kind === 'session') {
-        const x = RR.Sessions.get(m.id);
+      if (sid) {
+        const x = RR.Sessions.get(sid);
         if (!x) return '';
-        const what = x.kind === 'battle' ? 'Battle' : 'Session';
+        const what = x.format === 'battle' ? 'Battle' : 'Session';
         head = '<div class="ses-row"><label for="session-name">' + what + ' Name:</label>' +
           '<input type="text" id="session-name" maxlength="40" value="' + RR.esc(x.name) + '" placeholder="A name for this ' + what.toLowerCase() + '">' +
           '<button type="button" class="pill-btn primary" data-act="play-session">▶ Play ' + what + '</button></div>';
+        const over = G.overWords();
+        const overHtml = m.kind === 'session' && over.length ? '<div class="over-note"><span>Playing just this time: ' + over.map(o => '<b>' + RR.esc(o.text) + '</b>').join(' · ') +
+          '. Below are its own settings.</span><button type="button" class="h-link" data-act="over-off">Play its own</button></div>' : '';
+        const own = x.format === 'rounds' || x.format === 'games' || x.format === 'battle';
+        return '<div class="sec ses-head">' + head + overHtml + '</div>' + formatHtml(x) +
+          (own && m.kind === 'session' ? TAB.notes() + TAB.rhythms() + TAB.helps() + '<div class="sec"><h3>Melody Source</h3>' + sourceHtml(P()) + '</div>' : '');
       } else if (m.kind === 'level') {
         const ed = RR.LevelEdits.edited(m.n);
         head = '<div class="ses-row"><span class="lv-title"><i class="band-dot" style="--band:' + RR.bandOf(m.n).colour + '"></i>Level ' + m.n + ' · ' + RR.esc(RR.LEVELS[m.n - 1].name) +
@@ -207,6 +246,7 @@
       const s = P();
       return '<div class="sec"><h3>Look &amp; Feel</h3><table class="helps"><tbody>' +
         '<tr><td>Note Colors</td><td>' + seg('colour', [['solid', 'Solid Color'], ['always', 'Transparent Color'], ['lit', 'When Played'], ['black', 'Black']], s.colour) + '</td></tr>' +
+        '<tr><td>Staff Color</td><td>' + seg('staff', [['notes', 'Its Notes’ Lines'], ['all', 'All Lines'], ['plain', 'Black']], s.staff || 'plain') + '</td></tr>' +
         '<tr><td>Xylophone Bar</td><td>' + seg('barText', [['letters', 'Letter Name'], ['numbers', 'Number'], ['both', 'Both'], ['neither', 'Neither']], barText(s)) + '</td></tr>' +
         '<tr><td>Xylophone hint</td><td>' + seg('glow', [['never', 'Never'], ['after2', 'After 2 slips'], ['always', 'Always']], s.glow) + '</td></tr>' +
         '<tr><td>Grey out unused bars</td><td>' + seg('grey', [['true', 'On'], ['false', 'Off']], String(!!s.grey)) + '</td></tr>' +
@@ -218,7 +258,7 @@
     },
     points() {
       return '<div class="sec">' + swRow('Points', '@points', RR.device.points) +
-        RR.note('pt-how', 'Each melody earns 1 to 20. Find the notes: 1–8 (a note right first time counts 1, second time ½). Every note first time, in your own steady beat: 9–12. A Test with the metronome, every note right and in time: Slow 13–15, Moderate 16–18, Fast 19–20. Every note right but not quite with the click (a little behind, say) scores as on your own: 9–12. A wrong or missed note drops it to 1–8. Stars: ★ 1–7 · ★★ 8–12 · ★★★ 13–20.') +
+        RR.note('pt-how', 'Each melody earns 1 to 20. Find the notes: 1–8 (a note right first time counts 1, second time ½). Every note first time, in your own steady beat: 9–12. A Test with the metronome, every note right first time at about its tempo — wherever you come in, on beat 1 or not: Slow 13–15, Moderate 16–18, Fast 19–20. Every note right but faster or slower than the metronome scores as on your own: 9–12. A wrong bar drops it to 1–8. Stars: ★ 1–7 · ★★ 8–12 · ★★★ 13–20.') +
         RR.note('pt', 'With points off there are no numbers anywhere. The lights, sparkles and stars stay.') +
         swRow('Gold stars', '@stars', RR.device.stars) +
         swRow('Celebration sounds', '@celebrate', RR.device.celebrate) + '</div>' +
@@ -239,7 +279,7 @@
       const name = G.mode.kind === 'session' ? G.mode.name : G.mode.kind === 'level' ? 'Level ' + G.mode.n : '';
       return '<div class="sec"><h3>Lesson link</h3>' + RR.note('sh', 'A link that opens Melody Reader with exactly these settings, as a lesson — the notes, the rhythms, the look and helps, the format, ' +
           'where the melodies come from (your My melodies sets go inside the link)' + (G.battle ? ', and the teams, turns and rounds' : '') + '. Nothing on the other computer changes them. ' +
-          'The chip says Lesson, and Settings shows only Sound, Points and Leave the lesson. Post it for a class, or put it in a Google Site.') +
+          'The chip says Lesson, and the Library shows only Points, Sound and Leave the lesson. Post it for a class, or put it in a Google Site.') +
         '<div class="row"><span class="lbl">The lesson’s name</span><input type="text" id="lesson-name" maxlength="40" value="' + RR.esc(name) + '" placeholder="Week 3"></div>' +
         '<div class="row"><span class="lbl"></span><button type="button" class="pill-btn primary" data-act="copy-link">Copy the lesson link</button></div>' +
         '<div class="row"><input type="text" id="lesson-link" readonly aria-label="The lesson link" value="' + RR.esc(lessonLink(name || 'Lesson')) + '"></div></div>';
@@ -252,9 +292,12 @@
   /* a level has a ✎ page like a session's now (2026-10-08) — the old Notes · Rhythm · Format · Look & Feel
      tabs were the same sections, and changing them made a Custom practice */
   const TABS_LESSON = [['leave', 'Lesson'], ['points', 'Points'], ['sound', 'Sound']];
-  const pageName = () => G.battle ? '⚔️ Battle' : G.mode.kind === 'session' ? '✎ Session' : G.mode.kind === 'level' ? '✎ Level ' + G.mode.n : G.mode.gen ? '✎ Generated' : G.mode.label ? '✎ My Melodies' : '✎ Custom';
-  // Teach Me to Read: nothing of its own to change — the levels (to leave it), the players, the sound
-  const tabs = () => G.mode.kind === 'lesson' ? TABS_LESSON : G.mode.kind === 'teach' ? [['level', 'Level'], ['points', 'Points'], ['sound', 'Sound']] : [['level', 'Level'], ['session', pageName()], ['points', 'Points'], ['sound', 'Sound'], ['share', 'Share']];
+  const pageName = () => G.battle ? '⚔️ Battle' : G.sessionId() ? '✎ Session' : G.mode.kind === 'level' ? '✎ Level ' + G.mode.n : G.mode.gen ? '✎ Generated' : G.mode.label ? '✎ My Melodies' : '✎ Custom';
+  /* the Level tab (the sessions and the levels) and the Share tab moved into the Library on 2026-10-12 (the user's:
+     the ♫ and the gear became one Library). Practice and Songs have nothing of their own to change — unless a
+     session plays that way: then its page */
+  const tabs = () => G.mode.kind === 'lesson' ? TABS_LESSON
+    : (G.mode.kind !== 'teach' || G.sessionId() ? [['session', pageName()]] : []).concat([['points', 'Points'], ['sound', 'Sound']]);
   const OLD_TABS = ['notes', 'rhythms', 'play', 'helps'];
   const lessonLink = name => RR.Lesson.link(name, G.setup, G.playingSet(), G.battle);
 
@@ -269,6 +312,7 @@
   }
   function open(which) {
     if (which) tab = OLD_TABS.includes(which) ? 'session' : which;
+    ptab = null;
     G.pause();
     render();
     RR.windowOpened($('#settings'));
@@ -302,7 +346,7 @@
       k = 'game'; v = 'round' + Math.max(1, Math.min(RR.ROUND_MAX, isFinite(n) ? n : 5));
     }
     if (k[0] === '@') {                        // the browser's own: points, stars, celebrations, the sound
-      if (k === '@points') RR.device.points = v;
+      if (k === '@points') { RR.device.points = v; const sid = G.sessionId(); if (sid) RR.Sessions.setPoints(sid, v); }   // a session keeps its own (2026-10-12)
       else if (k === '@stars') RR.device.stars = v;
       else if (k === '@celebrate') RR.device.celebrate = v;
       else if (k === '@voice') RR.Sound.voice = v;
@@ -437,6 +481,7 @@
     if (bt) {
       changeBattle(b => {
         if (bt.dataset.bt === 'per') b.per = +bt.dataset.v;
+        else if (bt.dataset.bt === 'tools') b.tools = bt.dataset.v === 'true';       // the colours, letters and keyboard: on or off for everyone
         else b.rounds = Math.max(1, Math.min(RR.BATTLE_ROUNDS_MAX, b.rounds + (+bt.dataset.v || 0)));
       });
       return 'turns';
@@ -465,63 +510,16 @@
   body.addEventListener('click', async e => {
     if (RR.foldClick(e)) return;
     const t = e.target;
-    const lv = t.closest('[data-level]');
-    if (lv) { G.selectLevel(+lv.dataset.level); render(); return; }
     const bc = battleClick(t);
     if (bc) { render(); if (bc === 'add-team') focusLastTeam(body); return; }
-    const ss = t.closest('[data-session]');
-    if (ss) { G.selectSession(ss.dataset.session); render(); return; }
-    const el = t.closest('[data-edit-level]');
-    if (el) { G.selectLevel(+el.dataset.editLevel); tab = 'session'; render(); $('#tab-body').scrollTop = 0; return; }
-    const es = t.closest('[data-edit-session]');
-    if (es) { if (G.selectSession(es.dataset.editSession)) { tab = 'session'; render(); $('#tab-body').scrollTop = 0; } return; }
-    const us = t.closest('[data-unsession]');
-    if (us) { await deleteSession(us.dataset.unsession); return; }
+    if (formatClick(t)) { render(); return; }
     if (editClick(t)) { render(); return; }
-    const pl = t.closest('[data-player]');
-    if (pl) { RR.Players.use(pl.dataset.player); render(); return; }
-    const up = t.closest('[data-unplayer]');
-    if (up) {
-      const name = up.dataset.unplayer;
-      if (await RR.ask('Remove ' + name + ' and ' + name + '’s scores?', 'Remove')) { RR.Players.remove(name); render(); }
-      return;
-    }
+    if (prefsClick(t, render)) return;
     const act = t.closest('[data-act]');
     if (!act) return;
     const a = act.dataset.act;
     if (a === 'melodies') { close(); RR.Melodies.open(); return; }
-    if (a === 'add-player') {
-      const r = RR.Players.add($('#player-name').value);
-      if (!r.ok) { RR.toast(r.why); $('#player-name').focus(); return; }
-      render(); RR.toast(r.name + ' is playing'); return;
-    }
-    if (a === 'test') {
-      await RR.Sound.prime(0.3);
-      const tt = RR.Sound.now() + 0.05;
-      ['C4', 'E4', 'G4', 'C5'].forEach((id, i) => RR.Sound.playAt(id, tt + i * 0.18));
-    } else if (a === 'reset') {
-      if (await RR.ask('Reset all the scores' + (RR.device.player ? ' for ' + RR.device.player : '') + '? Best scores, stars on the levels and tricky notes all go.', 'Reset')) {
-        RR.Scores.reset(); G.points = 0; G.streak = 0; G.bestStreak = 0; G.drawChips(); render(); RR.toast('Scores reset');
-      }
-    } else if (a === 'new-session') {
-      const name = ($('#new-session').value || '').trim().slice(0, 40);
-      if (!name) { $('#new-session').focus(); RR.toast('Give the session a name first'); return; }
-      // a copy of what is chosen — its own settings (not what is played just this time)
-      const rec = RR.Sessions.add(name, G.readingPractice());
-      G.selectSession(rec.id);
-      tab = 'session'; render(); $('#tab-body').scrollTop = 0;
-      RR.toast('“' + rec.name + '” is in My sessions');
-    } else if (a === 'new-battle') {
-      const name = ($('#new-session').value || '').trim().slice(0, 40);
-      if (!name) { $('#new-session').focus(); RR.toast('Give the battle a name first'); return; }
-      // a copy of what is playing — straight to the Test (a battle is for points), two teams to start
-      const p = G.readingPractice(); p.practice = false;
-      const rec = RR.Sessions.add(name, p, { teams: [], per: 1, rounds: 3 });
-      G.selectSession(rec.id);
-      tab = 'session'; render(); $('#tab-body').scrollTop = 0;
-      const f = body.querySelector('.bt-name'); if (f) { f.focus(); f.select(); }
-      RR.toast('Name the teams and pick their colours');
-    } else if (a === 'play-session') {
+    if (a === 'play-session') {
       close(); RR.View.go('play');
     } else if (a === 'reset-level') {
       const n = G.mode.n;
@@ -531,39 +529,135 @@
       G.over = {}; G.compose(); G.remember(); G.roundChanged = true; G.applyInstrument();
       render(); RR.toast('Playing its own settings');
     } else if (a === 'delete-session') {
-      await deleteSession(G.mode.id);
-    } else if (a === 'copy-link') {
-      const name = ($('#lesson-name').value || '').trim() || 'Lesson';
-      const link = lessonLink(name);
-      $('#lesson-link').value = link;
-      try { await navigator.clipboard.writeText(link); RR.toast('Lesson link copied'); }
-      catch (_) { $('#lesson-link').select(); RR.toast('Select the link and copy it'); }
+      await deleteSession(G.sessionId());
     } else if (a === 'leave') {
       RR.Lesson.leave(); close();
     }
   });
-  /* a session deleted: if it was playing, what it was carries on as Custom */
+  /* a session deleted: if it was playing, what it was carries on as Custom (played the Practice or Songs way:
+     carries on as that lesson or song). True when it went */
   async function deleteSession(id) {
-    const x = RR.Sessions.get(id); if (!x) return;
-    if (!(await RR.ask('Delete the session “' + x.name + '”? Its best scores go too.', 'Delete'))) return;
+    const x = RR.Sessions.get(id); if (!x) return false;
+    if (!(await RR.ask('Delete the session “' + x.name + '”? Its best scores go too.', 'Delete'))) return false;
     RR.Sessions.remove(id);
     if (G.mode.kind === 'session' && G.mode.id === id) {
       G.mode = { kind: 'custom', from: x.name };
       G.battle = null; G.compose(); G.remember(); G.roundChanged = true;
-      tab = 'level';
+    } else if (G.mode.kind === 'teach' && G.mode.session && G.mode.session.id === id) { delete G.mode.session; G.remember(); }
+    G.drawChips(); if (isOpen()) render();
+    return true;
+  }
+  const isOpen = () => !$('#settings').hidden;
+
+  /* ---- the Format's own controls (the session page, 2026-10-12): true when the click was one ---- */
+  function formatClick(t) {
+    const sid = G.sessionId(), x = sid && RR.Sessions.get(sid);
+    if (!x) return false;
+    const replay = () => { G.selectSession(sid); };
+    const f = t.closest('[data-sf]');
+    if (f) {
+      if (f.dataset.sf === x.format) return true;
+      ptab = null;
+      RR.Sessions.setFormat(sid, f.dataset.sf);
+      replay();                                   // played its new way at once (a new round, a new lesson…)
+      $('#tab-body').scrollTop = 0;
+      return true;
     }
-    G.drawChips(); render();
+    const pt = t.closest('[data-spts]');
+    if (pt) {
+      const on = pt.dataset.spts === 'true';
+      RR.Sessions.setPoints(sid, on); RR.device.points = on; RR.saveDevice(); G.drawChips(); G.draw();
+      return true;
+    }
+    const tb = t.closest('[data-stab]');
+    if (tb) { ptab = tb.dataset.stab; return true; }
+    const st = t.closest('[data-st]');
+    if (st) { RR.Sessions.setTeach(sid, { id: st.dataset.id }); replay(); return true; }
+    const ss = t.closest('[data-ss]');
+    if (ss) {
+      const s = RR.clone(x.song), k = ss.dataset.ss, v = ss.dataset.v;
+      const n = (id => { const L = RR.teachLevel(id); return L ? L.ex.length : 1; });
+      if (k === 'song') { s.id = ss.dataset.id; s.from = 0; s.to = n(s.id) - 1; s.part = false; }
+      else if (k === 'part') {
+        // a section to begin with: two slides (the Songs window's way); the whole song: all of them
+        const len = n(s.id); s.part = v === 'part';
+        if (s.part && (s.to <= s.from || (s.from === 0 && s.to >= len - 1))) s.to = Math.min(len - 1, s.from + 1);
+        if (!s.part) { s.from = 0; s.to = len - 1; }
+      }
+      else if (k === 'practice') s.practice = v === 'true';
+      else if (k === 'auto') s.auto = v === 'true';
+      RR.Sessions.setSong(sid, s); replay();
+      return true;
+    }
+    return false;
+  }
+  /* a song's section, picked from its two boxes */
+  function sectionChange(e) {
+    if (e.target.id !== 'ses-from' && e.target.id !== 'ses-to') return false;
+    const sid = G.sessionId(), x = sid && RR.Sessions.get(sid); if (!x) return true;
+    const s = RR.clone(x.song), v = +e.target.value;
+    if (e.target.id === 'ses-from') { s.from = v; s.to = Math.max(s.to, v); } else { s.to = v; s.from = Math.min(s.from, v); }
+    RR.Sessions.setSong(sid, s); G.selectSession(sid);
+    return true;
+  }
+
+  /* ---- Points · Players · Sound: the window's tabs, and the Library's Settings (2026-10-12) — the actions on
+     them, true when `a` was one; `redraw` after a change ---- */
+  function prefsAct(a, redraw) {
+    if (a === 'add-player') {
+      const box = $('#player-name'), r = RR.Players.add(box ? box.value : '');
+      if (!r.ok) { RR.toast(r.why); if (box) box.focus(); return true; }
+      redraw(); RR.toast(r.name + ' is playing'); return true;
+    }
+    if (a === 'test') {
+      RR.Sound.prime(0.3).then(() => {
+        const tt = RR.Sound.now() + 0.05;
+        ['C4', 'E4', 'G4', 'C5'].forEach((id, i) => RR.Sound.playAt(id, tt + i * 0.18));
+      });
+      return true;
+    }
+    if (a === 'reset') {
+      RR.ask('Reset all the scores' + (RR.device.player ? ' for ' + RR.device.player : '') + '? Best scores, stars on the levels and tricky notes all go.', 'Reset').then(yes => {
+        if (!yes) return;
+        RR.Scores.reset(); G.points = 0; G.streak = 0; G.bestStreak = 0; G.drawChips(); redraw(); RR.toast('Scores reset');
+      });
+      return true;
+    }
+    return false;
+  }
+  /* a click in Points or Sound anywhere (the Library's Settings): the switches and choices of this browser, the
+     players — true when it was one */
+  function prefsClick(t, redraw) {
+    const sg = t.closest('[data-k]');
+    if (sg && sg.dataset.k[0] === '@') { change(sg.dataset.k, sg.dataset.v); redraw(); return true; }
+    const tg = t.closest('[data-toggle]');
+    if (tg && tg.dataset.toggle[0] === '@') {
+      const k = tg.dataset.toggle;
+      change(k, !(k === '@points' ? RR.device.points : k === '@stars' ? RR.device.stars : RR.device.celebrate)); redraw(); return true;
+    }
+    const pl = t.closest('[data-player]');
+    if (pl) { RR.Players.use(pl.dataset.player); redraw(); return true; }
+    const up = t.closest('[data-unplayer]');
+    if (up) {
+      const name = up.dataset.unplayer;
+      RR.ask('Remove ' + name + ' and ' + name + '’s scores?', 'Remove').then(yes => { if (yes) { RR.Players.remove(name); redraw(); } });
+      return true;
+    }
+    const act = t.closest('[data-act]');
+    return !!(act && prefsAct(act.dataset.act, redraw));
   }
 
   // the number of melodies, typed: taken when the box is left (or Enter)
   body.addEventListener('change', e => {
     if (e.target.id === 'round-count') { change('countSet', e.target.value); render(); }
+    if (sectionChange(e)) { render(); return; }
     if (battleChange(e)) render();
   });
   body.addEventListener('input', e => {
     if (battleInput(e)) return;
-    if (e.target.id === 'session-name' && G.mode.kind === 'session') {     // renamed as you type
-      if (RR.Sessions.rename(G.mode.id, e.target.value)) { G.mode.name = e.target.value.trim().slice(0, 40); G.drawChips(); $('#custom-tag').textContent = G.modeLabel(); }
+    if (e.target.id === 'session-name' && G.sessionId()) {     // renamed as you type
+      const nm = e.target.value.trim().slice(0, 40), m = G.mode;
+      if (RR.Sessions.rename(G.sessionId(), e.target.value)) { if (m.kind === 'session') m.name = nm; else m.session.name = nm; G.remember(); G.drawChips(); $('#custom-tag').textContent = G.modeLabel(); }
       return;
     }
     const r = e.target.closest('[data-range]');
@@ -576,10 +670,8 @@
       });
       return;
     }
-    if (e.target.id === 'lesson-name') $('#lesson-link').value = lessonLink(e.target.value.trim() || 'Lesson');
   });
   body.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.target.id === 'new-session') { e.preventDefault(); body.querySelector('[data-act="new-session"]').click(); }
     if (e.key === 'Enter' && e.target.id === 'session-name') { e.preventDefault(); e.target.blur(); }
     if (e.key === 'Enter' && (e.target.id === 'round-count' || e.target.id === 'battle-rounds' || e.target.matches('.bt-name'))) { e.preventDefault(); e.target.blur(); }
     if (e.key === 'Enter' && e.target.id === 'player-name') { e.preventDefault(); body.querySelector('[data-act="add-player"]').click(); }
@@ -588,6 +680,14 @@
 
   /* for the top drop-down (drop.js, 2026-10-08): a section of the ✎ page on what is playing, and its controls */
   const sectionHtml = name => name === 'battle' ? (G.battle ? battlePage() : '') : TAB[name] ? TAB[name]() : '';
+  /* the Library (2026-10-12): its Settings folder is Points and Sound; its Share & backup has the lesson link */
+  const prefsHtml = () => '<h4 class="lb-sub">Points, stars and players</h4>' + TAB.points() + '<h4 class="lb-sub">Sound</h4>' + TAB.sound();
+  function prefsInput(e) {
+    const r = e.target.closest('[data-range]');
+    if (!r || r.dataset.range[0] !== '@') return false;
+    change(r.dataset.range, r.value); return true;
+  }
   RR.Settings = { open, close, render, settle, draftHtml, draftClick, sectionHtml, liveClick: editClick, battleClick, battleInput, battleChange, focusLastTeam,
-    isOpen: () => !$('#settings').hidden };
+    deleteSession, prefsHtml, prefsClick, prefsInput, shareHtml: () => TAB.share(), lessonLink,
+    isOpen };
 })();

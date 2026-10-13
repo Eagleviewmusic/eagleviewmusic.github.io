@@ -60,6 +60,7 @@
     if (G.battle) return '✎ Notes, rhythms and more';
     if (m.kind === 'level') return '✎ Change Level ' + m.n;
     if (m.kind === 'session') return '✎ Change ' + m.name;
+    if (m.kind === 'teach' && m.session) return '✎ Change ' + m.session.name;     // a session played the Practice or Songs way
     return '✎ Look & Feel and more';
   }
 
@@ -113,7 +114,7 @@
       '<header class="dd-head"><i class="band-dot" style="--band:' + G.modeColour() + '"></i><div class="dd-what"><b id="dd-title">' + esc(G.modeLabel()) + '</b><span>' + esc(formatWords()) + '</span></div>' +
       '<button class="icon-btn close" data-d="close" type="button" aria-label="Close">×</button></header>' +
       '<div class="dd-body dd-' + k + '">' + body + '</div>' +
-      '<footer class="dd-foot">' + (k === 'teach' ? '<span></span>' : '<button type="button" class="h-link" data-d="page">' + esc(pageWord()) + '</button>') +
+      '<footer class="dd-foot">' + (k === 'teach' && !G.sessionId() ? '<span></span>' : '<button type="button" class="h-link" data-d="page">' + esc(pageWord()) + '</button>') +
       '<button type="button" class="pill-btn go" data-d="close">Done</button></footer></div>';
   }
   function draw(focusSel) {
@@ -180,7 +181,13 @@
         G.announce('Level ' + d.dataset.n + ': ' + RR.LEVELS[+d.dataset.n - 1].name);
       }
       else if (a === 'session') { G.selectSession(d.dataset.id); close(); }
-      else if (a === 'teach') { RR.Teach.start(d.dataset.id); close(); G.announce('Teach Me to Read · ' + RR.teachLevel(d.dataset.id).long); }
+      else if (a === 'teach') {
+        if (RR.Teach.start(d.dataset.id)) { close(); G.announce('Practice · ' + RR.teachLevel(d.dataset.id).long); }
+        else RR.toast('No melodies in it yet — write them in My melodies');
+      }
+      else if (a === 'teach-make') thenOpen(() => RR.Teach.openWindow('make'));   // + Make a unit (2026-10-12)
+      else if (a === 'tsong') { if (RR.Teach.startSong(d.dataset.id)) { close(); G.announce('Songs · ' + RR.teachLevel(d.dataset.id).title); } }   // Songs: another song
+      else if (a === 'tsongs') thenOpen(() => RR.Teach.openSongs());
       else if (a === 'set') { G.switchSet(d.dataset.id); close(); }
       else if (a === 'song') {
         const list = G.songPicks().slice(), id = d.dataset.id, i = list.indexOf(id);
@@ -188,7 +195,7 @@
         G.setSongPicks(list); draw('[data-d="song"][data-id="' + CSS.escape(id) + '"]');
       }
       else if (a === 'edit-set') { const cur = G.playingSet(); thenOpen(() => RR.Melodies.open(cur && cur.id)); }
-      else if (a === 'new-set') thenOpen(() => { RR.Melodies.open(); const nb = document.querySelector('#melodies [data-act="new"]'); if (nb) nb.click(); });
+      else if (a === 'new-set') thenOpen(() => RR.Library.newMelody());     // the Library's + New melody (2026-10-12)
       return;
     }
     // a battle's teams, turns and rounds; Generated's notes and rhythms — Settings' own controls

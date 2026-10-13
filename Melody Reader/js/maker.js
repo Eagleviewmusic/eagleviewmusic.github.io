@@ -8,7 +8,21 @@
      strike a bar      adds that note (keys 1–0 − = too); Rest adds a rest
      ⌫ (or Backspace)  takes the last one back
      ▶ (or Space)      hears what is written
-     Save              into the set it was opened from
+     Save              into the set it was opened from, and back to it
+
+   SLIDES (2026-10-12, the user's: "it only lets me make one slide … make
+   many slides under the same file"): every melody of the set is a slide,
+   numbered along the top. + New slide (or Enter) saves this one and
+   starts a blank one after the last, in the same time and length; a
+   number goes to that slide, saving this one first; Delete this slide
+   (asked). A half-written slide is filled with rests when it is left
+   (asked first, as Save does); an untouched blank one is simply dropped.
+
+   THE LAYOUT (2026-10-12, the user's: the staff shrank under rows of
+   controls): the music card is the staff and one slim line (the set, the
+   slides, + New slide, what is left); the tools are one bar between the
+   card and the xylophone (the dock, index.html); the slide's name, time and
+   length are in a little window from its ✎ button there (pop).
 
    A melody is one or two whole bars and nothing crosses a bar line, so a
    value that doesn't fit what is left of the bar is greyed out. The empty
@@ -32,7 +46,8 @@
   ];
   const RESTABLE = [16, 8, 4, 2, 1];
 
-  const M = { active: false, setId: null, index: null, melody: null, bars: 1, value: 4, dirty: false, timers: [] };
+  const M = { active: false, setId: null, index: null, melody: null, bars: 1, value: 4, dirty: false, changed: false, timers: [] };
+  const MAX = 60;                                     // a set's melodies at most (sets.js)
 
   const barTicks = () => M.melody.time[0] * 4;
   const used = () => M.melody.notes.reduce((a, n) => a + n.t, 0);
@@ -71,47 +86,111 @@
     if (RR.Melodies) RR.Melodies.close();
     if (RR.View) RR.View.go('play');                // the music card is the editor (from the home page too)
     G.pause(); clearTimeout(G.autoT);
-    M.active = true; M.setId = setId; M.index = (index === null || index === undefined) ? null : index;
-    const src = M.index !== null && set.melodies[M.index];
-    M.melody = src ? RR.clone(src) : { title: '', time: [4, 4], notes: [] };
-    M.bars = src ? Math.round(src.notes.reduce((a, n) => a + n.t, 0) / (src.time[0] * 4)) : 1;
-    M.value = 4; M.dirty = false;
+    M.active = true; M.setId = setId; M.changed = false;
+    M.value = 4;
     $('#app').classList.add('making');
-    $('#mk-set').textContent = set.title + (M.index !== null ? ' · melody ' + (M.index + 1) : ' · a new melody');
-    $('#mk-title').value = M.melody.title || '';
+    $('#mk-set').textContent = set.title;
     if (RR.Xylo.count() !== 13) RR.Xylo.build(13);
     RR.Xylo.setGreyed(null); RR.Xylo.setLabels(true, true); RR.Xylo.setGlow(null);
-    render();
+    // a new slide starts in the time and length of the set's last one
+    const last = set.melodies[set.melodies.length - 1];
+    load(index === null || index === undefined ? null : index, last);
     const f = $('#mk-values .mk-val.on'); if (f) f.focus();
-    G.announce('Make a melody. Pick a note value, then play the bars — keys 1 to 0 — to write it.');
+    G.announce('Make a melody. Pick a note value, then play the bars — keys 1 to 0 — to write it. + New slide, or Enter, for the next one.');
+  }
+  const barsOf = m => Math.max(1, Math.round(m.notes.reduce((a, n) => a + n.t, 0) / (m.time[0] * 4)));
+  /* a slide on the stand: one of the set's melodies, or (null) a blank new one — in the time and length of `like` */
+  function load(index, like) {
+    const set = RR.Sets.get(M.setId);
+    const src = set && index !== null && set.melodies[index];
+    M.index = src ? index : null;
+    M.melody = src ? RR.clone(src) : { title: '', time: like ? like.time.slice() : [4, 4], notes: [] };
+    M.bars = src ? barsOf(src) : like ? barsOf(like) : 1;
+    M.dirty = false;
+    $('#mk-title').value = M.melody.title || '';
+    if (!fits(M.value)) { const v = VALUES.find(x => fits(x.t)); if (v) M.value = v.t; }
+    stopHear();
+    render();
+  }
+  const hasNotes = () => M.melody.notes.some(n => n.p);
+  /* this slide into the set (asked first to fill a half-written one with rests). True when there is nothing
+     left unsaved — an untouched blank slide counts: there is nothing to keep */
+  async function commit() {
+    M.melody.title = ($('#mk-title').value || '').trim().slice(0, 60);
+    if (!M.dirty) return true;
+    if (!hasNotes()) {
+      if (M.index === null && !M.melody.notes.length) return true;      // a blank new slide: nothing to keep
+      RR.toast('Write at least one note on this slide — strike a bar' + (M.index !== null ? ', or Delete this slide' : ''));
+      return false;
+    }
+    if (!full()) {
+      if (!(await RR.ask('Slide ' + slideNo() + ' isn’t full yet. Fill the rest with rests and save it?', 'Fill and save', 'Keep writing'))) return false;
+      M.melody.notes = M.melody.notes.concat(fillers());
+    }
+    const mel = RR.Sets.normalizeMelody(M.melody);
+    if (!mel) { RR.toast("That slide couldn't be saved"); return false; }
+    const set = RR.Sets.get(M.setId);
+    if (M.index === null && set && set.melodies.length >= MAX) { RR.toast('A set holds ' + MAX + ' slides at most'); return false; }
+    let at = M.index;
+    const rec = RR.Sets.update(M.setId, s => {
+      if (at === null) { s.melodies.push(mel); at = s.melodies.length - 1; } else s.melodies[at] = mel;
+    });
+    if (!rec) { RR.toast("That set can't be changed here"); return false; }
+    M.index = at; M.dirty = false; M.changed = true;
+    return true;
+  }
+  const slideNo = () => M.index !== null ? M.index + 1 : (RR.Sets.get(M.setId) || { melodies: [] }).melodies.length + 1;
+  /* + New slide (or Enter): this one saved, a blank one after the last */
+  async function newSlide() {
+    const set = RR.Sets.get(M.setId); if (!set) return;
+    if (M.index === null && !M.melody.notes.length) { RR.toast('This is the new slide — strike the bars to write it'); return; }
+    const count = set.melodies.length + (M.index === null ? 1 : 0);
+    if (count >= MAX) { RR.toast('A set holds ' + MAX + ' slides at most'); return; }
+    if (!(await commit())) return;
+    const now = RR.Sets.get(M.setId);
+    load(null, M.melody);
+    G.announce('Slide ' + (now.melodies.length + 1) + ': a new one. Strike the bars to write it.');
+  }
+  /* a slide's number: this one saved first */
+  async function go(i) {
+    if (i === M.index) return;
+    if (!(await commit())) return;
+    const set = RR.Sets.get(M.setId);
+    if (!set || !set.melodies[i]) return;
+    load(i);
+    G.announce('Slide ' + (i + 1) + ' of ' + set.melodies.length + '.');
+  }
+  async function delSlide() {
+    if (M.index === null) return;
+    const i = M.index;
+    if (!(await RR.ask('Delete slide ' + (i + 1) + '?', 'Delete', 'Keep it'))) return;
+    const rec = RR.Sets.update(M.setId, s => { s.melodies.splice(i, 1); });
+    if (!rec) return;
+    M.changed = true;
+    // the one after it (or before, if it was the last); none left: a blank new one
+    load(rec.melodies.length ? Math.min(i, rec.melodies.length - 1) : null, rec.melodies[i - 1] || M.melody);
+    RR.toast('Slide ' + (i + 1) + ' deleted');
   }
   function leave(saved) {
-    stopHear();
+    stopHear(); pop(false);
     M.active = false;
     $('#app').classList.remove('making');
     const setId = M.setId;
     G.applyInstrument();
-    if (saved && G.setup.set === setId) { G.queue = []; G.newRound(); } else G.draw();
+    if ((saved || M.changed) && G.setup.set === setId) { G.queue = []; G.newRound(); } else G.draw();
     if (RR.Melodies) RR.Melodies.open(setId);
   }
   async function cancel() {
-    if (M.dirty && M.melody.notes.length && !(await RR.ask('Leave without saving this melody?', 'Leave', 'Keep writing'))) return;
+    const other = M.changed ? ' (the other slides are saved)' : '';
+    if (M.dirty && M.melody.notes.length && !(await RR.ask('Leave without saving this slide?' + other, 'Leave', 'Keep writing'))) return;
     leave(false);
   }
+  /* Save: this slide, then back to the set (a blank new slide after others: nothing to save, just back) */
   async function save() {
-    if (!M.melody.notes.some(n => n.p)) { RR.toast('Write at least one note first — strike a bar'); return; }
-    if (!full()) {
-      if (!(await RR.ask('The bars aren’t full yet. Fill the rest with rests and save?', 'Fill and save', 'Keep writing'))) return;
-      M.melody.notes = M.melody.notes.concat(fillers());
-    }
-    M.melody.title = ($('#mk-title').value || '').trim().slice(0, 60);
-    const mel = RR.Sets.normalizeMelody(M.melody);
-    if (!mel) { RR.toast("That melody couldn't be saved"); return; }
-    const rec = RR.Sets.update(M.setId, s => {
-      if (M.index === null) s.melodies.push(mel); else s.melodies[M.index] = mel;
-    });
-    if (!rec) { RR.toast("That set can't be changed here"); return; }
-    RR.toast('Saved in ' + rec.title);
+    const set = RR.Sets.get(M.setId);
+    if (!hasNotes() && !(M.index === null && !M.melody.notes.length && set && set.melodies.length)) { RR.toast('Write at least one note first — strike a bar'); return; }
+    if (!(await commit())) return;
+    RR.toast('Saved in ' + RR.Sets.get(M.setId).title);
     leave(true);
   }
 
@@ -178,8 +257,22 @@
   function valuePic(t) {
     return RR.Eng.render({ time: [Math.max(1, Math.ceil(t / 4)), 4], notes: [{ p: 'A4', t }] }, { ss: 6, bare: true, colour: 'black', labels: 'none', maxStretch: 1 }).svg;
   }
+  function slidesHtml() {
+    const set = RR.Sets.get(M.setId), mels = set ? set.melodies : [];
+    const chips = mels.map((m, i) => '<button type="button" class="mk-slide' + (i === M.index ? ' on' : '') + '" data-slide="' + i + '" aria-pressed="' + (i === M.index) + '"' +
+      ' title="Slide ' + (i + 1) + (m.title ? ': ' + RR.esc(m.title) : '') + '" aria-label="Slide ' + (i + 1) + (m.title ? ', ' + RR.esc(m.title) : '') + (i === M.index ? ', on the stand' : '') + '">' + (i + 1) + '</button>');
+    if (M.index === null) chips.push('<button type="button" class="mk-slide on new" aria-pressed="true" aria-label="Slide ' + (mels.length + 1) + ', new, on the stand" title="A new slide">' + (mels.length + 1) + '</button>');
+    return chips.join('');
+  }
   function render() {
     if (!M.active) return;
+    // the slides
+    const strip = $('#mk-slides');
+    strip.innerHTML = slidesHtml();
+    const cur = strip.querySelector('.mk-slide.on');
+    if (cur) { const l = cur.offsetLeft - strip.offsetLeft, r = l + cur.offsetWidth; if (l < strip.scrollLeft) strip.scrollLeft = l - 6; else if (r > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = r - strip.clientWidth + 6; }
+    $('#mk-del').hidden = M.index === null;
+    $('#mk-new').classList.toggle('ready', full());
     // the palette
     $('#mk-values').innerHTML = VALUES.map(v => '<button type="button" class="mk-val' + (v.t === M.value ? ' on' : '') + (fits(v.t) ? '' : ' no') + '" data-t="' + v.t + '" aria-pressed="' + (v.t === M.value) + '" title="' + v.about + '"><span class="pic">' + valuePic(v.t) + '</span><b>' + v.name + '</b></button>').join('');
     $('#mk-rest').disabled = full();
@@ -187,21 +280,42 @@
     $('#mk-time').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.v === M.melody.time[0]));
     $('#mk-bars').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.v === M.bars));
     const u = used(), bt = barTicks();
-    $('#mk-status').textContent = full() ? 'Full ✓ — Save it' : (M.bars > 1 ? 'Bar ' + (Math.floor(u / bt) + 1) + ' of ' + M.bars + ' · ' : '') + beatsWord(roomInBar()) + ' left' + (M.bars > 1 && Math.floor(u / bt) + 1 < M.bars ? ' in this bar' : '');
+    $('#mk-status').textContent = full() ? 'Full ✓' : (M.bars > 1 ? 'Bar ' + (Math.floor(u / bt) + 1) + ' of ' + M.bars + ' · ' : '') + beatsWord(roomInBar()) + ' left' + (M.bars > 1 && Math.floor(u / bt) + 1 < M.bars ? ' in this bar' : '');
+    $('#mk-status2').textContent = $('#mk-status').textContent;
     $('#mk-save').classList.toggle('ready', full());
+    // the slide's button in the dock: its time and length (and name) — its window changes them
+    const name = ($('#mk-title').value || '').trim();
+    $('#mk-opts').textContent = '✎ ' + M.melody.time[0] + '/4 · ' + (M.bars === 1 ? '1 bar' : '2 bars');
+    $('#mk-opts').title = (name ? '“' + name + '” · ' : '') + 'The slide’s name, time and length';
+    $('#mk-opts').setAttribute('aria-label', 'This slide: ' + (name ? name + ', ' : '') + M.melody.time[0] + '/4, ' + (M.bars === 1 ? 'one bar' : 'two bars') + '. Its name, time and length');
     // the music: what is written, then the empty rest of the bars, faint
     const music = $('#music');
     const fitW = music.clientWidth, fitH = music.clientHeight;
-    if (!fitW || !fitH) return;
+    if (!fitW || !fitH) { music.innerHTML = ''; return; }          // no room: never the music that was there before
     const written = M.melody.notes.length;
     const card = { time: M.melody.time, notes: M.melody.notes.concat(fillers()) };
-    const m = RR.Eng.measure(card);
-    const ss = Math.max(8, Math.min(fitH / (2.7 + 4 + 2.9 + 1.5), fitW / (m.prefix + m.notes * 0.95 + m.fixed), 30));
+    // the tight row (Teach Me to Read's: less room above and below the staff) and as big as it fits — up to a
+    // smartboard's 46 (it was capped at 30, in the full row, under two rows of controls). Two bars may draw as
+    // two rows, a bar each, when that is bigger (a phone held upright: there the width is what runs out)
+    const rowH = RR.Eng.rowSpaces(true, true);
+    let tick = 0;
+    const cut = card.notes.findIndex(n => { const at = tick; tick += n.t; return at === bt; });
+    const plan = split => {
+      const ranges = split ? [[0, cut], [cut, card.notes.length]] : [[0, card.notes.length]];
+      const rows = ranges.map(([a, b], r) => ({ a, b, card: { time: card.time, notes: card.notes.slice(a, b) }, noTime: r > 0, endBar: split && r === 0 ? 'single' : 'final' }));
+      const widest = Math.max.apply(null, rows.map(x => { const mm = RR.Eng.measure(x.card, false, x.noTime); return mm.prefix + mm.notes * 0.95 + mm.fixed; }));
+      return { rows, ss: Math.max(8, Math.min(fitH / (rowH * rows.length), fitW / widest, 46)) };
+    };
+    let lay = plan(false);
+    if (M.bars === 2 && cut > 0) { const two = plan(true); if (two.ss > lay.ss * 1.04) lay = two; }
+    const states = card.notes.map((n, i) => i < written ? 'lit' : 'todo'), next = full() ? -1 : written;
     music.setAttribute('aria-label', 'Your melody: ' + M.melody.notes.filter(n => n.p).length + ' notes so far. ' + $('#mk-status').textContent + '.');
-    music.innerHTML = RR.Eng.render(card, {
-      ss, maxW: fitW, colour: 'always', states: card.notes.map((n, i) => i < written ? 'lit' : 'todo'), noHalo: true,
-      faintFrom: written, nextIdx: full() ? -1 : written, labels: 'letters'
-    }).svg;
+    const svgs = lay.rows.map(x => RR.Eng.render(x.card, {
+      ss: lay.ss, maxW: fitW, maxStretch: lay.rows.length > 1 ? 3 : 1.9, noTime: x.noTime, endBar: x.endBar,
+      colour: 'always', states: states.slice(x.a, x.b), noHalo: true,
+      faintFrom: Math.max(0, written - x.a), nextIdx: next >= x.a && next < x.b ? next - x.a : -1, labels: 'letters', tight: true
+    }).svg);
+    music.innerHTML = svgs.length > 1 ? '<div class="rows">' + svgs.join('') + '</div>' : svgs[0];
   }
 
   /* ---------------- wiring ---------------- */
@@ -221,9 +335,29 @@
   $('#mk-time').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) setTime(+b.dataset.v); });
   $('#mk-bars').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) setBars(+b.dataset.v); });
   $('#mk-title').addEventListener('input', () => { M.dirty = true; });
+  $('#mk-slides').addEventListener('click', e => { const b = e.target.closest('[data-slide]'); if (b) go(+b.dataset.slide); });
+  $('#mk-new').addEventListener('click', newSlide);
+  /* the slide's window (its name, time, length, Delete): from its button in the dock; Done, Escape (app.js) or a
+     tap anywhere else closes it — not a tap in a question it asked (changing the time asks first) */
+  const popEl = $('#mk-pop');
+  function pop(want) {
+    if (!!want === !popEl.hidden) return;
+    popEl.hidden = !want;
+    $('#mk-opts').setAttribute('aria-expanded', String(!!want));
+    if (want) { const f = popEl.querySelector('#mk-title'); if (f) f.focus(); }
+  }
+  $('#mk-opts').addEventListener('click', () => pop(popEl.hidden));
+  $('#mk-pop-done').addEventListener('click', () => { pop(false); render(); $('#mk-opts').focus(); });
+  $('#mk-title').addEventListener('change', render);
+  $('#mk-title').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); pop(false); render(); $('#mk-opts').focus(); } });
+  document.addEventListener('pointerdown', e => {
+    if (!popEl.hidden && !e.target.closest('#mk-pop') && !e.target.closest('#mk-opts') && !e.target.closest('.modal')) { pop(false); render(); }
+  }, true);
+  $('#mk-del').addEventListener('click', delSlide);
 
   RR.Maker = {
-    enter, cancel, save, undo, hear, render, add,
+    enter, cancel, save, undo, hear, render, add, newSlide, go, delSlide,
+    popOpen: () => !popEl.hidden, closePop: () => { pop(false); render(); },
     get active() { return M.active; },
     state: () => M     // for tests
   };

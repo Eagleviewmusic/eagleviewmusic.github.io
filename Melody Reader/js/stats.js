@@ -12,7 +12,7 @@
                        First try           how many notes were right first time, as a line
                        How melodies scored the three kinds of score, one bar
                        Note by note        each bar's first-try share, and the change
-                       The metronome       Tests at Slow · Moderate · Fast, and how many in time
+                       The metronome       Tests at Slow · Moderate · Fast, and how many at its tempo
      Recent          the last 50 melodies (columns by kind of score, the
                      average of the last ten as a line) · the calendar
      All time        the ladder's stars · records · mix-ups · the last games
@@ -56,7 +56,7 @@
   const TIER_NAMES = () => [
     ['Found the notes', RR.device.points ? '1–8 points' : 'every note, with slips'],
     ['In your own steady beat', RR.device.points ? '9–12 points' : 'every note first time'],
-    ['With the metronome', RR.device.points ? '13–20 points' : 'every note in time']
+    ['With the metronome', RR.device.points ? '13–20 points' : 'every note at its tempo']
   ];
   const PACE_NAMES = ['Slow', 'Moderate', 'Fast'];
 
@@ -162,12 +162,12 @@
     // The metronome
     const paceSum = sum.pc[0] + sum.pc[1] + sum.pc[2], maxPc = Math.max(1, ...sum.pc);
     const tempos = RR.Points.PACES.map(p => RR.paceTempo(G.setup, p.id));
-    out += cardHtml('metro', 'With the metronome', paceSum ? plural(paceSum, 'Test') + ' counted in · darker = in time all through' : '',
+    out += cardHtml('metro', 'With the metronome', paceSum ? plural(paceSum, 'Test') + ' counted in · darker = every note at its tempo' : '',
       paceSum ? (tables.metro ? tableHtml(['Tempo', 'Tests', 'In time all through'], PACE_NAMES.map((p, i) => [p + ' (' + tempos[i] + ' BPM)', String(sum.pc[i]), String(sum.pk[i])]))
         : '<div class="hbars">' + PACE_NAMES.map((p, i) => {
           const all = sum.pc[i], ok = sum.pk[i];
           return '<div class="hbar"><span class="hb-l"><b>' + p + '</b><small>' + tempos[i] + ' BPM</small></span><span class="hb-track">' +
-            (ok ? '<i class="hb-ok" style="width:' + (100 * ok / maxPc) + '%" data-tv="' + ok + ' in time" data-tl="' + p + ' · every note in time"></i>' : '') +
+            (ok ? '<i class="hb-ok" style="width:' + (100 * ok / maxPc) + '%" data-tv="' + ok + ' at its tempo" data-tl="' + p + ' · every note at its tempo"></i>' : '') +
             (all - ok ? '<i class="hb-rest" style="width:' + (100 * (all - ok) / maxPc) + '%" data-tv="' + (all - ok) + ' other tries" data-tl="' + p + ' · a note early, late or missed"></i>' : '') +
             '</span><span class="hb-v">' + ok + ' of ' + all + '</span></div>';
         }).join('') + '</div>')

@@ -30,14 +30,20 @@ Through the Claude Apps server (`../.claude/serve.js`; python's
 
 `http://localhost:8816/tests/` runs the engine checks (generator, Songbook,
 levels, engraver, practices, lesson links, melody sets under the library
-rules, the points, My sessions, the gold star, round lengths, Battle
+rules, the points, My sessions (and, 2026-10-12, their formats, points and unnamed names), the gold star, round lengths, Battle
 Mode and its fair plan, the Helps' choices, the session page's rules, My
 stats' history and charts, the new ladder: 300 melodies a level against
 its notes, moves, leaps, meters and pick-ups; metronome runs played in
 time, slow, fast, late in, with a note skipped or a wrong bar; level changes kept and reset, a
 session's own melody set, lesson links carrying every setting, Song sets and a battle) — 107 of
 them, all passing as of 2026-10-08; with Teach Me to Read's 11 (its six levels' exercises, the
-staff's lines, the gold-star rule, the saved marks, Solid Color, the tighter staff, high A) 121, all passing on 2026-10-11.
+staff's lines, the gold-star rule, the saved marks, Solid Color, the tighter staff, high A) 121, all passing on 2026-10-11;
+with Your units and the Tools panel's look (2026-10-12: a set as a unit, marks that follow a melody, low C's red
+ledger line, a set gone and back, the look kept) 126, all passing on 2026-10-12; then the metronome's click-matching
+checks (the follower's) were replaced by the tempo rule's (2026-10-12) — 122; with Staff Color and a battle's Tools
+switch, 124; with the song levels (a Songbook song, any set as a song) 126, all passing on 2026-10-12; with a session's
+Format (old sessions taking one, the points each format sets, Battle kept, the picks made safe, a session from Practice)
+and the names for an unnamed session, 133, all passing on 2026-10-12.
 
 The Teacher Library shelf reads `../Teacher Library/index.json`, which only
 exists on the live site; served from its own folder (8815/8816) it can't be
@@ -48,6 +54,71 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 — and delete it afterwards.
 
 ## What's built (all six phases)
+
+- **The Library** (2026-10-12, the user's: "combine the My Melodies button
+  with the Setting Button and call it 'Library'", laid out like Song Writer
+  2.5's Library — "the go to place to find anything"). The top bar's ♫ and
+  gear are one **Library** button (icon only on a phone). It opens in the
+  window that was My melodies (`#melodies`; `js/library.js` draws its list,
+  `js/melodies.js` keeps the window and a set's page):
+  - **Now playing** — what is on the music, ✎ Change it (its page), ▶ To
+    the music (from the home page).
+  - **The buttons**, Song Writer's row: **+ New melody** (not New song —
+    asks which set it goes in, or a new one, blank = "My melodies", then
+    Make a melody) · **Teacher Library** · **Share & backup** (a page of
+    its own: the lesson link that was Settings' Share tab — not for
+    Practice or Songs, which links can't carry yet — and the melody sets'
+    Download / Restore) · **Set up for students** and **Save picture**,
+    both marked *soon* and only saying so when pressed (the user: "we'll
+    discuss that later"). No Save as.
+  - **+ New session** under them — no name needed: left empty it's
+    called "Monday's Xylo Workout", "Friday's Xylo Bootcamp"… (today's day
+    and one of five titles — Xylo Workout, Xylo Bootcamp, Mallet Madness,
+    Note Safari, Rainbow Jam — one not taken; `RR.sessionName`, the name
+    shown in the empty box). It's a copy of what is playing (from Practice
+    or a song: a session of that) and opens its page. No Battle button
+    here: Battle is one of the formats.
+  - **The folders**, each a Song Writer group head that folds (which are
+    open is kept: `device.libOpen`; My sessions and My melodies open to
+    begin with): **My sessions** (▶ Play · ✎ · ×, the format's picture,
+    what it plays, its stars) · **My melodies** (the Teacher Library's
+    books, Shared with you, Your sets — ▶ Play, Open — and + New set for
+    an empty one) · **Songs** (the Songbook: ▶ Play straight through, A
+    section… opens the Songs window) · **Practice** (the six lessons and
+    your exercises, ▶ Play; + Make an exercise) · **Levels** (the fifteen
+    by band, ▶ Play · ✎) · **Settings** (Points, gold stars, celebrations,
+    Players, Reset scores, Sound — the Settings window's own sections).
+  - In a lesson: Now playing, Leave the lesson, and Settings only.
+  The Settings window stays as the **✎ page** of what is playing (opened
+  from the Library, the level box's drop-down, the home page's windows),
+  with Points and Sound beside it; its Level and Share tabs went into the
+  Library. Round done's Settings button is a Library button.
+- **A session's Format** (2026-10-12, the user's: "under format it will
+  include practice, rounds, songs, games, and Battle — and depending on
+  what they pick, more appropriate choices will be given"). On the
+  session's page **Format comes first** now (it decides the rest — my
+  call; it was below Look & Feel), with the home page's five:
+  **Practice** — which lesson, song or exercise (Practice's tiles, tabs
+  Lessons · Songs · Exercises) · **Rounds** — how many melodies ·
+  **Songs** — which song (the Songbook's or a set of yours), the whole of
+  it or a section, Practice, Auto-Next · **Games** — Beat the Clock (30 s
+  / 60 s / 2 min) or Endless · **Battle** — the teams, turns and rounds.
+  The user chose (asked 2026-10-12) that Practice and Songs play **the way
+  their home cards do** (teach.js: `G.mode = { kind: 'teach', …, session:
+  { id, name } }`, the chip showing the session's name), the session
+  remembering the pick; Rounds, Games and Battle play the session's own
+  notes, rhythms, look and source as before (those sections show only for
+  them). Changing the format plays it the new way at once.
+  **Points** sit under the format: choosing a format sets them — **off
+  for Practice and Songs, on for Rounds, Games and Battles** — and they
+  can be changed any time (there, or the Points switch in the Library's
+  Settings while the session plays); the session keeps what was chosen
+  (`points`) and sets the browser's Points switch whenever it is picked.
+  Practice and Songs count no points yet, so On shows nothing there (the
+  page says so). A session saved before formats takes one from what it
+  was: a battle → Battle, a Song → Songs (its first song), Beat the Clock
+  or Endless → Games, else Rounds. Leaving Battle keeps the teams for
+  coming back.
 
 - **Teach Me to Read** (2026-10-11, the user's design for Level 1; Levels 2
   and 3 made the same way at their ask) — a card on the home page like the
@@ -64,8 +135,8 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 
   **The music card** (2026-10-11, the user's: the notation had become the
   smallest thing on it): from a tablet up, Listen · the metronome ·
-  Keyboard stand in a column on the left and ↻ · Next on the right (the
-  tempo choice opens beside the metronome), so the staff has the card's
+  Keyboard stood in a column on the left — since 2026-10-12 Listen ·
+  Tools (below) — and ↻ · Next on the right, so the staff has the card's
   whole height; the staff is drawn tighter (`tight`: 1.8 spaces above the
   top line, the letters 2.35 below the bottom — its notes never leave D4 to
   G5), the notes a little closer (fitted at 0.8 of their width, not 0.95),
@@ -89,15 +160,19 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   notes, the next-bar hint after two slips. **No Practice / Test and no
   score** (the score chip is hidden): play an exercise on your own and it
   gets a **green check**; pick the **metronome — Slow or Moderate, no
-  Fast** — and it counts in at once, then **goes round and round**
+  Fast** (in Tools since 2026-10-12) — and it counts in at once, then **goes round and round**
   (2026-10-11, the user's: "do not stop it after 1 round, let it repeat" —
   a class can read the board and play along on real xylophones): the
   melody comes back straight after its last bar, the click going on, until
   the metronome is turned Off (or Escape, ↻ to count in again, Listen,
-  another exercise, a window). Each time round is marked on its own: every
-  note and no wrong bar, a **gold star** (a slip: a check; a missed note:
-  nothing) — the mark floats up each time, the sound and the words only
-  when it goes up. **▶ Listen goes round and round too** until pressed
+  another exercise, a window). Each time it is played through it is marked
+  on its own: every note, no wrong bar and at about the metronome's tempo
+  — wherever the player came in — a **gold star** (a slip, or too fast or
+  slow for it: a check); the notes stay lit until the next bar is struck,
+  which starts the next time round as its first note (2026-10-12: it used
+  to be closed by the clock, a note not played in its window missed) —
+  the mark floats up each time, the sound and the words only when it goes
+  up. **▶ Listen goes round and round too** until pressed
   again — with the metronome on, with its clicks (playing along stops for
   it; ↻ goes back to it). **Free to move** (2026-10-11, the user's:
   "teachers need to move more freely"): **Next** works any time (it lights
@@ -106,7 +181,7 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   card with the five marks (a dashed circle for one not played): **▶ The
   ones left** if any, else **Try again for gold stars** (unless all five
   are gold — it goes to the first without one and points out the
-  metronome), **Advanced Level n ▸** and/or **Level n+1 ▸**, Home. **⌨ Keyboard** (beside the metronome) puts a computer
+  metronome), **Advanced Level n ▸** and/or **Level n+1 ▸**, Home. **The computer keyboard** (in Tools since 2026-10-12; a button beside the metronome before) puts a computer
   keyboard in the music's place — the number row, the level's keys lit in
   their bars' colours with the letter (low/high in Advanced), the letters
   row greyed under it when there's room; they play (tapped, or the real
@@ -116,6 +191,141 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   back to the exercise it was on. The level box's drop-down lists the six;
   Settings shows only Level · Points · Sound. Nothing here goes into
   scores, the ladder or My stats.
+
+- **The landing page, redesigned** (2026-10-12, the user's: "change 'Teach
+  Me to Read' to 'Practice' and within the Practice settings will be
+  Lessons, Songs, Exercises … Next to it will be Rounds … Songs … Games …
+  and finally Battle Mode. Do not include all the battle mode sessions on
+  the landing button"). How to play is now **Practice · Rounds · Songs ·
+  Games · Battle Mode**; Make your own is My melodies · A new session · A
+  lesson link.
+  - **Practice** — Teach Me to Read renamed (everywhere it shows: the card,
+    the window, the level box "Practice · Level 1", the end card, My
+    melodies' strip "▶ Practice"). Its window has three tabs: **Lessons**
+    (the six levels) · **Songs** (every Songbook song, slide by slide —
+    `RR.teachLevel('S:<song>')`, `RR.teachSongs`; a check and a gold star
+    per slide, kept by the slide's content like a unit's) · **Exercises**
+    (your units and + Make a unit). It plays exactly as Teach Me to Read did.
+  - **Rounds** — as before, with points.
+  - **Songs** — new: a song straight through, **no points and no checks or
+    stars on the way** — the celebration at the end. Its window: which song
+    (the Songbook's, or any melody set of yours — `'M:<set id>'`, no need to
+    be an exercise), **The whole song / A section** (Slide _ to _, or tap
+    the slide pictures; a new section starts as two slides), **Practice
+    Off** (the default) / On and **Auto-Next Slide On** (the default) / Off.
+    It plays on the Practice machinery (`G.mode = { kind: 'teach', id, song:
+    true, from, to, practice, auto }`, `songAdvance` in teach.js): Practice
+    off + Auto-Next — a slide played through hands on to the next **the
+    moment its last note is struck**; with the metronome (Tools, Fast
+    allowed) the click carries on across the slides (`G.swapCard`), so the
+    beat is kept all through. Practice on — the slide goes round (Listen,
+    the hints), and with Auto-Next moves on after a moment; Auto-Next off —
+    Next lights and moves on. A section goes round again from its first
+    slide; the whole song ends on **You played …!** (slips counted, "with
+    the metronome all the way through!" when it was) — ▶ Hear your song ·
+    ↻ Play it again · Another song · Home. On the music card Songs keeps
+    the Practice button (pause = on, the red ball = straight through); the
+    dots show where you are (a section's outside faded). The level box's
+    drop-down lists the songs, and *A section, Practice, Auto-Next…* opens
+    the window. Nothing goes into scores or My stats.
+  - **Games** — Beat the Clock and Endless: the window opens with the two
+    side by side (each with its record), How long for the clock, then what
+    to read (Generate · Leveled Challenges · My Melodies, as before).
+  - **Battle Mode** — the card no longer lists the battles: its ▶ Play opens
+    a window with **Your battles** (teams' colours, part-way, ✎ to change)
+    and ⚔️ + New battle.
+  The old home Songs chooser (several songs in order) is gone from the home
+  page; the Song *format* (with points) is still a session's choice on its
+  ✎ page.
+
+- **Every mode has Teach Me to Read's music card, and Tools** (2026-10-12,
+  the user's: "I really like the way the Teach Me to Read section looks …
+  implement it in the other sections … include a practice button between
+  the play and tools button … Remove the text for all three buttons … all
+  sections should be able to choose color notes, color lines, names under
+  notes … allow Battles to turn off all tools, and for battles put the
+  metronome on the outside"). From a tablet up the buttons stand in a
+  column left of the staff — **▶ Listen · Practice · Tools** (Teach Me to
+  Read: no Practice; a practice with Practice Disabled, Levels 14–15 and
+  Beat the clock: none either; a battle: **▶ · Practice · the metronome ·
+  Tools**) — with **no words under them** anywhere; ↻ and Next (its word
+  kept: it says Finish at the end) on the right; the staff drawn tight and
+  as big as it fits, one row or two (game.js draw, `big`). A phone keeps
+  the row under the music. **Tools** (`js/tools.js`, `RR.Tools`, moved out
+  of teach.js) is the same everywhere: the metronome (Off · Slow ·
+  Moderate · Fast; Teach Me to Read no Fast; not in a battle — beside the
+  music there — nor Beat the clock), then side by side **Computer /
+  Keyboard** (with a little keyboard; the picture lights the bars live
+  here) and **Auto-Next Slide On/Off**, then Note Colors · Staff Color ·
+  Text Below the Notes. **Where a change goes:** Teach Me to Read — the
+  browser's, for every level and unit (`RR.teachLook`, now with `auto`);
+  anywhere else — the level or session playing, as its ✎ page would
+  (`G.base` → `G.saveSetup`: a level becomes *your* Level n, Reset gives it
+  back; a lesson's are just for it). **Staff Color** is a new practice
+  field `staff`: `'plain'` (the default — every level, session and old
+  link looks as it did) · `'notes'` · `'all'`, also on the ✎ page's Look &
+  Feel. **Auto-Next Slide** is the practice's `auto` (the ✎ page's
+  Auto-Progress); in Teach Me to Read on your own it goes on 1.6 s after
+  the check (a strike first cancels it), with the metronome straight away
+  into the next exercise, **the click carrying on** (`G.swapCard`; a new
+  meter counts in again), and after the last to the end card. **Battles:**
+  the battle page's Turns and rounds has **Tools On / Off** (`battle.tools`,
+  `RR.cleanBattle`; off hides the Tools button — the metronome stays).
+
+- **Teach Me to Read: Tools and Your units** (2026-10-12, the user's asks).
+  - **Tools** — "the metronome and keyboard display … on an extendable
+    menu that pops up when needed. With them … change the note color,
+    change the staff color". The music card's left column is now ▶ Listen
+    and **Tools** (sliders); the metronome and Keyboard buttons are gone
+    from it. Tools opens a panel beside the button (over the xylophone on
+    a phone, `#teach-tools`, `position: fixed` so it can hang outside the
+    music card): **Metronome** Off · Slow · Moderate (a tempo counts in at
+    once and the panel closes so the music shows) · **Computer Keyboard**
+    (show / back to the music; closes the panel) · **Note Colors** Solid
+    Color / Transparent Color / When Played / Black · **Staff Color** Its
+    Notes' Lines / All Lines / Black · **Text Below the Notes** Letter
+    Name / Solfège / Nothing (my addition — the letters are scaffolding
+    too) · **↺ All the colors and letters back** once anything is changed.
+    The look changes the music at once, stays open while you try things,
+    and is **kept by the browser for every level and unit**
+    (`device.teachLook`, `RR.teachLook`) until changed back. While the
+    metronome plays, the Tools button turns green with a ticking dot and
+    the tempo's name under it (the panel is usually closed); with the
+    keyboard showing it says Keyboard in pink. Escape or a tap anywhere
+    else closes it. *Try again for gold stars* now opens Tools with the
+    metronome pulsing.
+  - **Your units** — "take the melodies I've created or create new ones,
+    and build a unit that will show up in the Teach Me to Read section".
+    A unit is **a My melodies set played the Teach Me to Read way**: big,
+    the tight staff, its notes' lines lit (low C's ledger line red, high
+    A's blue), round and round with the metronome, a check and a gold star
+    for each melody, the keyboard picture with its keys. Any set can be one
+    — yours, shared, the Teacher Library's — and stays in My melodies,
+    where its melodies are written and changed (any notes C4–A5, any
+    rhythm, 2/4 3/4 4/4, one or two bars, up to 60). Three ways in:
+    - the Teach Me to Read window: **Your units** under the six levels,
+      then **+ Make a unit** — *From a melody set you have* (Use it) or
+      *Or start a new one* (a name → a new set, a unit at once, its page
+      in My melodies opens to + Add a melody);
+    - a set's page in My melodies: a pink **Teach Me to Read** strip —
+      **▶ Teach Me to Read** makes it a unit (if it isn't) and plays it;
+      Take it out;
+    - the level box's drop-down: the units under the six, and **+ Make a
+      unit from your melodies…**.
+    A unit picked in the window shows its notes, the lines lit, its keys,
+    Start at (every melody), **✎ Write and change its melodies** (My
+    melodies), **Take it out of Teach Me to Read** (the set stays; its
+    marks here go) and ↺ Clear. **⧉ Copy melodies in** (a card beside +
+    Add a melody on your own sets) copies melodies from your other sets,
+    shared ones and the **Songbook** into this one — so a unit can be
+    built from melodies you already have; each source folds open, tap the
+    melodies, *Copy n melodies in* (they're copies). The end card counts
+    the unit's melodies (*3 of 4 played*, *Four gold stars!*), offers the
+    next unit if there is one, and Home. More than twelve melodies: the
+    dots become **‹ 5 of 14 ›** with how many are played, the tile says
+    "3 of 14 played". The home card's foot counts the units too. Deleting
+    a set takes it out of the units; a Teacher Library book put back is
+    hidden and comes back with the book.
 
 - **Each level and session is its own** (2026-10-08, the user's report:
   settings "over lapping each other", a battle's score carrying into a
@@ -275,10 +485,16 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   it; `RR.ALL` is all thirteen, `RR.TWELVE` stays C4–G5 so the fifteen
   levels keep their range, `RR.barsFor` picks 10/12/13); bars not in the
   music greyed out at the first levels.
-- **The music** — Leland engraving of one or two bars (beams three times the
-  usual thickness since 2026-10-11, the user's — 1.5 staff spaces, `BEAM` in
-  engrave.js; a sixteenth's second beam sits 0.4 spaces clear of the first,
-  on longer stems); coloured notes (pale
+- **The music** — Leland engraving of one or two bars. **Stems and beams
+  (2026-10-12, the user's):** a stem is twice the usual thickness (0.26 of a
+  staff space, `STEM` in engrave.js) and sits **behind** its head — stems,
+  flags and beams are drawn first, the heads over them; under a see-through
+  head (Transparent Color, not yet played) the paper hides the stem, just in
+  the stem's column, so the staff line still shows through the rest. Beams
+  are half what they were: 0.75 of a space (`BEAM`; three times the usual
+  1.5 from 2026-10-11, halved now); a sixteenth's second beam sits 0.4
+  clear of the first, its stems no longer than an eighth's unless it needs
+  them; a flag sits on the far edge of the thicker stem. Coloured notes (pale
   until played), lit when played, or black; the next note's glow; ghost
   notes where a slip landed; letter names or rhythm syllables under the
   notes; two rows on a phone held upright.
@@ -394,30 +610,37 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   score chip's ★ counts the round's gold stars. The ladder (the level list's
   ★★★ and Level n+1 ▸) still runs on the 1–3 stars inside (`starsFor`).
 - **Count me in** (the count-in run, `beat.js`) — the family count-in (*Get
-  ready 1 2 3 4*), then the metronome through the melody at **Slow 60 ·
-  Moderate 80 · Fast 100** (the three tempos are in How to play). Nothing
-  shows but the notes lighting when struck in time — no playhead, no words,
-  no ghosts; the missed notes show at the end. Judged by the time the child
-  *heard* (Perfect · Good · Early/Late · Missed windows, never shown).
-  Practice has no count-in run any more (it had a "That would be 14 points"
-  one until 2026-10-05).
+  ready 1 2 3 4*), then the metronome at **Slow 60 · Moderate 80 · Fast
+  100** (the three tempos are in How to play), **for as long as the player
+  takes** — it stops when the melody is played through (or Off, ↻,
+  Practice, Next, a window). **The notes are followed in order, as on your
+  own** (2026-10-12, the user's: "it wants the user to play exactly at the
+  correct moment in the metronome — so if it's on beat three and you're on
+  beat one, it will consider what you're playing as on beat three even if
+  that's the first note you've played. I don't want it that strong — I
+  just want it to click and to light the notes up in order"): the next note
+  lights when its bar is struck, whenever that is — during the count-in too
+  — any other bar is a slip with its ghost note, the next note's glow shows,
+  and nothing is ever Missed by the clock. (Until then each strike was
+  matched to the note its click said was due — `RR.Points.follower`, gone —
+  so coming in two beats late made the first strike note 3.) Practice has no
+  count-in run (it had a "That would be 14 points" one until 2026-10-05).
 - **Points: 1–20 a melody** (`js/points.js`) — **1–8** finding the notes
   (first try 1, second ½); **9–12** every note first time in your own steady
   beat (a least-squares fit finds your tempo; the leftover, in beats, is the
   grade — 12 ≤ 0.06, 11 ≤ 0.10, 10 ≤ 0.15, 9 ≤ 0.21, else 8); **13–20** a
-  clean Test with the metronome: Slow 13–15, Moderate 16–18, Fast 19–20. A
-  metronome run with every bar right first time but not all with the click —
-  some early or late, or a player drifting behind — scores as on your own,
-  9–12 (at least 9 if every note was within the click's window); a wrong or
-  missed note drops it to 1–8 (a note found second time ½, a missed one 0).
-  **Which note a strike is** (2026-10-07, the user's report: "a little too
-  slow … a score of 1 to 4"): `RR.Points.follower` follows the player — each
-  note expected a written length after the last one found, at their own
-  tempo (the last five notes, kept to 60–160% of the metronome's) — and the
-  click only decides Perfect · Good · Early · Late · Off. It used to be the
-  clock alone, so a player 10% slow drifted out of the windows after a few
-  notes and everything after was Missed or a wrong bar. The run ends just
-  after the last note, or once the next one is well overdue. Stars: ★ 1–7 · ★★ 8–12 · ★★★ 13–20;
+  Test with the metronome, every note first time **at about its tempo**:
+  Slow 13–15, Moderate 16–18, Fast 19–20. **Where the player came in doesn't
+  matter** (2026-10-12, the user's: "if the user played the melody at
+  basically the correct tempo — even if they started on beat 3 instead of
+  beat 1 — count that as correct"): `RR.Points.tempoCheck` takes the
+  player's own tempo from the spacing of their notes (tier 2's least-squares
+  line) and compares it with the metronome's — within 15% and steady (≤ 0.21
+  beat) is with the metronome; the top of the pace for ≤ 0.06 beat and
+  within 4%, one under for ≤ 0.10 and 6%, else the bottom (Fast: 20 / 19).
+  Faster or slower than that scores as on your own, 9–12, and says which
+  ("a little slower than the metronome"); a wrong bar drops it to 1–8 (a
+  note found second time ½). Stars: ★ 1–7 · ★★ 8–12 · ★★★ 13–20;
   next level at ★★ or better in 4 of 5. The streak counts 8+ in a row (no
   bonus). Points and stars can each be turned off.
 - **Games** — a round of any 1–99 melodies (− / + or type it; 2026-10-05 —
@@ -480,6 +703,9 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   stars and ✎), ✎ the page of what is chosen (✎ Level n · ✎ Session ·
   ⚔️ Battle · ✎ Custom), Points, Sound, Share (2026-10-08: the levels'
   Notes · Rhythm · Format · Look & Feel tabs became their ✎ page).
+  *2026-10-12: no gear any more — the Level tab (sessions, levels) and the
+  Share tab moved into the Library; the window is the ✎ page, Points and
+  Sound.*
 - **The session page, laid out by the user** (2026-10-06; a battle's the
   same, with its teams first): **Session Name:** [the name] **▶ Play
   Session** on one row (Battle Name / Play Battle) · **Choose the Notes** —
@@ -524,7 +750,8 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 - **Lesson links** — Share → a link that opens the practice as a lesson,
   with every setting, its melody sets (as melodies) and a battle's teams
   (2026-10-08).
-- **My melodies** (the ♫ button) — melody **sets** kept by the family's EVM
+- **My melodies** (the ♫ button until 2026-10-12; now the Library's My
+  melodies folder) — melody **sets** kept by the family's EVM
   Library rules: + New set, rename, reorder, delete; ▶ Play this set (with
   the chosen level's judging, helps and tempo — the chip reads "Week 3 ·
   Level 4"); Copy a link (`?set=` — opening it files the set once, read-only,
@@ -537,6 +764,33 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   2/4 · 3/4 · 4/4, 1 or 2 bars; values that don't fit what's left of the bar
   grey out; the empty beats show faintly; Save asks to fill a half-written
   melody with rests.
+  **Slides** (2026-10-12, the user's: "it only lets me make one slide … make
+  many slides under the same file"): every melody of the set is a numbered
+  slide along the top of the maker. **+ New slide** (or **Enter**) saves this
+  one and starts a blank one after the last, in the same time and length; a
+  number goes to that slide, saving this one first; **Delete this slide**
+  (asked). A half-written slide is filled with rests when it is left (asked,
+  as Save does); an untouched blank one is dropped. Save saves this slide and
+  goes back to the set; Cancel leaves only this slide's changes unsaved.
+  **Relaid the same day** (the user's: "you simply make the staff get smaller
+  and smaller as we add more and more rows to the already vertically small
+  window"): at 1000×560 the maker's three rows of controls had left the staff
+  27 px. Now the music card holds the staff and ONE slim line — the set, the
+  slides, + New slide, what is left of the bar, Cancel, Save. The writing
+  tools (the values, Rest, ⌫, ▶) are one bar between the card and the
+  xylophone (`#maker-dock`, the stage's middle row while making: 60 / auto /
+  40), so their height comes out of the xylophone — which gets a slimmer
+  frame, no bolts, bars nearer one length and the number under the letter, so
+  nothing collides. The slide's name, time and length (set once a slide) and
+  Delete this slide are behind its **✎ 4/4 · 1 bar** button, in a little
+  window that pops up over the music (Done, Escape or a tap elsewhere). The
+  staff is drawn in Teach Me to Read's tight row and up to a smartboard's size
+  (ss 46; it was capped at 30), and a two-bar slide draws as two rows when
+  that is bigger (a phone). Staff height, 5 lines: 1000×560 27 → 81 px,
+  820×600 → 81 px, 1280×800 ~65 → 148 px; a phone's two-bar slide fills the
+  card in two rows. On a phone the set's name goes, the dock wraps (values a
+  row of their own, "2 beats left" beside ✎) and the window drops from the
+  top.
 - **Players** — first names (Settings → Points, or the Score board's "Who's
   playing?"); each has their own scores, stars, tricky notes and session
   points; the first name takes over the scores kept so far; removing a name
@@ -595,22 +849,24 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 | `js/xylophone.js` | the bars and their input |
 | `js/engrave.js` | the staff |
 | `js/songbook.js`, `js/melody.js` | the Songbook; rhythm cells and the generator |
-| `js/levels.js` | the ladder, the defaults, `sanitize`, the gold star's marks, My sessions |
+| `js/levels.js` | the ladder, the defaults, `sanitize`, the gold star's marks, My sessions (their Format, points, picks — `RR.SESSION_FORMATS`, `RR.formatPoints`, `setFormat`; `RR.sessionName`) |
 | `js/game.js` | the card, Find the notes / No slips, scoring, rounds, games, Play; `RR.Scores` |
 | `js/beat.js` | Count me in: the count-in, the metronome, judging a run |
 | `js/points.js` | what a try is worth (1–20), the stars, the paces' tempos |
-| `js/settings.js`, `js/board.js` | the two windows, Round done, Time's up |
+| `js/settings.js`, `js/board.js` | the ✎ page window (a session's Format first, 2026-10-12) with Points and Sound — their sections also drawn in the Library; the Score board, Round done, Time's up |
+| `js/library.js` | the Library (2026-10-12): Now playing, the buttons, + New session, the folders, Share & backup, New melody; `RR.Library.open/newSession/newMelody` |
 | `js/lesson.js`, `js/app.js` | lesson links; the keys, the buttons, the start |
 | `js/sets.js` | My melodies' data: melody sets by the EVM Library rules, links, backups, the shelf |
-| `js/melodies.js`, `js/maker.js` | the My melodies window; Make a melody |
+| `js/melodies.js`, `js/maker.js` | the Library's window (`#melodies`, was My melodies) and a melody set's page in it; Make a melody |
 | `js/players.js` | names on a shared computer |
 | `js/history.js` | My stats' history: the days, the last 200 melodies, the last 60 games, records, time playing; ranges and streaks (pure, tested) |
 | `js/charts.js` | the SVG charts (columns, line, calendar, one split bar) and their tooltip |
 | `js/stats.js` | the My stats page |
 | `js/home.js` | the home page, and the three views (`RR.View`: home · play · stats) with the browser's Back |
 | `js/drop.js` | the level box's drop-down: what can be changed about what is playing (2026-10-08) |
-| `js/teach-data.js` | Teach Me to Read's six levels and their exercises, the staff's lit lines, the gold-star rule, each player's marks (pure, tested) |
-| `js/teach.js` | Teach Me to Read on the music card: checks and gold stars, Next, the end card, the computer keyboard, the home card's window and the drop-down |
+| `js/teach-data.js` | Teach Me to Read's six levels and their exercises, the staff's lit lines, the gold-star rule, each player's marks; your units (`RR.TeachUnits`, a unit built from its set); the look (`RR.teachLook`, `RR.teachStaff`) (pure, tested) |
+| `js/tools.js` | Tools, in every mode: the panel (metronome, Computer Keyboard, Auto-Next Slide, Note Colors, Staff Color, Text Below the Notes), where its changes are kept, the staff's lines (`RR.Tools.staff`), the computer keyboard picture (2026-10-12) |
+| `js/teach.js` | Teach Me to Read on the music card: checks and gold stars, Next, Auto-Next, the end card, the home card's window (levels, your units, Make a unit) and the drop-down |
 | `lib/` | vendored copies — see `lib/README.md` |
 | `assets/MA4A-rainbow-reader-cover.jpg` | the hub card's cover (400×400) |
 | `tests/index.html` | the engine checks |
@@ -626,14 +882,59 @@ rounds, the ladder's stars, first-try counts per note, mix-ups, totals —
 and since 2026-10-07 My stats' `days`, `log`, `games`, `rec`, `since`, with
 totals `points` `gold` `made` `rounds` `secs` beside the old three; an
 older file just lacks them and gains them on first use, so no new key),
-`rainbow_reader_teach_v1` (Teach Me to Read's marks per player, `{ L1: [0|1|2 × 5] … }`, 2026-10-11),
-`rainbow_reader_sessions_v1` (My sessions; `rainbow_reader_mine_v1`, the old
-Mine band, is read once into it and left alone), `rainbow_reader_sets_v1` (My
+`rainbow_reader_teach_v1` (Teach Me to Read's marks per player, `{ L1: [0|1|2 × 5] … }`, 2026-10-11; a unit's
+as `{ 'U:<set id>': { <melody key>: 1|2 } }`, 2026-10-12), `rainbow_reader_teach_units_v1` (your units: `{ v: 1,
+units: [{ set, at }] }`, this browser's, 2026-10-12; the device keeps `teachLook` beside it),
+`rainbow_reader_sessions_v1` (My sessions: `[{ id, name, practice, format, points, teach: { id },
+song: { id, part, from, to, practice, auto }, kind?: 'battle', battle? }]` — format, points, teach and song since
+2026-10-12, filled in on read for older records; `battle` is kept when the format moves off Battle;
+`rainbow_reader_mine_v1`, the old Mine band, is read once into it and left alone), `rainbow_reader_sets_v1` (My
 melodies, an id map of EVM items). The device also keeps the set being
-played and the player names. Every read is checked and
+played and the player names, and (2026-10-12) `libOpen` — which Library folders are open — and `lastSet`,
+the set New melody last wrote into; `practice` may carry `session` (a session played the Practice or Songs
+way). Every read is checked and
 falls back to defaults; a change of shape gets a new `_v2` key.
 
 ## Traps (found while building)
+
+- **The Library and session formats (2026-10-12).** "Is a session
+  playing?" is `G.sessionId()`, not `G.mode.kind === 'session'`: a
+  Practice or Songs session plays as `kind: 'teach'` with `mode.session`.
+  Anything that restarts a teach level (`RR.Teach.start`) drops the
+  session unless it passes `{ session }` as the fourth argument
+  (`G.selectSession` does; `G.switchPlayer` and the reload go through it).
+  A session sets `RR.device.points` when picked, so the switch stays as
+  the last session left it for levels played after — the Points switch
+  is still the browser's. The Library lives in `#melodies` and is drawn
+  by `RR.Library.html()` whenever melodies.js has no set open; its
+  actions are `data-lb` (melodies.js keeps `data-open` / `data-play` /
+  `data-act` for sets). Its Settings folder is Settings' own Points and
+  Sound sections: `RR.Settings.prefsClick` takes only `@` keys from
+  `data-k` / `data-toggle` — anything else there would change the
+  practice. Deleting a playing session from the Library calls
+  `RR.Settings.settle()` itself (the Settings window used to on close).
+
+- **Your units and Tools (2026-10-12).** A unit is `RR.teachLevel('U:<set
+  id>')`, built from the set every time a set or the unit list changes
+  (`RR.Sets.rev` — every save in sets.js moves it — and
+  `RR.TeachUnits.rev`), so nothing keeps a stale copy; anything that saves
+  sets must go through sets.js's `save`. Its `ex` is the set's melodies
+  (not token strings: `RR.teachCards` checks `lv.unit`) and `keys` their
+  content keys (`RR.teachMelKey`: notes and meter, not the title) — a
+  unit's marks are kept by key, so they follow a melody that moves and
+  start afresh for one that changes. `RR.Teach.start` returns false for a
+  unit with no melodies — callers (restore, the drop-down, a player
+  switch) fall back. A unit's set changed while it plays: My melodies'
+  `close()` calls `RR.Teach.refresh()`, which re-deals the exercise if it
+  changed and goes to Level 1 if the unit is empty or gone. The Tools
+  panel sits outside the music card (fixed, placed by `placeTools` beside
+  `#btn-tools`; a phone's CSS pins it to the bottom) because the card
+  clips; game.js draws on every note, so `drawTools` skips an unchanged
+  panel. The look lives in the practice for colour and labels (`G.base`
+  and `G.setup`, set by `applyLook`) and in `RR.Teach.staff()` for the
+  lines (game.js asks it in `draw`). In the built-in browser pane, a
+  screenshot taken right after a change often shows the page before it —
+  check the DOM, then take another.
 
 - **Teach Me to Read rides on the card machinery (2026-10-11).** Playing on
   your own is the `practice` stage (its "found" is the check); a play with
@@ -645,13 +946,12 @@ falls back to defaults; a change of shape gets a new `_v2` key.
   next/restart/drawSides/dots. `drawSides` resets Next's label and
   `teach-ok` for every other mode, so nothing leaks out of it. While the
   computer keyboard shows, every strike goes to `RR.Teach.kbdHit` first
-  (`strike`), so nothing can count. **Round and round** (2026-10-11): in
-  a Teach run beat.js makes the clicks as they come (`B.loop`, no list)
-  and, at each time round's close (`B.close` after its start: half a beat
-  before the next, or the last note's window), hands the judging to
-  `G.passDone` (marks, then the notes dark again — the run, `G.phase =
-  'running'` and the click carry on) and starts a fresh follower at the
-  next time round. Listen's loop schedules each time round 0.6 s before the
+  (`strike`), so nothing can count. **Round and round** (2026-10-11;
+  followed in order since 2026-10-12): the run's click goes on; when the
+  last note is found in a Teach run, judgeFind calls `G.passDone` instead
+  of `finish` (the mark, `G.passOver` — the notes stay lit) and the next
+  strike calls `newPass` (dark again) before it is followed as note 1.
+  The run, `G.phase = 'running'` and the click carry on. Listen's loop schedules each time round 0.6 s before the
   last ends and keeps only the timers of the last two in `G.hearTimers`
   (every earlier one has gone off). The main game still plays and runs
   once. The keyboard picture's sizes come from container queries on
@@ -692,9 +992,14 @@ falls back to defaults; a change of shape gets a new `_v2` key.
   `.score-chip:not(.battle) .sc-teams` hides them and `drawChips` empties
   them. Check what is *visible* (computed display), not just the state.
 
-- **A metronome run follows the player (2026-10-07).** Don't go back to
-  matching strikes to notes by the click alone: drift is cumulative, so
-  any fixed window drops a slightly slow player's later notes. Tests that
+- **A metronome run follows the player in order (2026-10-12).** Don't go
+  back to matching strikes to notes by the click — neither the clock alone
+  (2026-10-07: drift is cumulative, a slightly slow player's later notes
+  dropped) nor the follower that replaced it (it still expected the first
+  note on beat 1: coming in late made the first strike note 3). In a run,
+  `strike` sends every bar to `judgeFind`, as on your own; `finish` stops
+  the click; the only thing the metronome judges is the tempo
+  (`RR.Points.tempoCheck`), never where the player came in. Tests that
   press bars in the real app must use a level whose bars are live — the
   new Level 1 greys out everything but E and G, and a greyed bar ignores
   `RR.Xylo.press`.

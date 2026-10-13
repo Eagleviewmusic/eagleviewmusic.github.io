@@ -10,8 +10,9 @@
                     closes a window, or stops a count-in (as tapping its
                     Get ready card does: back to Practice)
      the buttons    Listen · Practice / Test · the metronome · Start over ·
-                    Next · the level chip · the score chip · Settings ·
-                    ‹ Home · the Melody Reader name (the home page)
+                    Next · the level chip · the score chip · the Library
+                    (2026-10-12: was ♫ My melodies and the gear) · ‹ Home ·
+                    the Melody Reader name (the home page)
      the start      a lesson link if the address has one (straight to the
                     music); else the practice or level this browser was
                     last on, and the home page (home.js, 2026-10-07)
@@ -40,8 +41,10 @@
     if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
     if (e.key === 'Escape') {
       if (RR.View.current !== 'play') { if (!anyWindow() && RR.View.current === 'stats') RR.View.back(); else closeWindows(); return; }
-      if (G.pickOpen()) { G.closePick(); $('#btn-metro').focus(); }
-      else if (RR.Teach.kbdOn() && !anyWindow()) RR.Teach.kbd(false);   // the computer keyboard's picture: back to the music
+      if (RR.Tools.isOpen()) { RR.Tools.close(); $('#btn-tools').focus(); }   // the Tools panel
+      else if (G.pickOpen()) { G.closePick(); $('#btn-metro').focus(); }
+      else if (RR.Tools.kbdOn() && !anyWindow()) RR.Tools.kbd(false);   // the computer keyboard's picture: back to the music
+      else if (RR.Maker.active && RR.Maker.popOpen()) { RR.Maker.closePop(); $('#mk-opts').focus(); }   // the slide's window first
       else if (RR.Maker.active && !anyWindow()) RR.Maker.cancel();
       else if (G.phase === 'countin' && !anyWindow()) G.stopCountIn();
       else if (G.mode.kind === 'teach' && G.phase === 'running' && !anyWindow()) G.setMetro('off');   // Teach Me to Read's round and round: stop
@@ -53,6 +56,7 @@
       if (e.key === 'Backspace') { e.preventDefault(); RR.Maker.undo(); return; }
       if (e.key === ' ' && tag !== 'BUTTON') { e.preventDefault(); RR.Maker.hear(); return; }
       if ((e.key === 'r' || e.key === 'R') && !e.repeat) { e.preventDefault(); RR.Maker.add(null); return; }
+      if (e.key === 'Enter' && tag !== 'BUTTON' && !e.repeat) { e.preventDefault(); RR.Maker.newSlide(); return; }   // + New slide (2026-10-12)
     }
     let k = e.key;
     if (/^Numpad\d$/.test(e.code)) k = e.code.slice(6);
@@ -62,7 +66,7 @@
       if (!e.repeat && i < RR.Xylo.count()) RR.Xylo.press(RR.BARS[i].id, e);
       return;
     }
-    if (e.repeat || RR.Maker.active || RR.Teach.kbdOn()) return;
+    if (e.repeat || RR.Maker.active || RR.Tools.kbdOn()) return;
     // Space and Enter on a focused button belong to the button
     if ((e.key === ' ' || e.key === 'Enter') && tag === 'BUTTON') return;
     if (e.key === ' ') {
@@ -93,9 +97,8 @@
   document.addEventListener('pointerdown', e => {
     if (G.phase === 'countin' && e.target.closest && e.target.closest('.evm-count-card')) { e.preventDefault(); G.stopCountIn(); }
   });
-  $('#gear').addEventListener('click', () => { if (!RR.Maker.active) RR.Settings.open(); });
-  $('#mel-btn').addEventListener('click', () => { if (!RR.Maker.active) RR.Melodies.open(); });
-  // the level box: a drop-down to change how this is played (drop.js, 2026-10-08); the gear has everything
+  $('#lib-btn').addEventListener('click', () => { if (!RR.Maker.active) RR.Melodies.open(); });
+  // the level box: a drop-down to change how this is played (drop.js, 2026-10-08); the Library has everything
   $('#level-chip').addEventListener('click', () => { if (RR.Maker.active) return; if (RR.Drop.isOpen()) RR.Drop.close(); else RR.Drop.open(); });
   $('#score-chip').addEventListener('click', () => { if (!RR.Maker.active) RR.Board.open(); });
   $('#settings').addEventListener('click', e => {
@@ -127,7 +130,10 @@
     if (RR.oldDeviceSet) { if (!over.set) over.set = RR.oldDeviceSet; RR.oldDeviceSet = null; }
     // a session (an old Mine practice: the session it became)
     const ses = d && (d.kind === 'session' ? RR.Sessions.get(d.id) : d.kind === 'mine' ? RR.Sessions.list().find(x => x.name === String(d.name || '').trim().slice(0, 40)) : null);
-    if (d && d.kind === 'teach' && RR.teachLevel(d.id)) RR.Teach.start(d.id, d.at);     // Teach Me to Read, at the exercise it was on
+    // a session played the Practice or Songs way: the session again, at the exercise or slide it was on (2026-10-12)
+    const tses = d && d.kind === 'teach' && typeof d.session === 'string' ? RR.Sessions.get(d.session) : null;
+    if (tses && (tses.format === 'practice' || tses.format === 'songs')) G.selectSession(tses.id, null, typeof d.at === 'number' ? d.at : undefined);
+    else if (d && d.kind === 'teach' && RR.teachLevel(d.id) && RR.Teach.start(d.id, d.at, d.song ? { from: d.from, to: d.to, practice: d.practice, auto: d.auto } : undefined)) { /* Practice (or a song in Songs), where it was */ }
     else if (ses) G.selectSession(ses.id, over);
     else if (d && d.practice && (d.kind === 'custom' || d.kind === 'mine' || d.kind === 'session')) {
       G.usePractice(d.practice, { kind: 'custom', from: d.kind === 'custom' ? d.from || null : d.name || null,

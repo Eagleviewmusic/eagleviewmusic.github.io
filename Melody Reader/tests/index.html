@@ -256,65 +256,26 @@
       check('Points, tier 2: fewer than three notes have no rhythm to judge → 12', P.rhythm([0, 8], [0, 3]).grade === 12);
       const fr = P.free({ tries: [0, 0, 0, 0, 0, 0], starts, times: at(80) }), fs1 = P.free({ tries: [0, 1, 0, 0, 0, 0], starts, times: at(80) });
       check('Points: on your own, every note first time in rhythm → 12; one slip → tier 1', fr.pts === 12 && fr.tier === 2 && fs1.pts === 7 && fs1.tier === 1);
-      const J = (p, g2) => Array(p).fill('Perfect').concat(Array(g2).fill('Good'));
-      const ci = (judge, pace, tries, times) => P.countIn({ judge, pace, tries, starts: starts.slice(0, judge.length), times: times || at(80).slice(0, judge.length) });
-      check('Points, tier 3: all Perfect — Slow 15 · Moderate 18 · Fast 20', ci(J(4, 0), 'slow').pts === 15 && ci(J(4, 0), 'moderate').pts === 18 && ci(J(4, 0), 'fast').pts === 20);
-      check('Points, tier 3: fewer Perfect, still all in time — Slow 14 / 13 · Moderate 16 · Fast 19',
-        ci(J(2, 2), 'slow').pts === 14 && ci(J(1, 3), 'slow').pts === 13 && ci(J(1, 3), 'moderate').pts === 16 && ci(J(2, 2), 'fast').pts === 19 && ci(J(3, 1), 'fast').pts === 20);
-      const late = ci(['Perfect', 'Late', 'Perfect', 'Perfect'], 'fast');
-      check('Points: a count-in with every bar right but one late drops to 9–12', late.tier === 2 && late.pts >= 9 && late.pts <= 12, late.pts + '');
-      const miss = ci(['Perfect', 'Missed', 'Perfect', 'Perfect'], 'fast'), wrong = ci(J(4, 0), 'fast', [1, 0, 0, 0]), lots = ci(['Missed', 'Late', 'Missed', 'Missed'], 'fast', [0, 3, 0, 0]);
-      check('Points: a missed note or a wrong bar drops a count-in to 1–8 (a note found second time ½, never below 1)', miss.pts === 6 && wrong.pts === 7 && lots.pts === 1 && miss.tier === 1 && wrong.tier === 1,
-        [miss.pts, wrong.pts, lots.pts].join(' '));
+      // with the metronome (2026-10-12): the notes followed in order; what counts is the player's tempo against the
+      // metronome's — never where they came in
+      const ci = (pace, o) => P.countIn(Object.assign({ pace, tries: starts.map(() => 0), starts, times: at(80), tempo: 80 }, o || {}));
+      check('Points, tier 3: every note first time at the metronome’s tempo — Slow 15 · Moderate 18 · Fast 20',
+        ci('slow').pts === 15 && ci('moderate').pts === 18 && ci('fast').pts === 20 && ci('slow').tier === 3);
+      check('With the metronome, where the player came in doesn’t matter: two beats late, or between two clicks, scores the same',
+        ci('slow', { times: at(80).map(t => t + 1.5) }).pts === 15 && ci('slow', { times: at(80).map(t => t + 2.3 + 0.37) }).pts === 15);
+      const f5 = ci('slow', { times: at(84) }), f10 = ci('slow', { times: at(88) }), s25 = ci('slow', { times: at(60) }), f30 = ci('slow', { times: at(104) });
+      check('A little off its tempo still counts (5% → 14, 10% → 13 at Slow); much slower or faster scores as on your own (12, tier 2) and says which',
+        f5.pts === 14 && f10.pts === 13 && f10.tier === 3 && s25.tier === 2 && s25.pts === 12 && /slower/.test(s25.detail) && /faster/.test(f30.detail) && f30.tier === 2,
+        [f5.pts, f10.pts, s25.pts, f30.pts].join(' · '));
+      const shaky = ci('slow', { times: at(80, [0, 0.4, -0.4, 0.4, -0.4, 0]) }), oneWrong = ci('fast', { tries: [1, 0, 0, 0, 0, 0] }), threeWrong = ci('fast', { tries: [0, 3, 0, 0, 0, 0] });
+      check('Not a steady beat isn’t with the metronome (8); a wrong bar drops it to the notes: first try 1, second ½ (7, 6)',
+        shaky.pts === 8 && shaky.tier === 1 && oneWrong.pts === 7 && oneWrong.tier === 1 && threeWrong.pts === 6 && /wrong bar/.test(oneWrong.detail),
+        [shaky.pts, oneWrong.pts, threeWrong.pts].join(' · '));
+      const tc = P.tempoCheck(starts, at(72), 80);
+      check('tempoCheck: the player’s own tempo from their notes’ spacing, against the metronome’s (72 vs 80 → 0.9, within 15%)',
+        Math.abs(tc.ratio - 0.9) < 1e-9 && tc.ok && !P.tempoCheck(starts, at(66), 80).ok && P.tempoCheck([0, 4], [5, 9], 80).ok && !('follower' in P));
       check('Stars follow the tiers: ★ 1–7 · ★★ 8–12 · ★★★ 13–20',
         [0, 1, 7, 8, 12, 13, 20].map(P.starsFor).join('') === '0112233');
-      // a metronome run, followed (2026-10-07): a player a little slow (or fast, or late in) is followed, not dropped
-      (function () {
-        let st = 0;
-        const mel = [['E4', 4], ['D4', 4], ['C4', 8], ['E4', 2], ['D4', 2], ['C4', 4], [null, 4], ['G4', 4], ['E4', 4], ['D4', 4], ['E4', 4], ['C4', 16]]
-          .map(([p, t]) => { const n = { p, start: st, rest: !p }; st += t; return n; });
-        const spt = 0.25, q = 4 * spt, ok = Math.max(0.26, 0.38 * q);
-        const AT = { startT: 10, spt, beat: q, perfect: Math.max(0.075, 0.11 * q), good: Math.max(0.15, 0.22 * q), ok };
-        const metroEnd = AT.startT + st * spt + 0.12;
-        let seed = 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-        // scale: 1.1 = 10% slow; delay: a late start (s); jitter: ± s; skip: a note never played; wrongAt: a wrong bar just before that note
-        function play(o) {
-          const f = P.follower(mel, AT), when = n => AT.startT + (o.delay || 0) + n.start * spt * (o.scale || 1) + (o.jitter ? (rnd() - 0.5) * 2 * o.jitter : 0);
-          mel.forEach((n, i) => {
-            if (n.rest || i === o.skip) return;
-            if (i === o.wrongAt) f.strike('B4', when(n) - 0.12);
-            f.strike(n.p, when(n));
-          });
-          const stray = o.stray ? f.strike('A4', when(mel[mel.length - 1]) + 0.2) : null;
-          const idx = mel.map((n, i) => n.rest ? -1 : i).filter(i => i >= 0);
-          const judge = idx.map(i => f.judge[i] || 'Missed');
-          const r = P.countIn({ judge, starts: idx.map(i => mel[i].start), times: idx.map(i => f.times[i]), tries: idx.map(i => f.tries[i]), wrong: f.wrong(), pace: 'slow' });
-          // the old way, the clock alone: how many notes fell outside their click's window
-          const outside = idx.filter(i => Math.abs(when(mel[i]) - (AT.startT + mel[i].start * spt)) > ok).length;
-          return { f, judge, r, stray, outside, n: idx.length };
-        }
-        const inTime = play({}), slow = play({ scale: 1.1 }), slower = play({ scale: 1.25 }), quick = play({ scale: 0.9 }), lateIn = play({ delay: 1 }), wobbly = play({ scale: 1.12, jitter: 0.04 });
-        check('A metronome run in time: every note found and with the click → 13–15 at Slow', inTime.r.tier === 3 && inTime.r.pts === 15 && inTime.judge.every(j => j === 'Perfect'));
-        check('A metronome run 10% slow — steady — is followed: every note found, scored as on your own (12), not 1–4',
-          slow.judge.every(j => j !== 'Missed') && slow.r.tier === 2 && slow.r.pts === 12 && slow.f.wrong() === 0,
-          slow.judge.join(' ') + ' → ' + slow.r.pts + ' (the clock alone would have dropped ' + slow.outside + ' of ' + slow.n + ')');
-        check('25% slow, 10% fast, a beat late in, or slow and a little uneven: every note still found, 11–12',
-          [slower, quick, lateIn, wobbly].every(x => x.judge.every(j => j !== 'Missed') && x.f.wrong() === 0 && x.r.pts >= 11 && x.r.tier === 2),
-          [slower, quick, lateIn, wobbly].map(x => x.r.pts).join(' · '));
-        const skip = play({ scale: 1.1, skip: 4 }), wrongBar = play({ scale: 1.1, wrongAt: 7 }), stray = play({ stray: true });
-        check('A note passed over is Missed (the rest still found); a wrong bar counts against its note (½); a strike after the last note counts for nothing',
-          skip.f.judge[4] === 'Missed' && skip.judge.filter(j => j === 'Missed').length === 1 && skip.r.tier === 1 && skip.r.pts === Math.floor(8 * (skip.n - 1) / skip.n) &&
-          wrongBar.f.tries[7] === 1 && wrongBar.judge.every(j => j !== 'Missed') && wrongBar.r.pts === Math.floor(8 * (wrongBar.n - 0.5) / wrongBar.n) &&
-          stray.stray && stray.stray.stray === true && stray.f.wrong() === 0 && stray.r.tier === 3,
-          skip.r.pts + ' · ' + wrongBar.r.pts);
-        // the run's end: just after the last note; or, the player stopped, once the next note is well overdue
-        const stop = P.follower(mel, AT); [0, 1, 2].forEach(i => stop.strike(mel[i].p, AT.startT + mel[i].start * spt * 1.1));
-        const done = slow.f.endAt(metroEnd), lastT = slow.f.times[mel.length - 1];
-        check('The run ends just after the last note — or waits for a slow player, then ends once the next note is overdue',
-          Math.abs(done - (lastT + 0.3)) < 1e-9 && stop.endAt(metroEnd) >= metroEnd && isFinite(stop.endAt(metroEnd)) && stop.next() === 3 &&
-          P.follower(mel, AT).endAt(metroEnd) === metroEnd,
-          'the last note struck at ' + (lastT - AT.startT).toFixed(2) + ' s → ends at ' + (done - AT.startT).toFixed(2) + ' s; stopped after 3 notes → ' + (stop.endAt(metroEnd) - AT.startT).toFixed(2) + ' s');
-      })();
       check('Slow · Moderate · Fast are 60 · 80 · 100 by default', ['slow', 'moderate', 'fast'].map(id => RR.paceTempo(RR.DEFAULTS, id)).join() === '60,80,100');
     })();
 
@@ -416,6 +377,71 @@
       } finally {
         K.forEach((k, i) => { if (keep[i] == null) localStorage.removeItem(k); else localStorage.setItem(k, keep[i]); });
       }
+    })();
+
+    // 8a. a session's Format and its points (2026-10-12): Practice · Rounds · Songs · Games · Battle; the names a session left unnamed gets
+    (function () {
+      const K = [RR.KEY.sessions, RR.KEY.mine], keep = K.map(k => localStorage.getItem(k));
+      try {
+        // sessions saved before formats: each takes one from what it was
+        localStorage.setItem(RR.KEY.sessions, JSON.stringify([
+          { id: 'ses_a', name: 'Old round', practice: { game: 'round7' } },
+          { id: 'ses_b', name: 'Old clock', practice: { game: 'clock' } },
+          { id: 'ses_c', name: 'Old song', practice: { game: 'song', songPicks: ['set:set_q', 'ode'] } },
+          { id: 'ses_d', name: 'Old battle', kind: 'battle', battle: { rounds: 4 }, practice: {} },
+          { id: 'ses_e', name: 'Old Songbook song', practice: { game: 'song', songPicks: ['ode'] } }
+        ]));
+        const f = id => RR.Sessions.get(id);
+        check('A session saved before formats takes one from what it was: Rounds, Games, Songs (its first song), Battle',
+          f('ses_a').format === 'rounds' && f('ses_b').format === 'games' && f('ses_c').format === 'songs' && f('ses_c').song.id === 'M:set_q' &&
+          f('ses_e').song.id === 'S:ode' && f('ses_d').format === 'battle' && f('ses_d').kind === 'battle' && f('ses_d').battle.rounds === 4 && !f('ses_a').kind);
+        check('Points come with the format: off for Practice and Songs, on for Rounds, Games and Battles',
+          f('ses_a').points && f('ses_b').points && f('ses_d').points && f('ses_c').points === false &&
+          RR.formatPoints('practice') === false && RR.formatPoints('songs') === false && RR.formatPoints('rounds') && RR.formatPoints('games') && RR.formatPoints('battle'));
+        // a format chosen sets the points; the points can be changed after; what the format needs is filled in
+        RR.Sessions.setPoints('ses_a', false);
+        const offRound = f('ses_a').points;
+        RR.Sessions.setFormat('ses_a', 'practice');
+        const pr = f('ses_a');
+        RR.Sessions.setPoints('ses_a', true);
+        const prOn = f('ses_a').points;
+        RR.Sessions.setFormat('ses_a', 'games');
+        const gm = f('ses_a');
+        RR.Sessions.setFormat('ses_a', 'battle');
+        const bt = f('ses_a');
+        RR.Sessions.updateBattle('ses_a', Object.assign(RR.clone(bt.battle), { rounds: 6 }));
+        RR.Sessions.setFormat('ses_a', 'rounds');
+        const back = f('ses_a');
+        RR.Sessions.setFormat('ses_a', 'battle');
+        const again = f('ses_a');
+        check('Choosing a format sets its points (Practice off, Games on…); changed by hand, the session keeps it',
+          offRound === false && pr.format === 'practice' && pr.points === false && prOn === true && gm.points === true && gm.practice.game === 'clock');
+        check('Battle as a format: a battle with Practice off; back to Rounds, Practice on and no battle label — the teams kept for next time',
+          bt.kind === 'battle' && bt.practice.practice === false && back.format === 'rounds' && !back.kind && back.practice.practice === true &&
+          RR.roundLen(back.practice.game) === 5 && again.kind === 'battle' && again.battle.rounds === 6);
+        // Practice's pick and the Songs pick, made safe
+        RR.Sessions.setTeach('ses_b', { id: 'A2' }); const t1 = f('ses_b').teach.id;
+        RR.Sessions.setTeach('ses_b', { id: '<script>' }); const t2 = f('ses_b').teach.id;
+        RR.Sessions.setSong('ses_b', { id: 'S:ode', part: true, from: 2, to: 1, practice: 'yes', auto: false });
+        const sg = f('ses_b').song;
+        check('Practice’s pick and the Songs pick are kept safe (a lesson, a song, a section that never runs backwards)',
+          t1 === 'A2' && t2 === 'L1' && sg.id === 'S:ode' && sg.part && sg.from === 2 && sg.to === 2 && sg.practice === true && sg.auto === false);
+        const made = RR.Sessions.add('From Practice', RR.DEFAULTS, null, { format: 'practice', teach: { id: 'L3' } });
+        const plain = RR.Sessions.add('Plain', Object.assign(RR.clone(RR.DEFAULTS), { game: 'endless' }));
+        check('A new session made from Practice is a Practice session; one made from Endless is Games',
+          made.format === 'practice' && made.teach.id === 'L3' && made.points === false && plain.format === 'games' && plain.points === true);
+      } finally {
+        K.forEach((k, i) => { if (keep[i] == null) localStorage.removeItem(k); else localStorage.setItem(k, keep[i]); });
+      }
+      // the name for a session left unnamed: today's day and one of five titles, one not taken
+      const tue = new Date(2026, 9, 13);          // a Tuesday
+      const n1 = RR.sessionName([], tue, 0), n2 = RR.sessionName([], tue, 0.99);
+      const all = RR.SESSION_TITLES.map(t => 'Tuesday’s ' + t);
+      const left = RR.sessionName(all.slice(1), tue, 0.5);
+      const full = RR.sessionName(all, tue, 0);
+      check('A session left unnamed: “Tuesday’s Xylo Workout” and the like — five titles, one not yet taken, then a number',
+        RR.SESSION_TITLES.length === 5 && n1 === 'Tuesday’s Xylo Workout' && all.includes(n2) && left === all[0] && full === 'Tuesday’s Xylo Workout 2' &&
+        /^Friday’s /.test(RR.sessionName([], new Date(2026, 9, 16))));
     })();
 
     // 8b. each level and session is its own (2026-10-08): level changes kept, a session's own set, links carry everything
@@ -585,9 +611,9 @@
         [[true, true, 8.7], [false, true, 11.1], [false, false, 9.6]].every(x => Math.abs(RR.Eng.rowSpaces(x[0], x[1]) - x[2]) < 1e-9) &&
         RR.Eng.render(RR.teachCards(RR.teachLevel('A3'))[4], { ss: 20, maxW: 900, colour: 'solid', labels: 'letters', tight: true }).H < 20 * 8.8);
       const M = RR.teachMark;
-      check('A gold star is the metronome, every note and no wrong bar; a slip or playing on your own is a check; a missed note is nothing yet',
-        M({ run: true, missed: 0, wrong: 0 }) === 2 && M({ run: true, missed: 0, wrong: 1 }) === 1 && M({ run: false, missed: 0, wrong: 0 }) === 1 &&
-        M({ run: true, missed: 1, wrong: 0 }) === 0);
+      check('A gold star is the metronome, every note, no wrong bar, at about its tempo; a slip, too fast or slow, or playing on your own is a check; a missed note is nothing yet',
+        M({ run: true, missed: 0, wrong: 0 }) === 2 && M({ run: true, missed: 0, wrong: 0, inTempo: true }) === 2 && M({ run: true, missed: 0, wrong: 0, inTempo: false }) === 1 &&
+        M({ run: true, missed: 0, wrong: 1 }) === 1 && M({ run: false, missed: 0, wrong: 0 }) === 1 && M({ run: true, missed: 1, wrong: 0 }) === 0);
       // the marks, kept per player (the key is put back as it was)
       const KEY = 'rainbow_reader_teach_v1', was = localStorage.getItem(KEY), dev = RR.device.player;
       try {
@@ -603,6 +629,86 @@
         if (was == null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, was);
         RR.device.player = dev; RR.TeachMarks.load();
       }
+    })();
+
+    // Your units and the Tools panel's look (2026-10-12): a My melodies set played the Teach Me to Read way
+    (function () {
+      const KEYS = [RR.Sets.KEY, 'rainbow_reader_teach_units_v1', 'rainbow_reader_teach_v1', RR.KEY.device];
+      const was = KEYS.map(k => localStorage.getItem(k)), dev = RR.device.player, look = RR.device.teachLook;
+      const mel = (src, title) => ({ title, time: [4, 4], notes: src.split(' ').filter(x => x !== '|').map(x => { const [p, t] = x.split(':'); return { p: p === 'r' ? null : p, t: +t }; }) });
+      try {
+        KEYS.slice(0, 3).forEach(k => localStorage.removeItem(k)); RR.TeachUnits.load(); RR.TeachMarks.load(); RR.device.player = 'Test kid';
+        const set = RR.Sets.create('Unit test', [mel('C4:4 E4:4 G4:4 A5:4', 'one'), mel('E4:8 G4:8 | C4:16', 'two'), mel('G4:2 G4:2 E4:4 r:4 E4:4', 'three')]);
+        const id = 'U:' + set.id, before = RR.teachLevel(id);
+        const added = RR.TeachUnits.add(set.id), again = RR.TeachUnits.add(set.id), lesson = RR.TeachUnits.add('lesson_1');
+        const L = RR.teachLevel(id), C = RR.COLOUR, cards = L ? RR.teachCards(L) : [];
+        check('Your units: a My melodies set becomes a unit — its notes (low C to high A), their lines and ledger lines lit, its melodies the exercises, in order',
+          before === null && added && !again && !lesson && L && L.unit && L.ex.length === 3 && L.notes.join() === 'C4,E4,G4,A5' &&
+          L.lines.join(' ') === [C.E, C.G, 'dim', 'dim', 'dim'].join(' ') && L.ledgers[28] === C.C && L.ledgers[40] === C.A &&
+          cards.length === 3 && cards[1].title === 'two' && cards[1].notes.length === 3 && cards[2].part === 3 && cards[2].of === 3 && cards[0].teach === id &&
+          RR.TeachUnits.levels().map(x => x.id).join() === id && RR.teachLevel('U:nope') === null && /3 melodies · C E G · high A/.test(L.sub));
+        RR.TeachMarks.set(id, 0, 2); RR.TeachMarks.set(id, 2, 1);
+        const m1 = RR.TeachMarks.get(id).join('');
+        RR.Sets.update(set.id, s => { s.melodies.reverse(); });
+        const m2 = RR.TeachMarks.get(id).join('');
+        RR.Sets.update(set.id, s => { s.melodies[0].notes[0].p = 'A4'; });
+        const m3 = RR.TeachMarks.get(id).join('');
+        check('A unit’s marks follow each melody: moved, it keeps its mark; changed, it starts afresh (a new title alone keeps it)',
+          m1 === '201' && m2 === '102' && m3 === '002' && (RR.Sets.update(set.id, s => { s.melodies[2].title = 'renamed'; }), RR.TeachMarks.get(id).join('')) === '002');
+        const U2 = RR.teachLevel(id), low = RR.teachCards(U2)[2];
+        const svg = RR.Eng.render(low, { ss: 20, maxW: 900, colour: 'solid', labels: 'letters', tight: true, lines: U2.lines, ledgers: U2.ledgers }).svg;
+        check('Low C’s ledger line is lit red in a unit (high A’s blue, as before)', low.notes[0].p === 'C4' && svg.includes('fill="#ef4444" stroke="#b91c1c"') && svg.includes('fill="#3b82f6" stroke="#1d4ed8"'));
+        // a set gone (a Teacher Library book put back): out of sight, still listed; taken out: its marks go
+        const lib = RR.Sets.load(), keep = lib[set.id]; delete lib[set.id]; RR.Sets.save(lib);
+        const hidden = RR.TeachUnits.levels().length === 0 && RR.TeachUnits.has(set.id);
+        const lib2 = RR.Sets.load(); lib2[set.id] = keep; RR.Sets.save(lib2);
+        const back = RR.TeachUnits.levels().length === 1;
+        const out = RR.TeachUnits.remove(set.id);
+        check('A unit whose set has gone is hidden and comes back with it; taken out, the set stays and its marks go',
+          hidden && back && out && !RR.teachLevel(id) && !!RR.Sets.get(set.id) && !(RR.TeachMarks.data.players['Test kid'] || {})[id] && RR.TeachMarks.get(id).length === 0);
+        // the look: Note Colors · Staff Color · Text Below the Notes, kept by the browser
+        delete RR.device.teachLook;
+        const d0 = JSON.stringify(RR.teachLook()) === JSON.stringify({ colour: 'solid', staff: 'notes', labels: 'letters', auto: false });
+        const okSet = RR.setTeachLook('colour', 'black') && RR.setTeachLook('staff', 'all') && !RR.setTeachLook('colour', 'pink') && !RR.setTeachLook('size', 'big');
+        const A3 = RR.teachLevel('A3'), all = RR.teachStaff(A3, 'all'), plain = RR.teachStaff(A3, 'plain'), mine = RR.teachStaff(A3, 'notes');
+        const autoOk = RR.setTeachLook('auto', true) && RR.teachLook().auto === true && !RR.setTeachLook('auto', 'yes');
+        check('Tools: the look starts as Solid Color · its notes’ lines · letter names · Auto-Next off; changed it is kept; the staff can be its notes’ lines, all five in colour, or plain',
+          d0 && okSet && autoOk && RR.teachLook().colour === 'black' && RR.teachLook().staff === 'all' && RR.teachLook().labels === 'letters' &&
+          JSON.parse(localStorage.getItem(RR.KEY.device)).teachLook.colour === 'black' &&
+          all.lines.join(' ') === [C.E, C.G, C.B, C.D, C.F].join(' ') && plain.lines === null && plain.ledgers === null && mine.lines === A3.lines);
+      } finally {
+        KEYS.forEach((k, i) => { if (was[i] == null) localStorage.removeItem(k); else localStorage.setItem(k, was[i]); });
+        RR.device.player = dev; if (look === undefined) delete RR.device.teachLook; else RR.device.teachLook = look;
+        RR.TeachUnits.load(); RR.TeachMarks.load();
+      }
+    })();
+
+    // Practice's Songs and the Songs card (2026-10-12): a Songbook song, or any melody set, as a level of slides
+    (function () {
+      const hcb = RR.teachLevel('S:hot-cross-buns'), all = RR.teachSongs();
+      const cards = hcb ? RR.teachCards(hcb) : [];
+      check('A Songbook song is a Practice level: its slides, notes and lines; every song of the Songbook is there',
+        !!hcb && hcb.kind === 'song' && hcb.unit && hcb.ex.length === 4 && hcb.notes.join() === 'C4,D4,E4' && cards.length === 4 && cards[0].teach === 'S:hot-cross-buns' &&
+        cards[2].notes.length === 8 && hcb.ledgers && hcb.ledgers[28] === RR.COLOUR.C && all.length === Object.keys(RR.SONGS).length && RR.teachLevel('S:nope') === null &&
+        /4 slides/.test(hcb.sub));
+      const KEY = RR.Sets.KEY, was = localStorage.getItem(KEY);
+      try {
+        const set = RR.Sets.create('Song test', [{ title: 'a', time: [3, 4], notes: [{ p: 'G4', t: 4 }, { p: 'E4', t: 4 }, { p: 'C4', t: 4 }] }]);
+        const M = RR.teachLevel('M:' + set.id), U = RR.teachLevel('U:' + set.id);
+        check('Any melody set plays as a song (M:), whether or not it is one of Practice’s exercises (U: needs adding)',
+          !!M && M.kind === 'mset' && M.ex.length === 1 && RR.teachCards(M)[0].time.join('/') === '3/4' && U === null);
+      } finally { if (was == null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, was); }
+    })();
+
+    // Tools in every mode (2026-10-12): a practice's Staff Color; a battle can turn Tools off
+    (function () {
+      const st = v => RR.sanitize({ staff: v }).staff;
+      const b1 = RR.cleanBattle({ teams: [{ name: 'A' }, { name: 'B' }] }), b2 = RR.cleanBattle(Object.assign({}, b1, { tools: false })), b3 = RR.cleanBattle(Object.assign({}, b1, { tools: 'no' }));
+      check('Staff Color is a practice’s own: plain black lines unless it says its notes’ lines or all of them (old practices and the levels: plain)',
+        RR.DEFAULTS.staff === 'plain' && st('notes') === 'notes' && st('all') === 'all' && st('pink') === 'plain' && st(undefined) === 'plain' &&
+        RR.LEVELS.every(l => RR.originalLevel(l.n).staff === 'plain'));
+      check('A battle has Tools on unless it turned them off; its shape (teams, turns, rounds) is unchanged by it',
+        b1.tools === true && b2.tools === false && b3.tools === true && b2.teams.length === 2 && b2.per === b1.per && b2.rounds === b1.rounds);
     })();
 
     document.getElementById('sum').innerHTML = '<span class="' + (fail ? 'fail' : 'pass') + '">' + pass + ' passed, ' + fail + ' failed</span>';
