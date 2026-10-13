@@ -323,15 +323,6 @@
 
           <h2 class="page-title"><span class="page-title-ico">🗓️</span> Weekly Class Schedule</h2>
         </div>
-
-        <!-- Sync Calendar Toggle Button (Far Right) -->
-        <div class="page-sheet-head-right">
-          <button type="button" id="btnToggleCalendarSync" class="btn-sync-calendar-toggle" onclick="app.toggleCalendarSync()" title="Toggle calendar dates and highlight today">
-            <span class="sync-ico">📅</span>
-            <span class="sync-label">Sync Calendar</span>
-            <span id="calendarSyncBadge" class="sync-badge">OFF</span>
-          </button>
-        </div>
       </div>
 
       <div class="schedule-table-container">
@@ -436,7 +427,7 @@
           <h2><span>📋</span> Attendance &amp; Gradebook Registers Built Right In</h2>
           <ul>
             <li><strong>Live In-Chart Grading:</strong> Hit "Start" to launch a live grading session directly on your visual seating chart. Tap buttons right on student seats to mark quick checks (+), gold stars (★, tap + twice), minuses (−), or unsatisfactory (✕, tap − twice) during active lessons.</li>
-            <li><strong>Attendance Garden:</strong> Choose the Garden layout and every student gets a mystery plant in a pot on the classroom shelves, one of ten: a flytrap, violet, daisy, rose, bellflower, dahlia, sunflower, tulip, lily or cactus. Plants grow through six stages, from an empty pot to full bloom, one stage for each class a student attends in a row (classes that meet daily grow more slowly; change the stages in Settings → Garden Growth). Everyone starts at stage 1 the day a class's garden first opens. An absence before full bloom loses the plant and brings a different kind; a full-bloom flower is kept until it's replanted. To fix a garden by hand, turn on Settings → Edit Garden: each click on a pot grows it one stage, and border flowers can be removed. Click a flower in full bloom to replant it into the flower bed outside the window, where the class's garden keeps every one; the student then starts a new pot with a different mystery plant.</li>
+            <li><strong>Attendance Garden:</strong> Choose the Garden layout and every student gets a mystery plant in a pot on the classroom shelves, one of ten: a flytrap, violet, daisy, rose, bellflower, dahlia, sunflower, tulip, lily or cactus. Plants grow through six stages, from an empty pot to full bloom, one stage for each class a student attends (classes that meet daily grow more slowly; change the stages in Settings → Garden Growth). Everyone starts at stage 1 the day a class's garden first opens. An absence doesn't undo anything: the plant just doesn't grow that day, and a full-bloom flower is kept until it's replanted. To fix a garden by hand, turn on Settings → Edit Garden: each click on a pot grows it one stage, and border flowers can be removed. Click a flower in full bloom to replant it into the flower bed outside the window, where the class's garden keeps every one; the student then starts a new pot with a different mystery plant.</li>
             <li><strong>Interactive Spreadsheets:</strong> Jump over to the Attendance or Grades views for a clean, frozen-header register view. Sort assessment columns by category themes—like Singing, Instruments, Movement, Culture, Theory, and Effort!</li>
             <li><strong>One-Click Camera Snapshots:</strong> Need a sub plan or a quick physical printout for your clipboard? Click the camera icon to snap high-resolution JPEG pictures of your seating charts, attendance logs, or grade registers in seconds—complete with a fun camera shutter sound!</li>
           </ul>
@@ -540,7 +531,7 @@
   <div id="gardenGrowthModal" class="modal-overlay" style="z-index: 2100;">
     <div class="modal garden-growth-modal">
       <h2>🌱 Garden Growth</h2>
-      <p class="growth-intro">How many classes in a row each stage lasts. An absence before full bloom loses the plant, and the student starts a different kind of plant; a flower in full bloom is safe until it's replanted, and its new pot starts at stage 1 that day. Each class is Weekly or Daily in Manage Schedule, and its garden counts only classes from the day it was first opened.</p>
+      <p class="growth-intro">How many classes attended each stage lasts. An absence doesn't start the plant over: it just doesn't grow that day. A flower in full bloom stays until it's replanted, and its new pot starts at stage 1 that day. Each class is Weekly or Daily in Manage Schedule, and its garden counts only classes from the day it was first opened.</p>
       <div id="gardenGrowthGrid" class="growth-grid"></div>
       <div class="modal-actions" style="justify-content: space-between;">
         <button type="button" class="btn btn-outline" onclick="app.resetGardenGrowthDraft()">Reset to defaults</button>

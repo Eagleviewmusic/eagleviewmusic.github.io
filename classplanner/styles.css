@@ -4056,45 +4056,6 @@ th.column-drag-over {
   background-color: rgba(253, 243, 207, 0.6) !important;
 }
 
-.btn-sync-calendar-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  border: 2px solid var(--line-strong);
-  background: var(--paper);
-  color: var(--ink-soft);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 3px 0 var(--line-strong);
-  user-select: none;
-}
-
-.btn-sync-calendar-toggle:hover {
-  background: #fffaea;
-}
-
-.btn-sync-calendar-toggle.active {
-  background: var(--blue-soft);
-  border-color: var(--blue);
-  color: var(--blue-dark);
-  box-shadow: 0 3px 0 var(--blue);
-}
-
-.sync-ico { font-size: 0.95rem; }
-.sync-label { font-weight: 800; font-size: 0.85rem; }
-
-.sync-badge {
-  font-size: 0.72rem;
-  font-weight: 900;
-  padding: 2px 7px;
-  border-radius: 10px;
-  background: var(--line);
-  color: var(--ink-muted);
-  letter-spacing: 0.04em;
-}
-
 .btn-schedule-week-nav {
   border: 2px solid var(--line-strong);
   background: var(--paper);

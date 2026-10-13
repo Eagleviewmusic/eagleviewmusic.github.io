@@ -1,7 +1,7 @@
 // The Garden layout's plants: garden/<plant>-<stage>.webp, stage 1 (empty pot) to 6 (full bloom)
 const GARDEN_PLANTS = ['flytrap', 'violet', 'daisy', 'rose', 'bellflower', 'dahlia', 'sunflower', 'tulip', 'lily', 'cactus'];
 const GARDEN_STAGES = 6;
-// How many class sessions in a row each of stages 1-5 lasts (stage 6 lasts until the flower is
+// How many classes attended each of stages 1-5 lasts (stage 6 lasts until the flower is
 // replanted), for classes that meet once a week and classes that meet several times a week.
 // The user can change these in Settings > Garden Growth.
 const GARDEN_GROWTH_DEFAULTS = { weekly: [1, 1, 1, 1, 1], daily: [1, 1, 2, 2, 2] };
@@ -225,7 +225,7 @@ class SeatingChartApp {
         this.tempSchedules = [];
         this.tempSelectedScheduleId = 'sched_regular';
         this.scheduleTimeBlocks = [];
-        this.isCalendarSyncEnabled = false;
+        // The schedule always shows a real week's dates (today highlighted); ‹ › move between weeks
         this.calendarSyncWeekOffset = 0;
 
         this.init();
@@ -388,7 +388,6 @@ class SeatingChartApp {
 
         this.renderClassDropdown();
         this.renderScheduleDropdown();
-        this.updateCalendarSyncUI();
         this.render();
       }
 
@@ -443,9 +442,6 @@ class SeatingChartApp {
 
         // 2. Update app title & brand text
         this.updateAppTitle();
-
-        // 3. Update calendar sync UI
-        this.updateCalendarSyncUI();
 
         // 4. Ensure valid current class is selected
         if (!this.currentClassId || !this.classes.some(c => c.id === this.currentClassId)) {
@@ -917,7 +913,6 @@ class SeatingChartApp {
         localStorage.setItem('classPlanner_schedules_v1', JSON.stringify(this.schedules || []));
         localStorage.setItem('classPlanner_currentScheduleId_v1', this.currentScheduleId || '');
         localStorage.setItem('classPlanner_scheduleTimeBlocks_v1', JSON.stringify(this.scheduleTimeBlocks || []));
-        localStorage.setItem('classPlanner_calendarSync_v1', this.isCalendarSyncEnabled ? 'true' : 'false');
         localStorage.setItem('seatingApp_appName', this.appName || 'ClassPlanner');
         localStorage.setItem('seatingApp_gradingStyle', this.gradingStyle || 'informal');
         localStorage.setItem('seatingApp_suppressRemoveStudentWarning', this.suppressRemoveStudentWarning.toString());
@@ -1339,16 +1334,11 @@ class SeatingChartApp {
         const savedSubjects = localStorage.getItem('classPlanner_subjects_v1');
         const savedSchedules = localStorage.getItem('classPlanner_schedules_v1');
         const savedScheduleId = localStorage.getItem('classPlanner_currentScheduleId_v1');
-        const savedCalendarSync = localStorage.getItem('classPlanner_calendarSync_v1');
         const savedGradingStyle = localStorage.getItem('seatingApp_gradingStyle');
         const savedSuppressWarning = localStorage.getItem('seatingApp_suppressRemoveStudentWarning');
 
         if (savedAppName) {
           this.appName = savedAppName;
-        }
-
-        if (savedCalendarSync !== null) {
-          this.isCalendarSyncEnabled = (savedCalendarSync === 'true');
         }
 
         if (savedGradingStyle) {
@@ -1757,7 +1747,7 @@ class SeatingChartApp {
           subjects: this.subjects || [],
           schedules: this.schedules || [],
           currentScheduleId: this.currentScheduleId || 'sched_regular',
-          calendarSync: this.isCalendarSyncEnabled === true,
+          calendarSync: true, // the dates are always on now; kept for older copies of the app
           gardenGrowth: this.gardenGrowth,
           classes: sanitizedClasses
         };
@@ -1817,10 +1807,6 @@ class SeatingChartApp {
             if (typeof importedData.suppressRemoveStudentWarning === 'boolean') {
               this.suppressRemoveStudentWarning = importedData.suppressRemoveStudentWarning;
               localStorage.setItem('seatingApp_suppressRemoveStudentWarning', this.suppressRemoveStudentWarning.toString());
-            }
-
-            if (typeof importedData.calendarSync === 'boolean') {
-              this.isCalendarSyncEnabled = importedData.calendarSync;
             }
 
             if (importedData.gardenGrowth && typeof importedData.gardenGrowth === 'object') {
@@ -1884,7 +1870,6 @@ class SeatingChartApp {
             this.closeModal('settingsModal');
             this.renderClassDropdown();
             this.renderScheduleDropdown();
-            this.updateCalendarSyncUI();
             this.render();
             if (this.currentViewMode === 'schedule') this.renderScheduleTable();
             if (this.currentViewMode === 'attendance') this.renderAttendanceTable();
@@ -2662,7 +2647,6 @@ class SeatingChartApp {
         }
 
         this.renderScheduleDropdown();
-        this.updateCalendarSyncUI();
         this.updateAddGradeColumnButtonsUI();
         this.updateAddAttendanceButtonUI();
         this.updateSubheaders();
@@ -4490,38 +4474,9 @@ class SeatingChartApp {
         });
       }
 
-      toggleCalendarSync() {
-        this.isCalendarSyncEnabled = !this.isCalendarSyncEnabled;
-        this.calendarSyncWeekOffset = 0; // Reset back to current week whenever toggled
-        this.saveData();
-        this.updateCalendarSyncUI();
-        this.renderScheduleTable();
-      }
-
       changeCalendarSyncWeek(delta) {
         this.calendarSyncWeekOffset = (this.calendarSyncWeekOffset || 0) + delta;
         this.renderScheduleTable();
-      }
-
-      updateCalendarSyncUI() {
-        const btn = document.getElementById('btnToggleCalendarSync');
-        const badge = document.getElementById('calendarSyncBadge');
-        if (!btn) return;
-        if (this.isCalendarSyncEnabled) {
-          btn.classList.add('active');
-          if (badge) {
-            badge.textContent = 'ON';
-            badge.style.background = 'var(--blue)';
-            badge.style.color = '#ffffff';
-          }
-        } else {
-          btn.classList.remove('active');
-          if (badge) {
-            badge.textContent = 'OFF';
-            badge.style.background = 'var(--line)';
-            badge.style.color = 'var(--ink-muted)';
-          }
-        }
       }
 
       getScheduleCalendarDates() {
@@ -4584,50 +4539,46 @@ class SeatingChartApp {
             <tr>
               <th style="width: 175px; min-width: 160px; text-align: center;">Time</th>
               ${DAYS.map(d => {
-                if (this.isCalendarSyncEnabled) {
-                  const todayThClass = d.isToday ? ' schedule-today-th' : '';
-                  const badgeStyle = d.isToday ? 'background: #2563eb; color: #ffffff;' : 'background: #e2e8f0; color: #475569;';
-                  
-                  let headerInnerHtml = '';
-                  if (d.key === 'Monday') {
-                    headerInnerHtml = `
-                      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px;">
-                        <button type="button" class="btn-schedule-week-nav" onclick="event.stopPropagation(); app.changeCalendarSyncWeek(-1)" title="Previous Week">‹</button>
-                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; flex: 1;">
-                          <span style="font-size: 0.8rem; font-weight: 800; padding: 1px 8px; border-radius: 10px; ${badgeStyle}">${d.dateStr}</span>
-                          <span style="font-size: 0.95rem; font-weight: ${d.isToday ? '800' : '700'}; color: ${d.isToday ? 'var(--blue-dark)' : 'var(--ink)'};">${d.label}</span>
-                        </div>
-                        <div style="width: 26px; flex-shrink: 0;"></div>
-                      </div>
-                    `;
-                  } else if (d.key === 'Friday') {
-                    headerInnerHtml = `
-                      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px;">
-                        <div style="width: 26px; flex-shrink: 0;"></div>
-                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; flex: 1;">
-                          <span style="font-size: 0.8rem; font-weight: 800; padding: 1px 8px; border-radius: 10px; ${badgeStyle}">${d.dateStr}</span>
-                          <span style="font-size: 0.95rem; font-weight: ${d.isToday ? '800' : '700'}; color: ${d.isToday ? 'var(--blue-dark)' : 'var(--ink)'};">${d.label}</span>
-                        </div>
-                        <button type="button" class="btn-schedule-week-nav" onclick="event.stopPropagation(); app.changeCalendarSyncWeek(1)" title="Next Week">›</button>
-                      </div>
-                    `;
-                  } else {
-                    headerInnerHtml = `
-                      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; width: 100%;">
+                const todayThClass = d.isToday ? ' schedule-today-th' : '';
+                const badgeStyle = d.isToday ? 'background: #2563eb; color: #ffffff;' : 'background: #e2e8f0; color: #475569;';
+                
+                let headerInnerHtml = '';
+                if (d.key === 'Monday') {
+                  headerInnerHtml = `
+                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px;">
+                      <button type="button" class="btn-schedule-week-nav" onclick="event.stopPropagation(); app.changeCalendarSyncWeek(-1)" title="Previous Week">‹</button>
+                      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; flex: 1;">
                         <span style="font-size: 0.8rem; font-weight: 800; padding: 1px 8px; border-radius: 10px; ${badgeStyle}">${d.dateStr}</span>
                         <span style="font-size: 0.95rem; font-weight: ${d.isToday ? '800' : '700'}; color: ${d.isToday ? 'var(--blue-dark)' : 'var(--ink)'};">${d.label}</span>
                       </div>
-                    `;
-                  }
-
-                  return `
-                    <th class="${todayThClass}" style="width: 18%; min-width: 130px; text-align: center; vertical-align: middle; padding: 8px 6px;">
-                      ${headerInnerHtml}
-                    </th>
+                      <div style="width: 26px; flex-shrink: 0;"></div>
+                    </div>
+                  `;
+                } else if (d.key === 'Friday') {
+                  headerInnerHtml = `
+                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px;">
+                      <div style="width: 26px; flex-shrink: 0;"></div>
+                      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; flex: 1;">
+                        <span style="font-size: 0.8rem; font-weight: 800; padding: 1px 8px; border-radius: 10px; ${badgeStyle}">${d.dateStr}</span>
+                        <span style="font-size: 0.95rem; font-weight: ${d.isToday ? '800' : '700'}; color: ${d.isToday ? 'var(--blue-dark)' : 'var(--ink)'};">${d.label}</span>
+                      </div>
+                      <button type="button" class="btn-schedule-week-nav" onclick="event.stopPropagation(); app.changeCalendarSyncWeek(1)" title="Next Week">›</button>
+                    </div>
                   `;
                 } else {
-                  return `<th style="width: 18%; min-width: 130px; text-align: center;">${d.label}</th>`;
+                  headerInnerHtml = `
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; width: 100%;">
+                      <span style="font-size: 0.8rem; font-weight: 800; padding: 1px 8px; border-radius: 10px; ${badgeStyle}">${d.dateStr}</span>
+                      <span style="font-size: 0.95rem; font-weight: ${d.isToday ? '800' : '700'}; color: ${d.isToday ? 'var(--blue-dark)' : 'var(--ink)'};">${d.label}</span>
+                    </div>
+                  `;
                 }
+
+                return `
+                  <th class="${todayThClass}" style="width: 18%; min-width: 130px; text-align: center; vertical-align: middle; padding: 8px 6px;">
+                    ${headerInnerHtml}
+                  </th>
+                `;
               }).join('')}
             </tr>
           </thead>
@@ -4697,7 +4648,7 @@ class SeatingChartApp {
                 return;
               }
 
-              const isTodayColumn = (this.isCalendarSyncEnabled && day.isToday);
+              const isTodayColumn = day.isToday;
               const cellHighlightClass = isTodayColumn ? ' schedule-today-cell' : '';
               const todayCellStyle = isTodayColumn ? 'border-left: 1.5px solid #bfdbfe; border-right: 1.5px solid #bfdbfe;' : '';
 
@@ -8094,10 +8045,11 @@ class SeatingChartApp {
 
       // Renames one student in every seating structure of a class: the live rows/lines, the
       // per-row-count copies getRowsData/getLinesData swap back in, divided rows, circle,
-      // free form, the group layouts, the unplaced list, today's absences and the garden plant.
+      // free form, the group layouts, the unplaced list, today's absences and the garden plant,
+      // and carries their attendance and grades over to the new name (renameStudentRecords).
       // Arrays are changed in place, because rows/lines can be the same array as a count copy.
-      // classList and studentProfiles stay with the callers (each rename path has its own rules).
-      // Attendance statuses and grades are NOT moved: they stay under the old name.
+      // classList and studentProfiles stay with the callers (each rename path has its own rules);
+      // both update classList first.
       renameStudentSeating(currentClass, oldName, newName) {
         if (!currentClass || !oldName || !newName || oldName === newName) return;
         const renameIn = arr => {
@@ -8132,6 +8084,32 @@ class SeatingChartApp {
         renameIn(currentClass.unplacedStudents);
         renameIn(currentClass.absentStudents);
         this.renameGardenPlant(currentClass, oldName, newName);
+        this.renameStudentRecords(currentClass, oldName, newName);
+      }
+
+      // A new name is the same student (user, 2026-10-13: a rename is only how the name is shown),
+      // so their attendance marks and grades, kept by name, go with it: every attendance date,
+      // every grade column of every subject, and any attendance or grade being taken right now.
+      // If another student still has the old name (two of the same name, one renamed), the
+      // records are copied so both keep the history they shared.
+      renameStudentRecords(currentClass, oldName, newName) {
+        if (!currentClass || !oldName || !newName || oldName === newName) return;
+        const keepOld = Array.isArray(currentClass.classList) && currentClass.classList.includes(oldName);
+        const carry = byName => {
+          if (!byName || typeof byName !== 'object' || !Object.prototype.hasOwnProperty.call(byName, oldName)) return;
+          byName[newName] = byName[oldName];
+          if (!keepOld) delete byName[oldName];
+        };
+        (Array.isArray(currentClass.attendanceDates) ? currentClass.attendanceDates : []).forEach(d => carry(d && d.statuses));
+        Object.values(currentClass.subjectGrades || {}).forEach(cols => {
+          if (Array.isArray(cols)) cols.forEach(col => carry(col && col.grades));
+        });
+        (Array.isArray(currentClass.gradeColumns) ? currentClass.gradeColumns : []).forEach(col => carry(col && col.grades));
+        if (currentClass.id === this.currentClassId) {
+          carry(this.activeAttendanceStatuses);
+          carry(this.draftAttendanceDate && this.draftAttendanceDate.statuses);
+          carry(this.draftGradeColumn && this.draftGradeColumn.grades);
+        }
       }
 
       saveClassListEdits() {
@@ -8155,24 +8133,33 @@ class SeatingChartApp {
           }
         });
 
-        renames.forEach(r => {
+        // Each name goes through a placeholder first, so swapping two names in one save can't
+        // mix up their seats, attendance or grades
+        const temps = renames.map((r, i) => `\u0000rename${i}`);
+        renames.forEach((r, i) => {
           // 1. Update classList (by position, so one of two same-named students can be renamed)
+          currentClass.classList[r.idx] = temps[i];
+
+          // 2. Update every seating chart, and carry their attendance and grades along
+          this.renameStudentSeating(currentClass, r.original, temps[i]);
+        });
+        renames.forEach((r, i) => {
           currentClass.classList[r.idx] = r.newName;
+          this.renameStudentSeating(currentClass, temps[i], r.newName);
+        });
 
-          // 2. Update every seating chart
-          this.renameStudentSeating(currentClass, r.original, r.newName);
-
-          // 3. Update studentProfiles
+        // 3. Update studentProfiles
+        if (!currentClass.studentProfiles) currentClass.studentProfiles = {};
+        renames.forEach(r => {
+          if (!currentClass.classList.includes(r.original)) delete currentClass.studentProfiles[r.original];
+        });
+        renames.forEach(r => {
           const parsed = this.parseStudentName(r.newName);
-          if (!currentClass.studentProfiles) currentClass.studentProfiles = {};
           currentClass.studentProfiles[r.newName] = {
             firstName: parsed.firstName,
             lastName: parsed.lastName,
             rosterName: r.newName
           };
-          if (r.original !== r.newName && currentClass.studentProfiles[r.original]) {
-            delete currentClass.studentProfiles[r.original];
-          }
         });
 
         this.isClassListEditMode = false;
@@ -9165,14 +9152,16 @@ class SeatingChartApp {
       }
 
       // The kind of plant in the student's pot now: their first plant, or the one they were
-      // given when an absence or a replant started a new plant
+      // given when a replant (or an Edit Garden "grow something else") started a new plant
       getGardenPlant(currentClass, student) {
         const { starts } = this.getGardenGrowth(currentClass, student);
         return this.getGardenKind(currentClass, student, starts[starts.length - 1]) || GARDEN_PLANTS[0];
       }
 
       // The kind given to the plant that began at `start`: 'first' (kept in gardenPlants), or
-      // 'r'/'a' + the day of the replant or absence that started it (kept in gardenNewPlants)
+      // 'r' + the day of the replant / 'e' + the Edit Garden id that started it (kept in
+      // gardenNewPlants). Older data may also hold 'a' + day keys, from when an absence lost the
+      // plant; nothing starts a plant that way now, so those kinds are simply no longer used.
       getGardenKind(currentClass, student, start) {
         const kind = start === 'first'
           ? (currentClass.gardenPlants || {})[student]
@@ -9192,8 +9181,8 @@ class SeatingChartApp {
       }
 
       // Gives out plants: a first plant for each student without one (the kind the class has
-      // fewest of, ties at random, so the kinds stay even), then a new kind for each plant an
-      // absence or a replant has started. Returns true when any were given out.
+      // fewest of, ties at random, so the kinds stay even), then a new kind for each plant a
+      // replant has started. Returns true when any were given out.
       assignGardenPlants(currentClass) {
         if (!currentClass.gardenPlants || typeof currentClass.gardenPlants !== 'object') currentClass.gardenPlants = {};
         const plants = currentClass.gardenPlants;
@@ -9292,13 +9281,13 @@ class SeatingChartApp {
       }
 
       // The student's current plant: how many classes it has grown (`sessions`), its `stage`, and
-      // every plant start so far (`starts`: 'first', then 'r<day>' for each replant, 'a<day>' for
-      // each absence that ended a plant, 'e<id>' for each Edit Garden "grow something else").
-      // Only classes from the garden's day one count. Marked present = one more class. A replant
-      // starts a new plant that same day, which counts as its first class. An absence ends a plant
-      // that has started growing, unless it is in full bloom: that waits for its replant. Classes
-      // with no mark for the student are skipped. An Edit Garden change puts the plant at the start
-      // of its stage. On any one day the class comes first, then replants and edits in the order made.
+      // every plant start so far (`starts`: 'first', then 'r<day>' for each replant, 'e<id>' for
+      // each Edit Garden "grow something else").
+      // Only classes from the garden's day one count. Marked present = one more class. An absence
+      // just means no growth that day (user, 2026-10-13: the plant waits, it doesn't start over);
+      // classes with no mark are skipped the same way. A replant starts a new plant that same day,
+      // which counts as its first class. An Edit Garden change puts the plant at the start of its
+      // stage. On any one day the class comes first, then replants and edits in the order made.
       getGardenGrowth(currentClass, student) {
         const pace = this.getAttendancePace(currentClass);
         const firstDay = this.getGardenStartDay(currentClass);
@@ -9329,9 +9318,6 @@ class SeatingChartApp {
             count = this.gardenFirstClassOf(e.edit.stage, pace);
           } else if (e.status === 'present') {
             count++;
-          } else if (e.status === 'absent' && count > 0 && this.getGardenStageFor(count, pace) < GARDEN_STAGES) {
-            count = 0;
-            starts.push(`a${e.day}`);
           }
         });
         return { sessions: count, stage: this.getGardenStageFor(count, pace), starts };
@@ -12303,7 +12289,7 @@ class SeatingChartApp {
             ? 'Full bloom. Click the flower to replant it.'
             : sessions === 0
               ? 'New pot: it starts growing at the next class'
-              : `Stage ${stage} of ${GARDEN_STAGES} (${sessions} ${sessions === 1 ? 'class' : 'classes'} in a row)`;
+              : `Stage ${stage} of ${GARDEN_STAGES} (${sessions} ${sessions === 1 ? 'class' : 'classes'})`;
         }
 
         seat.innerHTML = `
