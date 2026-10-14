@@ -1,0 +1,2030 @@
+{
+  "format": "evm-item",
+  "formatVersion": 1,
+  "app": "song-writer",
+  "kind": "song",
+  "id": "song_1791933869868_e7s1",
+  "title": "Sutoku In",
+  "createdAt": 1791933869869,
+  "updatedAt": 1791938804995,
+  "book": "More songs",
+  "data": {
+    "score": {
+      "v": 2,
+      "key": "D",
+      "scale": "minor",
+      "progressions": [
+        {
+          "id": "p1",
+          "name": "Progression 1",
+          "chords": [
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "bVI",
+              "place": "s",
+              "beats": 2
+            },
+            {
+              "chord": "V",
+              "place": "d",
+              "beats": 2
+            },
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "bVI",
+              "place": "s",
+              "beats": 2
+            },
+            {
+              "chord": "V",
+              "place": "d",
+              "beats": 2
+            },
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "V",
+              "place": "d"
+            },
+            {
+              "chord": "V",
+              "place": "d"
+            },
+            {
+              "chord": "V",
+              "place": "d"
+            },
+            {
+              "chord": "i",
+              "place": "f"
+            }
+          ]
+        },
+        {
+          "id": "p2",
+          "name": "Progression 2",
+          "chords": [
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "bVI",
+              "place": "s",
+              "beats": 2
+            },
+            {
+              "chord": "V",
+              "place": "d",
+              "beats": 2
+            },
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "bVI",
+              "place": "s",
+              "beats": 2
+            },
+            {
+              "chord": "V",
+              "place": "d",
+              "beats": 2
+            }
+          ]
+        },
+        {
+          "id": "p3",
+          "name": "Progression 3",
+          "chords": [
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "i",
+              "place": "f",
+              "beats": 2
+            },
+            {
+              "chord": "bVI",
+              "place": "s",
+              "beats": 2
+            },
+            {
+              "chord": "V",
+              "place": "d"
+            },
+            {
+              "chord": "i",
+              "place": "f"
+            },
+            {
+              "chord": "V",
+              "place": "d"
+            },
+            {
+              "chord": "V",
+              "place": "d"
+            },
+            {
+              "chord": "V",
+              "place": "d"
+            }
+          ]
+        }
+      ],
+      "track": [
+        {
+          "prog": "p2",
+          "from": 1,
+          "to": 20
+        },
+        {
+          "prog": "p2",
+          "from": 21,
+          "to": "melody",
+          "here": [
+            {
+              "bar": 38,
+              "beat": 1,
+              "beats": 4,
+              "chords": [
+                {
+                  "chord": "i",
+                  "beats": 4,
+                  "rhythm": "q q e q.~"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "lines": [
+        {
+          "label": "A",
+          "syllables": [
+            {
+              "text": "Se",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "wo",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "h."
+                }
+              ]
+            },
+            {
+              "text": "ha",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ya",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-mi,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q.",
+                  "tie": true
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "I",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-wa",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti-low",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "ni",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "se",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ka",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ru",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ru,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q",
+                  "tie": true
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "ru,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Se",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "wo",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "h."
+                }
+              ]
+            },
+            {
+              "text": "ha",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ya",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-mi,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q.",
+                  "tie": true
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "I",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-wa",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti-low",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "ni",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "se",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ka",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ru",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q",
+                  "tie": true
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "-ru,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "q"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "re",
+                      "rest": true
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Ta",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ki",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ga",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-wa,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "ta",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ki",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ga",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-wa,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "ta",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ki",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ga",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-wa",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "no,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "so",
+                      "rest": true
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Ta",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ki",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ga",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-wa,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "ta",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ki",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ga",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-wa,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "ta",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ki",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-ga",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "-wa",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "no,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "la",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "la",
+                      "acc": "flat",
+                      "rest": true
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Wa",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "-re",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "-te",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "mo",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "su",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "-e",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "ni,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "so",
+                      "rest": true
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "A",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "-wan",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "to",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "zo",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "o",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "h"
+                }
+              ]
+            },
+            {
+              "text": "-mo",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "h"
+                }
+              ]
+            },
+            {
+              "text": "-u.",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "w"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "so",
+                      "rest": true
+                    }
+                  ],
+                  "v": "w"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "so",
+                      "rest": true
+                    }
+                  ],
+                  "v": "w"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "so",
+                      "rest": true
+                    }
+                  ],
+                  "v": "h"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "so",
+                      "rest": true
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            }
+          ],
+          "pickup": "q"
+        },
+        {
+          "label": "",
+          "syllables": [
+            {
+              "text": "The",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "rock",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do-high"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "di",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "-vides",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q."
+                }
+              ]
+            },
+            {
+              "text": "the",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "stream",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do-high"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "in",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "two,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "so",
+                      "rest": true
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "and",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "both",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do-high"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "with",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "might",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "and",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "main,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "h"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "fa",
+                      "rest": true
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Go",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "tum",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do-high"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "-bling",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "down",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q."
+                }
+              ]
+            },
+            {
+              "text": "the",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "wa",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do-high"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "-ter",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "-fall,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "so",
+                      "rest": true
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "But",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "well",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do-high"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "I",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "know",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "the",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "twain",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "h"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "fa",
+                      "rest": true
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "will",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "soon,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do-high"
+                    }
+                  ],
+                  "v": "h."
+                }
+              ]
+            },
+            {
+              "text": "will",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "soon,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do-high"
+                    }
+                  ],
+                  "v": "h"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "do-high",
+                      "rest": true
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "will",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "soon",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do-high"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "u",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "-nite",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "a",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "-gain.",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "h"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "so",
+                      "rest": true
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Will",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "soon,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do-high"
+                    }
+                  ],
+                  "v": "h."
+                }
+              ]
+            },
+            {
+              "text": "will",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "soon,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do-high"
+                    }
+                  ],
+                  "v": "h"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "do-high",
+                      "rest": true
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "will",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "soon",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do-high"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "u",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "-nite",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "a",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "-gain,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "a",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "re"
+                    }
+                  ],
+                  "v": "h"
+                }
+              ]
+            },
+            {
+              "text": "-gain.",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "w"
+                }
+              ]
+            }
+          ],
+          "pickup": "q"
+        }
+      ]
+    },
+    "layout": {
+      "v": 1,
+      "notes": null,
+      "accidentals": true,
+      "rests": true,
+      "harmony": true,
+      "connected": true,
+      "chords": null,
+      "values": null,
+      "keys": null,
+      "scaleMorph": true,
+      "chordBend": true,
+      "show": {
+        "sectionTitles": true,
+        "keycaps": true,
+        "barNumbers": true
+      },
+      "locked": false
+    }
+  }
+}
