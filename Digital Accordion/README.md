@@ -37,6 +37,18 @@ the system's light/dark setting.
 - **Pearloid note buttons**: the note colours, with `assets/pearl.svg` (a grey swirl)
   laid over them with `soft-light`, a gloss and a chrome ring. Chord tones become round
   bass buttons. Legends follow the same dark/cream rule.
+- **The page uses `assets/marble.webp` and `assets/pearl.webp` (2026-10-13)** — the two SVGs
+  rendered once at 2× (headless Chrome screenshot, WebP quality 0.86). The SVGs stay as the
+  source; re-render both if either changes. Browsers re-ran the SVGs' noise filters whenever a
+  button repainted, which made the lights lag behind the sound.
+- **A press changes no CSS filter and runs no transition (2026-10-13).** A lit button takes
+  `--c-lit` (what the old `brightness(1.12) saturate(1.1)` filter made of its colour, worked out
+  once by `litColour()` in `paintCap()`), its glow and its sunk look at once. The bellows open
+  by a class on themselves (`.bellows.open`), no longer `body.sounding`. When a chord bends a
+  note or a Z X C V B tab is held, only the buttons whose label changes are relabelled and
+  refitted (`fitLabelInPlace`) — the whole stage is no longer refitted on a press. Measured in
+  headless Chrome, press to lit button: desktop ~84 → ~32 ms, a phone-speed CPU (6× slower)
+  ~64 → ~48 ms (bending chords ~83 → ~48 ms), dropped frames ~78 → ~1 on desktop.
 - **No lamps.** Tower/Panels/Keys, the toggles (♪ notes, 8va) and the Z X C V B tabs are
   ivory tabs; one that is on is *pushed in*, the way a register tab is. (Until 2026-09-26
   they carried a red circle that lit — the user did not want red lights.) The Z X C V B

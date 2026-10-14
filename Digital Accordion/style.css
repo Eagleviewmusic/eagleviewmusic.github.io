@@ -462,7 +462,6 @@ kbd { font-family: var(--font-ui); }
   background:
     linear-gradient(180deg, rgba(255, 240, 215, 0.1), rgba(0, 0, 0, 0) 9%, rgba(0, 0, 0, 0) 91%, rgba(0, 0, 0, 0.4)),
     repeating-linear-gradient(90deg, #0a0807 0 0.6px, #3b3229 0.6px, #5a4d40 3.3px, #a3927a 3.55px 3.95px, #2a231d 4.2px, #1a1511 6.9px, #0a0807 6.9px 7.5px);
-  transition: filter 0.6s;
 }
 /* the metal trim that follows each end */
 .bellows::before, .bellows::after {
@@ -477,8 +476,7 @@ kbd { font-family: var(--font-ui); }
   bottom: 0;
   clip-path: polygon(0 0, 12.5% 6px, 25% 0, 37.5% 6px, 50% 0, 62.5% 6px, 75% 0, 87.5% 6px, 100% 0, 100% 3px, 87.5% 9px, 75% 3px, 62.5% 9px, 50% 3px, 37.5% 9px, 25% 3px, 12.5% 9px, 0 3px);
 }
-body.sounding .bellows { transform: scaleX(1.3); transition-duration: 0.22s; }
-body.sounding .bellows i { filter: brightness(1.2); transition-duration: 0.22s; }
+.bellows.open { transform: scaleX(1.3); transition-duration: 0.22s; }
 
 /* ---------------- blocks: lamp buttons in the note colours ---------------- */
 .block {
@@ -501,7 +499,6 @@ body.sounding .bellows i { filter: brightness(1.2); transition-duration: 0.22s; 
     inset 0 2px 0 rgba(255, 255, 255, 0.34),
     inset 0 -5px 0 rgba(0, 0, 0, 0.2);
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.32);
-  transition: transform 0.07s ease, filter 0.07s ease, box-shadow 0.12s ease;
   touch-action: none;
   overflow: hidden;
 }
@@ -516,20 +513,21 @@ body.sounding .bellows i { filter: brightness(1.2); transition-duration: 0.22s; 
 }
 .block.bent, .kcap.bent {
   box-shadow: 0 0 0 2px var(--bezel), inset 0 0 0 3px rgba(255, 250, 235, 0.95), inset 0 -5px 0 rgba(0, 0, 0, 0.18), 0 0 14px rgba(255, 250, 235, 0.45);
-  filter: saturate(1.15);
 }
 .block.bent .main::after, .kcap.bent .main::after { content: ''; }
-/* lit: the lamp behind the lens comes on */
+/* lit: the lamp behind the lens comes on — at once, and without CSS filters: the filters and the
+   transitions made every press repaint for several frames and lag on phones (2026-10-13).
+   --c-lit is the colour the old brightness/saturate filter gave, worked out in paintCap(). */
 .block.is-on {
   transform: translateY(1px) scale(1.025);
-  filter: brightness(1.13) saturate(1.12);
+  background-color: var(--c-lit, var(--c));
   background-image:
     radial-gradient(ellipse 80% 70% at 50% 42%, rgba(255, 252, 232, 0.55), rgba(255, 252, 232, 0) 72%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 50%);
   box-shadow:
     0 0 0 2px var(--bezel),
-    0 0 0 3.5px color-mix(in srgb, var(--c) 65%, #fff),
-    0 0 30px 6px color-mix(in srgb, var(--c) 60%, transparent),
+    0 0 0 3.5px color-mix(in srgb, var(--c-lit, var(--c)) 65%, #fff),
+    0 0 30px 6px color-mix(in srgb, var(--c-lit, var(--c)) 60%, transparent),
     inset 0 2px 0 rgba(255, 255, 255, 0.5),
     inset 0 -3px 0 rgba(0, 0, 0, 0.15);
   z-index: 3;
@@ -543,7 +541,7 @@ body.sounding .bellows i { filter: brightness(1.2); transition-duration: 0.22s; 
   box-shadow:
     0 0 0 2px var(--bezel),
     inset 0 0 0 3px rgba(255, 250, 235, 0.95),
-    0 0 30px 6px color-mix(in srgb, var(--c) 60%, transparent);
+    0 0 30px 6px color-mix(in srgb, var(--c-lit, var(--c)) 60%, transparent);
 }
 .block .main { line-height: 1; white-space: nowrap; }
 .block .sub { font-size: 0.5em; opacity: 0.9; font-weight: 600; margin-top: 0.18em; line-height: 1; white-space: nowrap; }
@@ -638,7 +636,6 @@ body.sounding .bellows i { filter: brightness(1.2); transition-duration: 0.22s; 
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 calc(var(--k) * -0.08) 0 rgba(0, 0, 0, 0.3), 0 2px 0 #000;
   padding: 2px;
   overflow: hidden;
-  transition: transform 0.06s ease, filter 0.06s ease;
 }
 .kcap .kc { position: absolute; top: 3px; left: 6px; font: 700 calc(var(--k) * 0.19)/1.2 var(--font-ui); font-stretch: 100%; text-transform: uppercase; opacity: 0.8; }
 .kcap .main { font-size: calc(var(--k) * 0.33); line-height: 1; margin-top: calc(var(--k) * 0.12); white-space: nowrap; max-width: 100%; }
@@ -655,8 +652,8 @@ body.sounding .bellows i { filter: brightness(1.2); transition-duration: 0.22s; 
 .kcap.reserved .main { font-size: calc(var(--k) * 0.4); margin-top: 0; }
 .kcap.is-on {
   transform: translateY(2px);
-  filter: brightness(1.15) saturate(1.1);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c, #fff) 60%, #fff), 0 0 22px 4px color-mix(in srgb, var(--c, #fff) 60%, transparent);
+  background-color: var(--c-lit, var(--c, #fff));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-lit, var(--c, #fff)) 60%, #fff), 0 0 22px 4px color-mix(in srgb, var(--c-lit, var(--c, #fff)) 60%, transparent);
   z-index: 2;
 }
 .kbd.tiny .kcap .kc { display: none; }
@@ -944,7 +941,7 @@ input[type="range"]:focus-visible { outline: 2px solid var(--amber); outline-off
 
 @media (prefers-reduced-motion: reduce) {
   .stage.booting .block, .stage.booting .kcap.bound { animation: none; }
-  .bellows, body.sounding .bellows { transition: none; transform: none; }
+  .bellows, .bellows.open { transition: none; transform: none; }
   .sheet, .sheet-backdrop.open { animation: none; }
 }
 
@@ -1058,7 +1055,7 @@ input[type="range"]:focus-visible { outline: 2px solid var(--amber); outline-off
 .style-swatch.digital i:nth-child(1) { background: #FF3B30; }
 .style-swatch.digital i:nth-child(2) { background: #FFCC00; }
 .style-swatch.digital i:nth-child(3) { background: #007AFF; }
-.style-swatch.accordion { background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0.15)), url("assets/marble.svg") -80px -40px / 300px 300px; background-color: #7a100c; }
+.style-swatch.accordion { background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0.15)), url("assets/marble.webp") -80px -40px / 300px 300px; background-color: #7a100c; }
 .style-swatch.accordion i {
   width: 18px; height: 24px; border-radius: 4px 4px 5px 5px;
   background: radial-gradient(circle, #b3261e 0 1.8px, transparent 2.3px 4px, #b3261e 4.4px 5.6px, transparent 6px), linear-gradient(180deg, #faf4e4, #e2d3ae);
@@ -1074,8 +1071,10 @@ input[type="range"]:focus-visible { outline: 2px solid var(--amber); outline-off
    the system's light or dark setting.
    ========================================================================== */
 :root[data-style="accordion"] {
-  --marble: url("assets/marble.svg") 0 0 / 600px 600px;
-  --pearl: url("assets/pearl.svg");
+  /* marble.webp and pearl.webp are marble.svg and pearl.svg rendered once at 2× (2026-10-13): the
+     SVGs' noise filters were re-run by the browser whenever a button repainted, which lagged on phones */
+  --marble: url("assets/marble.webp") 0 0 / 600px 600px;
+  --pearl: url("assets/pearl.webp");
   --mesh: radial-gradient(circle, rgba(45, 25, 5, 0.55) 0 0.85px, transparent 1.25px) 0 0 / 4px 4px, linear-gradient(180deg, #d4be88, #b2975b);
   --chrome: linear-gradient(180deg, #fdfcfa, #cbc6bc 45%, #f1eee8 55%, #968f84);
   --rim: 0 0 0 1px #1c0402, 0 0 0 3px #dcd7cd, 0 0 0 4px #2a0806;
@@ -1104,7 +1103,7 @@ input[type="range"]:focus-visible { outline: 2px solid var(--amber); outline-off
 
 /* the top bar: glossy celluloid over a chrome strip */
 [data-style="accordion"] .topbar {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.03) 42%, rgba(0, 0, 0, 0.2)), url("assets/marble.svg") -140px -60px / 600px 600px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.03) 42%, rgba(0, 0, 0, 0.2)), url("assets/marble.webp") -140px -60px / 600px 600px;
   background-color: #7a100c; border-bottom: 0;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
@@ -1145,7 +1144,7 @@ input[type="range"]:focus-visible { outline: 2px solid var(--amber); outline-off
 [data-style="accordion"] .seg-btn::before, [data-style="accordion"] .mini-btn.lamp::before, [data-style="accordion"] .side-title::before { display: none; }
 [data-style="accordion"] #edit-btn { display: none; }
 [data-style="accordion"] .mini-btn.add, [data-style="accordion"] .btn-primary {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.2)), url("assets/marble.svg") -50px -120px / 300px 300px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.2)), url("assets/marble.webp") -50px -120px / 300px 300px;
   background-color: #8a120c; color: #fff4dc; border-color: #2a0604; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
 }
 
@@ -1209,17 +1208,17 @@ input[type="range"]:focus-visible { outline: 2px solid var(--amber); outline-off
 }
 [data-style="accordion"] .block.is-on {
   transform: translateY(2px);
-  filter: brightness(1.12) saturate(1.1);
+  background-color: var(--c-lit, var(--c));
   background-image: radial-gradient(ellipse 80% 70% at 50% 45%, rgba(255, 252, 232, 0.45), rgba(255, 252, 232, 0) 72%), var(--pearl);
   background-size: 100% 100%, 260px 260px; background-blend-mode: normal, soft-light;
-  box-shadow: 0 0 0 1px #1c0402, 0 0 0 3px #fff6e6, 0 0 0 4px #2a0806, 0 0 26px 6px color-mix(in srgb, var(--c) 60%, transparent), inset 0 3px 6px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 0 0 1px #1c0402, 0 0 0 3px #fff6e6, 0 0 0 4px #2a0806, 0 0 26px 6px color-mix(in srgb, var(--c-lit, var(--c)) 60%, transparent), inset 0 3px 6px rgba(0, 0, 0, 0.28);
 }
 [data-style="accordion"] .block.is-on.out-of-scale {
   background-image: radial-gradient(ellipse 80% 70% at 50% 45%, rgba(255, 252, 232, 0.4), rgba(255, 252, 232, 0) 72%), repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.12) 0 6px, rgba(0, 0, 0, 0) 6px 12px), var(--pearl);
   background-size: 100% 100%, auto, 260px 260px; background-blend-mode: normal, normal, soft-light;
 }
 [data-style="accordion"] .block.is-on.bent, [data-style="accordion"] .block.is-on.modded {
-  box-shadow: var(--rim), inset 0 0 0 3px rgba(255, 250, 235, 0.95), 0 0 26px 6px color-mix(in srgb, var(--c) 60%, transparent);
+  box-shadow: var(--rim), inset 0 0 0 3px rgba(255, 250, 235, 0.95), 0 0 26px 6px color-mix(in srgb, var(--c-lit, var(--c)) 60%, transparent);
 }
 /* chord tones inside a chord: little round bass buttons */
 [data-style="accordion"] .block .tones i {
@@ -1256,7 +1255,7 @@ input[type="range"]:focus-visible { outline: 2px solid var(--amber); outline-off
 }
 [data-style="accordion"] .sheet::before { display: none; }
 [data-style="accordion"] .sheet-head {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(0, 0, 0, 0.15)), url("assets/marble.svg") -200px -300px / 600px 600px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(0, 0, 0, 0.15)), url("assets/marble.webp") -200px -300px / 600px 600px;
   background-color: #7a100c; border-bottom: 3px solid #d4cfc4; box-shadow: 0 1px 0 #1a0302;
 }
 [data-style="accordion"] .sheet-head h2 { font: 800 15px/1.2 var(--font-panel); letter-spacing: 0.12em; color: #f8eed6; text-shadow: 1px 1px 0 rgba(90, 20, 10, 0.95), 1px 3px 4px rgba(0, 0, 0, 0.5); }
@@ -1376,7 +1375,7 @@ input[type="range"]:focus-visible { outline: 2px solid var(--amber); outline-off
   display: inline-flex; align-items: center; gap: 7px; flex: 0 1 auto; min-width: 0;
   height: 30px; padding: 0 11px 0 6px; margin: 0 3px;
   border: 0; border-radius: 15px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0) 48%, rgba(0, 0, 0, 0.22)), url("assets/marble.svg") -90px -40px / 300px 300px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0) 48%, rgba(0, 0, 0, 0.22)), url("assets/marble.webp") -90px -40px / 300px 300px;
   background-color: #7a100c; color: #f8eed6;
   font: 700 10.5px/1 var(--font-panel); letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
@@ -1401,7 +1400,7 @@ input[type="range"]:focus-visible { outline: 2px solid var(--amber); outline-off
   position: absolute; left: 10px; right: 10px; z-index: 30;
   padding: 12px 12px 11px; overflow-y: auto; overscroll-behavior: contain;
   border-radius: 10px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(0, 0, 0, 0.2)), url("assets/marble.svg") -260px -120px / 600px 600px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(0, 0, 0, 0.2)), url("assets/marble.webp") -260px -120px / 600px 600px;
   background-color: #6a0d0a;
   box-shadow: 0 0 0 1px #1a0302, 0 0 0 4px #d4cfc4, 0 0 0 5px #1a0302, 0 16px 30px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   container-type: inline-size;
@@ -1587,7 +1586,7 @@ input[type="range"]:focus-visible { outline: 2px solid var(--amber); outline-off
 /* Volume and Close stay in reach when the drawer has to scroll */
 [data-style="accordion"] .reg-foot {
   position: sticky; bottom: -11px; margin: 0 -12px -11px; padding: 8px 14px 10px; z-index: 1;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.25)), url("assets/marble.svg") -260px -420px / 600px 600px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.25)), url("assets/marble.webp") -260px -420px / 600px 600px;
   background-color: #5e0b08; border-radius: 0 0 10px 10px;
   box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.12), 0 -6px 10px rgba(30, 3, 2, 0.35);
 }

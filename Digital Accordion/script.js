@@ -583,32 +583,50 @@ function setMod(m, on) {
   updateBend();
   paintChords();
 }
-/* Relabel chord blocks (and key caps) in place while modifiers are held. */
+/* Relabel chord blocks (and key caps) in place while modifiers are held — only the ones whose
+   name or notes change. A round button refits its own label, and a label never moves a button, so
+   the Buttons view is not refitted: that re-measured every button on each press and made the
+   lights lag, most of all on phones (2026-10-13). */
 function paintChords() {
+  let refit = false;
   $$('[data-side="chords"][data-block]').forEach(el => {
     const b = getBlock('chords', el.dataset.block); if (!b) return;
     const info = blockInfo('chords', b);
-    const main = $('.main', el); if (main) { setLabel(main, info.main); if (el.classList.contains('kcap')) fitCapLabel(main); else if (el._d) fitRoundLabel(el, el._d); }
-    const sub = $('.sub:not(.octmark)', el); if (sub && info.sub) sub.textContent = info.sub;
+    let changed = false;
+    const col = $('.tones', el);
+    if (col) {
+      const next = chordToneColumn(b);
+      if (next.innerHTML !== col.innerHTML) { if (next.children.length !== col.children.length) refit = true; col.replaceWith(next); changed = true; }
+    }
+    const sub = $('.sub:not(.octmark)', el); if (sub && info.sub && sub.textContent !== info.sub) { sub.textContent = info.sub; changed = true; }
     el.classList.toggle('modded', info.modded);
     el.classList.toggle('out-of-scale', !info.inScale);
-    const col = $('.tones', el); if (col) col.replaceWith(chordToneColumn(b));
+    const main = $('.main', el);
+    if (main && (changed || main.dataset.text !== info.main)) { setLabel(main, info.main); fitLabelInPlace(el, main); }
   });
   $$('.mod-btn').forEach(btn => btn.classList.toggle('on', heldMods.has(btn.dataset.mod)));
   $$('.kcap.mod').forEach(cap => cap.classList.toggle('is-on', heldMods.has(MOD_KEYS[cap.dataset.key])));
-  requestAnimationFrame(fitStage);
+  // (in Panels a chord gaining or losing a note changes its padding, and so its neighbours' widths)
+  if (refit && !isRound()) requestAnimationFrame(fitStage);
 }
 /* Relabel melody blocks and key caps in place — a re-render would drop
-   the pointer that is holding the chord. */
+   the pointer that is holding the chord. Only the notes a chord bends change. */
 function paintMelody() {
   $$('[data-side="melody"][data-block]').forEach(el => {
     const b = getBlock('melody', el.dataset.block); if (!b) return;
     const info = blockInfo('melody', b);
-    const main = $('.main', el); if (main) { setLabel(main, info.main); if (el._d) fitRoundLabel(el, el._d); }
-    const sub = $('.sub:not(.octmark)', el); if (sub && info.sub) sub.textContent = info.sub;
+    let changed = false;
+    const sub = $('.sub:not(.octmark)', el); if (sub && info.sub && sub.textContent !== info.sub) { sub.textContent = info.sub; changed = true; }
+    const main = $('.main', el);
+    if (main && (changed || main.dataset.text !== info.main)) { setLabel(main, info.main); fitLabelInPlace(el, main); }
     el.classList.toggle('bent', info.bent);
   });
-  requestAnimationFrame(fitStage);
+}
+/* a relabelled block, key cap or round button sizes its own label */
+function fitLabelInPlace(el, main) {
+  if (el.classList.contains('kcap')) fitCapLabel(main);
+  else if (el._d) fitRoundLabel(el, el._d, true);
+  else if (layout.view === 'panels' && el.closest('#stage')) fitBlockLabel(el);
 }
 
 function heldLatch(b) {
@@ -867,7 +885,20 @@ function isLightColour(hex) {
 }
 function paintCap(el, hex) {
   el.style.setProperty('--c', hex);
+  el.style.setProperty('--c-lit', litColour(hex));
   el.classList.toggle('ink-dark', isLightColour(hex));
+}
+/* A lit button's colour: what CSS's brightness(1.12) saturate(1.1) made of it, worked out once
+   here so that a press changes no filter (filters made every press lag on phones — 2026-10-13). */
+const litCache = {};
+function litColour(hex) {
+  if (typeof hex !== 'string' || hex.length < 7) return hex;
+  if (hex in litCache) return litCache[hex];
+  const c = [1, 3, 5].map(i => Math.min(1, parseInt(hex.slice(i, i + 2), 16) / 255 * 1.12));
+  const s = 1.1, M = [[0.213 + 0.787 * s, 0.715 - 0.715 * s, 0.072 - 0.072 * s],
+    [0.213 - 0.213 * s, 0.715 + 0.285 * s, 0.072 - 0.072 * s], [0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s]];
+  const out = M.map(r => Math.round(Math.max(0, Math.min(1, r[0] * c[0] + r[1] * c[1] + r[2] * c[2])) * 255));
+  return (litCache[hex] = '#' + out.map(v => v.toString(16).padStart(2, '0')).join(''));
 }
 
 function refreshScaleSelect() {
@@ -927,7 +958,7 @@ function renderStage() {
 function paintSignal() {
   const on = { chords: false, melody: false };
   activeCount.forEach((n, k) => { on[k.slice(0, k.indexOf('/'))] = true; });
-  document.body.classList.toggle('sounding', on.chords || on.melody);
+  $$('.bellows').forEach(b => b.classList.toggle('open', on.chords || on.melody));
   $$('.side').forEach(s => s.classList.toggle('sounding', !!on[s.dataset.side]));
 }
 /* Power-on: a lamp test sweeps the panel from bottom left to top right. */
@@ -1241,29 +1272,31 @@ function fitStage() {
   }
   placeDrawers();
   if (isRound()) { fitRound(stage); placeDrawers(); return; }
-  $$('.block', stage).forEach(el => {
-    const w = el.clientWidth, h = el.clientHeight;
-    const main = $('.main', el); if (!main) return;
-    const tones = $('.tones', el);
-    let toneW = 0;
-    if (tones) {
-      const n = tones.children.length || 3;
-      const gap = 3, inset = 8;
-      // fill the block's height, then cap by the block's width
-      const size = Math.max(12, Math.min((h - 2 * inset - gap * (n - 1)) / n, w * 0.26, 46));
-      tones.style.setProperty('--tone', size + 'px');
-      toneW = inset + size + 10;
-      el.style.paddingLeft = toneW + 'px';
-    }
-    let px = Math.min(h * 0.46, (w - toneW) * 0.42, 64);
-    const hasSub = !!$('.sub', el);
-    if (hasSub) px = Math.min(px, h * 0.36);
-    const tw = labelWidth(main.dataset.measure || main.textContent, px);
-    if (tw > (w - toneW) * 0.82) px = px * ((w - toneW) * 0.82) / tw;
-    px = Math.max(9, px);
-    main.style.fontSize = px + 'px';
-    const sub = $('.sub', el); if (sub) sub.style.fontSize = Math.max(8, px * 0.48) + 'px';
-  });
+  $$('.block', stage).forEach(fitBlockLabel);
+}
+/* Panels: a block's label (and chord notes) sized to the block. */
+function fitBlockLabel(el) {
+  const w = el.clientWidth, h = el.clientHeight;
+  const main = $('.main', el); if (!main) return;
+  const tones = $('.tones', el);
+  let toneW = 0;
+  if (tones) {
+    const n = tones.children.length || 3;
+    const gap = 3, inset = 8;
+    // fill the block's height, then cap by the block's width
+    const size = Math.max(12, Math.min((h - 2 * inset - gap * (n - 1)) / n, w * 0.26, 46));
+    tones.style.setProperty('--tone', size + 'px');
+    toneW = inset + size + 10;
+    el.style.paddingLeft = toneW + 'px';
+  }
+  let px = Math.min(h * 0.46, (w - toneW) * 0.42, 64);
+  const hasSub = !!$('.sub', el);
+  if (hasSub) px = Math.min(px, h * 0.36);
+  const tw = labelWidth(main.dataset.measure || main.textContent, px);
+  if (tw > (w - toneW) * 0.82) px = px * ((w - toneW) * 0.82) / tw;
+  px = Math.max(9, px);
+  main.style.fontSize = px + 'px';
+  const sub = $('.sub', el); if (sub) sub.style.fontSize = Math.max(8, px * 0.48) + 'px';
 }
 
 /* ---------- round buttons (Accordion style, Tower view) ----------
@@ -1541,12 +1574,15 @@ function roundMarks(d) {
   const kh = Math.max(12, Math.min(d * 0.17, 22)), mh = Math.max(7, Math.min(d * 0.085, 11));
   return { t, kh, mh, keyBottom: (1 - t) * (-0.4 * kh) + t * (0.08 * d), markTop: (1 - t) * (-0.3 * mh) + t * (0.085 * d) };
 }
-function fitRoundLabel(el, d) {
+function fitRoundLabel(el, d, relabel) {
   const main = $('.main', el); if (!main) return;
   const text = main.dataset.text || main.textContent;
   const sub = $('.sub', el), subText = sub ? sub.textContent : '';
   const ks = $('.keys', el);
-  const hasKey = !!(ks && ks.children.length && d >= 30 && getComputedStyle(ks).display !== 'none');
+  // (a relabel while playing keeps what the last fit saw: reading the style here makes the browser restyle once per button)
+  const hasKey = relabel && el._hasKey !== undefined ? el._hasKey
+    : !!(ks && ks.children.length && d >= 30 && getComputedStyle(ks).display !== 'none');
+  el._hasKey = hasKey;
   const oct = $('.oct', el), hasOct = !!(oct && d >= 26);
   let tones = $('.tones', el);
   el.classList.toggle('small', d < 30);   // too small for the key letter
