@@ -193,7 +193,7 @@
       const on = v === 'true';
       if (setLook('auto', on)) { draw('[data-tl="auto"]'); G.announce('Auto-Next Slide ' + (on ? 'on: the next one comes by itself.' : 'off.')); }
     } else if (a === 'reset') {
-      RR.device.teachLook = Object.assign(RR.clone(RR.TEACH_LOOK), { auto: !!RR.teachLook().auto, beat: RR.teachLook().beat }); RR.saveDevice();   // colours and letters only
+      RR.resetTeachLook();                                                // colours and letters only
       setLook('colour', RR.TEACH_LOOK.colour);
       draw('[data-tl="colour"].on');
       G.announce('The colors and letters are back.');

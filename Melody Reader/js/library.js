@@ -33,6 +33,13 @@
    its own, with ‹ back: Share & backup (the lesson link, which was
    Settings' Share tab, and the backups) and New melody (the set). In a
    lesson: what plays, Leave the lesson, and Settings.
+
+   The lesson link is for whatever is playing (2026-10-13, the user's: "the
+   ability to create a link to whatever it is they are doing — even
+   practice sessions, and songs and whatever"): a level, a session, a
+   battle, Generated, a set — and Practice's lessons and exercises and
+   Songs, which links couldn't carry before. Now playing has 🔗 Get a link
+   for it; the link is short (lesson.js), made as the name is typed.
    ========================================================================== */
 (function () {
   'use strict';
@@ -57,6 +64,7 @@
     levels: '<path d="M3 20h5v-5h5v-5h5V5h3"/>',
     prefs: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
     book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+    link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
     chev: '<path d="m9 6 6 6-6 6"/>'
   };
   /* each format's colour and the home page's card picture (home.js) */
@@ -96,17 +104,20 @@
 
   /* ---- what is playing ---- */
   function nowHtml() {
-    const m = G.mode, lesson = m.kind === 'lesson', page = !lesson && (m.kind !== 'teach' || !!G.sessionId());
+    const m = G.mode, lesson = G.inLesson(), page = !lesson && (m.kind !== 'teach' || !!G.sessionId());
     const words = m.kind === 'teach' ? RR.Teach.where() : G.battle ? plural(G.battle.teams.length, 'team') + ' · ' + plural(G.battle.rounds, 'round') : RR.gameText(G.setup);
     const away = RR.View && RR.View.current !== 'play';
+    const linkable = !lesson && !!RR.Lesson.current();
     return '<div class="lb-now" style="--band:' + (G.battle ? FMT.battle.col : G.modeColour()) + '"><i class="band-dot" aria-hidden="true"></i>' +
       '<span class="lb-now-txt"><span class="lb-now-k">Now playing</span><b>' + esc(G.modeLabel()) + '</b><small>' + esc(words) + '</small></span>' +
-      '<span class="lb-now-btns">' + (page ? act('page', '✎ Change it', '', 'soft') : '') + (away ? act('music', '▶ To the music', '', 'go') : '') + '</span></div>';
+      '<span class="lb-now-btns">' + (page ? act('page', '✎ Change it', '', 'soft') : '') +
+        (linkable ? act('link', svg(IC.link) + 'Get a link', '', 'soft lb-act-i', 'A link to what’s playing, for a class or a Google Site') : '') +
+        (away ? act('music', '▶ To the music', '', 'go') : '') + '</span></div>';
   }
 
   /* ---- the buttons (Song Writer 2.5's row) ---- */
   function btnsHtml() {
-    const shelf = !!window.EVMShelf && G.mode.kind !== 'lesson';
+    const shelf = !!window.EVMShelf && !G.inLesson();
     const soon = '<span class="lb-soon">soon</span>';
     return '<div class="lb-btns">' +
       '<button type="button" class="pill-btn primary lb-btn" data-lb="newmel">' + svg(IC.plus) + 'New melody</button>' +
@@ -149,7 +160,7 @@
 
   /* ---- My melodies: the Teacher Library's books, shared with you, your own ---- */
   function setRow(set) {
-    const playing = G.over && G.over.set === set.id && G.mode.kind !== 'lesson';
+    const playing = G.over && G.over.set === set.id && !G.inLesson();
     const n = set.melodies.length, times = Array.from(new Set(set.melodies.map(m => m.time[0] + '/4')));
     const tags = (RR.Sets.isShelf(set) ? '<span class="mel-tag book">Teacher Library</span>' : set.received ? '<span class="mel-tag">Shared</span>' : '') +
       (RR.TeachUnits.has(set.id) ? '<span class="mel-tag teach">Practice</span>' : '');
@@ -222,7 +233,7 @@
 
   /* ---- the Library ---- */
   function homeHtml() {
-    if (G.mode.kind === 'lesson') {
+    if (G.inLesson()) {
       return nowHtml() + '<div class="lb-lesson">' + RR.note('lb-lsn', 'This practice came from a lesson link. Leave the lesson to choose your own sessions, melodies and levels again.') +
         '<button type="button" class="pill-btn primary" data-lb="leave">Leave the lesson</button></div>' +
         '<div class="lb-prefs lb-prefs-open">' + RR.Settings.prefsHtml() + '</div>';
@@ -237,10 +248,48 @@
   }
 
   /* ---- Share & backup: the lesson link (Settings' Share tab, 2026-10-08), the melody sets' backups ---- */
+  /* the link of whatever is playing (lesson.js): Practice and Songs open where they are, or from the start */
+  let linkFrom = 'here', linkTok = 0, linkNow = '';
+  function linkHtml() {
+    const m = G.mode, teach = m.kind === 'teach', d = RR.Lesson.current(linkFrom);
+    if (!d) return '<div class="sec"><h3>A link to what you’re playing</h3><p class="note">There’s nothing in this to play yet — write its melodies first.</p></div>';
+    const own = !!d.m || !!d.ss, L = teach ? RR.teachLevel(m.id) : null;
+    const startAt = teach ? (m.song ? RR.Teach.range()[0] : 0) : 0;
+    const word = m.song ? 'slide' : 'exercise';
+    const what = teach ? (m.song ? 'the song' + (own ? ' (your melodies go inside the link)' : '') + ', its section, Practice and Auto-Next' : (L && L.unit ? 'your melodies (inside the link)' : 'the lesson')) +
+        ', the ' + word + ' it opens at, the look in Tools (colors, staff, letters, click or drum beat) and the tempo'
+      : 'the notes, the rhythms, the look and helps, the format, where the melodies come from' + (own ? ' (your My melodies sets go inside the link)' : '') + (G.battle ? ', the teams, turns and rounds' : '') + ' and the tempo';
+    const words = (teach ? RR.Teach.where().replace(/ · .*$/, '') : G.battle ? plural(G.battle.teams.length, 'team') + ' · ' + plural(G.battle.rounds, 'round') : RR.gameText(G.setup)) + ' · ' + G.tempo + ' BPM';
+    const seg = (list, cur) => '<div class="seg" role="group" aria-label="Where it opens">' + list.map(([v, w]) => '<button type="button" data-lb="link-from" data-v="' + v + '" class="' + (cur === v ? 'on' : '') + '" aria-pressed="' + (cur === v) + '">' + w + '</button>').join('') + '</div>';
+    return '<div class="sec lb-link"><h3>A link to what you’re playing</h3>' +
+      RR.note('sh', 'A link that opens Melody Reader on exactly this, as a lesson — ' + what + '. Nothing on the other computer changes them' + (teach && !m.song ? ', and each student’s checks and gold stars are their own' : '') + '. ' +
+        'The chip says Lesson, and the Library shows only Points, Sound and Leave the lesson. Post it for a class, or put it in a Google Site.') +
+      '<div class="lb-link-what" style="--band:' + (G.battle ? FMT.battle.col : G.modeColour()) + '"><i class="band-dot" aria-hidden="true"></i><span><b>' + esc(G.modeLabel()) + '</b><small>' + esc(words) + '</small></span></div>' +
+      '<div class="row"><span class="lbl">The lesson’s name</span><input type="text" id="lesson-name" maxlength="40" value="' + esc(RR.Lesson.defaultName()) + '" placeholder="Week 3"></div>' +
+      (teach && RR.Teach.at > startAt ? '<div class="row"><span class="lbl">It opens at</span>' + seg([['here', cap(word) + ' ' + (RR.Teach.at + 1) + ' — here'], ['start', m.song ? cap(word) + ' ' + (startAt + 1) + ' — ' + (startAt ? 'the section’s start' : 'the start') : 'The start']], linkFrom) + '</div>' : '') +
+      '<div class="row"><span class="lbl"></span><button type="button" class="pill-btn primary lb-copy" data-act="copy-link">' + svg(IC.link) + '<span>Copy the link</span></button><small class="lb-link-len" aria-live="polite"></small></div>' +
+      '<div class="row"><input type="text" id="lesson-link" readonly aria-label="The lesson link" placeholder="Making the link…"></div></div>';
+  }
+  const cap = w => w.charAt(0).toUpperCase() + w.slice(1);
+  /* the link in its box — made again as the name is typed (a short link is made asynchronously: the last one asked
+     for wins); a promise of it */
+  function refreshLink() {
+    const box = $('#lesson-name'), out = $('#lesson-link');
+    const d = RR.Lesson.current(linkFrom);
+    if (!out || !d) return Promise.resolve('');
+    const tok = ++linkTok;
+    linkNow = '';
+    const p = RR.Lesson.shortLink((box && box.value || '').trim() || 'Lesson', d);
+    p.then(l => {
+      if (tok !== linkTok) return;
+      linkNow = l; out.value = l;
+      const len = $('#mel-body .lb-link-len'); if (len) len.textContent = l.length.toLocaleString() + ' characters';
+    });
+    return p;
+  }
   function shareHtml() {
-    const teach = G.mode.kind === 'teach';
-    return (teach ? '<div class="sec"><h3>Lesson link</h3><p class="note">A lesson link carries a level, a session of Rounds, Games or Battle, or melodies you generated — not Practice or Songs yet. Play one of those, then come back here for its link.</p></div>'
-      : RR.Settings.shareHtml()) +
+    if (sub === 'share') Promise.resolve().then(refreshLink);       // once the page is drawn
+    return linkHtml() +
       '<div class="sec"><h3>Back up your melodies</h3>' + RR.note('lb-bk', 'All your melody sets in one file — keep it safe, or open it on another computer with Restore. Restoring adds what isn’t here, and never makes a second copy of a set.') +
       '<div class="lb-btns"><button type="button" class="pill-btn lb-btn" data-lb="backup">Download a backup</button>' +
       '<button type="button" class="pill-btn lb-btn" data-lb="restore">Restore from a backup</button></div></div>';
@@ -272,7 +321,7 @@
   Lib.back = () => { if (!sub) return false; sub = null; return true; };
   /* each time the Library opens: its first page, a fresh name for a session left unnamed */
   Lib.reset = function () {
-    sub = null; into = null;
+    sub = null; into = null; linkFrom = 'here';
     hint = RR.sessionName(RR.Sessions.list().map(x => x.name));
   };
   const draw = () => RR.Melodies.render();
@@ -307,11 +356,22 @@
     hint = RR.sessionName(RR.Sessions.list().map(x => x.name));
   };
 
+  /* the link onto the clipboard — asked for inside the click, the text to follow if it is still being made (Safari
+     refuses a copy made after the click is over; Song Writer 2.5's copyTextLater) */
+  async function copyText(text) {
+    if (typeof text !== 'string' && window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      try { await navigator.clipboard.write([new ClipboardItem({ 'text/plain': Promise.resolve(text).then(t => new Blob([t], { type: 'text/plain' })) })]); return true; } catch (_) { /* below */ }
+    }
+    const t = await text;
+    try { await navigator.clipboard.writeText(t); return true; } catch (_) { return false; }
+  }
   async function copyLink() {
-    const box = $('#lesson-name'), name = (box && box.value || '').trim() || 'Lesson', link = RR.Settings.lessonLink(name);
-    $('#lesson-link').value = link;
-    try { await navigator.clipboard.writeText(link); RR.toast('Lesson link copied'); }
-    catch (_) { $('#lesson-link').select(); RR.toast('Select the link and copy it'); }
+    const ok = await copyText(linkNow || refreshLink());
+    const b = $('#mel-body .lb-copy span');
+    if (ok) {
+      RR.toast('Lesson link copied');
+      if (b) { b.textContent = '✓ Copied'; setTimeout(() => { if (b.isConnected) b.textContent = 'Copy the link'; }, 2500); }
+    } else { const f = $('#lesson-link'); if (f) f.select(); RR.toast('Select the link and copy it'); }
   }
   function close() { if (RR.Melodies.isOpen()) RR.Melodies.close(); }
   const toMusic = () => RR.View.go('play');
@@ -330,7 +390,8 @@
       const again = document.querySelector('#mel-body .lb-fold[data-f="' + f + '"]'); if (again) again.focus();
     }
     else if (a === 'newmel') { sub = 'newmel'; into = null; draw(); scrollTop(); }
-    else if (a === 'share') { sub = 'share'; draw(); scrollTop(); }
+    else if (a === 'share' || a === 'link') { sub = 'share'; draw(); scrollTop(); if (a === 'link') { const f = $('#lesson-name'); if (f) f.focus(); } }
+    else if (a === 'link-from') { linkFrom = b.dataset.v === 'start' ? 'start' : 'here'; draw(); const f = $('#mel-body [data-lb="link-from"].on'); if (f) f.focus(); }
     else if (a === 'back') { sub = null; draw(); }
     else if (a === 'shelf') { if (window.EVMShelf) EVMShelf.openSheet(); }
     else if (a === 'students') RR.toast('Set up for students is coming soon');
@@ -375,7 +436,7 @@
   };
   /* typing in it: the lesson's name (its link follows), the volume */
   Lib.input = function (e) {
-    if (e.target.id === 'lesson-name') { $('#lesson-link').value = RR.Settings.lessonLink(e.target.value.trim() || 'Lesson'); return true; }
+    if (e.target.id === 'lesson-name') { refreshLink(); return true; }
     return RR.Settings.prefsInput(e);
   };
   /* Enter in a box does its button */

@@ -825,6 +825,74 @@
         five.length === 2 && five[0][0].id === 'snare' && five[0][0].gap === 40 && five[1][0].id === 'tom' && five[1][0].tick === 2 && five[1][0].gap === 40 &&
         rest.length === 2 && rest[1].length === 1 && rest[1][0].rest === true);
 
+      /* ---- links to whatever is playing (2026-10-13): short links, Practice and Songs, the look and the tempo ---- */
+      await (async function () {
+        const L = RR.Lesson, base = location.href.split(/[?#]/)[0];
+        const open = async href => { await L.unpack(href); return L.parse(href); };
+        // every level, short: the same practice back, and shorter than the long form
+        let same = true, short = 0, long = 0;
+        for (const l of RR.LEVELS) {
+          const p = RR.practiceOfLevel(l.n), d = { p: Object.assign(RR.clone(p), { set: null }), tempo: 96 };
+          const href = await L.shortLink('Week 3 — Café', d), back = await open(href);
+          if (!back || back.name !== 'Week 3 — Café' || JSON.stringify(back.practice) !== JSON.stringify(p) || back.tempo !== 96 || back.teach) same = false;
+          short += href.length; long += L.longLink('Week 3 — Café', d).length;
+        }
+        check('Short lesson links (deflated, after ~) round-trip every level with its tempo', L.canPack && same && short < long * 0.75,
+          'average ' + Math.round(short / RR.LEVELS.length) + ' characters, long form ' + Math.round(long / RR.LEVELS.length));
+        // Practice's lesson by name, where it opens, the look; Songs: a section, Practice, Auto-Next
+        const look = { colour: 'black', staff: 'all', labels: 'solfege', auto: true, beat: 'drums' };
+        const a = await open(await L.shortLink('Mi So La', { t: { id: 'L2', at: 2, look }, tempo: 88 }));
+        const b = await open(await L.shortLink('Buns', { t: { id: 'S:hot-cross-buns', at: 2, song: { from: 1, to: 2, practice: true, auto: false }, look } }));
+        check('A link carries Practice’s lesson (by name), the exercise it opens at, the Tools look and the tempo; Songs its song, section, Practice and Auto-Next',
+          a.teach.id === 'L2' && a.teach.at === 2 && JSON.stringify(a.teach.look) === JSON.stringify(look) && a.tempo === 88 && !a.teach.song && !a.bad &&
+          b.teach.id === 'S:hot-cross-buns' && b.teach.at === 2 && b.teach.song.from === 1 && b.teach.song.to === 2 && b.teach.song.practice === true && b.teach.song.auto === false);
+        // your own melodies go inside: a unit as 'U:lesson', a set played as a song as 'M:lesson' — built from the link, never an id
+        const mel = ps => ({ title: '', time: [4, 4], notes: ps.split(' ').map(p => ({ p, t: 4 })) });
+        const m = { title: 'Week 9', melodies: [mel('E4 G4 E4 G4'), mel('G4 A4 G4 E4'), mel('C4 D4 E4 C4')] };
+        const uHref = await L.shortLink('Week 9', { t: { id: 'U', at: 1, look }, m }), u = await open(uHref);
+        const s = await open(await L.shortLink('Week 9', { t: { id: 'M', song: { from: 0, to: 2, practice: false, auto: true }, look }, m }));
+        const MK = 'rainbow_reader_teach_v1', keep = localStorage.getItem(MK);
+        let built = null, marks = null;
+        try {
+          L.set = u.set; L.rev++;
+          const lv = RR.teachLevel('U:lesson');
+          built = lv && lv.ex.length === 3 && lv.kind === 'unit' && RR.teachLevel('M:lesson').kind === 'mset';
+          RR.TeachMarks.set('U:lesson', 1, 2); marks = RR.TeachMarks.get('U:lesson').join();
+        } finally {
+          L.set = null; L.rev++;
+          if (keep == null) localStorage.removeItem(MK); else localStorage.setItem(MK, keep);
+          RR.TeachMarks.load();
+        }
+        check('Your own melodies go inside a Practice or Songs link — a unit plays as U:lesson, a set as a song as M:lesson, built from the link (marks by melody)',
+          u.teach.id === 'U:lesson' && u.set.melodies.length === 3 && u.set.id === 'lesson' && s.teach.id === 'M:lesson' && built && marks === '0,2,0' &&
+          !RR.teachLevel('U:lesson'), uHref.length + ' characters for three melodies');
+        // what can't be played opens nothing: cut short, a lesson this app doesn't have, a unit without its melodies
+        const cut = await open(uHref.slice(0, -12));
+        const gone = await open(await L.shortLink('X', { t: { id: 'L9' } }));
+        const noSet = await open(await L.shortLink('X', { t: { id: 'U' } }));
+        const junk = await open(base + '?lesson=X&z=~not-deflate');
+        check('A short link cut short, or naming a lesson or song that isn’t here, or a unit without its melodies, opens nothing (lost: the app opens as usual and says so)',
+          cut.lost && gone.lost && noSet.lost && junk.lost && L.needsUnpack(uHref) && !L.needsUnpack(base + '?lesson=X&p=e30'));
+        // the long form (a browser that can't deflate) carries Practice and the tempo too; a look and a tempo out of range are made safe
+        const lf = L.parse(L.longLink('Old way', { t: { id: 'A2', at: 9, look: { colour: 'neon', beat: 'drums' } }, tempo: 400 }));
+        check('The long form carries Practice too; an unknown look part becomes the usual one, a tempo is snapped to the dial',
+          lf.teach.id === 'A2' && lf.teach.at === 9 && lf.teach.look.colour === RR.TEACH_LOOK.colour && lf.teach.look.beat === 'drums' && lf.tempo === RR.TEMPO.MARKS[RR.TEMPO.MARKS.length - 1]);
+        // a lesson's look is the lesson's: Tools changes it, never this browser's own
+        const DK = RR.KEY.device, dkeep = localStorage.getItem(DK), was = RR.clone(RR.device.teachLook || null);
+        try {
+          RR.lessonLook = RR.cleanTeachLook(look);
+          RR.setTeachLook('colour', 'lit');
+          const inLesson = RR.teachLook().colour === 'lit' && RR.lessonLook.colour === 'lit' && JSON.stringify(RR.device.teachLook || null) === JSON.stringify(was);
+          RR.resetTeachLook();
+          const reset = RR.lessonLook.colour === RR.TEACH_LOOK.colour && RR.lessonLook.beat === 'drums' && JSON.stringify(RR.device.teachLook || null) === JSON.stringify(was);
+          RR.lessonLook = null;
+          check('In a lesson Tools changes the lesson’s look only (↺ too); this browser’s look is left as it was', inLesson && reset);
+        } finally {
+          RR.lessonLook = null; RR.device.teachLook = was || undefined;
+          if (dkeep == null) localStorage.removeItem(DK); else localStorage.setItem(DK, dkeep);
+        }
+      })();
+
       document.getElementById('sum').innerHTML = '<span class="' + (fail ? 'fail' : 'pass') + '">' + pass + ' passed, ' + fail + ' failed</span>';
       document.title = (fail ? 'FAIL ' : 'PASS ') + document.title;
     })();

@@ -34,7 +34,7 @@
   /* what is playing, for the drop-down */
   function what() {
     const m = G.mode;
-    if (m.kind === 'lesson') return 'lesson';
+    if (G.inLesson()) return 'lesson';
     if (m.kind === 'teach') return 'teach';
     if (G.battle) return 'battle';
     if (G.setup.game === 'song') return 'songs';
@@ -133,7 +133,7 @@
   }
 
   function open() {
-    if (G.mode.kind === 'lesson') { RR.Settings.open('leave'); return; }
+    if (G.inLesson()) { RR.Settings.open('leave'); return; }
     if (!el) {
       el = document.createElement('div');
       el.className = 'modal drop-modal'; el.hidden = true;

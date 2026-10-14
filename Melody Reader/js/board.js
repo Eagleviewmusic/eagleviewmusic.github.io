@@ -98,7 +98,7 @@
       show('<div class="rd-card bt-card"><div class="bt-kicker">⚔️ Battle</div><h3>' + RR.esc(G.mode.name) + '</h3>' +
         '<div class="rd-sub">' + b.rounds + (b.rounds === 1 ? ' round' : ' rounds') + ' · ' + each + ' a turn · ' + b.teams.length + ' teams</div>' +
         '<div class="bt-teams">' + b.teams.map(teamName).join('') + '</div>' +
-        '<div class="rd-btns">' + go.replace('— Go ▸', 'first — Go ▸') + (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn" data-rd="battle-edit">Change the teams</button>') + '</div></div>');
+        '<div class="rd-btns">' + go.replace('— Go ▸', 'first — Go ▸') + (G.inLesson() ? '' : '<button type="button" class="pill-btn" data-rd="battle-edit">Change the teams</button>') + '</div></div>');
       G.announce('Battle! ' + b.teams.map(x => x.name).join(', ') + '. ' + t.name + ' goes first.');
     } else if (at.team === 0) {
       show('<div class="rd-card bt-card"><div class="bt-kicker">⚔️ Round ' + at.round + ' of ' + b.rounds + ' done</div><h3>Round ' + (at.round + 1) + '</h3>' +
@@ -119,7 +119,7 @@
     show('<div class="rd-card bt-card bt-over"><div class="bt-kicker">⚔️ Battle over — ' + (top.length === 1 ? 'the winner' : 'a tie!') + '</div>' +
       (top.length === 1 ? '<h3 class="bt-who" style="--tc:' + top[0].colour + '">🏆 ' + RR.esc(top[0].name) + '</h3>' : '<h3>🏆 ' + top.map(t => RR.esc(t.name)).join(' and ') + '</h3>') +
       '<div class="rd-sub">' + RR.esc(G.mode.name) + ' · ' + b.rounds + (b.rounds === 1 ? ' round' : ' rounds') + '</div>' + tableHtml(list) +
-      '<div class="rd-btns"><button type="button" class="pill-btn go" data-rd="battle-new">Battle again</button>' + (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn" data-rd="battle-edit">Change the battle</button>') + HOME_BTN + '</div></div>');
+      '<div class="rd-btns"><button type="button" class="pill-btn go" data-rd="battle-new">Battle again</button>' + (G.inLesson() ? '' : '<button type="button" class="pill-btn" data-rd="battle-edit">Change the battle</button>') + HOME_BTN + '</div></div>');
     G.announce('Battle over. ' + (top.length === 1 ? 'The winner: ' + top[0].name + '. ' : 'A tie: ' + top.map(t => t.name).join(' and ') + '. ') + list.map(t => t.name + ' ' + scoreText(t)).join(', ') + '.');
     if (RR.device.celebrate) RR.Sound.celebrate(3);
   }
@@ -150,7 +150,7 @@
       (ready ? '<div class="rd-ready">Ready for the next level!</div>' : '') +
       '<div class="rd-btns">' + (whole ? '<button type="button" class="pill-btn go" data-rd="song" data-label="' + (set ? '▶ Hear the whole set' : items.length > 1 ? '▶ Hear your songs' : '▶ Hear your song') + '">' + (set ? '▶ Hear the whole set' : items.length > 1 ? '▶ Hear your songs' : '▶ Hear your song') + '</button>' : '') +
       '<button type="button" class="pill-btn" data-rd="again">Play again</button>' +
-      (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn" data-rd="settings">Library</button>') + HOME_BTN +
+      (G.inLesson() ? '' : '<button type="button" class="pill-btn" data-rd="settings">Library</button>') + HOME_BTN +
       (ready ? '<button type="button" class="pill-btn go" data-rd="next">Level ' + (G.mode.n + 1) + ' ▸</button>' : '') + '</div></div>');
     G.announce((whole ? 'You played all of ' + whole + '. ' : 'Round done. ') + (RR.device.stars ? golds + (golds === 1 ? ' gold star. ' : ' gold stars. ') : '') + (RR.device.points ? total + ' points. ' : '') + (ready ? 'Ready for the next level.' : ''));
   }
@@ -164,7 +164,7 @@
       '<div class="rd-stats"><div><b>' + c.notes + '</b>notes</div><div><b>' + c.melodies + '</b>melodies</div><div><b>' + c.clean + '</b>clean</div>' +
       (RR.device.points ? '<div><b>' + pts + '</b>points</div>' : '') + '</div>' +
       '<div class="rd-btns"><button type="button" class="pill-btn go" data-rd="again">Go again</button>' +
-      (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn" data-rd="settings">Library</button>') + HOME_BTN + '</div></div>');
+      (G.inLesson() ? '' : '<button type="button" class="pill-btn" data-rd="settings">Library</button>') + HOME_BTN + '</div></div>');
     G.announce('Time’s up. ' + c.notes + ' notes, ' + c.melodies + ' melodies, ' + c.clean + ' clean.');
   }
 
@@ -226,7 +226,7 @@
         return '<div class="tb' + (pc === null ? ' none' : '') + '" style="--c:' + b.colour + '" title="' + b.id + (pc === null ? ' — not played yet' : ' — ' + pc + '% first time') + '"><em>' + (pc === null ? '' : pc + '%') + '</em><i style="height:' + (pc === null ? 8 : Math.max(8, pc * 0.7)) + '%"></i><span>' + b.letter + '</span></div>';
       }).join('') + '</div>' +
       (mix.length ? '<ul class="mixups">' + mix.map(m => { const [a, b] = m[0].split('>'); return '<li>You played ' + pill(b) + ' for ' + pill(a) + ' ' + m[1] + (m[1] === 1 ? ' time' : ' times') + '</li>'; }).join('') + '</ul>' : '') +
-      (G.mode.kind === 'lesson' ? '' : '<button type="button" class="pill-btn' + (G.setup.tricky ? ' go' : ' primary') + '" data-board="tricky">' + (G.setup.tricky ? '✓ Practising these' : 'Practise these') + '</button>') + '</div>' +
+      (G.inLesson() ? '' : '<button type="button" class="pill-btn' + (G.setup.tricky ? ' go' : ' primary') + '" data-board="tricky">' + (G.setup.tricky ? '✓ Practising these' : 'Practise these') + '</button>') + '</div>' +
       '<div class="panel wide"><h3>Totals</h3><div class="tiles"><div class="tile"><b>' + (tot.melodies | 0) + '</b><span>melodies read</span></div><div class="tile"><b>' + (tot.notes | 0) + '</b><span>notes read</span></div>' +
       '<div class="tile"><b>' + acc + '%</b><span>first try</span></div><div class="tile tile-btn"><button type="button" class="pill-btn go" data-board="stats">📊 All my stats ▸</button></div></div></div>';
   }

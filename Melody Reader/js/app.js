@@ -14,7 +14,9 @@
                     (2026-10-12: was ♫ My melodies and the gear) · ‹ Home ·
                     the Melody Reader name (the home page)
      the start      a lesson link if the address has one (straight to the
-                    music); else the practice or level this browser was
+                    music — a practice, or since 2026-10-13 Practice or
+                    Songs, at the link's tempo; a short link is read first,
+                    lesson.js); else the practice or level this browser was
                     last on, and the home page (home.js, 2026-10-07)
      the views      the keys above belong to the music; on the home page
                     and My stats they do nothing (Escape on My stats goes
@@ -155,7 +157,7 @@
   }
   /* the shelf took a set away (a book put back) that was being played: play the level again */
   function shelfChanged() {
-    if (G.setup.set && G.mode.kind !== 'lesson' && !RR.Sets.get(G.setup.set)) G.playOnce('set', null);
+    if (G.setup.set && !G.inLesson() && !RR.Sets.get(G.setup.set)) G.playOnce('set', null);
     RR.Melodies.render(); G.drawChips(); RR.View.render();
   }
 
@@ -164,7 +166,13 @@
     const lesson = RR.Lesson.fromUrl();
     let got = null;
     if (lesson) {
-      G.usePractice(lesson.practice, { kind: 'lesson', name: lesson.name }, lesson.battle);
+      const t = lesson.teach;
+      if (t) {
+        // Practice or Songs: its look for as long as the lesson is open, where it opens, its section and ways
+        RR.lessonLook = t.look;
+        RR.Teach.start(t.id, t.at, t.song || undefined, { lesson: { name: lesson.name } });
+      } else G.usePractice(lesson.practice, { kind: 'lesson', name: lesson.name }, lesson.battle);
+      if (lesson.tempo) G.tempo = lesson.tempo;      // the tempo dial where the link's maker had it
       document.title = lesson.name + ' · Melody Reader';
     } else {
       got = RR.Sets.receiveFromUrl();
@@ -175,6 +183,8 @@
     if (got) arrived(got);
     if (window.self !== window.top) document.documentElement.classList.add('in-iframe');
   }
-  start();
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => G.draw());
+  const fonts = () => { if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => G.draw()); };
+  // a short lesson link is inflated first (asynchronously — lesson.js)
+  if (RR.Lesson.needsUnpack()) RR.Lesson.unpack().then(start, start).then(fonts);
+  else { start(); fonts(); }
 })();

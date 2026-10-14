@@ -146,7 +146,7 @@
 
   /* ---- the top: hello, Play / Carry on, the totals ---- */
   function heroHtml() {
-    const who = RR.Players.current(), lesson = G.mode.kind === 'lesson';
+    const who = RR.Players.current(), lesson = G.inLesson();
     const me = RR.History.me(), streak = RR.History.dayStreak(me.days);
     const over = roundOver();
     let go = '▶ Play', sub = '';
@@ -154,6 +154,7 @@
       // Practice: its lesson and the exercise it is on; Songs: the song and the slide
       if (G.mode.song ? RR.Teach.at > (G.mode.from | 0) : RR.TeachMarks.get(G.mode.id).some(Boolean)) go = '▶ Carry on';
       sub = esc(G.modeLabel()) + ' · ' + esc(RR.Teach.where());
+      if (lesson) go = '▶ Play the lesson';
     } else if (G.battle) {
       const part = G.round.length > 0 && !over;
       go = part ? '▶ Carry on the battle' : '▶ Start the battle';
@@ -218,7 +219,7 @@
     return '<section class="h-sec" aria-labelledby="h-make"><div class="h-head"><h2 id="h-make">Make your own</h2></div><div class="mode-grid make">' +
       card('mel', 'My melodies', 'Write your own melodies on the xylophone, in sets — then play them.', '', sets.length ? plural(sets.length, 'set') + ' · ' + plural(mel, 'melody', 'melodies') : '', '<button type="button" class="mc-play" data-h="melodies">Open</button>') +
       card('ses', 'A new session', 'Practice, Rounds, Songs, Games or a Battle — set up your way, and kept by name in the Library.', '', '', '<button type="button" class="mc-play" data-h="new-session">+ New session</button>') +
-      card('link', 'A lesson link', 'Send what you’re playing to a class or a family as a link.', '', '', '<button type="button" class="mc-play" data-h="share">Make a link</button>') +
+      card('link', 'A lesson link', 'Send what you’re playing — a level, a session, a Practice lesson, a song — to a class or a family as a link.', '', '', '<button type="button" class="mc-play" data-h="share">Make a link</button>') +
       '</div></section>';
   }
 
@@ -249,7 +250,7 @@
 
   function render() {
     const el = $('#home'); if (!el || View.current !== 'home') return;
-    const y = el.scrollTop, lesson = G.mode.kind === 'lesson';
+    const y = el.scrollTop, lesson = G.inLesson();
     el.innerHTML = '<div class="h-wrap">' + heroHtml() + (lesson ? '' : howHtml() + makeHtml()) + statsHtml() + '</div>';
     el.scrollTop = y;
     fillCharts();
@@ -275,7 +276,7 @@
       '<footer class="sheet-foot"><button type="button" class="pill-btn" data-bw="close">Close</button></footer></div>';
   }
   function openBattles() {
-    if (G.mode.kind === 'lesson') { go('play'); return; }
+    if (G.inLesson()) { go('play'); return; }
     if (!batEl) {
       batEl = document.createElement('div');
       batEl.className = 'modal pick-modal battles-modal'; batEl.hidden = true;
@@ -385,7 +386,7 @@
     const f = focusSel && pickEl.querySelector(focusSel); if (f) f.focus();
   }
   function openPick(fmt) {
-    if (G.mode.kind === 'lesson') { go('play'); return; }
+    if (G.inLesson()) { go('play'); return; }
     if (!pickEl) {
       pickEl = document.createElement('div');
       pickEl.className = 'modal pick-modal'; pickEl.hidden = true;

@@ -51,7 +51,10 @@ practices and the Practice look, compound and triplet slots) — 146, all passin
 (each against the user's files — the newest beat for a meter wins — a beat of more than a bar going round, a resting
 bar) — 149, all passing on 2026-10-13. Everything editable from the Library (the app's songs and lessons read as sets,
 a change makes "(my copy)", "(my copy 2)", copies after their originals in Songs and Practice, a lesson's copy kept one
-of Practice's, your exercises left alone) — 157, all passing on 2026-10-13 (with a copy saved or not).
+of Practice's, your exercises left alone) — 157, all passing on 2026-10-13 (with a copy saved or not). Links to
+whatever is playing (short links for every level with the tempo, Practice's lessons and Songs with their section and
+look, your own melodies inside as `U:lesson` / `M:lesson`, links that can't be played opening nothing, the long form,
+the lesson's own look) — 163, all passing on 2026-10-13.
 
 The Teacher Library shelf reads `../Teacher Library/index.json`, which only
 exists on the live site; served from its own folder (8815/8816) it can't be
@@ -62,6 +65,56 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 — and delete it afterwards.
 
 ## What's built (all six phases)
+
+- **A link to whatever is playing** (2026-10-13, the user's: "give the
+  user the ability to create a link to whatever it is they are doing —
+  even practice sessions, and songs and whatever"). The lesson link now
+  carries everything that can be on the music, not just practices:
+  - **What it carries**: a level (your changes to it too), a session —
+    Rounds, Games, Battle, and now **Practice** and **Songs** sessions —
+    Generated melodies, a melody set, a format played just this time; and
+    **Practice's lessons and your exercises** and **Songs** (a Songbook
+    song or a set of yours played as a song). Practice and Songs travel as
+    `t` (lesson.js): Practice's six lessons and the Songbook's songs by
+    name ('L2', 'S:hot-cross-buns'); your own — an exercise, your copy of a
+    lesson or a song, a set played as a song — with their melodies inside
+    the link, never an id (they play as `U:lesson` / `M:lesson`, in memory,
+    like a lesson's set). With them go the exercise or slide it opens at,
+    a song's section, Practice and Auto-Next, and the **Tools look**
+    (Note Colors, Staff Color, Text Below, Auto-Next, Click or Drum beat).
+    **Every link carries the tempo dial's tempo** too.
+  - **Opening one**: straight to the music as a lesson, as before — "Lesson ·
+    Week 3", Settings = Lesson · Points · Sound, the Library = Now playing,
+    Leave the lesson, Settings; nothing kept as this browser's place
+    (`G.inLesson()`: `kind: 'lesson'`, or Practice / Songs with
+    `mode.lesson`). Practice from a link: the lesson's look while it is
+    open (`RR.lessonLook` — Tools changes it just for then, ↺ too; this
+    browser's own look is untouched), no going on to the next level from
+    its end card, no Another song at a song's end; switching players keeps
+    the lesson and the tempo. Each student's checks and gold stars on
+    Practice's lessons are their own (an exercise from a link: by melody,
+    under `U:lesson`).
+  - **Making one**: 🔗 **Get a link** on the Library's Now playing (new), or
+    Share & backup, or the home page's *A lesson link* card — all the same
+    page: what it opens (with the tempo), the lesson's name (it starts as
+    the level's, session's, lesson's or song's), **It opens at** — *here*
+    (the exercise or slide you're on, the default) or *the start* (shown
+    only when you're past the start; a Practice lesson's start is each
+    student's first not yet played) — Copy the link, and how long it is.
+  - **Short links** (as Song Writer 2.5's of the same day — a long link can
+    be cut short on its way into a Google Site): everything in one deflated
+    JSON after `z=~` (`CompressionStream('deflate')`, base64url) — a level
+    ~530 characters (the long form ~870), a Practice lesson ~190, three
+    melodies of your own ~290. app.js waits for `RR.Lesson.unpack()` before
+    it starts. A browser that can't deflate makes the long form (`p= m= ss=
+    b= t= tempo=`); every older link still opens. A short link that can't be
+    read — cut short, or naming a lesson or song this app doesn't have —
+    opens the app as usual with a message (*That lesson link didn't come
+    through whole …*), never a lesson of defaults.
+  - Settings' Share tab's code moved into the Library (`library.js
+    linkHtml`; `RR.Settings.shareHtml` / `lessonLink` are gone); the
+    Library's link name box got the family's input style. `RR.toast(text,
+    ms)` takes a duration.
 
 - **Everything editable from the Library** (2026-10-13, the user's: "I
   notice that from the library, I cannot edit any of the songs or Practice
@@ -916,7 +969,9 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   *Practise these*, totals, Reset.
 - **Lesson links** — Share → a link that opens the practice as a lesson,
   with every setting, its melody sets (as melodies) and a battle's teams
-  (2026-10-08).
+  (2026-10-08); since 2026-10-13 of whatever is playing — Practice and
+  Songs too — with the tempo, and short (see *A link to whatever is
+  playing* at the top).
 - **My melodies** (the ♫ button until 2026-10-12; now the Library's My
   melodies folder) — melody **sets** kept by the family's EVM
   Library rules: + New set, rename, reorder, delete; ▶ Play this set (with
@@ -1026,7 +1081,7 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 | `tests/drum-beats/` | each drum beat's Ostinato Builder backup, as the user made it |
 | `js/settings.js`, `js/board.js` | the ✎ page window (a session's Format first, 2026-10-12) with Points and Sound — their sections also drawn in the Library; the Score board, Round done, Time's up |
 | `js/library.js` | the Library (2026-10-12): Now playing, the buttons, + New session, the folders, Share & backup, New melody; `RR.Library.open/newSession/newMelody` |
-| `js/lesson.js`, `js/app.js` | lesson links; the keys, the buttons, the start |
+| `js/lesson.js`, `js/app.js` | lesson links — of whatever is playing, short (`z=~`), Practice and Songs as `t` (2026-10-13); the keys, the buttons, the start (after a short link is read) |
 | `js/sets.js` | My melodies' data: melody sets by the EVM Library rules, links, backups, the shelf; the app's own songs and lessons as sets (`songbook:`/`practice:`) and your copies of them (copy on the first change, `copyOf`, `onCopied`, 2026-10-13) |
 | `js/melodies.js`, `js/maker.js` | the Library's window (`#melodies`, was My melodies) and a melody set's page in it; Make a melody |
 | `js/players.js` | names on a shared computer |
@@ -1067,6 +1122,21 @@ way). Every read is checked and
 falls back to defaults; a change of shape gets a new `_v2` key.
 
 ## Traps (found while building)
+
+- **Links (2026-10-13).** "Is a lesson open?" is `G.inLesson()`, not
+  `G.mode.kind === 'lesson'`: Practice and Songs from a link play as
+  `kind: 'teach'` with `mode.lesson`. Anything that restarts a teach level
+  drops the lesson unless it passes `{ lesson }` as `RR.Teach.start`'s
+  fourth argument (`G.switchPlayer` does, and puts the tempo back —
+  `usePractice` resets it). `remember()` returns at once in a lesson, so a
+  lesson never becomes the browser's place. Practice's look in a lesson is
+  `RR.lessonLook` (cleared by Leave the lesson); write the look only
+  through `RR.setTeachLook` / `RR.resetTeachLook`, never into
+  `device.teachLook` directly. A short link is inflated asynchronously:
+  `RR.Lesson.parse` reads it only after `RR.Lesson.unpack(href)` (app.js
+  does this before `start()`; the tests await it). `U:lesson` is the one
+  unit not in `RR.TeachUnits` — teach-data.js's `unitLevel` lets the key
+  `lesson` through, and its cache stamp includes `RR.Lesson.rev`.
 
 - **The Library and session formats (2026-10-12).** "Is a session
   playing?" is `G.sessionId()`, not `G.mode.kind === 'session'`: a

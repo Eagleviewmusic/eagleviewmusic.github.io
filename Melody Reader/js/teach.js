@@ -110,13 +110,15 @@
   /* a level at an exercise (a reload, the window's Start at) — or at the first not yet played. A unit with
      no melodies can't be started (false) */
   /* `extra`: { session: { id, name } } — a session of yours played this way (2026-10-12: its Format is Practice
-     or Songs); it names what plays, and its ✎ page is the session's */
+     or Songs); it names what plays, and its ✎ page is the session's. { lesson: { name } } — a lesson link's
+     (2026-10-13, lesson.js): played as a lesson, never kept as this browser's place */
   T.start = function (id, at, song, extra) {
     const L = RR.teachLevel(id) || RR.TEACH[0];
     if (!L.ex.length) return false;
     RR.Tools.kbd(false); RR.Tools.close(); cancelAuto();
     T.id = L.id;
-    const mode = Object.assign({ kind: 'teach', id: L.id }, extra && extra.session ? { session: extra.session } : {});
+    const mode = Object.assign({ kind: 'teach', id: L.id }, extra && extra.session ? { session: extra.session } : {},
+      extra && extra.lesson ? { lesson: { name: String(extra.lesson.name || 'Lesson').slice(0, 40) } } : {});
     if (song) {
       // Songs: its section (the whole song unless picked), Practice and Auto-Next as chosen (Off and On to begin with)
       const n = L.ex.length, a = Math.max(0, Math.min(n - 1, song.from | 0)), b = Math.max(a, Math.min(n - 1, song.to == null ? n - 1 : song.to | 0));
@@ -343,7 +345,7 @@
     G.stopHear(true); RR.Beat.stop(); clearTimeout(G.practiceT); RR.Tools.close(); cancelAuto();
     const L = lv(), m = marks(), n = m.length, gold = m.filter(x => x === 2).length, all = gold === n;
     const played = m.filter(Boolean).length, left = n - played;
-    const nexts = nextsOf(L);
+    const nexts = G.inLesson() ? [] : nextsOf(L);          // a lesson link's lesson is the lesson: no going on to another
     // moved on before playing them all (free to, since 2026-10-11): which are left, and a way back to them
     const leftNums = m.map((x, i) => x ? 0 : i + 1).filter(Boolean).map(String);
     const leftWords = leftNums.length > 6 ? numWord(left) : andList(leftNums);
@@ -380,7 +382,7 @@
       '<h3>You played ' + esc(L.title) + '!</h3><p class="te-say">' + say + '</p>' +
       '<div class="rd-btns"><button type="button" class="pill-btn go" data-songend="hear" data-label="▶ Hear your song">▶ Hear your song</button>' +
         '<button type="button" class="pill-btn primary" data-songend="again">↻ Play it again</button>' +
-        '<button type="button" class="pill-btn" data-songend="other">Another song</button>' +
+        (G.inLesson() ? '' : '<button type="button" class="pill-btn" data-songend="other">Another song</button>') +
         '<button type="button" class="pill-btn" data-songend="home">' + RR.HOME_SVG + 'Home</button></div></div>';
     el.hidden = false;
     G.overlay = true;

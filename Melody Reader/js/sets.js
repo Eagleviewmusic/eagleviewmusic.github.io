@@ -252,7 +252,7 @@
     if (!window.EVMShelf) return;
     EVMShelf.init({
       app: APP,
-      disabled: !!(RR.Game && RR.Game.mode && RR.Game.mode.kind === 'lesson'),
+      disabled: !!(RR.Game && RR.Game.inLesson && RR.Game.inLesson()),
       load, save,
       incoming: rec => normalize(Object.assign({}, rec), rec.id),
       key,

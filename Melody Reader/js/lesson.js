@@ -1,32 +1,58 @@
 /* ==========================================================================
    Melody Reader — lesson.js
    --------------------------------------------------------------------------
-   RR.Lesson — a practice shared as a link (DESIGN §15, ENGINE §8):
+   RR.Lesson — whatever is playing, shared as a link (DESIGN §15, ENGINE §8):
 
-     ?lesson=Week%203&p=<base64url of the practice>
-                     [&m=<base64url of { title, melodies }>]
-                     [&ss=<base64url of [{ title, melodies }, …]>]
-                     [&b=<base64url of { teams, per, rounds }>]
+     ?lesson=Week%203&z=~<deflated base64url of { p, m, ss, b, t, tempo }>
 
-   Opening one plays that practice as a lesson: the chip reads "Lesson ·
-   Week 3", Settings shows only the Lesson, Points and Sound tabs, scores
-   are kept under the lesson's name, and the player's own saved practice is
-   left as it was. Leave the lesson goes back to it. For focus, not
-   security — there is no password.
+   Opening one plays it as a lesson: the chip reads "Lesson · Week 3",
+   Settings shows only the Lesson, Points and Sound tabs, scores are kept
+   under the lesson's name, and the player's own saved practice is left as
+   it was. Leave the lesson goes back to it. For focus, not security —
+   there is no password.
 
    Everything that decides what is played travels (2026-10-08, the user's:
-   "I want all the exact settings to come through in that link"): the whole
-   practice — every field, not just those that differ from today's
-   defaults, so a later change of default can't change an old link — the
-   melody set it plays (`m`), the My melodies sets its Song format plays
-   (`ss`, picked as 'set:lesson_1' …), and a battle's teams, turns and
-   rounds (`b`). The browser's own things stay the student's: the sound,
-   the volume, Points / Gold stars shown or not, the players.
+   "I want all the exact settings to come through in that link"):
+
+     p       the whole practice — every field, not just those that differ
+             from today's defaults, so a later change of default can't
+             change an old link
+     m       the melody set it plays, as its melodies
+     ss      the My melodies sets its Song format plays (picked as
+             'set:lesson_1' …)
+     b       a battle's teams, turns and rounds
+     t       (2026-10-13, the user's: "a link to whatever it is they are
+             doing — even practice sessions, and songs and whatever")
+             Practice or Songs instead of a practice: { id, at, song, look }
+             — one of Practice's six lessons ('L2') or a Songbook song
+             ('S:hot-cross-buns') by name; one of your own (an exercise, your
+             copy of a lesson or a song, a set played as a song) as 'U' or
+             'M' with its melodies in `m`; where it opens (`at`: the exercise
+             or slide); a song's section, Practice and Auto-Next; the Tools
+             look (colours, staff, letters, Auto-Next, click or drum beat)
+     tempo   the tempo dial's tempo (2026-10-13)
+
+   A session played the Practice or Songs way travels as that lesson or
+   song, under the session's name. The browser's own things stay the
+   student's: the sound, the volume, Points / Gold stars shown or not, the
+   players, the checks and gold stars a student has on Practice's lessons.
+
+   SHORT LINKS (2026-10-13, as Song Writer 2.5's of the same day: a long
+   link can be cut short on its way into a Google Site). Everything is one
+   JSON, deflated (the browser's CompressionStream) and written after a '~'
+   in `z` — a level's about 40% shorter (~530 characters); with melodies
+   inside, under a third as long.
+   Inflating is asynchronous, so app.js waits for RR.Lesson.unpack() before
+   it starts, and parse() stays synchronous. A browser that can't deflate
+   still makes the long form (p= m= ss= b= t= tempo=, each base64url), and
+   links of either form made before keep opening. A short link that can't
+   be read (cut short) opens nothing: the app opens as usual and says so.
 
    Sets travel as their melodies, never a library id: the family rule is
    that lesson payloads carry no item header, so a lesson can never
    overwrite anyone's library. A lesson's sets live in memory only
-   (RR.Lesson.set → 'lesson', RR.Lesson.sets → 'lesson_1' …).
+   (RR.Lesson.set → 'lesson', RR.Lesson.sets → 'lesson_1' …; Practice and
+   Songs play the set as 'U:lesson' / 'M:lesson').
    ========================================================================== */
 (function () {
   'use strict';
@@ -36,52 +62,177 @@
     const s = RR.Sets ? RR.Sets.normalize({ title: raw && raw.title, melodies: raw && raw.melodies }, id) : null;
     return s && s.melodies.length ? { id, title: s.title, melodies: s.melodies, isCustom: true } : null;
   };
+  const clip = (s, n) => String(s == null ? '' : s).slice(0, n);
+
+  /* ---- short links: deflated JSON in base64url after '~' ---- */
+  const canPack = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+  async function streamBytes(bytes, stream) {
+    return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+  }
+  function toB64u(bytes) {
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function fromB64u(s) {
+    let b = String(s).replace(/-/g, '+').replace(/_/g, '/');
+    while (b.length % 4) b += '=';
+    const bin = atob(b), out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  const unpacked = {};       // a short link's `z`, read before the app started: its data (or null: it didn't read)
+
+  /* ---- what the link carries ---- */
+  /* a practice (a level, a session of Rounds, Games or Battle, Generated, a set): { p, m, ss, b } */
+  function practiceData(practice, set, battle) {
+    const p = RR.sanitize(practice);
+    delete p.set;                                   // ids never travel in a lesson
+    p.tricky = false;                               // a personal help, not the lesson's
+    const playsSet = !!(set && set.melodies && set.melodies.length);
+    if (!playsSet && p.from === 'set') p.from = 'made';
+    // the Song format's My melodies sets go inside the link, numbered in the order they play
+    const extra = [];
+    p.songPicks = p.songPicks.map(id => {
+      if (id.indexOf('set:') !== 0) return id;
+      const s = RR.Sets && RR.Sets.get(id.slice(4));
+      if (!s || !s.melodies.length) return null;
+      extra.push(melodiesOf(s));
+      return 'set:lesson_' + extra.length;
+    }).filter(Boolean);
+    const d = { p };
+    if (playsSet) d.m = melodiesOf(set);
+    if (extra.length) d.ss = extra;
+    if (battle) d.b = RR.cleanBattle(battle);
+    return d;
+  }
+  /* Practice or Songs (G.mode.kind 'teach'): { t, m } — null when there is nothing to play.
+     `from` 'start': from its first exercise (a Practice lesson: the student's first not yet played) or
+     the section's first slide; else where it is now */
+  function teachData(mode, at, from) {
+    const L = RR.teachLevel(mode.id);
+    if (!L || !L.ex.length) return null;
+    let id = L.id, set = null;
+    if (/^[UM]:/.test(id)) {
+      set = RR.Sets.get(L.set);
+      if (!set || !set.melodies.length) return null;
+      id = id[0];                                   // your own: its melodies go inside, never its id
+    }
+    const t = { id, look: RR.teachLook() };
+    if (mode.song) t.song = { from: mode.from | 0, to: mode.to == null ? L.ex.length - 1 : mode.to | 0, practice: !!mode.practice, auto: mode.auto !== false };
+    if (from !== 'start') t.at = at | 0;
+    else if (mode.song) t.at = t.song.from;
+    const d = { t };
+    if (set) d.m = melodiesOf(set);
+    return d;
+  }
+
+  /* the long form: each part its own parameter (the only form before 2026-10-13; still made where the browser
+     can't deflate) */
+  function longLink(name, d) {
+    let href = RR.pageBase() + '?lesson=' + encodeURIComponent(clip(name, 40));
+    ['p', 'm', 'ss', 'b', 't'].forEach(k => { if (d[k]) href += '&' + k + '=' + RR.b64enc(d[k]); });
+    if (d.tempo) href += '&tempo=' + d.tempo;
+    return href;
+  }
+  async function shortLink(name, d) {
+    if (!canPack) return longLink(name, d);
+    try {
+      return RR.pageBase() + '?lesson=' + encodeURIComponent(clip(name, 40)) + '&z=~' +
+        toB64u(await streamBytes(new TextEncoder().encode(JSON.stringify(d)), new CompressionStream('deflate')));
+    } catch (_) { return longLink(name, d); }
+  }
+
+  /* ---- reading one back ---- */
+  const LESSONS = () => (RR.TEACH || []).map(x => x.id);
+  function readTeach(t, set) {
+    if (!t || typeof t !== 'object') return null;
+    let id = typeof t.id === 'string' ? t.id : '';
+    if (id === 'U' || id === 'M') id = set ? id + ':lesson' : '';
+    const ok = LESSONS().includes(id) || (/^S:/.test(id) && RR.SONGS && RR.SONGS[id.slice(2)]) || /^[UM]:lesson$/.test(id);
+    if (!ok) return null;
+    const n = x => Number.isFinite(+x) && +x >= 0 ? Math.floor(+x) : undefined;
+    const s = t.song && typeof t.song === 'object' ? t.song : null;
+    return {
+      id, at: n(t.at), look: RR.cleanTeachLook(t.look),
+      song: s ? { from: n(s.from) || 0, to: n(s.to), practice: s.practice === true, auto: s.auto !== false } : null
+    };
+  }
 
   RR.Lesson = {
     set: null,     // the lesson's own melody set, in memory, while a lesson is open
     sets: [],      // the sets its Song format plays ('lesson_1' …)
-    link(name, practice, set, battle) {
-      const p = RR.sanitize(practice);
-      delete p.set;                                   // ids never travel in a lesson
-      p.tricky = false;                               // a personal help, not the lesson's
-      const playsSet = !!(set && set.melodies && set.melodies.length);
-      if (!playsSet && p.from === 'set') p.from = 'made';
-      // the Song format's My melodies sets go inside the link, numbered in the order they play
-      const extra = [];
-      p.songPicks = p.songPicks.map(id => {
-        if (id.indexOf('set:') !== 0) return id;
-        const s = RR.Sets && RR.Sets.get(id.slice(4));
-        if (!s || !s.melodies.length) return null;
-        extra.push(melodiesOf(s));
-        return 'set:lesson_' + extra.length;
-      }).filter(Boolean);
-      let href = RR.pageBase() + '?lesson=' + encodeURIComponent(String(name).slice(0, 40)) + '&p=' + RR.b64enc(p);
-      if (playsSet) href += '&m=' + RR.b64enc(melodiesOf(set));
-      if (extra.length) href += '&ss=' + RR.b64enc(extra);
-      if (battle) href += '&b=' + RR.b64enc(RR.cleanBattle(battle));
-      return href;
+    rev: 0,        // moves on whenever those change (Practice's levels built from them are built again)
+    canPack,
+    /* a practice's link, the long form (what every link was until 2026-10-13; the tests read it) */
+    link(name, practice, set, battle) { return longLink(name, practiceData(practice, set, battle)); },
+    /* what is playing, as a link's parts — `from` 'start' or 'here' (Practice and Songs); null when it
+       can't be one */
+    current(from) {
+      const G = RR.Game, m = G.mode;
+      const d = m.kind === 'teach' ? teachData(m, RR.Teach.at, from) : practiceData(G.setup, G.playingSet(), G.battle);
+      if (d) d.tempo = G.tempo;
+      return d;
     },
-    /* the lesson in a link, if it has one; bad: true when part of it didn't read */
+    longLink, shortLink,
+    /* the name a link of what is playing starts with */
+    defaultName() {
+      const G = RR.Game, m = G.mode;
+      if (m.kind === 'session') return m.name;
+      if (m.kind === 'level') return 'Level ' + m.n;
+      if (m.kind === 'teach') {
+        if (m.session) return m.session.name;
+        const L = RR.teachLevel(m.id) || {};
+        return clip(m.song || L.unit ? L.title : 'Practice ' + L.title, 40);
+      }
+      return clip(String(m.label || '').replace(/^[♫♪]\s*/, ''), 40);
+    },
+    /* a short link in the address: read it before the app starts (app.js) */
+    needsUnpack(href) {
+      try { return (new URL(href || location.href, location.href).searchParams.get('z') || '').charAt(0) === '~'; } catch (_) { return false; }
+    },
+    async unpack(href) {
+      let z;
+      try { z = new URL(href || location.href, location.href).searchParams.get('z'); } catch (_) { return; }
+      if (!z || z.charAt(0) !== '~' || z in unpacked) return;
+      unpacked[z] = null;
+      if (!canPack) return;
+      try {
+        const d = JSON.parse(new TextDecoder().decode(await streamBytes(fromB64u(z.slice(1)), new DecompressionStream('deflate'))));
+        unpacked[z] = d && typeof d === 'object' && !Array.isArray(d) ? d : null;
+      } catch (_) { /* cut short, most likely: parse says it's lost */ }
+    },
+    /* the lesson in a link, if it has one; bad: true when part of it didn't read; lost: true when nothing of it
+       can be played (a short link cut short, a lesson or song that isn't in this app) */
     parse(href) {
       let q;
       try { q = new URL(href, location.href).searchParams; } catch (_) { return null; }
       if (!q.has('lesson')) return null;
-      let raw = {}, bad = false, set = null, battle = null;
+      const name = (q.get('lesson') || 'Lesson').slice(0, 40);
+      let bad = false, set = null, battle = null, raw = {};
       const sets = [];
-      try { raw = q.get('p') ? RR.b64dec(q.get('p')) : {}; } catch (_) { bad = true; }
-      if (q.get('m')) {
-        try { set = readSet(RR.b64dec(q.get('m')), 'lesson'); if (!set) bad = true; } catch (_) { bad = true; }
+      // the parts: one short `z`, or each its own parameter
+      const z = q.get('z');
+      let d;
+      if (z) {
+        d = z.charAt(0) === '~' ? unpacked[z] : null;
+        if (!d) return { name, lost: true };
+      } else {
+        d = {};
+        ['p', 'm', 'ss', 'b', 't'].forEach(k => { if (q.get(k)) { try { d[k] = RR.b64dec(q.get(k)); } catch (_) { bad = true; } } });
+        if (q.get('tempo')) d.tempo = q.get('tempo');
       }
-      if (q.get('ss')) {
-        try {
-          const list = RR.b64dec(q.get('ss'));
-          (Array.isArray(list) ? list : []).slice(0, 40).forEach((x, i) => { sets[i] = readSet(x, 'lesson_' + (i + 1)); });
-        } catch (_) { bad = true; }
+      if (d.p) raw = d.p;
+      if (d.m) { set = readSet(d.m, 'lesson'); if (!set) bad = true; }
+      if (d.ss) (Array.isArray(d.ss) ? d.ss : []).slice(0, 40).forEach((x, i) => { sets[i] = readSet(x, 'lesson_' + (i + 1)); });
+      if (d.b) { try { battle = RR.cleanBattle(d.b); } catch (_) { bad = true; } }
+      const tempo = d.tempo != null && Number.isFinite(+d.tempo) && RR.snapTempo ? RR.snapTempo(+d.tempo) : null;
+      // Practice or Songs: nothing else to read — and if it can't be played, nothing is
+      if (d.t) {
+        const teach = readTeach(d.t, set);
+        return teach ? { name, teach, set, sets: [], battle: null, practice: RR.sanitize({}), tempo, bad } : { name, lost: true };
       }
-      if (q.get('b')) {
-        try { battle = RR.cleanBattle(RR.b64dec(q.get('b'))); } catch (_) { bad = true; }
-      }
-      const practice = RR.sanitize(raw);
+      const practice = RR.sanitize(raw && typeof raw === 'object' ? raw : {});
       // a Song set that didn't come through is left out
       practice.songPicks = practice.songPicks.filter(id => { const m = /^set:lesson_(\d+)$/.exec(id); return !m ? id.indexOf('set:') !== 0 : !!sets[+m[1] - 1]; });
       if (set) {
@@ -96,19 +247,24 @@
         practice.set = null;
         if (practice.from === 'set') practice.from = 'made';
       }
-      return { name: (q.get('lesson') || 'Lesson').slice(0, 40), practice, set, sets, battle, bad };
+      return { name, practice, set, sets, battle, teach: null, tempo, bad };
     },
     /* the lesson in the address */
     fromUrl() {
       const l = RR.Lesson.parse(location.href);
+      if (l && l.lost) {
+        RR.toast('That lesson link didn’t come through whole — it may have been cut short. Ask for it again.', 7000);
+        return null;
+      }
       if (l && l.bad) RR.toast("Part of that lesson link didn't read — playing it with the usual settings");
-      if (l) { RR.Lesson.set = l.set; RR.Lesson.sets = l.sets; }
+      if (l) { RR.Lesson.set = l.set; RR.Lesson.sets = l.sets; RR.Lesson.rev++; }
       return l;
     },
     leave() {
       try { history.replaceState(null, '', RR.pageBase()); } catch (_) { /* a page that can't change its address just restores */ }
       document.title = 'Melody Reader';
-      RR.Lesson.set = null; RR.Lesson.sets = [];
+      RR.Lesson.set = null; RR.Lesson.sets = []; RR.Lesson.rev++;
+      RR.lessonLook = null;                       // Practice's look is this browser's again
       RR.App.restore();
       RR.toast('Back to your own levels');
     }

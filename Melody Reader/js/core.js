@@ -146,13 +146,14 @@
   };
 
   let toastTimer = null;
-  RR.toast = function (text) {
+  /* `ms`: how long it stays (2.4 s unless said) */
+  RR.toast = function (text, ms) {
     let el = document.getElementById('toast');
     if (!el) { el = document.createElement('div'); el.id = 'toast'; el.className = 'toast'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
     el.textContent = text;
     el.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+    toastTimer = setTimeout(() => el.classList.remove('show'), ms || 2400);
   };
 
   /* A small yes/no window — the family's "Delete "X"?" pattern.

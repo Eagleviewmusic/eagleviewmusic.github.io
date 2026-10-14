@@ -44,7 +44,7 @@
   let copy = null;        // ⧉ Copy melodies in: { into: set id, chosen: Set of 'source|index', open: Set of sources }
 
   const isOwn = set => !set.received;
-  const playing = id => G.over && G.over.set === id && G.mode.kind !== 'lesson';   // played just this time (Stop ends it)
+  const playing = id => G.over && G.over.set === id && !G.inLesson();   // played just this time (Stop ends it)
 
   function pic(m) {
     const card = { time: m.time, notes: m.notes };
@@ -102,7 +102,7 @@
     $('#mel-back').hidden = lib() && !RR.Library.sub();
     $('#mel-back').setAttribute('aria-label', copy ? 'Back to the set' : 'Back to the Library');
     $('#mel-title').textContent = copy ? 'Copy melodies in' : view ? 'Melody set' : RR.Library.title();
-    $('#mel-tag').textContent = !lib() && G.playingSet() && G.mode.kind !== 'lesson' ? 'Playing: ' + G.playingSet().title : '';
+    $('#mel-tag').textContent = !lib() && G.playingSet() && !G.inLesson() ? 'Playing: ' + G.playingSet().title : '';
     const body = $('#mel-body'), y = body.scrollTop;
     body.innerHTML = copy ? copyHtml(set) : view ? setHtml(set) : RR.Library.html();
     body.scrollTop = y;

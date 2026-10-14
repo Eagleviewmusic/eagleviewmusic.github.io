@@ -158,6 +158,11 @@
     G.fresh = true;                            // a new player starts with Practice on
     if (G.mode.kind === 'teach') {                 // their own marks: their own place in it (a session played this way stays the session)
       if (G.mode.session && RR.Sessions.get(G.mode.session.id)) { G.selectSession(G.mode.session.id); return; }
+      if (G.mode.lesson) {                          // a lesson link's lesson or song stays the lesson (the tempo too)
+        const m = G.mode, t = G.tempo;
+        RR.Teach.start(m.id, m.song ? m.from : undefined, m.song ? { from: m.from, to: m.to, practice: m.practice, auto: m.auto } : undefined, { lesson: m.lesson });
+        G.tempo = t; return;
+      }
       if (!RR.Teach.start(G.mode.id)) RR.Teach.start('L1'); return;
     }
     G.newRound();
@@ -170,6 +175,7 @@
     if (m.kind === 'session') return (G.battle ? '⚔️ ' : '') + m.name;
     if (m.kind === 'lesson') return 'Lesson · ' + m.name;
     if (m.kind === 'teach') {
+      if (m.lesson) return 'Lesson · ' + m.lesson.name;   // a lesson link's lesson or song (2026-10-13)
       if (m.session) return m.session.name;                // a session played the Practice or Songs way (2026-10-12)
       const L = RR.teachLevel(m.id) || {};
       // Songs: the song (and the section); Practice (was Teach Me to Read, renamed 2026-10-12): its lesson, song or unit
@@ -225,8 +231,11 @@
     return s;
   }
   G.compose = () => { G.setup = compose(); };
+  /* a lesson link is open: a practice ('lesson'), or Practice or Songs played from one (2026-10-13) */
+  G.inLesson = () => G.mode.kind === 'lesson' || !!G.mode.lesson;
   /* where this browser keeps what is playing, for the next visit (a lesson is never kept) */
   function remember() {
+    if (G.inLesson()) return;
     const m = G.mode, over = Object.keys(G.over).length ? RR.clone(G.over) : undefined;
     if (m.kind === 'level') { RR.device.level = m.n; RR.device.practice = { kind: 'level', n: m.n, over }; }
     else if (m.kind === 'session') RR.device.practice = { kind: 'session', id: m.id, over };
@@ -396,7 +405,7 @@
     app.classList.toggle('no-play', !!s.playHidden);
     app.classList.toggle('game-clock', s.game === 'clock');
     app.classList.toggle('game-open', s.game === 'endless' || s.game === 'clock');
-    app.classList.toggle('in-lesson', G.mode.kind === 'lesson');
+    app.classList.toggle('in-lesson', G.inLesson());
     app.classList.toggle('teach-on', G.mode.kind === 'teach');
     app.classList.toggle('song-on', G.mode.kind === 'teach' && !!G.mode.song);        // Songs: its own Practice button
     // the buttons beside the music (2026-10-12): the metronome stands there only in a battle (elsewhere it is in

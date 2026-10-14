@@ -264,10 +264,11 @@
       return L;
     }
     if (!RR.Sets) return null;
-    const stamp = RR.Sets.rev + '/' + U.rev;
+    const stamp = RR.Sets.rev + '/' + U.rev + '/' + (RR.Lesson ? RR.Lesson.rev : 0);
     const hit = cache.get(id);
     if (hit && hit.stamp === stamp) return hit.L;
-    const set = id[0] === 'M' || U.has(key) ? RR.Sets.get(key) : null;
+    // a lesson link's set (2026-10-13): 'U:lesson' / 'M:lesson', in memory while the lesson is open
+    const set = id[0] === 'M' || U.has(key) || key === 'lesson' ? RR.Sets.get(key) : null;
     const L = set ? melodyLevel(id, set.title, set.melodies, { kind: id[0] === 'U' ? 'unit' : 'mset', set: key, shared: !!set.received, book: set.book || '',
       copyOf: RR.Sets.copyOf(set) }) : null;      // copyOf: your copy of the Songbook's song or a lesson ('songbook:…', 'practice:…')
     cache.set(id, { stamp, L });
@@ -299,16 +300,28 @@
   /* ---- the look (2026-10-12): Tools → Note Colors · Staff Color · Text Below the Notes ---- */
   RR.TEACH_LOOK = { colour: 'solid', staff: 'notes', labels: 'letters', auto: false, beat: 'click' };   // auto: Auto-Next Slide (Tools, 2026-10-12); beat: the metronome's sound, Click or Drum beat (2026-10-13)
   const LOOKS = { colour: ['solid', 'always', 'lit', 'black'], staff: ['notes', 'all', 'plain'], labels: ['letters', 'solfege', 'none'], auto: [true, false], beat: ['click', 'drums'] };
-  RR.teachLook = function () {
-    const d = RR.device.teachLook, o = Object.assign({}, RR.TEACH_LOOK);
+  /* a look, every part of it: what `d` says where it says something allowed, else the first look */
+  RR.cleanTeachLook = function (d) {
+    const o = Object.assign({}, RR.TEACH_LOOK);
     if (d && typeof d === 'object') Object.keys(LOOKS).forEach(k => { if (LOOKS[k].includes(d[k])) o[k] = d[k]; });
     return o;
   };
+  /* a lesson link's look (2026-10-13): while the lesson is open it is the look, and Tools changes it just
+     for then — this browser's own (device.teachLook) is left as it was */
+  RR.lessonLook = null;
+  RR.teachLook = () => RR.cleanTeachLook(RR.lessonLook || RR.device.teachLook);
   RR.setTeachLook = function (k, v) {
     if (!LOOKS[k] || !LOOKS[k].includes(v)) return false;
-    RR.device.teachLook = Object.assign(RR.teachLook(), { [k]: v });
-    RR.saveDevice();
+    const look = Object.assign(RR.teachLook(), { [k]: v });
+    if (RR.lessonLook) RR.lessonLook = look;
+    else { RR.device.teachLook = look; RR.saveDevice(); }
     return true;
+  };
+  /* Tools' ↺: the colours and letters as they began — Auto-Next and the metronome's sound kept */
+  RR.resetTeachLook = function () {
+    const was = RR.teachLook(), look = Object.assign(RR.clone(RR.TEACH_LOOK), { auto: !!was.auto, beat: was.beat });
+    if (RR.lessonLook) RR.lessonLook = look;
+    else { RR.device.teachLook = look; RR.saveDevice(); }
   };
   /* the staff's lines for a level and a look: its notes' lines lit (the rest greyed) · all five in their
      colours · or plain black */

@@ -2,7 +2,8 @@
    Melody Reader — settings.js
    --------------------------------------------------------------------------
    RR.Settings — one window, tabs down the side (across the top on a phone):
-   Level · ✎ (the page of what is chosen) · Points · Sound · Share.
+   ✎ (the page of what is chosen) · Points · Sound (the Level and Share
+   tabs went into the Library on 2026-10-12).
 
    The ✎ page (2026-10-06 for sessions; 2026-10-08 for the levels too —
    the user's ask) — every choice on one page: Choose the Notes · Choose
@@ -276,19 +277,8 @@
         '<div class="row"><span class="lbl"></span><button type="button" class="pill-btn" data-act="test">Test the sound</button></div>' +
         RR.note('sd', 'Test the sound also wakes up a Bluetooth or projector speaker that has gone to sleep, so the first note is never lost.') + '</div>';
     },
-    /* the link carries everything that decides what is played (lesson.js, 2026-10-08): every setting,
-       the melody sets (as their melodies), a battle's teams */
-    share() {
-      const name = G.mode.kind === 'session' ? G.mode.name : G.mode.kind === 'level' ? 'Level ' + G.mode.n : '';
-      return '<div class="sec"><h3>Lesson link</h3>' + RR.note('sh', 'A link that opens Melody Reader with exactly these settings, as a lesson — the notes, the rhythms, the look and helps, the format, ' +
-          'where the melodies come from (your My melodies sets go inside the link)' + (G.battle ? ', and the teams, turns and rounds' : '') + '. Nothing on the other computer changes them. ' +
-          'The chip says Lesson, and the Library shows only Points, Sound and Leave the lesson. Post it for a class, or put it in a Google Site.') +
-        '<div class="row"><span class="lbl">The lesson’s name</span><input type="text" id="lesson-name" maxlength="40" value="' + RR.esc(name) + '" placeholder="Week 3"></div>' +
-        '<div class="row"><span class="lbl"></span><button type="button" class="pill-btn primary" data-act="copy-link">Copy the lesson link</button></div>' +
-        '<div class="row"><input type="text" id="lesson-link" readonly aria-label="The lesson link" value="' + RR.esc(lessonLink(name || 'Lesson')) + '"></div></div>';
-    },
     leave() {
-      return '<div class="sec"><h3>' + RR.esc(G.modeLabel()) + '</h3>' + RR.note('lsn', 'This practice came from a lesson link. Leave the lesson to choose your own levels again.') +
+      return '<div class="sec"><h3>' + RR.esc(G.modeLabel()) + '</h3>' + RR.note('lsn', 'This came from a lesson link. Leave the lesson to choose your own levels, lessons and songs again.') +
         '<button type="button" class="pill-btn primary" data-act="leave">Leave the lesson</button></div>';
     }
   };
@@ -299,10 +289,9 @@
   /* the Level tab (the sessions and the levels) and the Share tab moved into the Library on 2026-10-12 (the user's:
      the ♫ and the gear became one Library). Practice and Songs have nothing of their own to change — unless a
      session plays that way: then its page */
-  const tabs = () => G.mode.kind === 'lesson' ? TABS_LESSON
+  const tabs = () => G.inLesson() ? TABS_LESSON
     : (G.mode.kind !== 'teach' || G.sessionId() ? [['session', pageName()]] : []).concat([['points', 'Points'], ['sound', 'Sound']]);
   const OLD_TABS = ['notes', 'rhythms', 'play', 'helps'];
-  const lessonLink = name => RR.Lesson.link(name, G.setup, G.playingSet(), G.battle);
 
   function render() {
     const list = tabs();
@@ -679,6 +668,6 @@
     change(r.dataset.range, r.value); return true;
   }
   RR.Settings = { open, close, render, settle, draftHtml, draftClick, sectionHtml, liveClick: editClick, battleClick, battleInput, battleChange, focusLastTeam,
-    deleteSession, prefsHtml, prefsClick, prefsInput, shareHtml: () => TAB.share(), lessonLink,
+    deleteSession, prefsHtml, prefsClick, prefsInput,
     isOpen };
 })();
