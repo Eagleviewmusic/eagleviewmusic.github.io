@@ -20,8 +20,9 @@
                    level and unit (RR.teachLook), and Auto-Next goes on to
                    the next exercise — with the metronome, the click
                    carrying on into it (G.swapCard)
-     metronome     Slow or Moderate (no Fast). Picking one counts in at
-                   once, then the exercise goes round and round with the
+     metronome     at the tempo dial's tempo (56–132 BPM, 72 to begin
+                   with — 2026-10-13; it was Slow or Moderate). Starting it
+                   counts in at once, then the exercise goes round and round with the
                    click until it is turned off (2026-10-11, the user's: a
                    class can play along on real xylophones); each time
                    round played through — every note, no wrong bar — gives
@@ -82,7 +83,7 @@
   const NEXT = { L1: ['A1', 'L2'], A1: ['L2'], L2: ['A2', 'L3'], A2: ['L3'], L3: ['A3'], A3: [] };
   function nextsOf(L) {
     if (!L.unit) return NEXT[L.id].map(RR.teachLevel);
-    if (L.kind === 'song') { const all = RR.teachSongs(), i = all.findIndex(x => x.id === L.id); return i >= 0 && all[i + 1] ? [all[i + 1]] : []; }
+    if (L.kind === 'song') { const all = RR.teachSongs().filter(x => x.kind === 'song'), i = all.findIndex(x => x.id === L.id); return i >= 0 && all[i + 1] ? [all[i + 1]] : []; }   // the next of the Songbook's (not your copy)
     if (L.kind !== 'unit') return [];
     const us = RR.TeachUnits.levels().filter(x => x.ex.length), i = us.findIndex(x => x.id === L.id);
     return i >= 0 && us[i + 1] ? [us[i + 1]] : [];
@@ -405,7 +406,7 @@
     const m = marks(), i = Math.max(0, m.findIndex(x => x < 2));
     T.go(i);
     RR.Tools.open(true, 'metro');
-    G.announce('Pick Slow or Moderate on the metronome, and play along for a gold star.');
+    G.announce('Start the metronome — turn the dial for its tempo — and play along for a gold star.');
   }
   $('#rounddone').addEventListener('click', e => {
     const b = e.target.closest('[data-teach]'); if (!b || !on()) return;
@@ -458,8 +459,8 @@
         '<b>' + (x.kind === 'song' ? '♪ ' : '♫ ') + esc(x.title) + '</b><span class="mc-n">' + plural(x.ex.length, 'slide') + '</span></button>').join('') + '</div>' +
         '<p class="dd-teach-make"><button type="button" class="h-link" data-d="tsongs">A section, Practice, Auto-Next…</button></p>';
     }
-    const us = RR.TeachUnits.levels();
-    return '<h3 class="dd-h">Choose a different level</h3><div class="teach-grid in-drop">' + RR.TEACH.map(L => tileHtml(L, 'd')).join('') + '</div>' +
+    const us = RR.teachExercises();
+    return '<h3 class="dd-h">Choose a different level</h3><div class="teach-grid in-drop">' + RR.teachLessons().map(L => tileHtml(L, 'd')).join('') + '</div>' +
       (us.length ? '<h3 class="dd-h">Your units</h3><div class="teach-grid in-drop units">' + us.map(L => tileHtml(L, 'd')).join('') + '</div>' : '') +
       '<p class="dd-teach-make"><button type="button" class="h-link" data-d="teach-make">+ Make a unit from your melodies…</button></p>';
   };
@@ -508,13 +509,13 @@
      Lessons, Songs, Exercises to practice"): Lessons — the six levels; Songs — the Songbook's, slide by slide;
      Exercises — your own units (and + Make a unit) */
   const TABS = [['lessons', 'Lessons', 'The very first notes, a step at a time'], ['songs', 'Songs', 'Songbook songs, slide by slide'], ['exercises', 'Exercises', 'Your own melodies, made into units']];
-  const tabOf = id => /^S:/.test(id) ? 'songs' : /^[UM]:/.test(id) ? 'exercises' : 'lessons';
+  const tabOf = id => RR.teachTabOf(id);           // your copies of a lesson or a song are on its tab (2026-10-13)
   function pickHtml() {
-    const L = RR.teachLevel(W.id) || RR.TEACH[0], us = RR.TeachUnits.levels();
+    const L = RR.teachLevel(W.id) || RR.TEACH[0], us = RR.teachExercises();
     const tabs = '<div class="src-tabs tw-tabs" role="radiogroup" aria-label="What to practise">' + TABS.map(x => '<button type="button" role="radio" data-tw="tab" data-v="' + x[0] + '" class="' + (W.tab === x[0] ? 'on' : '') + '" aria-checked="' + (W.tab === x[0]) + '">' +
       '<b>' + x[1] + '</b><small>' + x[2] + '</small></button>').join('') + '</div>';
     let pane;
-    if (W.tab === 'lessons') pane = '<div class="tw-levels"><div class="teach-grid">' + RR.TEACH.map(x => tileHtml(x, 'tw', W.id)).join('') + '</div></div>';
+    if (W.tab === 'lessons') pane = '<div class="tw-levels"><div class="teach-grid">' + RR.teachLessons().map(x => tileHtml(x, 'tw', W.id)).join('') + '</div></div>';
     else if (W.tab === 'songs') pane = '<div class="tw-levels"><div class="teach-grid units">' + RR.teachSongs().map(x => tileHtml(x, 'tw', W.id)).join('') + '</div></div>';
     else pane = '<div class="tw-levels"><div class="teach-grid units">' + us.map(x => tileHtml(x, 'tw', W.id)).join('') +
       '<button type="button" class="tt tt-new" data-tw="make"><span class="tt-plus" aria-hidden="true">+</span><span class="tt-txt"><b>Make a unit</b><small>' +
@@ -599,7 +600,7 @@
       // another tab: the first of it picked (an exercise tab with no units yet: nothing — + Make a unit)
       W.tab = b.dataset.v;
       if (tabOf(W.id) !== W.tab) {
-        const first = W.tab === 'lessons' ? (RR.TEACH.find(x => RR.TeachMarks.get(x.id).includes(0)) || RR.TEACH[0]) : W.tab === 'songs' ? RR.teachSongs()[0] : RR.TeachUnits.levels()[0];
+        const first = W.tab === 'lessons' ? (RR.TEACH.find(x => RR.TeachMarks.get(x.id).includes(0)) || RR.TEACH[0]) : W.tab === 'songs' ? RR.teachSongs()[0] : RR.teachExercises()[0];
         if (first) { W.id = first.id; W.at = firstTodo(W.id); }
       }
       drawWindow('.tw-tabs .on');
@@ -655,7 +656,8 @@
   let songWin = null;
   T.songsOpen = () => !!(songWin && !songWin.hidden);
   function songChoices() {
-    const sets = RR.Sets.list().filter(x => x.melodies.length && !/^lesson/.test(x.id)).map(x => RR.teachLevel('M:' + x.id)).filter(Boolean);
+    // your copies of the Songbook's songs are with them already (teachSongs)
+    const sets = RR.Sets.list().filter(x => x.melodies.length && !/^lesson/.test(x.id) && !RR.Sets.copyOf(x)).map(x => RR.teachLevel('M:' + x.id)).filter(Boolean);
     return RR.teachSongs().concat(sets);
   }
   function songsHtml() {
@@ -665,7 +667,9 @@
     SW.from = Math.max(0, Math.min(n - 1, SW.from)); SW.to = Math.max(SW.from, Math.min(n - 1, SW.to));
     const row = x => '<button type="button" class="mc-row' + (x.id === SW.id ? ' on' : '') + '" data-sw="song" data-id="' + esc(x.id) + '" aria-pressed="' + (x.id === SW.id) + '">' +
       '<b>' + (x.kind === 'song' ? '♪ ' : '♫ ') + esc(x.title) + '</b><span class="mc-n">' + plural(x.ex.length, 'slide') + '</span></button>';
-    const songs = all.filter(x => x.kind === 'song'), sets = all.filter(x => x.kind !== 'song');
+    // the Songbook's songs, each with your copies of it (2026-10-13); then your other sets
+    const songLike = x => x.kind === 'song' || /^songbook:/.test(x.copyOf || '');
+    const songs = all.filter(songLike), sets = all.filter(x => !songLike(x));
     const opts = v => Array.from({ length: n }, (_, i) => '<option value="' + i + '"' + (i === v ? ' selected' : '') + '>' + (i + 1) + '</option>').join('');
     const seg = (k, list, cur) => '<div class="seg" role="group">' + list.map(([v, w]) => '<button type="button" data-sw="' + k + '" data-v="' + v + '" class="' + (cur === v ? 'on' : '') + '" aria-pressed="' + (cur === v) + '">' + w + '</button>').join('') + '</div>';
     const pics = L ? RR.teachCards(L).map((c, i) => {

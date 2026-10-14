@@ -12,6 +12,13 @@
    Striking a bar that is still ringing stops its last voice first, with a
    12 ms fade — the original's rule, so a fast repeated note never piles up.
 
+   The drum beat (2026-10-13, drums.js) plays Ostinato Builder's kit
+   (lib/instruments, vendored) on this same context — through
+   EVMCountIn.timed, as Ostinato Builder does, so each hit is placed on the
+   audio clock however late its timer ran — at DRUM_LEVEL × volume, beside
+   the compressor rather than through it (the kit has its own soft-clip),
+   so the drums sit under the xylophone.
+
    Time. Everything that is scheduled — Play's notes, the count-in, the
    beat — goes on the audio clock. Two more clocks matter for With the
    beat, and both are read through getOutputTimestamp():
@@ -28,6 +35,10 @@
   let ctx = null, master = null;
   let voiceName = RR.device.voice === 'marimba' ? 'marimba' : 'vibraphone';
   let volume = typeof RR.device.volume === 'number' ? Math.max(0, Math.min(1, RR.device.volume)) : 0.8;
+  let kit = null, kitClock = null, drumBus = null;
+  // the kit's hits peak near 0.8–0.9. Measured 2026-10-13 (150 ms RMS, A-weighted, against a bar struck): at 0.22 the
+  // snare sits ~5 dB under a low C and ~12 under a high E, the tom and bass well under — present, never over the melody
+  const DRUM_LEVEL = 0.22;
   const live = new Map();       // bar id → its ringing voice
   const played = new Set();     // voices scheduled by Play, so Stop can silence them
 
@@ -91,6 +102,17 @@
     return ts && ts.performanceTime > 0 ? ts : null;
   }
   const latency = () => ctx ? (ctx.outputLatency || ctx.baseLatency || 0) : 0;
+  /* the drum kit, made the first time it is wanted (null without the library or the count-in's clock) */
+  function drums() {
+    if (kit) return kit;
+    if (!init() || !window.VirtualInstruments || !window.EVMCountIn) return null;
+    kitClock = EVMCountIn.timed(ctx);
+    drumBus = ctx.createGain(); drumBus.gain.value = DRUM_LEVEL * volume;
+    drumBus.connect(ctx.destination);
+    kit = VirtualInstruments.createKit({ audioContext: kitClock.ctx, destination: drumBus });
+    kit.unlock();
+    return kit;
+  }
   /* the audio time heard at performance time p — the output timestamp when
      it is trustworthy, else the clock less the output latency */
   function heardAtPerf(p) {
@@ -136,6 +158,13 @@
       const l = (accent ? 0.55 : 0.32) * (soft ? 0.45 : 1);
       osc(v, 'triangle', accent ? 1760 : 1320, t, t + 0.06).connect(env(v, t, [[l, 0.002], [0.0001, 0.05]]));
     },
+    /* a drum of the kit at audio time t (the drum beat); gapMs: until its next hit, for the kit's fast-repeat sound.
+       False when there is no kit — the caller clicks instead */
+    drum(id, t, gapMs) {
+      const k = drums(); if (!k) return false;
+      kitClock.soundAt(t, () => k.play(id, k.optionsForRepeat(id, gapMs || 0)));
+      return true;
+    },
     /* a melody finished: C E G on the marimba, an octave up for three stars */
     celebrate(stars) {
       if (!init()) return;
@@ -155,6 +184,6 @@
     get voice() { return voiceName; },
     set voice(v) { voiceName = v === 'marimba' ? 'marimba' : 'vibraphone'; RR.device.voice = voiceName; RR.saveDevice(); },
     get volume() { return volume; },
-    set volume(v) { volume = Math.max(0, Math.min(1, +v || 0)); if (master) master.gain.value = 0.28 * volume; RR.device.volume = volume; RR.saveDevice(); }
+    set volume(v) { volume = Math.max(0, Math.min(1, +v || 0)); if (master) master.gain.value = 0.28 * volume; if (drumBus) drumBus.gain.value = DRUM_LEVEL * volume; RR.device.volume = volume; RR.saveDevice(); }
   };
 })();

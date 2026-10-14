@@ -20,6 +20,15 @@
    (your own sets) copies melodies from your other sets, shared ones and
    the Songbook — so a unit can be built from melodies you already have.
 
+   THE APP'S OWN (2026-10-13, the user's: "edit any and everything from
+   the Library … make my own copy of that song … and call it 'my copy'"):
+   a Songbook song or one of Practice's lessons opens here from the Library
+   (sets.js 'songbook:…' / 'practice:…') — every tool there, ▶ to play it
+   as it is; the first change makes your copy (sets.js copyOnWrite) and the
+   page goes on in it, saying so. Your copy's page says whose copy it is and
+   where it lives (Songs or Practice, after the original); a lesson's copy
+   stays one of Practice's (no Take it out).
+
    Play this set plays the set just this time (G.over.set, 2026-10-08)
    over whatever level or session is chosen — its helps and tempos — and
    the chip reads "Week 3 · Level 4". Stop here, or picking another level
@@ -42,18 +51,34 @@
     return RR.Eng.render(card, { ss: 8, maxW: 270, maxStretch: 1.4, colour: 'always', states: m.notes.map(() => 'lit'), noHalo: true, labels: 'none' }).svg;
   }
 
+  /* the app's own, or your copy of it: what it is, and how it plays (a song as a song, a lesson the Practice way) */
+  const origName = id => { const o = id && RR.Sets.get(id); return o ? o.title : ''; };
+  function originHtml(set) {
+    if (set.builtIn) {
+      const song = set.builtIn === 'song';
+      return '<div class="mel-actions"><button type="button" class="pill-btn go" data-act="' + (song ? 'play-song' : 'play-lesson') + '">▶ ' + (song ? 'Play the song' : 'Practice it') + '</button></div>' +
+        RR.note('mlbi', (song ? 'One of the Songbook’s songs' : 'One of Practice’s lessons') + ' — the app’s own, so it stays as it is. Change anything here (a melody, the order, the name) and it becomes your own copy, “' +
+          RR.esc(set.title) + ' (my copy)”, right under it in ' + (song ? 'Songs' : 'Practice') + '.');
+    }
+    const c = RR.Sets.copyOf(set); if (!c) return '';
+    const song = /^songbook:/.test(c);
+    return '<p class="note mel-copy-of">Your copy of <b>' + RR.esc(origName(c)) + '</b> — it’s in ' + (song ? 'Songs' : 'Practice') + ', right under the original.' +
+      (song && set.melodies.length ? ' <button type="button" class="h-link" data-act="play-song">▶ Play it as a song</button>' : '') + '</p>';
+  }
   function setHtml(set) {
-    const own = isOwn(set), shelf = RR.Sets.isShelf(set);
+    const own = isOwn(set), shelf = RR.Sets.isShelf(set), app = !!set.builtIn;
     let h = '<div class="mel-set-head">' +
       (own ? '<input type="text" class="mel-rename" id="mel-rename" maxlength="60" value="' + RR.esc(set.title) + '" aria-label="The set’s name">'
         : '<h3 class="mel-set-title">' + RR.esc(set.title) + '</h3>' + (shelf ? '<span class="mel-tag book">Teacher Library · ' + RR.esc(set.book) + '</span>' : '<span class="mel-tag">Shared</span>')) +
-      '</div><div class="mel-actions">' +
+      (app ? '<span class="mel-tag song">' + (set.builtIn === 'song' ? 'Songbook' : 'Practice') + '</span>' : RR.Sets.copyOf(set) ? '<span class="mel-tag mine">My copy</span>' : '') +
+      '</div>' + (app ? originHtml(set) : '<div class="mel-actions">' +
       (set.melodies.length ? (playing(set.id) ? '<button type="button" class="pill-btn" data-act="stop">■ Stop playing it</button>' : '<button type="button" class="pill-btn go" data-act="play">▶ Play this set</button>') : '') +
       (own ? '' : '<button type="button" class="pill-btn primary" data-act="copy">Save my copy</button>') +
       (set.melodies.length ? '<button type="button" class="pill-btn" data-act="link">Copy a link</button>' : '') +
       (shelf ? '' : '<button type="button" class="pill-btn" data-act="delete">Delete set…</button>') + '</div>' +
+      originHtml(set) +
       (own ? '' : RR.note('mlro', shelf ? 'This set is from the Teacher Library. It stays as your teacher made it; Save my copy to change it. Put the book back on the Teacher Library shelf when you’re done.' : 'This set came from a link. It stays as it was sent; Save my copy to make one you can change.')) +
-      teachHtml(set);
+      teachHtml(set));
     h += '<div class="mel-grid">' + set.melodies.map((m, i) => '<div class="mel-card">' +
       '<div class="mel-pic">' + pic(m) + '</div><div class="mel-cap"><b>' + (i + 1) + '</b> ' + RR.esc(m.title || '') + '</div>' +
       '<div class="mel-tools"><button type="button" data-hear="' + i + '" aria-label="Hear melody ' + (i + 1) + '">▶</button>' +
@@ -105,13 +130,14 @@
      the set as a unit: ▶ plays it there (into the units if it isn't one); a unit can be taken out */
   function teachHtml(set) {
     const isUnit = RR.TeachUnits && RR.TeachUnits.has(set.id), n = set.melodies.length;
+    const lessonCopy = /^practice:/.test(RR.Sets.copyOf(set) || '');     // your copy of a lesson: always one of Practice's
     return '<div class="mel-teach"><span class="mel-teach-ico" aria-hidden="true">' + RR.TEACH_ICON + '</span>' +
       '<div class="mel-teach-txt"><b>Practice' + (isUnit ? ' <span class="mel-tag teach">an exercise</span>' : '') + '</b>' +
       '<span>' + (isUnit ? (n ? 'One of Practice’s exercises: played big, round and round, the lines of its notes lit.' : 'One of Practice’s exercises — + Add a melody to write its first.')
         : n ? 'Play this set the Practice way: big, round and round, the lines of its notes lit — it joins Practice’s exercises.'
           : 'Write a melody, then play the set the Practice way.') + '</span></div>' +
       '<div class="mel-teach-btns">' + (n ? '<button type="button" class="pill-btn go" data-act="teach">▶ Practice</button>' : '') +
-      (isUnit ? '<button type="button" class="h-link" data-act="teach-out">Take it out</button>' : '') + '</div></div>';
+      (isUnit && !lessonCopy ? '<button type="button" class="h-link" data-act="teach-out">Take it out</button>' : '') + '</div></div>';
   }
 
   /* ---------------- ⧉ Copy melodies in (2026-10-12) ----------------
@@ -186,7 +212,7 @@
   function hear(m) {
     stopHear();
     if (!RR.Sound.ctx) return;
-    const spt = 60 / RR.paceTempo(G.setup, RR.listenPace()) / 4;
+    const spt = 60 / RR.listenTempo() / 4;
     let t = RR.Sound.now() + 0.1;
     m.notes.forEach(n => {
       if (n.p) { RR.Sound.playAt(n.p, t); const id = n.p; timers.push(setTimeout(() => RR.Xylo.flash(id, 'demo', 260), Math.max(0, RR.Sound.heardAt(t) - RR.now()))); }
@@ -225,6 +251,12 @@
       RR.TeachUnits.remove(set.id); render();
     }
     else if (act === 'play' && set) play(set.id);
+    // the app's own song or lesson as it is — or your copy of a song, as a song
+    else if (act === 'play-song' && set) {
+      const id = set.builtIn ? 'S:' + set.id.slice(9) : 'M:' + set.id;
+      close(); if (RR.Teach.startSong(id)) { RR.View.go('play'); G.announce('Songs · ' + set.title); }
+    }
+    else if (act === 'play-lesson' && set) { close(); if (RR.Teach.start(set.id.slice(9))) { RR.View.go('play'); G.announce('Practice · ' + set.title); } }
     else if (act === 'stop') stop();
     else if (act === 'copy' && set) { const rec = RR.Sets.saveMyCopy(set.id); if (rec) { view = rec.id; render(); RR.toast('Saved as your own: ' + rec.title); } }
     else if (act === 'link' && set) {
@@ -273,6 +305,13 @@
   // ‹ : out of Copy melodies in, out of a set, out of one of the Library's own pages — back to the Library
   $('#mel-back').addEventListener('click', () => { if (copy) copy = null; else if (view) view = null; else RR.Library.back(); render(); });
   $('#melodies').addEventListener('click', e => { if (e.target === $('#melodies') || e.target.closest('[data-close]')) close(); });
+
+  /* the app's own song or lesson changed: the page — and Copy melodies in — go on in your copy */
+  RR.Sets.onCopied((from, rec) => {
+    if (view === from) view = rec.id;
+    if (copy && copy.into === from) copy.into = rec.id;
+    RR.toast('Your copy, “' + rec.title + '”, is ' + (/^songbook:/.test(from) ? 'in Songs' : 'in Practice') + ' — the original stays as it was');
+  });
 
   RR.Melodies = { open, close, render, play, stop, isOpen: () => !$('#melodies').hidden };
 })();

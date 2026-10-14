@@ -31,6 +31,8 @@
   <script src="../js/levels.js"></script>
   <script src="../js/teach-data.js"></script>
   <script src="../js/points.js"></script>
+  <script src="../lib/instruments/js/virtual-instruments.js"></script>
+  <script src="../js/drums.js"></script>
   <script src="../lib/evm-library.js"></script>
   <script src="../js/sets.js"></script>
   <script src="../js/lesson.js"></script>
@@ -147,10 +149,10 @@
 
     // 4. practices are made safe
     const junk = RR.sanitize({ notes: ['X9', 'C4'], rhythms: ['qr'], tempos: [999, 10, 'x'], tempo: 90, judge: 'beat', time: [7, 8], colour: 'blue', flash: 5, bars: 3, endDo: 'yes', practice: 'no' });
-    check('sanitize: junk is cleaned (and the old judge / tempo are dropped)', junk.notes.join() === 'C4' && junk.rhythms.join() === RR.DEFAULTS.rhythms.join() &&
-      junk.tempos.join() === '60,80,100' && !('judge' in junk) && !('tempo' in junk) && junk.practice === true &&
+    check('sanitize: junk is cleaned (and the old judge / tempo / three tempos are dropped)', junk.notes.join() === 'C4' && junk.rhythms.join() === RR.DEFAULTS.rhythms.join() &&
+      !('tempos' in junk) && !('judge' in junk) && !('tempo' in junk) && junk.practice === true &&
       junk.time[0] === 4 && junk.colour === 'always' && junk.flash === 0 && junk.bars === 1 && junk.endDo === true, JSON.stringify(junk).slice(0, 120));
-    check('sanitize: three tempos are kept in range and in order', RR.sanitize({ tempos: [200, 30, 90] }).tempos.join() === '40,90,160');
+    check('sanitize: a practice’s three tempos (Slow · Moderate · Fast, before the dial) are gone, old links too', !('tempos' in RR.sanitize({ tempos: [200, 30, 90] })) && !('tempos' in RR.DEFAULTS));
     check('Practice on every level but the last (sight-reading)', RR.LEVELS.every(l => l.practice === (l.n !== 15)));
     const six = RR.sanitize({ time: [6, 8] }), both = RR.sanitize({ times: [[6, 8], [4, 4], [5, 4]], leaps: ['M6', 'x'], pickup: true }), none = RR.sanitize({ leaps: [], times: [[9, 8]] });
     check('sanitize: 6/8, more than one meter, pick-ups and leaps', six.time.join('/') === '6/8' && six.times.length === 1 &&
@@ -254,29 +256,50 @@
       check('Points, tier 2: q q h q played evenly (no long note) is 8', even.grade === 8, 'off by ' + even.err.toFixed(2) + ' of a beat');
       check('Points, tier 2: slower than 30 BPM is finding, not a beat → 8', crawl.grade === 8);
       check('Points, tier 2: fewer than three notes have no rhythm to judge → 12', P.rhythm([0, 8], [0, 3]).grade === 12);
-      const fr = P.free({ tries: [0, 0, 0, 0, 0, 0], starts, times: at(80) }), fs1 = P.free({ tries: [0, 1, 0, 0, 0, 0], starts, times: at(80) });
-      check('Points: on your own, every note first time in rhythm → 12; one slip → tier 1', fr.pts === 12 && fr.tier === 2 && fs1.pts === 7 && fs1.tier === 1);
-      // with the metronome (2026-10-12): the notes followed in order; what counts is the player's tempo against the
-      // metronome's — never where they came in
-      const ci = (pace, o) => P.countIn(Object.assign({ pace, tries: starts.map(() => 0), starts, times: at(80), tempo: 80 }, o || {}));
-      check('Points, tier 3: every note first time at the metronome’s tempo — Slow 15 · Moderate 18 · Fast 20',
-        ci('slow').pts === 15 && ci('moderate').pts === 18 && ci('fast').pts === 20 && ci('slow').tier === 3);
-      check('With the metronome, where the player came in doesn’t matter: two beats late, or between two clicks, scores the same',
-        ci('slow', { times: at(80).map(t => t + 1.5) }).pts === 15 && ci('slow', { times: at(80).map(t => t + 2.3 + 0.37) }).pts === 15);
-      const f5 = ci('slow', { times: at(84) }), f10 = ci('slow', { times: at(88) }), s25 = ci('slow', { times: at(60) }), f30 = ci('slow', { times: at(104) });
-      check('A little off its tempo still counts (5% → 14, 10% → 13 at Slow); much slower or faster scores as on your own (12, tier 2) and says which',
-        f5.pts === 14 && f10.pts === 13 && f10.tier === 3 && s25.tier === 2 && s25.pts === 12 && /slower/.test(s25.detail) && /faster/.test(f30.detail) && f30.tier === 2,
-        [f5.pts, f10.pts, s25.pts, f30.pts].join(' · '));
-      const shaky = ci('slow', { times: at(80, [0, 0.4, -0.4, 0.4, -0.4, 0]) }), oneWrong = ci('fast', { tries: [1, 0, 0, 0, 0, 0] }), threeWrong = ci('fast', { tries: [0, 3, 0, 0, 0, 0] });
-      check('Not a steady beat isn’t with the metronome (8); a wrong bar drops it to the notes: first try 1, second ½ (7, 6)',
-        shaky.pts === 8 && shaky.tier === 1 && oneWrong.pts === 7 && oneWrong.tier === 1 && threeWrong.pts === 6 && /wrong bar/.test(oneWrong.detail),
-        [shaky.pts, oneWrong.pts, threeWrong.pts].join(' · '));
+      // the score (2026-10-13, the user's): the same with the metronome or without — every note first time and in
+      // rhythm goes by the player's tempo: about 100 or faster up to 20, 70–100 up to 17, under 70 up to 15
+      const sc = (bpm, o) => P.score(Object.assign({ tries: starts.map(() => 0), starts, times: at(bpm) }, o || {}));
+      const s104 = sc(104), s100 = sc(100), s98 = sc(98), s96 = sc(96), s80 = sc(80), s70 = sc(70), s69 = sc(69), s56 = sc(56);
+      check('Every note first time, in rhythm, on your own: by the tempo — 100 or faster 20, 70–99 17, under 70 15',
+        s104.pts === 20 && s100.pts === 20 && s98.pts === 20 && s96.pts === 17 && s80.pts === 17 && s70.pts === 17 && s69.pts === 15 && s56.pts === 15 && s80.tier === 3 && s80.pace === 'moderate' && s104.pace === 'fast',
+        [s104, s100, s98, s96, s80, s70, s69, s56].map(x => x.pts).join(' · '));
+      check('The same with the metronome: playing along at its tempo scores as on your own (80 → 17, 104 → 20)',
+        sc(80, { metro: 80 }).pts === 17 && sc(104, { metro: 104 }).pts === 20 && sc(60, { metro: 60 }).pts === 15);
+      check('With the metronome at 100, a player a little behind it (96) is still "around 100": 20; without it 96 is 17; far from it, their own tempo counts',
+        sc(96, { metro: 100 }).pts === 20 && sc(96).pts === 17 && sc(80, { metro: 100 }).pts === 17 && sc(104, { metro: 96 }).pts === 20);
+      const loose = k => sc(80, { times: at(80, [0, k, -k, k, -k, 0]) });
+      check('A looser rhythm is a point or two under the top (17 → 16 → 15 at 80); too loose is not in rhythm: every note right is 8',
+        loose(0.03).pts === 17 && loose(0.1).pts === 16 && loose(0.16).pts === 15 && loose(0.24).pts === 15 && loose(0.4).pts === 8 && loose(0.4).tier === 1,
+        [0.03, 0.1, 0.16, 0.24, 0.4].map(k => loose(k).pts + ' (' + loose(k).rhythm.err.toFixed(2) + ')').join(' · '));
+      const w1 = sc(104, { tries: [0, 1, 0, 0, 0, 0] }), w2 = sc(80, { tries: [1, 0, 0, 1, 0, 0] }), w3 = sc(60, { tries: [0, 2, 0, 0, 1, 0] });
+      check('In rhythm with wrong bars: 2 points off each (104 one wrong → 18; 80 two → 13; 60 three → 9), tier 2',
+        w1.pts === 18 && w1.tier === 2 && w2.pts === 13 && w3.pts === 9 && /wrong bar/.test(w1.detail), [w1.pts, w2.pts, w3.pts].join(' · '));
+      const many = sc(60, { tries: [1, 1, 1, 1, 1, 0] });
+      check('…never under what the notes alone are worth (60, five wrong: 15 − 10 = 5, more than the notes’ 4; ten wrong: the notes’ 1)',
+        many.pts === 5 && sc(60, { tries: [2, 2, 2, 2, 2, 0] }).pts === P.reading([2, 2, 2, 2, 2, 0]) && sc(60, { tries: [2, 2, 2, 2, 2, 0] }).tier === 1);
+      const off = sc(80, { times: at(80, [0, 0.4, -0.4, 0.4, -0.4, 0]), tries: [0, 1, 0, 0, 0, 0] });
+      check('Not in rhythm with a wrong bar: the notes, as before (first try 1, second ½ → 7); slower than 30 BPM is finding, not a beat (8)',
+        off.pts === 7 && off.tier === 1 && sc(24).pts === 8 && sc(24).tier === 1);
+      check('Where the player came in doesn’t matter: late by two beats, or between two clicks, the same',
+        sc(80, { metro: 80, times: at(80).map(t => t + 1.5) }).pts === 17 && sc(80, { metro: 80, times: at(80).map(t => t + 2.67) }).pts === 17);
+      const q3 = P.score({ starts: [0, 4, 8], times: [0, 0.3, 0.9], tries: [0, 0, 0] }), q3ok = P.score({ starts: [0, 4, 8], times: [0, 0.4, 0.82], tries: [0, 0, 0] });
+      check('Three notes: q q q played short-long (1 : 2) isn’t in rhythm (8); nearly even is (13 and up)',
+        q3.pts === 8 && q3.tier === 1 && q3ok.tier === 3 && q3ok.pts >= 13, q3.rhythm.err.toFixed(3) + ' · ' + q3ok.pts + ' (' + q3ok.rhythm.err.toFixed(3) + ')');
+      check('Two notes: no rhythm to judge, but their spacing is a tempo (a beat apart at 0.6 s → 100: 20)',
+        P.score({ starts: [0, 4], times: [1, 1.6], tries: [0, 0] }).pts === 20 && P.score({ starts: [0, 4], times: [1, 2], tries: [0, 0] }).pts === 15);
       const tc = P.tempoCheck(starts, at(72), 80);
-      check('tempoCheck: the player’s own tempo from their notes’ spacing, against the metronome’s (72 vs 80 → 0.9, within 15%)',
-        Math.abs(tc.ratio - 0.9) < 1e-9 && tc.ok && !P.tempoCheck(starts, at(66), 80).ok && P.tempoCheck([0, 4], [5, 9], 80).ok && !('follower' in P));
-      check('Stars follow the tiers: ★ 1–7 · ★★ 8–12 · ★★★ 13–20',
+      check('tempoCheck (Practice’s gold star): the player’s own tempo against the metronome’s (72 vs 80 → 0.9, within 15%)',
+        Math.abs(tc.ratio - 0.9) < 1e-9 && tc.ok && !P.tempoCheck(starts, at(66), 80).ok && P.tempoCheck([0, 4], [5, 9], 80).ok && !('follower' in P) && !('countIn' in P));
+      check('Stars follow the points: ★ 1–7 · ★★ 8–12 · ★★★ 13–20',
         [0, 1, 7, 8, 12, 13, 20].map(P.starsFor).join('') === '0112233');
-      check('Slow · Moderate · Fast are 60 · 80 · 100 by default', ['slow', 'moderate', 'fast'].map(id => RR.paceTempo(RR.DEFAULTS, id)).join() === '60,80,100');
+      // the tempo dial (2026-10-13): 56 → 132 on a classic metronome's marks, 72 to begin with
+      const T = RR.TEMPO;
+      check('The tempo dial: 56 to 132 on a classic metronome’s marks, 72 to begin with; anything snaps to the nearest mark',
+        T.MIN === 56 && T.MAX === 132 && T.DEFAULT === 72 && T.MARKS.includes(72) && T.MARKS.includes(100) && T.MARKS.every((m, i) => !i || m > T.MARKS[i - 1]) &&
+        RR.snapTempo(71) === 72 && RR.snapTempo(10) === 56 && RR.snapTempo(500) === 132 && RR.snapTempo('x') === 72 && RR.snapTempo(98) === 96 && RR.snapTempo(99) === 100);
+      check('The dial’s colours are the points’: under 70 Slow (15), 70–99 Moderate (17), 100 and up Fast (20)',
+        T.MARKS.filter(m => P.paceAt(m).id === 'slow').join() === '56,58,60,63,66,69' && P.paceAt(72).top === 17 && P.paceAt(96).id === 'moderate' && P.paceAt(100).top === 20);
+      check('6/8 clicks on the dotted quarter: 72 → 48', RR.beatTempo(72, [6, 8]) === 48 && RR.beatTempo(72, [4, 4]) === 72);
     })();
 
     /* ---- My sessions and the gold star (2026-10-05) ---- */
@@ -470,7 +493,7 @@
           RR.sanitize({ from: 'set' }).from === 'set');
 
         // a link: every field, the source set, the Song format's sets, a battle
-        const p = Object.assign(RR.clone(RR.DEFAULTS), { from: 'set', set: set.id, colour: 'black', labels: 'solfege', tempos: [50, 70, 90], gold: 13, auto: false,
+        const p = Object.assign(RR.clone(RR.DEFAULTS), { from: 'set', set: set.id, colour: 'black', labels: 'solfege', gold: 13, auto: false,
           game: 'song', songPicks: ['ode', 'set:' + set.id, 'set:set_gone_x'] });
         const link = RR.Lesson.link('Week 3', p, set, { teams: [{ name: 'Eagles', colour: '#a855f7' }, {}], per: 2, rounds: 4 });
         const back = RR.Lesson.parse(link);
@@ -668,11 +691,12 @@
           hidden && back && out && !RR.teachLevel(id) && !!RR.Sets.get(set.id) && !(RR.TeachMarks.data.players['Test kid'] || {})[id] && RR.TeachMarks.get(id).length === 0);
         // the look: Note Colors · Staff Color · Text Below the Notes, kept by the browser
         delete RR.device.teachLook;
-        const d0 = JSON.stringify(RR.teachLook()) === JSON.stringify({ colour: 'solid', staff: 'notes', labels: 'letters', auto: false });
+        const d0 = JSON.stringify(RR.teachLook()) === JSON.stringify({ colour: 'solid', staff: 'notes', labels: 'letters', auto: false, beat: 'click' });
         const okSet = RR.setTeachLook('colour', 'black') && RR.setTeachLook('staff', 'all') && !RR.setTeachLook('colour', 'pink') && !RR.setTeachLook('size', 'big');
         const A3 = RR.teachLevel('A3'), all = RR.teachStaff(A3, 'all'), plain = RR.teachStaff(A3, 'plain'), mine = RR.teachStaff(A3, 'notes');
-        const autoOk = RR.setTeachLook('auto', true) && RR.teachLook().auto === true && !RR.setTeachLook('auto', 'yes');
-        check('Tools: the look starts as Solid Color · its notes’ lines · letter names · Auto-Next off; changed it is kept; the staff can be its notes’ lines, all five in colour, or plain',
+        const autoOk = RR.setTeachLook('auto', true) && RR.teachLook().auto === true && !RR.setTeachLook('auto', 'yes') &&
+          RR.setTeachLook('beat', 'drums') && RR.teachLook().beat === 'drums' && !RR.setTeachLook('beat', 'bongos');   // the metronome's sound (2026-10-13)
+        check('Tools: the look starts as Solid Color · its notes’ lines · letter names · Auto-Next off · the click; changed it is kept; the staff can be its notes’ lines, all five in colour, or plain',
           d0 && okSet && autoOk && RR.teachLook().colour === 'black' && RR.teachLook().staff === 'all' && RR.teachLook().labels === 'letters' &&
           JSON.parse(localStorage.getItem(RR.KEY.device)).teachLook.colour === 'black' &&
           all.lines.join(' ') === [C.E, C.G, C.B, C.D, C.F].join(' ') && plain.lines === null && plain.ledgers === null && mine.lines === A3.lines);
@@ -685,7 +709,7 @@
 
     // Practice's Songs and the Songs card (2026-10-12): a Songbook song, or any melody set, as a level of slides
     (function () {
-      const hcb = RR.teachLevel('S:hot-cross-buns'), all = RR.teachSongs();
+      const hcb = RR.teachLevel('S:hot-cross-buns'), all = RR.teachSongs().filter(x => x.kind === 'song');   // the Songbook's (your copies, if any, sit among them)
       const cards = hcb ? RR.teachCards(hcb) : [];
       check('A Songbook song is a Practice level: its slides, notes and lines; every song of the Songbook is there',
         !!hcb && hcb.kind === 'song' && hcb.unit && hcb.ex.length === 4 && hcb.notes.join() === 'C4,D4,E4' && cards.length === 4 && cards[0].teach === 'S:hot-cross-buns' &&
@@ -711,8 +735,99 @@
         b1.tools === true && b2.tools === false && b3.tools === true && b2.teams.length === 2 && b2.per === b1.per && b2.rounds === b1.rounds);
     })();
 
-    document.getElementById('sum').innerHTML = '<span class="' + (fail ? 'fail' : 'pass') + '">' + pass + ' passed, ' + fail + ' failed</span>';
-    document.title = (fail ? 'FAIL ' : 'PASS ') + document.title;
+    /* ---- everything editable from the Library (2026-10-13): the app's own songs and lessons, and your copies ---- */
+    (function () {
+      const KEYS = [RR.Sets.KEY, 'rainbow_reader_teach_units_v1'];
+      const was = KEYS.map(k => localStorage.getItem(k));
+      try {
+        KEYS.forEach(k => localStorage.removeItem(k)); RR.TeachUnits.load();
+        const song = RR.Sets.get('songbook:hot-cross-buns'), lesson = RR.Sets.get('practice:L1');
+        check('The Songbook’s songs and Practice’s lessons read as sets of their own — never stored',
+          song && song.builtIn === 'song' && song.title === 'Hot Cross Buns' && song.melodies.length === RR.Melody.songCards('hot-cross-buns').length &&
+          lesson && lesson.builtIn === 'lesson' && lesson.title === 'Level 1 · Mi and So' && lesson.melodies.length === 5 && lesson.melodies.every(m => m.time.join('/') === '4/4') &&
+          RR.Sets.list().length === 0 && !RR.Sets.get('songbook:nope') && !RR.Sets.get('practice:L9') && RR.Sets.isBuiltIn('practice:A3'));
+        check('Every Songbook song and every lesson reads as a set, its melodies all kept',
+          Object.keys(RR.SONGS).every(k => RR.Sets.get('songbook:' + k).melodies.length === RR.Melody.songCards(k).length) &&
+          RR.TEACH.every(L => RR.Sets.get('practice:' + L.id).melodies.length === L.ex.length));
+        const told = []; RR.Sets.onCopied((from, rec) => told.push(from + '>' + rec.title));
+        const c1 = RR.Sets.update('songbook:hot-cross-buns', x => { x.melodies.splice(1, 1); });
+        check('Changing the app’s own song makes your copy — “Hot Cross Buns (my copy)”, the change in it, derivedFrom the song — and the song stays as it was',
+          c1 && c1.title === 'Hot Cross Buns (my copy)' && c1.derivedFrom === 'songbook:hot-cross-buns' && c1.melodies.length === song.melodies.length - 1 &&
+          RR.Sets.get('songbook:hot-cross-buns').melodies.length === song.melodies.length && RR.Sets.copyOf(RR.Sets.get(c1.id)) === 'songbook:hot-cross-buns' &&
+          told[0] === 'songbook:hot-cross-buns>Hot Cross Buns (my copy)');
+        const c2 = RR.Sets.update('songbook:hot-cross-buns', x => { x.melodies[0].notes[0].p = 'G4'; });
+        const c3 = RR.Sets.update(c1.id, x => { x.melodies.pop(); });
+        check('A second change to the original is a second copy (my copy 2); a change to your copy stays in it',
+          c2.title === 'Hot Cross Buns (my copy 2)' && c3.id === c1.id && RR.Sets.list().length === 2);
+        const songs = RR.teachSongs().map(L => L.id), at = songs.indexOf('S:hot-cross-buns');
+        check('Your copies sit right after their song in Songs (as your sets), in the order made',
+          songs[at + 1] === 'M:' + c1.id && songs[at + 2] === 'M:' + c2.id && RR.teachLevel('M:' + c1.id).copyOf === 'songbook:hot-cross-buns' &&
+          RR.teachTabOf('M:' + c1.id) === 'songs' && songs.filter(id => /^S:/.test(id)).length === Object.keys(RR.SONGS).length);
+        const l1 = RR.Sets.update('practice:L1', x => { x.title = 'My Mi and So'; });
+        const lessons = RR.teachLessons().map(L => L.id), li = lessons.indexOf('L1');
+        check('Changing a lesson (its name, here) makes your copy, one of Practice’s at once, right after the lesson — not with your exercises',
+          l1.title === 'My Mi and So' && l1.derivedFrom === 'practice:L1' && RR.TeachUnits.has(l1.id) && lessons[li + 1] === 'U:' + l1.id && lessons[li + 2] === 'A1' &&
+          !RR.teachExercises().some(L => L.id === 'U:' + l1.id) && RR.teachTabOf('U:' + l1.id) === 'lessons' && RR.teachLevel('U:' + l1.id).ex.length === 5);
+        // a lesson's copy back from a backup (no unit record): with the lessons again
+        RR.TeachUnits.remove(l1.id);
+        const again = RR.teachLessons().map(L => L.id);
+        check('A lesson’s copy that came back without its place in Practice (a backup) is put back with its lesson',
+          again[again.indexOf('L1') + 1] === 'U:' + l1.id && RR.TeachUnits.has(l1.id));
+        const own = RR.Sets.create('Week 3', [{ title: '', time: [4, 4], notes: [{ p: 'E4', t: 16 }] }]); RR.TeachUnits.add(own.id);
+        check('Your own sets aren’t copies; an exercise of yours stays with your exercises', !RR.Sets.copyOf(own) && RR.teachExercises().some(L => L.id === 'U:' + own.id) && RR.teachTabOf('U:' + own.id) === 'exercises');
+      } finally {
+        KEYS.forEach((k, i) => { if (was[i] == null) localStorage.removeItem(k); else localStorage.setItem(k, was[i]); });
+        RR.TeachUnits.load();
+      }
+    })();
+
+    /* ---- the drum beat (2026-10-13): the user's Ostinato Builder beats, one for each meter ---- */
+    (async function () {
+      const D = RR.Drums, b = D.bars([4, 4]);
+      const at = (bars, id) => bars.map((bar, i) => bar.filter(h => h.id === id).map(h => (i ? i + ':' : '') + +h.tick.toFixed(2)).join(' ')).filter(Boolean).join(' | ');
+      check('The 4/4 drum beat: bass 1, 3 and the and of 4 · snare 2 and 4 · tom the last sixteenth of 1 and 2, the and of 3 and 4 · hi-hat every eighth',
+        b.length === 1 && at(b, 'bass') === '0 8 14' && at(b, 'snare') === '4 12' && at(b, 'tom') === '3 7 10 14' && at(b, 'hihat') === '0 2 4 6 8 10 12 14' &&
+        b[0].every((h, i) => !i || h.tick >= b[0][i - 1].tick) && b[0].every(h => VirtualInstruments.INSTRUMENT_IDS.includes(h.id)), b[0].length + ' hits');
+      check('Each hit knows how far it is to its drum’s next one, round the bar (the kit’s fast-repeat sound): hi-hat 2, snare 8, tom 4 · 3 · 4 · 5, bass 8 · 6 · 2',
+        b[0].filter(h => h.id === 'hihat').every(h => h.gap === 2) && b[0].filter(h => h.id === 'snare').every(h => h.gap === 8) &&
+        b[0].filter(h => h.id === 'tom').map(h => h.gap).join() === '4,3,4,5' && b[0].filter(h => h.id === 'bass').map(h => h.gap).join() === '8,6,2');
+      const t3 = D.bars([3, 4]), t2 = D.bars([2, 4]), t6 = D.bars([6, 8]);
+      check('3/4 (the user’s shortened one, a bar): bass 1 and the and of 3 · snare 2 and 3 · tom the last sixteenth of 2 and 3 · hi-hat 1, its and, the and-a of 2, 3 e and',
+        t3.length === 1 && at(t3, 'bass') === '0 10' && at(t3, 'snare') === '4 8' && at(t3, 'tom') === '7 11' && at(t3, 'hihat') === '0 2 6 7 8 9 10' &&
+        t3[0].filter(h => h.id === 'bass').pop().gap === 2, at(t3, 'hihat'));
+      check('2/4: bass 1 · snare 2 · tom the last sixteenth of 1, the and of 2 · hi-hat 1, its and, the and-a of 2',
+        t2.length === 1 && at(t2, 'bass') === '0' && at(t2, 'snare') === '4' && at(t2, 'tom') === '3 6' && at(t2, 'hihat') === '0 2 6 7');
+      check('6/8: bass 1 · snare 4 · tom 3, 5, 6 · hi-hat every eighth (2 ticks apart, a dotted quarter 6)',
+        t6.length === 1 && at(t6, 'bass') === '0' && at(t6, 'snare') === '6' && at(t6, 'tom') === '4 8 10' && at(t6, 'hihat') === '0 2 4 6 8 10');
+      check('Every meter Melody Reader plays has a drum beat (2/4, 3/4, 4/4, 6/8); one without would click',
+        RR.METERS.map(RR.meterText).join() === '2/4,3/4,4/4,6/8' && RR.METERS.every(t => D.has(t)) && !D.has([5, 4]));
+      check('The metronome’s sound is a practice’s own: Click unless it says Drum beat (old practices, every level: Click)',
+        RR.DEFAULTS.beat === 'click' && RR.sanitize({ beat: 'drums' }).beat === 'drums' && RR.sanitize({ beat: 'bongos' }).beat === 'click' && RR.sanitize({}).beat === 'click' &&
+        RR.LEVELS.every(l => RR.originalLevel(l.n).beat === 'click') && RR.TEACH_LOOK.beat === 'click');
+      // the user's Ostinato Builder files, read as they are (only the bars each song plays)
+      // in the order they came: a later file's beat for a meter replaces an earlier one (3/4 was shortened)
+      const songs = [], newest = {}, key = o => RR.meterText(o.time);
+      for (const f of ['drum-beat-4-4.json', 'drum-beats-6-8-2-4-3-4.json', 'drum-beat-3-4.json']) {
+        try { songs.push.apply(songs, (await (await fetch('drum-beats/' + f)).json()).songs); } catch (e) { /* checked below */ }
+      }
+      songs.forEach(x => { const o = D.fromOstinato(x); newest[key(o)] = o; });
+      const read = Object.keys(newest).map(k => newest[k]);
+      check('Each drum beat is the user’s Ostinato Builder file as it is (tests/drum-beats/: 4/4; 6/8, 2/4 and a two-bar 3/4; then the shortened 3/4 — no links; beats past a song’s end left out)',
+        songs.length === 5 && read.length === 4 && read.every(o => RR.DRUM_BEATS[key(o)] && JSON.stringify(o.lines) === JSON.stringify(RR.DRUM_BEATS[key(o)].lines)) &&
+        songs.every(x => x.tracks.every(t => !Object.keys(t.links || {}).length)) && read.map(key).sort().join() === '2/4,3/4,4/4,6/8',
+        read.map(o => key(o) + ' ' + (RR.DRUM_BEATS[key(o)] && JSON.stringify(o.lines) === JSON.stringify(RR.DRUM_BEATS[key(o)].lines) ? '✓' : '✗')).join(' · '));
+      // a beat of more than a bar goes round (the 3/4 was two bars once); a bar with nothing in it holds its place
+      RR.DRUM_BEATS['5/4'] = { title: 'test', lines: { snare: 'x-|--|--|--|--|--|--|--|--|--', tom: '--|--|--|--|--|-x|--|--|--|--' } };
+      const five = D.bars([5, 4]);
+      RR.DRUM_BEATS['5/4'] = { title: 'test', lines: { snare: 'x-|--|--|--|--|--|--|--|--|--' } };
+      const rest = D.bars([5, 4]); delete RR.DRUM_BEATS['5/4'];
+      check('A beat of two bars goes round (each drum’s gap reaching across the bar line and back round); a bar with nothing in it holds its place (a rest)',
+        five.length === 2 && five[0][0].id === 'snare' && five[0][0].gap === 40 && five[1][0].id === 'tom' && five[1][0].tick === 2 && five[1][0].gap === 40 &&
+        rest.length === 2 && rest[1].length === 1 && rest[1][0].rest === true);
+
+      document.getElementById('sum').innerHTML = '<span class="' + (fail ? 'fail' : 'pass') + '">' + pass + ' passed, ' + fail + ' failed</span>';
+      document.title = (fail ? 'FAIL ' : 'PASS ') + document.title;
+    })();
   })();
   </script>
 </body>

@@ -118,17 +118,17 @@
     battle: 'Teams take turns at the xylophone, for points.'
   };
   let ptab = null;                            // Practice's pick: the tab showing (Lessons · Songs · Exercises)
-  const teachTab = id => /^S:/.test(id) ? 'songs' : /^[UM]:/.test(id) ? 'exercises' : 'lessons';
+  const teachTab = id => RR.teachTabOf(id);
   function practicePick(x) {
-    const tab = ptab || teachTab(x.teach.id), us = RR.TeachUnits.levels();
+    const tab = ptab || teachTab(x.teach.id), us = RR.teachExercises();
     const tabs = [['lessons', 'Lessons'], ['songs', 'Songs'], ['exercises', 'Exercises']];
-    const list = tab === 'lessons' ? RR.TEACH : tab === 'songs' ? RR.teachSongs() : us;
+    const list = tab === 'lessons' ? RR.teachLessons() : tab === 'songs' ? RR.teachSongs() : us;
     return '<h4 class="sf-q">What to practise</h4><div class="seg sf-tabs" role="group" aria-label="What to practise">' + tabs.map(t => '<button type="button" data-stab="' + t[0] + '" class="' + (tab === t[0] ? 'on' : '') + '" aria-pressed="' + (tab === t[0]) + '">' + t[1] + '</button>').join('') + '</div>' +
       '<div class="tw-levels"><div class="teach-grid in-ses' + (tab === 'lessons' ? '' : ' units') + '">' + list.map(L => RR.Teach.tileHtml(L, 'st', x.teach.id)).join('') + '</div></div>' +
       (tab === 'exercises' && !us.length ? '<p class="note">No exercises yet — a melody set of yours becomes one: Library → My melodies → a set → ▶ Practice.</p>' : '');
   }
   function songPick(x) {
-    const s = x.song, all = RR.teachSongs().concat(RR.Sets.list().filter(y => y.melodies.length && !/^lesson/.test(y.id)).map(y => RR.teachLevel('M:' + y.id)).filter(Boolean));
+    const s = x.song, all = RR.teachSongs().concat(RR.Sets.list().filter(y => y.melodies.length && !/^lesson/.test(y.id) && !RR.Sets.copyOf(y)).map(y => RR.teachLevel('M:' + y.id)).filter(Boolean));
     const L = RR.teachLevel(s.id), n = L ? L.ex.length : 0;
     const row = y => '<button type="button" class="mc-row' + (y.id === s.id ? ' on' : '') + '" data-ss="song" data-id="' + RR.esc(y.id) + '" aria-pressed="' + (y.id === s.id) + '">' +
       '<b>' + (y.kind === 'song' ? '♪ ' : '♫ ') + RR.esc(y.title) + '</b><span class="mc-n">' + y.ex.length + (y.ex.length === 1 ? ' slide' : ' slides') + '</span></button>';
@@ -253,12 +253,15 @@
         '<tr><td>Text below the notes</td><td>' + seg('labels', [['letters', 'Letter Name'], ['solfege', 'Solfege Name'], ['none', 'Nothing']], s.labels) + '</td></tr>' +
         '<tr><td>Practice</td><td>' + seg('practiceMode', [['on', 'On (default)'], ['off', 'Off (default)'], ['disabled', 'Disabled']], practiceMode(s)) + '</td></tr>' +
         '<tr><td>Play button</td><td>' + seg('playMode', [['anim', 'Animates music and bars'], ['sound', 'Plays sounds only'], ['off', 'Disabled']], playMode(s)) + '</td></tr>' +
+        // the metronome's sound (2026-10-13, the user's: "the metronome choice of click or drum beat") — Tools has it too
+        '<tr><td>Metronome</td><td>' + seg('beat', [['click', 'Click'], ['drums', 'Drum beat']], s.beat === 'drums' ? 'drums' : 'click') +
+          (s.beat === 'drums' && RR.METERS.some(t => !RR.Drums.has(t)) ? '<p class="note">No drum beat yet for ' + RR.METERS.filter(t => !RR.Drums.has(t)).map(RR.meterText).join(', ') + ' — those click.</p>' : '') + '</td></tr>' +
         '<tr><td>Auto-Progress to next melody</td><td>' + seg('auto', [['true', 'On'], ['false', 'Off']], String(!!s.auto)) + '</td></tr>' +
         '</tbody></table></div>';
     },
     points() {
       return '<div class="sec">' + swRow('Points', '@points', RR.device.points) +
-        RR.note('pt-how', 'Each melody earns 1 to 20. Find the notes: 1–8 (a note right first time counts 1, second time ½). Every note first time, in your own steady beat: 9–12. A Test with the metronome, every note right first time at about its tempo — wherever you come in, on beat 1 or not: Slow 13–15, Moderate 16–18, Fast 19–20. Every note right but faster or slower than the metronome scores as on your own: 9–12. A wrong bar drops it to 1–8. Stars: ★ 1–7 · ★★ 8–12 · ★★★ 13–20.') +
+        RR.note('pt-how', 'Each melody earns 1 to 20 — the same with the metronome or without it. Every note right first time, in rhythm: by your tempo — about 100 BPM or faster up to 20, 70 to 100 up to 17, slower than 70 up to 15 (a point or two less when the rhythm is looser). In rhythm with a wrong bar: 2 points off for each. Every note right but not in rhythm: 8. Not in rhythm, with wrong bars: the notes — a note right first time counts 1, second time ½ (1–8). Stars: ★ 1–7 · ★★ 8–12 · ★★★ 13–20.') +
         RR.note('pt', 'With points off there are no numbers anywhere. The lights, sparkles and stars stay.') +
         swRow('Gold stars', '@stars', RR.device.stars) +
         swRow('Celebration sounds', '@celebrate', RR.device.celebrate) + '</div>' +
@@ -369,13 +372,6 @@
     else if (k === 'time') { s.time = [+v, 4]; s.times = [s.time.slice()]; }
     else if (k === 'times') { s.times = v; s.time = v[0].slice(); }
     else if (['bars', 'flash', 'clockSecs', 'gold'].includes(k)) s[k] = +v;
-    else if (/^tempo\d$/.test(k)) {        // Slow ≤ Moderate ≤ Fast: dragging one past another pushes it along
-      const i = +k[5], tp = s.tempos.slice();
-      tp[i] = +v;
-      for (let j = i + 1; j < 3; j++) tp[j] = Math.max(tp[j], tp[j - 1]);
-      for (let j = i - 1; j >= 0; j--) tp[j] = Math.min(tp[j], tp[j + 1]);
-      s.tempos = tp;
-    }
     else if (k === 'auto') s.auto = v === 'true' || v === true;
     else if (k === 'grey') s.grey = v === 'true' || v === true;
     else if (k === 'barText') { s.letters = v === 'letters' || v === 'both'; s.nums = v === 'numbers' || v === 'both'; }
@@ -449,8 +445,8 @@
       const notes = r.filter(x => !CELL[x].rest && CELL[x].meter === CELL[id].meter);
       if (r.includes(id)) { if (!(notes.length === 1 && notes[0] === id)) r = r.filter(x => x !== id); } else r.push(id);
       change('rhythms', r);
-      // hear it: on G, at the Moderate tempo
-      const spt = 60 / RR.paceTempo(s, 'moderate') / 4; let tt = RR.Sound.now() + 0.05;
+      // hear it: on G, at the tempo dial's tempo
+      const spt = 60 / RR.listenTempo() / 4; let tt = RR.Sound.now() + 0.05;
       CELL[id].ticks.forEach(x => { if (x > 0) RR.Sound.playAt('G4', tt, 0.7); tt += Math.abs(x) * spt; });
       return true;
     }
@@ -663,11 +659,6 @@
     const r = e.target.closest('[data-range]');
     if (r) {
       change(r.dataset.range, r.value);
-      if (/^tempo\d$/.test(r.dataset.range)) P().tempos.forEach((v, i) => {
-        const b = $('#tempo' + i + '-v'), inp = body.querySelector('[data-range="tempo' + i + '"]');
-        if (b) b.textContent = v + ' BPM';
-        if (inp && inp !== r) inp.value = v;
-      });
       return;
     }
   });

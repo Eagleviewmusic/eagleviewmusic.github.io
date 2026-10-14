@@ -118,13 +118,11 @@
               <span class="ctl-label mode-label" id="mode-label">Practice</span>
             </div>
             <div class="ctl ctl-metro">
-              <!-- the weight slides up the arm for Slow, down for Fast, as on a real one -->
-              <button class="round-btn ctl-btn metro-btn" id="btn-metro" type="button" aria-label="Metronome off">
+              <!-- the weight slides up the arm for a slow tempo, down for a fast one, as on a real one -->
+              <button class="round-btn ctl-btn metro-btn" id="btn-metro" type="button" aria-controls="metro-pick" aria-expanded="false" aria-label="Metronome off">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path class="body" d="M9.2 3.2h5.6l4 17.3H5.2z" stroke-width="2" stroke-linejoin="round"/><path d="M6.6 15.2h10.8" stroke-width="1.8"/><path class="arm" d="M12 15.2L17.6 3.6" stroke-width="2" stroke-linecap="round"/><rect class="mw" id="metro-weight" x="-2.2" y="-1.4" width="4.4" height="2.8" rx=".7" transform="translate(14.3 9.6) rotate(25.8)"/></svg>
               </button>
               <span class="ctl-label metro-label" id="metro-label">Off</span>
-              <!-- Battle Mode: the metronome opens a choice of tempo; picking one counts in at once (game.js metroTap) -->
-              <div class="metro-pick" id="metro-pick" role="group" aria-label="Pick a tempo" hidden></div>
             </div>
             <div class="ctl ctl-tools">
               <!-- Tools — the metronome (beside the music in a battle), the computer keyboard, Auto-Next, the colours: a panel that pops up (tools.js) -->
@@ -211,6 +209,9 @@
 
   <!-- Teach Me to Read's Tools: beside its button, over the music (teach.js) -->
   <div class="teach-tools" id="teach-tools" role="dialog" aria-labelledby="tl-title" hidden></div>
+  <!-- Battle Mode: the metronome beside the music opens the tempo dial and Start / Stop (game.js metroTap, dial.js) —
+       out here, fixed, since the music card clips -->
+  <div class="metro-pick" id="metro-pick" role="dialog" aria-labelledby="mp-title" hidden></div>
   <div class="fx" id="fx" aria-hidden="true"></div>
   <div class="sr-only" id="announce" aria-live="polite"></div>
 
@@ -218,9 +219,12 @@
   <script src="lib/evm-count-in.js"></script>
   <script src="lib/evm-library.js"></script>
   <script src="lib/evm-shelf.js"></script>
+  <script src="lib/instruments/js/virtual-instruments.js"></script>
   <script src="js/core.js"></script>
   <script src="js/sound.js"></script>
   <script src="js/points.js"></script>
+  <script src="js/dial.js"></script>
+  <script src="js/drums.js"></script>
   <script src="js/xylophone.js"></script>
   <script src="js/engrave.js"></script>
   <script src="js/songbook.js"></script>

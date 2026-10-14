@@ -691,6 +691,11 @@ button:focus-visible, .bar:focus-visible { outline: 3px solid #2563eb; outline-o
 /* a set's page: Teach Me to Read (2026-10-12) — the set played as one of its units */
 .mel-tag.teach { background: #fce7f3; color: #9d174d; }
 .mel-tag.song { background: #e0f2fe; color: #075985; }
+/* your copy of the app's own song or lesson (2026-10-13): tagged, and in the Library tucked in under its original */
+.mel-tag.mine { background: #ffedd5; color: #9a3412; }
+.lb-badge.copy { margin-left: 22px; opacity: .85; }
+.mel-set-head .mel-tag { flex: none; }
+.mel-copy-of { margin: 2px 0 10px; }
 .mel-teach { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; background: #fdf2f8; border-radius: 16px; padding: 10px 14px; margin: 2px 0 12px; box-shadow: inset 0 0 0 2px #fbcfe8; }
 .mel-teach-ico { flex: none; width: 44px; height: 44px; border-radius: 12px; background: #fff; display: grid; place-items: center; box-shadow: inset 0 0 0 2.5px #be185d; }
 .mel-teach-ico svg { width: 32px; height: 32px; }
@@ -903,18 +908,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, .bar:focus-visible, 
 .bt-sum { margin: 4px 0 2px; }
 @media (prefers-reduced-motion: reduce) { .bt-sw button { transition: none; } }
 
-/* Battle Mode: the metronome's choice of tempo, over the button */
+/* Battle Mode: the metronome beside the music opens the tempo dial and Start / Stop (2026-10-13) — fixed beside the
+   button, like Tools (the music card clips); a phone: over the xylophone */
 .ctl { position: relative; }
-.metro-pick { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 4;
-  display: flex; gap: 6px; padding: 8px; border-radius: 18px; background: #fff; box-shadow: 0 10px 30px rgba(62,39,35,.3); white-space: nowrap; }
-.metro-pick::after { content: ''; position: absolute; top: 100%; left: 50%; margin-left: -8px; border: 8px solid transparent; border-top-color: #fff; }
-.metro-pick button { border: 0; border-radius: 12px; padding: 8px 12px 7px; background: #15803d; color: #fff; display: flex; flex-direction: column; align-items: center; line-height: 1.1; box-shadow: 0 3px 0 #14532d; }
-.metro-pick button b { font-size: 16px; font-weight: 700; }
-.metro-pick button small { font-size: 11.5px; font-weight: 600; opacity: .9; }
-.metro-pick button.on { background: #166534; box-shadow: 0 0 0 3px #fde047; }
-.metro-pick button.off { background: #f3ede1; color: var(--ink); box-shadow: 0 3px 0 #d9c9ad; justify-content: center; font-weight: 700; }
-.metro-pick button:active { transform: translateY(2px); box-shadow: none; }
-@media (max-width: 700px) { .metro-pick { padding: 6px; gap: 4px; } .metro-pick button { padding: 7px 9px 6px; } .metro-pick button b { font-size: 14px; } }
+.metro-pick { position: fixed; z-index: 30; width: 290px; padding: 10px 16px 14px; color: var(--ink); background: #fff; border-radius: 20px;
+  box-shadow: 0 16px 44px rgba(43,29,22,.34), 0 0 0 2px #efe5d3; }
+.metro-pick::before { content: ''; position: absolute; left: -10px; top: var(--ay, 50%); margin-top: -10px; border: 10px solid transparent; border-left: 0; border-right-color: #fff;
+  filter: drop-shadow(-2px 0 0 #efe5d3); }
+.mp-head { padding: 0 0 2px; }
+.mp-head b { font-size: 19px; }
+@media (max-width: 700px) {
+  .metro-pick { left: 8px; right: 8px; bottom: 8px; top: auto; width: auto; max-height: 72vh; overflow-y: auto; }
+  .metro-pick::before { display: none; }
+}
 
 /* the session page's first row: Session Name: [the name] ▶ Play Session (2026-10-06) */
 .ses-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -1380,18 +1386,46 @@ html.view-home .app-home { display: none; }
 .tl-head .icon-btn { width: 38px; height: 38px; }
 .tl-body { overflow-y: auto; min-height: 0; padding: 2px 16px 14px; display: flex; flex-direction: column; gap: 11px; }
 .tl-sec h4 { margin: 0 0 5px; font-size: 12.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink-soft); }
-.tl-metros { display: grid; grid-template-columns: .8fr 1fr 1fr; gap: 6px; }
-.tl-metro { border: 0; border-radius: 12px; padding: 7px 4px 6px; background: #f3ede1; color: #15803d; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  line-height: 1.1; box-shadow: 0 3px 0 #d9c9ad; }
-.tl-metro b { font-size: 16px; font-weight: 700; }
-.tl-metro small { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); }
-.tl-metro.off { color: var(--ink); }
-.tl-metro.on { background: #15803d; color: #fff; box-shadow: 0 3px 0 #14532d, 0 0 0 3px #fde047; }
-.tl-metro.on small { color: #fff; opacity: .9; }
-.tl-metro.off.on { background: #e7dcc7; color: var(--ink); box-shadow: 0 3px 0 #cbb994; }
-.tl-metro:active { transform: translateY(2px); box-shadow: none; }
+/* the tempo dial (dial.js, 2026-10-13): a half circle, Easy → Hard, in the points' colours; − / + under it */
+.td { display: flex; flex-direction: column; align-items: stretch; }
+.td-svg { display: block; width: 100%; max-width: 250px; margin: 0 auto; touch-action: none; cursor: pointer; border-radius: 14px; outline: none; -webkit-user-select: none; user-select: none; }
+
+.td-back { fill: none; stroke: #efe5d3; stroke-width: 20; stroke-linecap: round; }
+.td-band { fill: none; stroke-width: 12; }
+.td-ticks line { stroke: #cbb994; stroke-width: 1.6; stroke-linecap: round; }
+.td-end { font: 700 12.5px 'Fredoka', sans-serif; fill: var(--ink-soft); text-anchor: middle; }
+.td-num { font: 700 40px/1 'Fredoka', sans-serif; fill: var(--ink); text-anchor: middle; }
+.td-unit { font: 700 13px 'Fredoka', sans-serif; fill: var(--ink-soft); text-anchor: middle; letter-spacing: .5px; }
+.td-knob circle:first-child { fill: #fff; stroke: var(--ink); stroke-width: 3; }
+.td-knob { filter: drop-shadow(0 2px 2px rgba(43,29,22,.3)); transition: transform .08s ease-out; }
+.td-svg.turning .td-knob { transition: none; }
+.td-svg.turning .td-knob circle:first-child, .td-svg:focus-visible .td-knob circle:first-child { stroke: #be185d; stroke-width: 4; }
+.td-svg:focus-visible .td-num { fill: #be185d; }
+.td-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.td-step { flex: none; width: 40px; height: 40px; border: 0; border-radius: 50%; background: #f3ede1; color: var(--ink); font: 700 24px/1 'Fredoka', sans-serif; box-shadow: 0 3px 0 #d9c9ad; display: grid; place-items: center; padding: 0 0 2px; }
+.td-step:hover { background: #ebe2d1; }
+.td-step:active { transform: translateY(2px); box-shadow: none; }
+.td-step:disabled { opacity: .35; box-shadow: none; }
+.td-band-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; line-height: 1.15; color: var(--ink); }
+.td-band-txt b { font-size: 15px; font-weight: 700; white-space: nowrap; }
+.td-band-txt b::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--bc); margin-right: 6px; vertical-align: 1px; }
+.td-band-txt small { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+.td-beat { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-soft); text-align: center; }
+@media (prefers-reduced-motion: reduce) { .td-knob { transition: none; } }
+/* the metronome's sound, above the dial (2026-10-13): Click · Drum beat */
+.td-sound { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 4px; }
+.td-snd { display: flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 12px; background: #f6f1e7; padding: 7px 8px; color: var(--ink); font: 700 15px/1.1 'Fredoka', sans-serif; min-width: 0; }
+.td-snd svg { flex: none; width: 24px; height: 24px; fill: none; stroke: var(--ink-soft); }
+.td-snd:hover { background: #efe7d8; }
+.td-snd.on { background: #fff; box-shadow: inset 0 0 0 3px #be185d; }
+.td-snd.on svg { stroke: #be185d; }
+.td-none { margin: 2px 0 4px; font-size: 12.5px; color: var(--ink-soft); text-align: center; }
+/* the metronome's Start / Stop, under the dial */
+.tl-go { width: 100%; margin-top: 9px; border: 0; border-radius: 14px; padding: 10px 12px; font: 700 16px/1.1 'Fredoka', sans-serif; background: #15803d; color: #fff; box-shadow: 0 3px 0 #14532d; }
+.tl-go:active { transform: translateY(2px); box-shadow: none; }
+.tl-go.on { background: #e7dcc7; color: var(--ink); box-shadow: 0 3px 0 #cbb994; }
 .tl-say { margin: 6px 0 0; font-size: 13px; color: var(--ink-soft); line-height: 1.3; }
-.tl-sec.hint .tl-metros { border-radius: 14px; animation: tl-hint 1.4s ease-in-out infinite; }
+.tl-sec.hint .tl-go { animation: tl-hint 1.4s ease-in-out infinite; }
 @keyframes tl-hint { 0%, 100% { box-shadow: 0 0 0 0 rgba(21,128,61,.55); } 60% { box-shadow: 0 0 0 10px rgba(21,128,61,0); } }
 /* Computer Keyboard · Auto-Next Slide, side by side (2026-10-12, the user's: "Computer Keyboard — with computer on
    top and keyboard below it, and a little keyboard next to it … Right next to it, write Auto-Next Slide on/off") */
@@ -1408,7 +1442,6 @@ html.view-home .app-home { display: none; }
 .tl-sw { flex: none; font-style: normal; font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 3px 9px; background: #fff; color: var(--ink-soft); box-shadow: inset 0 0 0 2px #d9c9ad; }
 .tl-auto.on { background: #dcfce7; }
 .tl-auto.on .tl-sw { background: #15803d; color: #fff; box-shadow: none; }
-.tl-metros.n4 { grid-template-columns: .7fr 1fr 1fr 1fr; }
 .tl-choices { display: grid; gap: 6px; }
 .tl-choices.n4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .tl-choices.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -1423,7 +1456,7 @@ html.view-home .app-home { display: none; }
   .teach-tools { left: 8px; right: 8px; bottom: 8px; top: auto; width: auto; max-height: 72vh; }
   .teach-tools::before { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { .tools-btn.metro-on .tools-dot, .tl-sec.hint .tl-metros { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .tools-btn.metro-on .tools-dot, .tl-sec.hint .tl-go { animation: none; } }
 /* the five dots are buttons here: back to any exercise reached */
 .dots.teach-dots { pointer-events: auto; gap: 9px; }
 .dots button.dot { padding: 0; width: 19px; height: 19px; cursor: pointer; appearance: none; -webkit-appearance: none; }
@@ -1449,9 +1482,6 @@ html.view-home .app-home { display: none; }
   .app .side-right { grid-column: 3; grid-row: 1; align-self: stretch; flex-direction: column; justify-content: center; align-items: center; gap: 14px; }
   .app .music { grid-column: 2; grid-row: 1; }
   .app.kbd-on .kbd-view { grid-column: 2; }
-  /* the tempo choice opens beside the metronome, pointing at it */
-  .app .metro-pick { bottom: auto; top: 50%; left: calc(100% + 12px); transform: translateY(-50%); }
-  .app .metro-pick::after { top: 50%; left: auto; right: 100%; margin: -8px 0 0; border-color: transparent; border-right-color: #fff; }
 }
 /* a shorter screen: smaller buttons, so the three on the left fit beside the staff */
 @media (min-width: 701px) and (max-height: 820px) {

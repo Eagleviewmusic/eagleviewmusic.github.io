@@ -43,7 +43,15 @@ ledger line, a set gone and back, the look kept) 126, all passing on 2026-10-12;
 checks (the follower's) were replaced by the tempo rule's (2026-10-12) — 122; with Staff Color and a battle's Tools
 switch, 124; with the song levels (a Songbook song, any set as a song) 126, all passing on 2026-10-12; with a session's
 Format (old sessions taking one, the points each format sets, Battle kept, the picks made safe, a session from Practice)
-and the names for an unnamed session, 133, all passing on 2026-10-12.
+and the names for an unnamed session, 133, all passing on 2026-10-12. The tempo dial and the new score (2026-10-13:
+the points by the player's tempo, wrong bars 2 off each, a few notes judged a little harder, the dial's marks and
+colours, 6/8's click; the old three tempos dropped from practices) — 140, all passing on 2026-10-13. The drum beat
+(the 4/4 beat's hits and gaps, the user's Ostinato Builder file read as it is, the meters still to come, `beat` in
+practices and the Practice look, compound and triplet slots) — 146, all passing on 2026-10-13; with 3/4, 2/4 and 6/8
+(each against the user's files — the newest beat for a meter wins — a beat of more than a bar going round, a resting
+bar) — 149, all passing on 2026-10-13. Everything editable from the Library (the app's songs and lessons read as sets,
+a change makes "(my copy)", "(my copy 2)", copies after their originals in Songs and Practice, a lesson's copy kept one
+of Practice's, your exercises left alone) — 157, all passing on 2026-10-13 (with a copy saved or not).
 
 The Teacher Library shelf reads `../Teacher Library/index.json`, which only
 exists on the live site; served from its own folder (8815/8816) it can't be
@@ -54,6 +62,158 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 — and delete it afterwards.
 
 ## What's built (all six phases)
+
+- **Everything editable from the Library** (2026-10-13, the user's: "I
+  notice that from the library, I cannot edit any of the songs or Practice
+  Songs. I want to be able to edit any and everything from the Library. If
+  I change a song that is hard-coded into the app, make my own copy of
+  that song — put it with the rest of them — not with my sessions — and
+  call it 'my copy'"). Every row in Songs and Practice has **✎** now (as
+  sessions and levels had), opening a set's page — the same editor My
+  melodies uses (✎ a melody in Make a melody, ↑ ↓ ×, + Add a melody, ⧉
+  Copy melodies in, the name).
+  - **The app's own** — the Songbook's songs and Practice's six lessons —
+    read as sets of their own (`RR.Sets.get('songbook:<id>')`,
+    `'practice:<L1>'`), never stored. Their page says so, with ▶ Play the
+    song / ▶ Practice it to play them as they are. **The first change**
+    (`RR.Sets.update` on one of them: a melody written, moved or taken out,
+    the name) **makes your copy** — "Hot Cross Buns (my copy)", then "(my
+    copy 2)" — with the change in it, `derivedFrom` the original (the
+    family's field: it travels in backups and envelopes); the page and
+    Make a melody go on in the copy (`RR.Sets.onCopied`), and a toast says
+    where it is. Opening one and looking makes nothing.
+  - **Where copies live**: right under their original — in the Library's
+    Songs and Practice folders (tucked in, tagged *My copy*), Practice's
+    window and drop-down, the Songs window and a session's picks
+    (`RR.teachSongs`, `RR.teachLessons`, `RR.teachTabOf`). Not in My
+    melodies, not in My sessions. A song's copy plays as a song
+    (`'M:<set>'`); a lesson's copy is one of Practice's units from the start
+    (`'U:<set>'`, no Take it out — one that comes back from a backup is
+    made one again), not listed with your exercises (`RR.teachExercises`).
+  - **Your exercises** (your own sets as units) have ✎ too — changed in
+    place: they're yours.
+
+- **The drum beat** (2026-10-13, the user's: "To help the players feel the
+  beat, I'd like to add a simple drum beat as an alternative to the
+  metronome. This would work just like the metronome, playing the assigned
+  BPM — and it would be for 4/4 time … put this option in the tools next
+  to the metronome — click or drum beat, and find the best place in the
+  Session settings menu"). The metronome's sound is **Click** or **Drum
+  beat**: two buttons above the tempo dial in Tools and in a battle's
+  metronome pop-up (`RR.Dial.soundHtml`, → `G.setBeatSound`), and a
+  **Metronome** row on the ✎ page's **Look & Feel** (my pick for "the best
+  place": it is a help, like Practice and the Play button, and it sits
+  with them). It is the practice's own field `beat` (`'click'` default —
+  every level, old session and link clicks; a lesson link carries it);
+  Practice's lessons keep it in the look (`RR.teachLook().beat`), like
+  their colours. Changed with the metronome going, it starts again.
+  - **The beats** (`js/drums.js`, `RR.DRUM_BEATS`) are the user's, written
+    in Ostinato Builder 2.0 — one for **every meter Melody Reader plays,
+    4/4 · 3/4 · 2/4 · 6/8** (`RR.METERS` — Songbook songs are all 4/4; Make
+    a melody does 2/4, 3/4, 4/4; 6/8 only in Levels 14–15), each drum a
+    line of beats (`x-|--|x-|-x`: | between beats, a character a slot; 6/8
+    has two beats of three eighths). 4/4: bass 1, 3 and the and of 4 ·
+    snare 2 and 4 · tom the last sixteenth of 1 and 2, the and of 3 and 4 ·
+    hi-hat every eighth. 3/4 (the user sent a two-bar one, then shortened
+    it to a bar the same day): bass 1 and the and of 3 · snare 2 and 3 ·
+    tom the last sixteenth of 2 and 3 · hi-hat sixteenths and eighths. 2/4:
+    bass 1 · snare 2 · tom the last sixteenth of 1, the and of 2. 6/8: bass
+    1 · snare 4 · tom 3, 5, 6 · hi-hat every eighth. A beat may be **more
+    than a bar** (`RR.Drums.bars` gives its bars; it goes round from its
+    first bar at the music's first full bar, Listen's round and round
+    carrying the count on); an empty bar holds a rest's place. The user's
+    Ostinato Builder backups are kept as they came in `tests/drum-beats/`,
+    and `RR.Drums.fromOstinato` reads one — only the bars the song plays
+    (Ostinato Builder keeps beats past a song's end that it doesn't play:
+    the 6/8 file carries the 2/4's leftovers) — and a test checks every
+    beat against its file, the newest file for a meter winning: **a new or
+    changed beat = the user's backup → that folder → its lines into
+    `RR.DRUM_BEATS`**. A meter with no beat (none now) clicks, and Tools
+    says so.
+  - **The sounds** are Ostinato Builder's: the shared kit,
+    `lib/instruments/js/virtual-instruments.js` (vendored — see its README;
+    keep it byte-identical with `Virtual Instrument Assets`). `RR.Sound.drum`
+    plays it on Melody Reader's own context through `EVMCountIn.timed`, as
+    Ostinato Builder does, so each hit lands on the audio clock; at
+    `DRUM_LEVEL` 0.22 × volume, beside the xylophone's compressor (the kit
+    soft-clips itself). Measured offline the same day: the snare ~5 dB
+    under a low C struck (A-weighted, 150 ms), ~12 under a high E; tom and
+    bass well under — so the melody stays on top. (The click is much
+    quieter still — that was already so.)
+  - **How it plays** (beat.js `pulse` / `pump`, `span` for Listen): a bar at
+    a time on the music's bar lines. **The count-in is still clicked** —
+    "Get ready 1 2 3 4" — and the drums come in on the music's first full
+    bar, as a band's would after the drummer's count (a pick-up plays over
+    the last clicks); Listen with the metronome on is the same (a bar of
+    clicks, the drums from the first note's bar); Practice's click has no
+    count, so its drums start at once; Practice's lessons' round and round
+    keep the groove going. Each hit is told how far it is to its drum's
+    next one (the kit's fast-repeat sound).
+
+- **The tempo dial and one score for every Test** (2026-10-13, the user's:
+  "Instead of having preset tempos, lets give the user a dial from easy to
+  hard, going from 56 to 132 bpm. This dial will effect the playback too.
+  Lets make the default 72 unless the user changes it, and then let the
+  change only apply to that session … if they play the rhythms mostly
+  correct — whether with the metronome or not — give them the points they
+  would have gotten if played with the metronome").
+  - **The dial** (`js/dial.js`, `RR.Dial`) replaced Slow · Moderate · Fast
+    — in Tools, and in a battle's metronome pop-up (now `position: fixed`
+    beside the button, out of the music card, which clips; a phone: over
+    the xylophone). A half circle, **Easy** left, **Hard** right, coloured
+    as the points go: green under 70 BPM (up to 15), amber 70–99 (17), red
+    100 and up (20), with "Moderate · up to 17 points" under it (no points
+    line in Practice or with Points off). It stops on **a classic
+    metronome's marks** — 56 58 60 63 66 69 **72** 76 80 84 88 92 96 100
+    104 108 112 116 120 126 132 (`RR.TEMPO`, my call: steps a teacher
+    knows, and − / + mean something). Drag the knob round the arc or tap
+    it (the number in the middle takes no tap); − / + a mark at a time;
+    arrows, Page Up / Down, Home / End. Dragging moves only the picture —
+    the tempo is set when the finger lifts (keys and − / + half a second
+    after the last), so a count-in restarts once. Under it **▶ Start the
+    metronome / ■ Stop the metronome** (Start closes the panel and counts
+    in, as picking a tempo did). In 6/8 a line says the dotted quarter's
+    rate (72 → 48).
+  - **The tempo** is `G.tempo`, 72 when anything is picked (`usePractice`
+    — a level, a session, a battle, a lesson link, a Practice lesson,
+    unit or song — and a set or format played just this time, or the
+    set switched): turned, it stays for that until something else starts.
+    Not saved; the metronome itself is still Off on every new melody.
+    Turning it with the metronome going starts it again at the new tempo
+    (a Test or Practice lesson counts in again; Practice's click changes
+    step). **Listen, Hear your song, Make a melody and My melodies play at
+    it** (`RR.listenTempo`) — the metronome on or off. Practice lessons
+    may go up to 132 too (they stopped at Moderate before).
+  - **The score** (`RR.Points.score`) is the same with the metronome or
+    without it: **every note right first time and in rhythm** — by the
+    player's own tempo, about **100 or faster up to 20**, **70–99 up to
+    17**, **under 70 up to 15** (the top for a rhythm within 0.06 of a
+    beat, one under within 0.10, two under to 0.21 — the old "in rhythm");
+    **in rhythm with wrong bars: 2 points off each** (never under what the
+    notes alone are worth); **the notes right, the rhythm not: 8**; **not
+    in rhythm with wrong bars: the notes as before** (first try 1, second
+    ½). The tempo is the least-squares line's; with the metronome on and
+    the player within 6% of it, the metronome's when that is faster (so
+    playing along at 100 is "about 100"); 98 rounds up to Fast ("around
+    100"). A note with a slip is timed by **the first bar struck for it**
+    (`G.firstAt`), right or wrong — a wrong bar on its beat is the rhythm
+    kept — but not a stray in the count-in. Three to five notes are judged
+    a little harder (the leftover ×1.41 for three, ×1.15 for four, ×1.05
+    for five): with the rhythm worth up to 20, three quarters played
+    short-long counted as in rhythm. Six and up are as they were.
+  - **Kinds of score** (My stats): Found the notes · In rhythm, with wrong
+    bars · Every note, in rhythm. **With the metronome** became **Your
+    tempo** — the melodies played in rhythm by the player's tempo, Slow ·
+    Moderate · Fast, darker = every note right first time too (the days'
+    `pc` / `pk` keep their shape; the history before today counted Tests
+    with the metronome there). The gold star's marks read 8 · over 10 ·
+    13 (every note in rhythm) · 16 (in rhythm at 70 or faster).
+  - **Practice's gold star is still "with the metronome"** (teach.js,
+    `RR.Points.tempoCheck`): no points there, and the gold star is what the
+    metronome is for.
+  - The practice field `tempos` (Slow · Moderate · Fast's BPMs, hidden
+    since 2026-10-06) is gone — `sanitize` drops it from old practices and
+    links.
 
 - **The Library** (2026-10-12, the user's: "combine the My Melodies button
   with the Setting Button and call it 'Library'", laid out like Song Writer
@@ -159,8 +319,8 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   the paper). Only the level's bars are live, letter names under the
   notes, the next-bar hint after two slips. **No Practice / Test and no
   score** (the score chip is hidden): play an exercise on your own and it
-  gets a **green check**; pick the **metronome — Slow or Moderate, no
-  Fast** (in Tools since 2026-10-12) — and it counts in at once, then **goes round and round**
+  gets a **green check**; start the **metronome** (in Tools since 2026-10-12; at the tempo dial's tempo, any of
+  56–132, since 2026-10-13 — Slow or Moderate before) — and it counts in at once, then **goes round and round**
   (2026-10-11, the user's: "do not stop it after 1 round, let it repeat" —
   a class can read the board and play along on real xylophones): the
   melody comes back straight after its last bar, the click going on, until
@@ -216,8 +376,8 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
     It plays on the Practice machinery (`G.mode = { kind: 'teach', id, song:
     true, from, to, practice, auto }`, `songAdvance` in teach.js): Practice
     off + Auto-Next — a slide played through hands on to the next **the
-    moment its last note is struck**; with the metronome (Tools, Fast
-    allowed) the click carries on across the slides (`G.swapCard`), so the
+    moment its last note is struck**; with the metronome (Tools) the
+    click carries on across the slides (`G.swapCard`), so the
     beat is kept all through. Practice on — the slide goes round (Listen,
     the hints), and with Auto-Next moves on after a moment; Auto-Next off —
     Next lights and moves on. A section goes round again from its first
@@ -252,9 +412,9 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   kept: it says Finish at the end) on the right; the staff drawn tight and
   as big as it fits, one row or two (game.js draw, `big`). A phone keeps
   the row under the music. **Tools** (`js/tools.js`, `RR.Tools`, moved out
-  of teach.js) is the same everywhere: the metronome (Off · Slow ·
-  Moderate · Fast; Teach Me to Read no Fast; not in a battle — beside the
-  music there — nor Beat the clock), then side by side **Computer /
+  of teach.js) is the same everywhere: the metronome (the tempo dial and
+  ▶ Start / ■ Stop since 2026-10-13 — Off · Slow · Moderate · Fast before;
+  not in a battle — beside the music there — nor Beat the clock), then side by side **Computer /
   Keyboard** (with a little keyboard; the picture lights the bars live
   here) and **Auto-Next Slide On/Off**, then Note Colors · Staff Color ·
   Text Below the Notes. **Where a change goes:** Teach Me to Read — the
@@ -280,7 +440,8 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
     from it. Tools opens a panel beside the button (over the xylophone on
     a phone, `#teach-tools`, `position: fixed` so it can hang outside the
     music card): **Metronome** Off · Slow · Moderate (a tempo counts in at
-    once and the panel closes so the music shows) · **Computer Keyboard**
+    once and the panel closes so the music shows — since 2026-10-13 the
+    tempo dial and ▶ Start, which does the same) · **Computer Keyboard**
     (show / back to the music; closes the panel) · **Note Colors** Solid
     Color / Transparent Color / When Played / Black · **Staff Color** Its
     Notes' Lines / All Lines / Black · **Text Below the Notes** Letter
@@ -450,9 +611,11 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
     hide whether they're getting better) · **Note by note** (a little
     xylophone, each bar as tall as its first-try share, ▲▼ against the
     range before, the trickiest ringed) · **How your melodies scored** (one
-    bar: found the notes / own steady beat / with the metronome, then
-    checks and gold stars) · **With the metronome** (Tests at Slow ·
-    Moderate · Fast, darker = in time all through).
+    bar: found the notes / in rhythm, with wrong bars / every note, in
+    rhythm — 2026-10-13; it was own steady beat / with the metronome —
+    then checks and gold stars) · **Your tempo** (2026-10-13, was With
+    the metronome: the melodies in rhythm, Slow · Moderate · Fast by the
+    player's tempo, darker = every note too).
   - **Recent** — the last 50 melodies (a column each by kind of score, the
     average of ten as a line, ▲ up from the ten before) and **Every day
     you played** (a calendar, 26 weeks, fewer on a phone).
@@ -517,9 +680,10 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
     there*; then the next card opens in Test (they want to play without the
     practice). Practised, then tested → Practice again. Kept for the visit;
     a new level, set or player starts with Practice on (`G.fresh`).
-  - **The metronome** (one way everywhere since 2026-10-06 — Battle Mode's) —
-    a tap opens a choice: **Slow · Moderate · Fast** (each with its BPM; Off
-    too while it is on). Picking one in a Test **counts in at once**; in
+  - **The metronome** (one way everywhere since 2026-10-06 — Battle Mode's;
+    since 2026-10-13 **the tempo dial** and ▶ Start / ■ Stop — see *The
+    tempo dial* at the top; until then a choice of **Slow · Moderate ·
+    Fast**). Starting it in a Test **counts in at once**; in
     **Practice it starts clicking at once — no count-in** (2026-10-07, the
     user's): the card's beats, the bar's first higher, a nod of the button
     on each, for as long as the card is in Practice with the metronome on
@@ -532,8 +696,9 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
     melody** — nothing counts in by itself: no rolling on to the next
     melody, no count-in after a window closes (only Start over, Space, or
     picking a tempo start one). Off each time the page opens (not saved).
-    Changing it mid-Test starts the try again at the new pace. Listen plays
-    at its pace with its clicks (a bar of them first); Off = Slow, no clicks.
+    Changing it mid-Test starts the try again at the new tempo. Listen plays
+    at the dial's tempo, with the metronome's clicks when it is on (a bar of
+    them first); Off: no clicks.
   - **Stopping a count-in** — tapping the *Get ready 1 2 3 4* card while it
     counts (or Escape) stops it and goes back to Practice, the pause; the
     metronome stays on. (No Practice here: the Test waits.) The family card
@@ -610,8 +775,8 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   score chip's ★ counts the round's gold stars. The ladder (the level list's
   ★★★ and Level n+1 ▸) still runs on the 1–3 stars inside (`starsFor`).
 - **Count me in** (the count-in run, `beat.js`) — the family count-in (*Get
-  ready 1 2 3 4*), then the metronome at **Slow 60 · Moderate 80 · Fast
-  100** (the three tempos are in How to play), **for as long as the player
+  ready 1 2 3 4*), then the metronome at the tempo dial's tempo (2026-10-13;
+  it was **Slow 60 · Moderate 80 · Fast 100**), **for as long as the player
   takes** — it stops when the melody is played through (or Off, ↻,
   Practice, Next, a window). **The notes are followed in order, as on your
   own** (2026-10-12, the user's: "it wants the user to play exactly at the
@@ -625,7 +790,9 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   matched to the note its click said was due — `RR.Points.follower`, gone —
   so coming in two beats late made the first strike note 3.) Practice has no
   count-in run (it had a "That would be 14 points" one until 2026-10-05).
-- **Points: 1–20 a melody** (`js/points.js`) — **1–8** finding the notes
+- **Points: 1–20 a melody** (`js/points.js`) — *since 2026-10-13 one score
+  for every Test, by the player's own tempo: see* The tempo dial and one
+  score for every Test *at the top. What follows is how it was:* **1–8** finding the notes
   (first try 1, second ½); **9–12** every note first time in your own steady
   beat (a least-squares fit finds your tempo; the leftover, in beats, is the
   grade — 12 ≤ 0.06, 11 ≤ 0.10, 10 ≤ 0.15, 9 ≤ 0.21, else 8); **13–20** a
@@ -740,8 +907,8 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   Test). Gone: Ghost notes (always on now, the sight-reading levels too),
   Hearing it lights the bars (in Play button), and from How to play the gold
   star, the metronome's tempos, Flash and One go — their values stay as they
-  are (Level 15 still flashes, 14–15 are still one go, tempos 60/80/100, the
-  star over 10). Rhythm syllables went with Under the notes: Levels 7–8 now
+  are (Level 15 still flashes, 14–15 are still one go, tempos 60/80/100 —
+  gone 2026-10-13 with the dial — the star over 10). Rhythm syllables went with Under the notes: Levels 7–8 now
   show nothing below the notes, and an old practice or link with rhythm
   syllables reads as Nothing (the engraver can still draw them).
 - **Score board** — this round, best scores per practice and game, tricky
@@ -851,12 +1018,16 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
 | `js/songbook.js`, `js/melody.js` | the Songbook; rhythm cells and the generator |
 | `js/levels.js` | the ladder, the defaults, `sanitize`, the gold star's marks, My sessions (their Format, points, picks — `RR.SESSION_FORMATS`, `RR.formatPoints`, `setFormat`; `RR.sessionName`) |
 | `js/game.js` | the card, Find the notes / No slips, scoring, rounds, games, Play; `RR.Scores` |
-| `js/beat.js` | Count me in: the count-in, the metronome, judging a run |
-| `js/points.js` | what a try is worth (1–20), the stars, the paces' tempos |
+| `js/beat.js` | Count me in: the count-in, the metronome (at `G.tempo`) |
+| `js/points.js` | what a try is worth (1–20, `score`: the notes, the rhythm and the player's tempo), the stars, the paces (Slow · Moderate · Fast by tempo), the dial's marks (`RR.TEMPO`, `RR.snapTempo`, `RR.beatTempo`) |
+| `js/dial.js` | the metronome's tempo dial (2026-10-13): drawn in Tools and the battle's pop-up, its pointer, keys and − / + (`RR.Dial.html/bind`) → `G.setTempo`; Click · Drum beat above it (`RR.Dial.soundHtml`) → `G.setBeatSound` |
+| `js/drums.js` | the drum beat (2026-10-13): the user's beats per meter (`RR.DRUM_BEATS`), a meter's bar of hits (`RR.Drums.bar`), an Ostinato Builder song read as lines (`fromOstinato`) |
+| `lib/instruments/` | Ostinato Builder's drum kit (the shared `virtual-instruments.js`, vendored 2026-10-13) |
+| `tests/drum-beats/` | each drum beat's Ostinato Builder backup, as the user made it |
 | `js/settings.js`, `js/board.js` | the ✎ page window (a session's Format first, 2026-10-12) with Points and Sound — their sections also drawn in the Library; the Score board, Round done, Time's up |
 | `js/library.js` | the Library (2026-10-12): Now playing, the buttons, + New session, the folders, Share & backup, New melody; `RR.Library.open/newSession/newMelody` |
 | `js/lesson.js`, `js/app.js` | lesson links; the keys, the buttons, the start |
-| `js/sets.js` | My melodies' data: melody sets by the EVM Library rules, links, backups, the shelf |
+| `js/sets.js` | My melodies' data: melody sets by the EVM Library rules, links, backups, the shelf; the app's own songs and lessons as sets (`songbook:`/`practice:`) and your copies of them (copy on the first change, `copyOf`, `onCopied`, 2026-10-13) |
 | `js/melodies.js`, `js/maker.js` | the Library's window (`#melodies`, was My melodies) and a melody set's page in it; Make a melody |
 | `js/players.js` | names on a shared computer |
 | `js/history.js` | My stats' history: the days, the last 200 melodies, the last 60 games, records, time playing; ranges and streaks (pure, tested) |
@@ -998,11 +1169,46 @@ falls back to defaults; a change of shape gets a new `_v2` key.
   dropped) nor the follower that replaced it (it still expected the first
   note on beat 1: coming in late made the first strike note 3). In a run,
   `strike` sends every bar to `judgeFind`, as on your own; `finish` stops
-  the click; the only thing the metronome judges is the tempo
-  (`RR.Points.tempoCheck`), never where the player came in. Tests that
+  the click; since 2026-10-13 the metronome judges nothing in a Test (the
+  score is the player's own rhythm and tempo — its tempo only counts when
+  they were with it and it is faster) and in Practice only the gold star's
+  tempo (`RR.Points.tempoCheck`) — never where the player came in. Tests that
   press bars in the real app must use a level whose bars are live — the
   new Level 1 greys out everything but E and G, and a greyed bar ignores
   `RR.Xylo.press`.
+
+- **Your copy of the app's own (2026-10-13).** Never store a `songbook:`
+  or `practice:` id — `RR.Sets.update` on one makes a new set and returns
+  it with a **new id**; anything holding the old id (the set's page, Make
+  a melody, Copy melodies in) must follow `RR.Sets.onCopied`. Lists that
+  show "your sets" must leave copies out where their original's list
+  already shows them (`RR.Sets.copyOf`), or a copy appears twice (the
+  Songs window and a session's song picks did, until filtered). A test
+  that counts the Songbook's songs counts `kind === 'song'`: a teacher's
+  copies sit among them.
+
+- **The drum beat (2026-10-13).** The kit's voices read the clock once, at
+  `currentTime` — there is no "play at" in the library. Never call
+  `kit.play` straight from a timer: `RR.Sound.drum` wraps it in
+  `EVMCountIn.timed(ctx).soundAt(t, …)`, which hands the kit a clock that
+  reads `t`. A sound placed is not stoppable, so Listen makes each hit just
+  before it is due (as it did its clicks), and runs place them 120 ms
+  ahead. A new beat goes in `RR.DRUM_BEATS` by its meter's text (`'3/4'`),
+  its lines as many beats as the meter has (6/8: two, of three or six
+  slots); Ostinato Builder links (held notes) aren't read — a beat with
+  links needs them looked at first.
+
+- **The tempo dial (2026-10-13).** The dial only *shows* a new tempo while
+  it is dragged; `G.setTempo` runs when the finger lifts (keys and − / +
+  after half a second). Setting it on every mark passed would restart a
+  count-in at each one. The Tools panel redraws whenever its HTML changes
+  (game.js draws it on every note), so the dial keeps no state of its own
+  beyond `data-i` on the svg, and its listeners are bound once on the
+  panel (`RR.Dial.bind`), never on the svg. `G.tempo` goes back to 72 in
+  `usePractice` and the just-this-time changes (`playOnce` set / game,
+  `switchSet`) — not in `nextCard` or `newRound`: the user wants a tempo
+  kept for what is being played. The battle pop-up lives outside the
+  music card (it clips): `#metro-pick` is fixed, placed by `placePick`.
 
 - **The new ladder (2026-10-07).** Anything that needs a bar's or a beat's
   length goes through `RR.meter(card.time)` (never `time[0] * 4`), and

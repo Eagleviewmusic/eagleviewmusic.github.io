@@ -47,11 +47,12 @@
     rhythms: ['q', 'h'], time: [4, 4], bars: 1, endLong: true,
     times: [[4, 4]], pickup: false,                                    // times: each melody's meter, one of these (time = the first); pickup: half the melodies start with one
     leaps: ['P4', 'P5'], endLa: false, focus: [],                      // leaps (with Leaps too): 'P4' 'P5' 'M6'; endLa: half the melodies La-based; focus: a level's new notes and rhythms, more often
-    tempos: [60, 80, 100], practice: true, practiceStart: 'on', oneGo: false, flash: 0,   // practiceStart: 'off' = each melody starts in Test     // the metronome: Slow · Moderate · Fast (POINTS-AND-COUNT-IN.md)
+    practice: true, practiceStart: 'on', oneGo: false, flash: 0,      // practiceStart: 'off' = each melody starts in Test (the metronome's tempo is the dial's, not a practice's: 2026-10-13)
     gold: 11,                                                          // a gold star from this many points (of 20): over 10
     game: 'round5', clockSecs: 60, song: null, songPicks: [], from: 'both', auto: true,   // songPicks: the Song format's songs ('ode', 'set:<id>'), in order
     colour: 'always', letters: true, nums: true, glow: 'after2', labels: 'none',   // colour: 'solid' · 'always' (transparent until played) · 'lit' · 'black'; labels: 'none' · 'letters' · 'solfege'
     staff: 'plain',             // Staff Color (2026-10-12, Tools): 'plain' black lines · 'notes' its notes' lines lit · 'all' five in colour
+    beat: 'click',              // the metronome's sound (2026-10-13, Tools and Look & Feel): 'click' · 'drums' (the drum beat, drums.js)
     playHidden: false, playLights: true,
     songs: [], set: null
   };
@@ -110,10 +111,10 @@
 
   /* the gold star's marks: [points, the button, what it means] */
   RR.GOLDS = [
-    [8, '8 or more', 'every note right first time'],
+    [8, '8 or more', 'every note right first time, or in rhythm'],
     [11, 'Over 10', 'more than half the points'],
-    [13, '13 or more', 'in time with the metronome'],
-    [16, '16 or more', 'with the metronome at Moderate or Fast']
+    [13, '13 or more', 'every note right first time, in rhythm'],
+    [16, '16 or more', 'in rhythm at 70 BPM or faster']
   ];
 
   /* ---- making any practice safe ---- */
@@ -137,10 +138,8 @@
     if (Array.isArray(raw.songs)) p.songs = raw.songs.filter(id => RR.SONGS[id]);
     p.moves = oneOf(raw.moves, ['steps', 'skips', 'leaps'], D.moves);
     p.bars = oneOf(raw.bars, [1, 2], D.bars);
-    // old practices and links carried judge, tempo, click…: those are dropped
-    if (Array.isArray(raw.tempos) && raw.tempos.length === 3 && raw.tempos.every(v => typeof v === 'number' && isFinite(v))) {
-      p.tempos = raw.tempos.map(v => Math.max(40, Math.min(160, Math.round(v)))).sort((a, b) => a - b);
-    }
+    // old practices and links carried judge, tempo, click… and three tempos (Slow · Moderate · Fast, until the dial
+    // of 2026-10-13): those are dropped
     p.flash = oneOf(raw.flash, [0, 2, 3, 4, 6], D.flash);
     p.gold = oneOf(raw.gold, RR.GOLDS.map(g => g[0]), D.gold);
     p.game = RR.roundLen(raw.game) ? 'round' + RR.roundLen(raw.game) : oneOf(raw.game, ['song', 'clock', 'endless'], D.game);
@@ -154,6 +153,7 @@
     p.glow = oneOf(raw.glow, ['never', 'after2', 'always'], D.glow);
     p.labels = oneOf(raw.labels, ['none', 'letters', 'solfege'], D.labels);   // rhythm syllables were retired 2026-10-06
     p.staff = oneOf(raw.staff, ['plain', 'notes', 'all'], D.staff);
+    p.beat = oneOf(raw.beat, ['click', 'drums'], D.beat);
     p.practiceStart = oneOf(raw.practiceStart, ['on', 'off'], D.practiceStart);
     ['endDo', 'tricky', 'grey', 'endLong', 'practice', 'oneGo', 'auto', 'letters', 'nums',
       'playHidden', 'playLights', 'pickup', 'endLa'].forEach(k => { p[k] = bool(raw[k], D[k]); });
@@ -188,7 +188,6 @@
       (p.rhythms.some(r => C[r] && C[r].rest && kinds.includes(C[r].meter)) ? ' · rests' : '') +
       (times.length > 1 || times[0][0] !== 4 || times[0][1] !== 4 ? ' · ' + times.map(RR.meterText).join(' & ') : '') + (p.pickup ? ' · pick-ups' : '') +
       (p.moves === 'leaps' ? ' · leaps of ' + p.leaps.map(k => LEAP_WORD[k]).join(', ') : '') + (p.endLa ? ' · La-based too' : '') +
-      (p.tempos.join() !== RR.DEFAULTS.tempos.join() ? ' · ' + p.tempos.join('/') + ' BPM' : '') +
       (p.practice ? (p.practiceStart === 'off' ? ' · Practice off' : '') : ' · no Practice') + (p.flash ? ' · Flash' : '') + (p.gold !== RR.DEFAULTS.gold ? ' · ★ ' + p.gold + '+' : '');
   };
 

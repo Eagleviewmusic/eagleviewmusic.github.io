@@ -26,6 +26,22 @@
    • The Teacher Library shelf (lib/evm-shelf.js) files sets the same way,
      marked with their `book`; Put back removes them.
    • Backups keep ids, so restoring the same file twice adds nothing.
+
+   THE APP'S OWN, AND YOUR COPIES (2026-10-13, the user's: "I want to be
+   able to edit any and everything from the Library. If I change a song
+   that is hard-coded into the app, make my own copy of that song — put it
+   with the rest of them — not with my sessions — and call it 'my copy'"):
+   the Songbook's songs and Practice's six lessons read here as sets of
+   their own — 'songbook:<song id>', 'practice:<lesson id>' (get(); never
+   stored, never changed). A set's page opens on one like any other; the
+   first change (update — a melody written, moved or taken out, the name)
+   makes your copy instead: a set "<its name> (my copy)" (my copy 2 …),
+   derivedFrom the original's id — the family's own field, so it rides
+   through backups and envelopes — the change made in it, and onCopied's
+   listeners told (the set's page and Make a melody go on in the copy). A
+   lesson's copy is a unit of Practice from the start. The Library, the
+   Songs and Practice lists put each copy right after its original
+   (teach-data.js), and My melodies leaves them out.
    ========================================================================== */
 (function () {
   'use strict';
@@ -84,14 +100,55 @@
   function save(lib) { RR.save(KEY, lib); rev++; }
   function get(id) {
     if (id === 'lesson') return RR.Lesson && RR.Lesson.set;
+    if (isBuiltIn(id)) return builtIn(id);
     // a lesson's Song sets (2026-10-08): 'lesson_1', 'lesson_2' … in memory, from the link
     const m = /^lesson_(\d{1,2})$/.exec(id || '');
     if (m) return (RR.Lesson && RR.Lesson.sets && RR.Lesson.sets[+m[1] - 1]) || null;
     return id ? load()[id] || null : null;
   }
 
-  /* a change to one of your own sets: stamped, saved */
+  /* ---------------- the app's own, and your copies ---------------- */
+  const isBuiltIn = id => /^(songbook|practice):/.test(id || '');
+  /* the Songbook's song or Practice's lesson as a set (null when there is none by that id) */
+  function builtIn(id) {
+    const m = /^(songbook|practice):(.+)$/.exec(id || ''); if (!m) return null;
+    let title, mels;
+    if (m[1] === 'songbook') {
+      const song = RR.SONGS && RR.SONGS[m[2]]; if (!song || !RR.Melody) return null;
+      title = song.title;
+      mels = RR.Melody.songCards(m[2]).map(c => ({ title: song.title + ' ' + c.part, time: c.time, notes: c.notes }));
+    } else {
+      const L = (RR.TEACH || []).find(x => x.id === m[2]); if (!L || !RR.teachCards) return null;
+      title = L.title + ' · ' + L.name;
+      mels = RR.teachCards(L).map(c => ({ title: '', time: c.time, notes: c.notes }));
+    }
+    return { id, title, isCustom: false, builtIn: m[1] === 'songbook' ? 'song' : 'lesson', createdAt: 0,
+      melodies: mels.map(normalizeMelody).filter(Boolean) };
+  }
+  /* the original a copy was made from ('songbook:…', 'practice:…'), or null */
+  const copyOf = rec => rec && typeof rec.derivedFrom === 'string' && isBuiltIn(rec.derivedFrom) ? rec.derivedFrom : null;
+  const listeners = [];
+  /* the first change to the app's own: your copy, with the change in it */
+  function copyOnWrite(id, fn) {
+    const src = builtIn(id); if (!src) return null;
+    const lib = load(), titles = Object.keys(lib).map(k => lib[k].title.toLowerCase());
+    let title = src.title + ' (my copy)';
+    for (let n = 2; titles.includes(title.toLowerCase()); n++) title = src.title + ' (my copy ' + n + ')';
+    const nid = EVM.newId('set'), rec = normalize({ title, melodies: RR.clone(src.melodies) }, nid);
+    rec.derivedFrom = id;
+    fn(rec);
+    rec.title = (rec.title || '').trim().slice(0, 60) || title;
+    rec.melodies = rec.melodies.map(normalizeMelody).filter(Boolean).slice(0, MAX_MELODIES);
+    EVM.stamp(rec, null, key);
+    lib[nid] = rec; save(lib);
+    if (src.builtIn === 'lesson' && RR.TeachUnits) RR.TeachUnits.add(nid);      // played the Practice way, with the lessons
+    listeners.forEach(f => { try { f(id, rec); } catch (e) { /* one listener's trouble isn't the copy's */ } });
+    return rec;
+  }
+
+  /* a change to one of your own sets: stamped, saved — to the app's own: your copy */
   function update(id, fn) {
+    if (isBuiltIn(id)) return copyOnWrite(id, fn);
     const lib = load(), prev = lib[id];
     if (!prev || prev.received) return null;          // shared sets are never saved into
     const next = normalize(RR.clone(prev), id);
@@ -217,6 +274,7 @@
     get rev() { return rev; },
     KEY, APP, normalize, normalizeMelody, key, load, save, get, update, create, remove, saveMyCopy, list,
     shareLink, receiveFromUrl, download, restore, startShelf, notesOf,
+    isBuiltIn, copyOf, onCopied: f => listeners.push(f),
     isShelf: rec => !!(rec && rec.received && rec.book)
   };
 })();

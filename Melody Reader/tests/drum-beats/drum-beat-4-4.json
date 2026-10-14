@@ -1,0 +1,223 @@
+{
+  "app": "Eagle View Music Ostinato Builder",
+  "version": 1,
+  "exportedAt": "2026-10-13T22:29:48.039Z",
+  "count": 1,
+  "songs": [
+    {
+      "id": "song_1791930528680_hda3",
+      "title": "Simple Drum Beat",
+      "bpm": 80,
+      "timeSignatureNumerator": 4,
+      "timeSignatureDenominator": 4,
+      "measures": 1,
+      "tracks": [
+        {
+          "instrument": "bass",
+          "muted": false,
+          "beats": [
+            {
+              "slots": 2,
+              "cells": [
+                true,
+                false
+              ]
+            },
+            {
+              "slots": 2,
+              "cells": [
+                false,
+                false
+              ]
+            },
+            {
+              "slots": 2,
+              "cells": [
+                true,
+                false
+              ]
+            },
+            {
+              "slots": 2,
+              "cells": [
+                false,
+                true
+              ]
+            }
+          ],
+          "links": {}
+        },
+        {
+          "instrument": "snare",
+          "muted": false,
+          "beats": [
+            {
+              "slots": 2,
+              "cells": [
+                false,
+                false
+              ]
+            },
+            {
+              "slots": 2,
+              "cells": [
+                true,
+                false
+              ]
+            },
+            {
+              "slots": 2,
+              "cells": [
+                false,
+                false
+              ]
+            },
+            {
+              "slots": 2,
+              "cells": [
+                true,
+                false
+              ]
+            }
+          ],
+          "links": {}
+        },
+        {
+          "instrument": "tom",
+          "muted": false,
+          "beats": [
+            {
+              "slots": 4,
+              "cells": [
+                false,
+                false,
+                false,
+                true
+              ]
+            },
+            {
+              "slots": 4,
+              "cells": [
+                false,
+                false,
+                false,
+                true
+              ]
+            },
+            {
+              "slots": 2,
+              "cells": [
+                false,
+                true
+              ]
+            },
+            {
+              "slots": 2,
+              "cells": [
+                false,
+                true
+              ]
+            }
+          ],
+          "links": {}
+        },
+        {
+          "instrument": "hihat",
+          "muted": false,
+          "beats": [
+            {
+              "slots": 2,
+              "cells": [
+                true,
+                true
+              ]
+            },
+            {
+              "slots": 2,
+              "cells": [
+                true,
+                true
+              ]
+            },
+            {
+              "slots": 2,
+              "cells": [
+                true,
+                true
+              ]
+            },
+            {
+              "slots": 2,
+              "cells": [
+                true,
+                true
+              ]
+            }
+          ],
+          "links": {}
+        }
+      ],
+      "isCustom": true,
+      "createdAt": 1791930528688,
+      "layout": {
+        "layout": {
+          "v": 1,
+          "easy": {
+            "simple": [
+              "q",
+              "ee",
+              "ssss",
+              "h",
+              "w"
+            ],
+            "compound": [
+              "dq",
+              "eee",
+              "qe",
+              "qre",
+              "dh"
+            ]
+          },
+          "meters": {
+            "simple": [
+              "4/4",
+              "3/4",
+              "2/4",
+              "6/4",
+              "5/4"
+            ],
+            "compound": [
+              "6/8",
+              "9/8",
+              "12/8"
+            ]
+          },
+          "divide": {
+            "sixteenths": true,
+            "tuplets": true,
+            "subTuplets": true
+          },
+          "cells": {
+            "simple": {},
+            "compound": {}
+          },
+          "joins": {
+            "simple": 8,
+            "compound": 8
+          },
+          "instruments": null
+        },
+        "show": {
+          "dots": true,
+          "easy": false,
+          "barNumbers": true,
+          "beatNumbers": true,
+          "syllables": false,
+          "syllableSystem": "Simplified Kodály",
+          "words": true
+        }
+      },
+      "updatedAt": 1791930563327
+    }
+  ]
+}

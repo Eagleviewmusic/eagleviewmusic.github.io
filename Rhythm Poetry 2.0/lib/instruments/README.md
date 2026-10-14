@@ -4,7 +4,7 @@ A copy of the shared percussion engine, so Rhythm Poetry can sound its rhythm on
 voices rather than a homemade bass drum.
 
 * Authoritative copy: `Virtual Instrument Assets/js/virtual-instruments.js`
-* Other copies: `Ostinato Builder 2.0/lib/instruments/`, `Music Stand/lib/instruments/`
+* Other copies: `Ostinato Builder 2.0/lib/instruments/`, `Music Stand/lib/instruments/`, `Melody Reader/lib/instruments/` (2026-10-13)
   (`virtual-drum-kit/index.html` holds an older, deliberately divergent one —
   never sync from it.)
 

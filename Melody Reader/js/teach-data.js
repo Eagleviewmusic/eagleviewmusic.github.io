@@ -268,16 +268,37 @@
     const hit = cache.get(id);
     if (hit && hit.stamp === stamp) return hit.L;
     const set = id[0] === 'M' || U.has(key) ? RR.Sets.get(key) : null;
-    const L = set ? melodyLevel(id, set.title, set.melodies, { kind: id[0] === 'U' ? 'unit' : 'mset', set: key, shared: !!set.received, book: set.book || '' }) : null;
+    const L = set ? melodyLevel(id, set.title, set.melodies, { kind: id[0] === 'U' ? 'unit' : 'mset', set: key, shared: !!set.received, book: set.book || '',
+      copyOf: RR.Sets.copyOf(set) }) : null;      // copyOf: your copy of the Songbook's song or a lesson ('songbook:…', 'practice:…')
     cache.set(id, { stamp, L });
     return L;
   }
   /* Practice → Songs: the Songbook's songs, as levels */
-  RR.teachSongs = () => Object.keys(RR.SONGS || {}).map(k => unitLevel('S:' + k)).filter(Boolean);
+  /* …each followed by your copies of it (2026-10-13: "put it with the rest of them"), played as your sets ('M:') */
+  const copiesOf = orig => RR.Sets ? RR.Sets.list().filter(x => x.derivedFrom === orig).sort((a, b) => a.createdAt - b.createdAt) : [];
+  RR.teachSongs = () => [].concat.apply([], Object.keys(RR.SONGS || {}).map(k =>
+    [unitLevel('S:' + k)].concat(copiesOf('songbook:' + k).map(x => unitLevel('M:' + x.id))))).filter(Boolean);
+  /* Practice's six lessons, each followed by your copies of it — units of their own (a copy that came back from a
+     backup is made one again here) */
+  RR.teachLessons = () => [].concat.apply([], RR.TEACH.map(L => [L].concat(copiesOf('practice:' + L.id).map(x => {
+    if (!U.has(x.id)) U.add(x.id);
+    return unitLevel('U:' + x.id);
+  })))).filter(Boolean);
+  /* your exercises: your units — but not your copies of the lessons, which are with the lessons */
+  RR.teachExercises = () => U.levels().filter(L => !(L.copyOf && /^practice:/.test(L.copyOf)));
+  /* which of Practice's tabs a level is on: Lessons (and your copies of them) · Songs (and yours) · Exercises */
+  RR.teachTabOf = function (id) {
+    if (/^S:/.test(id)) return 'songs';
+    if (/^[UM]:/.test(id)) {
+      const L = RR.teachLevel(id), c = L && L.copyOf;
+      return c ? (/^songbook:/.test(c) ? 'songs' : 'lessons') : 'exercises';
+    }
+    return 'lessons';
+  };
 
   /* ---- the look (2026-10-12): Tools → Note Colors · Staff Color · Text Below the Notes ---- */
-  RR.TEACH_LOOK = { colour: 'solid', staff: 'notes', labels: 'letters', auto: false };   // auto: Auto-Next Slide (Tools, 2026-10-12)
-  const LOOKS = { colour: ['solid', 'always', 'lit', 'black'], staff: ['notes', 'all', 'plain'], labels: ['letters', 'solfege', 'none'], auto: [true, false] };
+  RR.TEACH_LOOK = { colour: 'solid', staff: 'notes', labels: 'letters', auto: false, beat: 'click' };   // auto: Auto-Next Slide (Tools, 2026-10-12); beat: the metronome's sound, Click or Drum beat (2026-10-13)
+  const LOOKS = { colour: ['solid', 'always', 'lit', 'black'], staff: ['notes', 'all', 'plain'], labels: ['letters', 'solfege', 'none'], auto: [true, false], beat: ['click', 'drums'] };
   RR.teachLook = function () {
     const d = RR.device.teachLook, o = Object.assign({}, RR.TEACH_LOOK);
     if (d && typeof d === 'object') Object.keys(LOOKS).forEach(k => { if (LOOKS[k].includes(d[k])) o[k] = d[k]; });

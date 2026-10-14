@@ -8,9 +8,10 @@
      days     { 'YYYY-MM-DD': a day — m melodies, p points, g gold stars,
               k checks (played through), n notes read, f of them first
               time, s seconds playing, r rounds finished, t [tier 1, 2, 3]
-              melodies, pc [Slow, Moderate, Fast] Tests with the
-              metronome and pk of those in time all through (tier 3), nt
-              { C4: [read, first time] } }
+              melodies, pc [Slow, Moderate, Fast] melodies in rhythm by
+              the player's tempo (2026-10-13; before, Tests with the
+              metronome at that pace) and pk of those with every note
+              first time too (tier 3), nt { C4: [read, first time] } }
      log      the last 200 melodies: { at, p, t, g, k, pc }
      games    the last 60 rounds, Songs and Beat the clocks finished
      rec      records: the best round, Beat the clock (per length), the
@@ -61,7 +62,8 @@
   }
 
   /* ---------------- recording (pure: `me` is a player's record) ---------------- */
-  /* a melody finished in a Test: o = { pts (1–20, before Points off), tier 1–3, gold, made, pace } —
+  /* a melody finished in a Test: o = { pts (1–20, before Points off), tier 1–3, gold, made, pace (the player's, in
+     rhythm: 'slow' · 'moderate' · 'fast'; else none) } —
      returns its handle, kept on the round's entry so a try again can take it back */
   function addMelody(me, o, at) {
     ready(me);

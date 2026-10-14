@@ -6,9 +6,11 @@
    should be able to choose color notes, color lines, names under notes"; it
    began in Teach Me to Read the same day):
 
-     Metronome        Off · Slow · Moderate (· Fast outside Teach Me to
-                      Read). Not in a battle — there it stands beside the
-                      music — nor in Beat the clock
+     Metronome        Click · Drum beat (drums.js), the tempo dial, Easy
+                      56 → Hard 132 BPM (dial.js, 2026-10-13 — it was Off
+                      · Slow · Moderate · Fast), and ▶ Start / ■ Stop. Not
+                      in a battle — there it stands beside the music — nor
+                      in Beat the clock
      Computer         the computer keyboard in the music's place: the
      Keyboard         bars' keys lit, playable, nothing counts
      Auto-Next Slide  On / Off: the next melody comes by itself once one
@@ -22,8 +24,8 @@
 
    The panel opens beside the button (over the xylophone on a phone),
    stays open while the look is changed (the music redraws as it does),
-   and closes for the metronome or the keyboard, on Escape, or a tap
-   anywhere else.
+   and closes for the metronome's Start / Stop or the keyboard, on Escape,
+   or a tap anywhere else. Turning the dial leaves it open.
    ========================================================================== */
 (function () {
   'use strict';
@@ -35,8 +37,9 @@
   T.look = function () {
     if (teach()) { const l = RR.teachLook(); if (G.mode.song) l.auto = G.mode.auto !== false; return l; }    // Songs: its own Auto-Next
     const s = G.setup || {};
-    return { colour: s.colour, staff: s.staff || 'plain', labels: s.labels, auto: !!s.auto };
+    return { colour: s.colour, staff: s.staff || 'plain', labels: s.labels, auto: !!s.auto, beat: s.beat === 'drums' ? 'drums' : 'click' };
   };
+  /* beat: the metronome's sound, Click or Drum beat (2026-10-13) — kept with the look */
   function setLook(k, v) {
     if (teach() && G.mode.song && k === 'auto') { G.mode.auto = !!v; G.remember(); }
     else if (teach()) {
@@ -52,6 +55,7 @@
     G.draw();
     return true;
   }
+  T.setLook = setLook;
   /* the notes the bars play here: the level's (Teach Me to Read), else what the xylophone has live */
   const notesHere = () => teach() ? RR.Teach.level().notes.slice()
     : Array.from(G.liveBars ? G.liveBars() : (G.setup && G.setup.notes) || []).filter(id => RR.BAR[id]).sort((a, b) => RR.BAR[a].step - RR.BAR[b].step);
@@ -99,20 +103,18 @@
   function html() {
     const look = T.look(), kb = T.kbdOn(), card = G.card || { time: [4, 4] };
     const changed = teach() && ['colour', 'staff', 'labels'].some(k => look[k] !== RR.TEACH_LOOK[k]);
-    const paces = teach() && !G.mode.song ? ['off', 'slow', 'moderate'] : ['off', 'slow', 'moderate', 'fast'];
-    const metro = paces.map(id => {
-      const onNow = id === 'off' ? !G.metroOn() : G.metro === id;
-      return '<button type="button" class="tl-metro' + (id === 'off' ? ' off' : '') + (onNow ? ' on' : '') + '" data-tl="metro" data-v="' + id + '" aria-pressed="' + onNow + '">' +
-        (id === 'off' ? '<b>Off</b>' : '<b>' + RR.Points.paceOf(id).name + '</b><small>' + RR.beatTempo(G.setup, id, card.time) + ' BPM</small>') + '</button>';
-    }).join('');
-    const say = teach() && G.mode.song ? (G.metroOn() ? 'The click goes on from slide to slide, all through the song.' : 'Pick a tempo: it counts in, then keeps the beat from slide to slide.')
-      : teach() ? (G.metroOn() ? 'Round and round until it’s Off — each time through with every note: a gold star.' : 'Pick a tempo: it counts in, then plays along round and round — every note for a gold star.')
-      : G.stage === 'practice' ? 'In Practice it clicks along; a Test with it counts you in.' : 'Picking a tempo counts you in at once.';
+    const on = G.metroOn();
+    // the dial (dial.js) and Start / Stop; the points a tempo is worth where there are points
+    const metro = RR.Dial.soundHtml(look.beat, card.time) + RR.Dial.html({ tempo: G.tempo, time: card.time, points: !!RR.device.points && !teach() }) +
+      '<button type="button" class="tl-go' + (on ? ' on' : '') + '" data-tl="metro" data-v="' + (on ? 'off' : 'on') + '">' + (on ? '■ Stop the metronome' : '▶ Start the metronome') + '</button>';
+    const say = teach() && G.mode.song ? (on ? 'The click goes on from slide to slide, all through the song.' : 'Start it: it counts in, then keeps the beat from slide to slide.')
+      : teach() ? (on ? 'Round and round until you stop it — each time through with every note: a gold star.' : 'Start it: it counts in, then plays along round and round — every note for a gold star.')
+      : G.stage === 'practice' ? 'In Practice it clicks along; a Test with it counts you in.' : 'Starting it counts you in at once.';
     return '<div class="tl-head"><b id="tl-title">Tools</b>' +
         '<button type="button" class="icon-btn close" data-tl="close" aria-label="Close the tools">×</button></div>' +
       '<div class="tl-body">' +
-        (metroHere() ? '<section class="tl-sec' + (hint === 'metro' ? ' hint' : '') + '"><h4>Metronome</h4><div class="tl-metros n' + paces.length + '">' + metro + '</div>' +
-          '<p class="tl-say">' + say + '</p></section>' : '') +
+        (metroHere() ? '<section class="tl-sec tl-metro-sec' + (hint === 'metro' ? ' hint' : '') + '"><h4>Metronome</h4>' + metro +
+          '<p class="tl-say">' + say + ' Listen plays at this tempo too.</p></section>' : '') +
         // the user's: "Computer Keyboard — with computer on top and keyboard below it, and a little keyboard next to
         // it — that's all. Right next to it, write Auto-Next Slide on/off"
         '<section class="tl-sec tl-pair">' +
@@ -132,7 +134,9 @@
     if (h === was && !focusSel && panel.firstChild) return;      // nothing changed (game.js draws on every note)
     was = h;
     const a = document.activeElement;
-    const f = focusSel || (a && panel.contains(a) && a.dataset.tl ? '[data-tl="' + a.dataset.tl + '"]' + (a.dataset.v && a.dataset.tl !== 'auto' ? '[data-v="' + a.dataset.v + '"]' : '') : null);
+    // the focus where it was: a choice, the dial or its − / +
+    const f = focusSel || (a && panel.contains(a) ? (a.dataset.tl ? '[data-tl="' + a.dataset.tl + '"]' + (a.dataset.v && !['auto', 'metro'].includes(a.dataset.tl) ? '[data-v="' + a.dataset.v + '"]' : '') :
+      a.dataset.dial ? '[data-dial="' + a.dataset.dial + '"]' : a.dataset.beat ? '[data-beat="' + a.dataset.beat + '"]' : null) : null);
     const body = panel.querySelector('.tl-body'), y = body ? body.scrollTop : 0;
     panel.innerHTML = h;
     panel.querySelector('.tl-body').scrollTop = y;
@@ -161,7 +165,7 @@
     }
     panel.hidden = false;
     $('#btn-tools').setAttribute('aria-expanded', 'true');
-    draw(why === 'metro' ? '[data-tl="metro"][data-v="slow"]' : metroHere() ? '.tl-metro.on' : '.tl-kbd');
+    draw(why === 'metro' ? '[data-tl="metro"]' : metroHere() ? '.td-svg' : '.tl-kbd');
   }
   T.open = open;
   T.close = () => open(false);
@@ -170,26 +174,26 @@
      keyboard shows; no word under it (2026-10-12, the user's: no text on the buttons) */
   T.drawButton = function () {
     const tb = $('#btn-tools'), metro = G.metroOn() && metroHere(), kb = T.kbdOn();
-    const pace = metro ? RR.Points.paceOf(G.metro) : null;
     tb.classList.toggle('metro-on', metro);
     tb.classList.toggle('kbd-on', kb);
-    tb.title = 'Tools: the metronome, the computer keyboard, the colors' + (metro ? ' — the metronome is on (' + pace.name + ')' : '');
+    tb.title = 'Tools: the metronome, the computer keyboard, the colors' + (metro ? ' — the metronome is on (' + G.tempo + ' BPM' + (RR.Beat.hasDrums(G.card.time) ? ', the drum beat' : '') + ')' : '');
     tb.setAttribute('aria-label', tb.title);
     if (isOpen()) { if (toolsOff()) open(false); else draw(); }
   };
 
   $('#btn-tools').addEventListener('click', () => { if (!G.overlay) open(!isOpen()); });
+  RR.Dial.bind(panel);                                                    // the tempo dial: G.setTempo when it is set
   panel.addEventListener('click', e => {
     const b = e.target.closest('[data-tl]'); if (!b) return;
     const a = b.dataset.tl, v = b.dataset.v;
     if (a === 'close') { open(false); $('#btn-tools').focus(); }
-    else if (a === 'metro') { open(false); if (T.kbdOn()) kbd(false); G.setMetro(v); }      // a tempo: the music wants seeing
+    else if (a === 'metro') { open(false); if (T.kbdOn()) kbd(false); G.setMetro(v); }      // Start / Stop: the music wants seeing
     else if (a === 'kbd') { open(false); kbd(!T.kbdOn()); }
     else if (a === 'auto') {
       const on = v === 'true';
       if (setLook('auto', on)) { draw('[data-tl="auto"]'); G.announce('Auto-Next Slide ' + (on ? 'on: the next one comes by itself.' : 'off.')); }
     } else if (a === 'reset') {
-      RR.device.teachLook = Object.assign(RR.clone(RR.TEACH_LOOK), { auto: !!RR.teachLook().auto }); RR.saveDevice();
+      RR.device.teachLook = Object.assign(RR.clone(RR.TEACH_LOOK), { auto: !!RR.teachLook().auto, beat: RR.teachLook().beat }); RR.saveDevice();   // colours and letters only
       setLook('colour', RR.TEACH_LOOK.colour);
       draw('[data-tl="colour"].on');
       G.announce('The colors and letters are back.');

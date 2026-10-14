@@ -12,7 +12,9 @@
                        First try           how many notes were right first time, as a line
                        How melodies scored the three kinds of score, one bar
                        Note by note        each bar's first-try share, and the change
-                       The metronome       Tests at Slow · Moderate · Fast, and how many at its tempo
+                       Your tempo          melodies played in rhythm, Slow · Moderate · Fast by the
+                                           player's tempo, and how many with every note too (2026-10-13;
+                                           it was Tests with the metronome at each pace)
      Recent          the last 50 melodies (columns by kind of score, the
                      average of the last ten as a line) · the calendar
      All time        the ladder's stars · records · mix-ups · the last games
@@ -53,12 +55,12 @@
     if (b.unit === 'week') return 'Week of ' + dateWords(b.key);
     return b.key === H().today() ? 'Today' : dateWords(b.key, true);
   }
+  /* the three kinds of score (points.js score, 2026-10-13 — the same with the metronome or without it) */
   const TIER_NAMES = () => [
-    ['Found the notes', RR.device.points ? '1–8 points' : 'every note, with slips'],
-    ['In your own steady beat', RR.device.points ? '9–12 points' : 'every note first time'],
-    ['With the metronome', RR.device.points ? '13–20 points' : 'every note at its tempo']
+    ['Found the notes', RR.device.points ? '1–8 points' : 'the rhythm not yet'],
+    ['In rhythm, with wrong bars', RR.device.points ? '2 points off a wrong bar' : 'a wrong bar or two'],
+    ['Every note, in rhythm', RR.device.points ? '13–20 points' : 'every note first time']
   ];
-  const PACE_NAMES = ['Slow', 'Moderate', 'Fast'];
 
   /* ---------------- pieces ---------------- */
   function cardHtml(id, title, sub, body, o) {
@@ -159,19 +161,18 @@
           (stars ? '<div><span class="mk-i">' + RR.STAR_SVG + '</span><b>' + sum.g + '</b> gold stars</div>' : '') + '</div>'
         : empty('Finish a melody in a Test to see how it scored.'), { table: !!tsum });
 
-    // The metronome
-    const paceSum = sum.pc[0] + sum.pc[1] + sum.pc[2], maxPc = Math.max(1, ...sum.pc);
-    const tempos = RR.Points.PACES.map(p => RR.paceTempo(G.setup, p.id));
-    out += cardHtml('metro', 'With the metronome', paceSum ? plural(paceSum, 'Test') + ' counted in · darker = every note at its tempo' : '',
-      paceSum ? (tables.metro ? tableHtml(['Tempo', 'Tests', 'In time all through'], PACE_NAMES.map((p, i) => [p + ' (' + tempos[i] + ' BPM)', String(sum.pc[i]), String(sum.pk[i])]))
-        : '<div class="hbars">' + PACE_NAMES.map((p, i) => {
+    // Your tempo (2026-10-13): the melodies played in rhythm, by the player's own tempo — the points go by it
+    const paceSum = sum.pc[0] + sum.pc[1] + sum.pc[2], maxPc = Math.max(1, ...sum.pc), PACES = RR.Points.PACES;
+    out += cardHtml('metro', 'Your tempo', paceSum ? plural(paceSum, 'melody', 'melodies') + ' in rhythm · darker = every note right first time too' : '',
+      paceSum ? (tables.metro ? tableHtml(['Tempo', 'In rhythm', 'Every note too'], PACES.map((p, i) => [p.name + ' (' + p.words + ')', String(sum.pc[i]), String(sum.pk[i])]))
+        : '<div class="hbars">' + PACES.map((p, i) => {
           const all = sum.pc[i], ok = sum.pk[i];
-          return '<div class="hbar"><span class="hb-l"><b>' + p + '</b><small>' + tempos[i] + ' BPM</small></span><span class="hb-track">' +
-            (ok ? '<i class="hb-ok" style="width:' + (100 * ok / maxPc) + '%" data-tv="' + ok + ' at its tempo" data-tl="' + p + ' · every note at its tempo"></i>' : '') +
-            (all - ok ? '<i class="hb-rest" style="width:' + (100 * (all - ok) / maxPc) + '%" data-tv="' + (all - ok) + ' other tries" data-tl="' + p + ' · a note early, late or missed"></i>' : '') +
+          return '<div class="hbar"><span class="hb-l"><b>' + p.name + '</b><small>' + p.words + '</small></span><span class="hb-track">' +
+            (ok ? '<i class="hb-ok" style="width:' + (100 * ok / maxPc) + '%" data-tv="' + ok + ' with every note" data-tl="' + p.name + ' · every note right first time, in rhythm"></i>' : '') +
+            (all - ok ? '<i class="hb-rest" style="width:' + (100 * (all - ok) / maxPc) + '%" data-tv="' + (all - ok) + ' with wrong bars" data-tl="' + p.name + ' · in rhythm, with a wrong bar or two"></i>' : '') +
             '</span><span class="hb-v">' + ok + ' of ' + all + '</span></div>';
         }).join('') + '</div>')
-        : empty('Pick a tempo on the metronome, then Test — it counts you in.'), { table: !!paceSum });
+        : empty('Play a melody in rhythm in a Test — with the metronome or without it — and your tempo shows here.'), { table: !!paceSum });
     out += '</div>';
 
     // ---- Recent ----

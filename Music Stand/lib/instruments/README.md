@@ -4,7 +4,7 @@ A copy of the shared percussion engine, so the Music Stand has its own sound
 library and does not have to borrow one from a frame.
 
 * Authoritative copy: `Virtual Instrument Assets/js/virtual-instruments.js`
-* Other copies: `Ostinato Builder 2.0/lib/instruments/`, `Rhythm Poetry 2.0/lib/instruments/`
+* Other copies: `Ostinato Builder 2.0/lib/instruments/`, `Rhythm Poetry 2.0/lib/instruments/`, `Melody Reader/lib/instruments/` (2026-10-13)
   (`virtual-drum-kit/index.html` holds an older, deliberately divergent one —
   never sync from it.)
 

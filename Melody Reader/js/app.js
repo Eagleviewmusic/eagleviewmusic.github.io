@@ -84,9 +84,9 @@
 
   $('#btn-play').addEventListener('click', () => G.hearIt());
   $('#btn-mode').addEventListener('click', () => G.toggleMode());
-  // Off → Slow → Moderate → Fast: the player's, for this visit (it never makes a practice Custom)
+  // a battle's metronome: the tempo dial and Start / Stop (game.js metroTap; the tempo is never saved into a practice)
   $('#btn-metro').addEventListener('click', () => G.metroTap());
-  // Battle Mode's choice of tempo: a pick counts in; a tap anywhere else closes it
+  // Start counts in (a Test); a tap anywhere else closes it
   $('#metro-pick').addEventListener('click', e => { const b = e.target.closest('[data-metro]'); if (b) G.setMetro(b.dataset.metro); });
   document.addEventListener('pointerdown', e => {
     if (G.pickOpen() && !e.target.closest('#metro-pick') && !e.target.closest('#btn-metro')) G.closePick();

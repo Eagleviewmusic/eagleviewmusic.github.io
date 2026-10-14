@@ -20,6 +20,14 @@
                      Settings (Points, Players, Sound) — each folds, and
                      which are open is kept (device.libOpen)
 
+   Everything in it can be changed (2026-10-13, the user's: "I want to be
+   able to edit any and everything from the Library"): a song, a lesson,
+   an exercise has ✎ like a session or a level — a set's page (melodies.js)
+   on it. The Songbook's songs and the six lessons are the app's own: the
+   page shows them as they are, and the first change makes your copy
+   ("Hot Cross Buns (my copy)", sets.js) — listed right after its original
+   in Songs or Practice, not in My melodies or My sessions.
+
    It lives in the window that was My melodies (#melodies — melodies.js
    keeps the window and a set's page); its list is this now. Two pages of
    its own, with ‹ back: Share & backup (the lesson link, which was
@@ -152,9 +160,12 @@
         '<button type="button" class="lb-act" data-open="' + esc(set.id) + '" aria-label="Open ' + esc(set.title) + '">Open</button>'
     });
   }
+  /* the sets My melodies lists: not a lesson's, and not your copies of the app's songs and lessons (they're in Songs
+     and Practice, after their originals) */
+  const mySets = () => RR.Sets.list().filter(s => !/^lesson/.test(s.id) && !RR.Sets.copyOf(s));
   function melodiesHtml() {
     const books = new Map(), shared = [], own = [];
-    RR.Sets.list().filter(s => !/^lesson/.test(s.id)).forEach(s => {
+    mySets().forEach(s => {
       if (RR.Sets.isShelf(s)) { if (!books.has(s.book)) books.set(s.book, []); books.get(s.book).push(s); }
       else if (s.received) shared.push(s);
       else own.push(s);
@@ -168,26 +179,33 @@
       '<button type="button" class="pill-btn" data-lb="new-set">+ New set</button></div>';
   }
 
-  /* ---- Songs (the Songbook's), Practice (its lessons and your exercises), the levels ---- */
+  /* ---- Songs (the Songbook's, and your copies), Practice (its lessons, your copies, your exercises), the levels ---- */
+  /* ✎ on a song, a lesson or an exercise: its set's page — the app's own ('songbook:…', 'practice:…'), or yours */
+  const setIdOf = L => L.set || (L.kind === 'song' ? 'songbook:' + L.songId : 'practice:' + L.id);
+  const editAct = (L, name) => '<button type="button" class="lb-act ic" data-open="' + esc(setIdOf(L)) + '" aria-label="' + esc('Change ' + name) + '" title="' + esc('Change ' + name) + '">✎</button>';
+  const copyTag = L => L.copyOf ? ' <span class="mel-tag mine">My copy</span>' : '';
   function songsHtml() {
     const cur = G.mode.kind === 'teach' && G.mode.song && !G.mode.session ? G.mode.id : null;
     return RR.teachSongs().map(L => row({
-      on: cur === L.id, badge: badge('songs'), title: esc(L.title), sub: esc(L.sub),
-      acts: act('song-play', '▶ Play', dataId(L.id), 'go', 'Play ' + L.title) + act('song-more', 'A section…', dataId(L.id), '', 'A section of ' + L.title + ', Practice, Auto-Next')
-    })).join('') + RR.note('lb-songs', 'A song, slide after slide, keeping a steady beat — your own melody sets can be played as songs too (Songs on the home page).');
+      on: cur === L.id, badge: badge('songs', L.copyOf ? 'copy' : ''), title: esc(L.title), tags: copyTag(L), sub: esc(L.sub),
+      acts: act('song-play', '▶ Play', dataId(L.id), 'go', 'Play ' + L.title) + act('song-more', 'A section…', dataId(L.id), '', 'A section of ' + L.title + ', Practice, Auto-Next') + editAct(L, L.title)
+    })).join('') + RR.note('lb-songs', 'A song, slide after slide, keeping a steady beat — your own melody sets can be played as songs too (Songs on the home page). ✎ changes a song: the Songbook’s stay as they are, and your change becomes your own copy, right under it.');
   }
   function teachRow(L) {
     const m = RR.TeachMarks.get(L.id), done = m.filter(Boolean).length, gold = m.filter(x => x === 2).length;
     const on = G.mode.kind === 'teach' && !G.mode.song && !G.mode.session && RR.Teach.id === L.id;
+    // your copy of a lesson wears its lesson's number
+    const orig = L.copyOf ? RR.TEACH.find(x => 'practice:' + x.id === L.copyOf) : null, num = orig || (L.unit ? null : L);
     return row({
-      on, badge: textBadge(L.unit ? '♫' : (L.adv ? 'A' : '') + L.n, RR.TEACH_COLOUR), title: esc(L.unit || L.adv ? L.title : L.title + ' · ' + L.name),
+      on, badge: textBadge(num ? (num.adv ? 'A' : '') + num.n : '♫', RR.TEACH_COLOUR, orig ? 'copy' : ''), title: esc(L.unit || L.adv ? L.title : L.title + ' · ' + L.name), tags: copyTag(L),
       sub: esc(L.sub) + (m.length ? ' · ' + done + ' of ' + m.length + ' played' + (gold ? ' · ★ ' + gold : '') : ''),
-      acts: act('teach-play', '▶ Play', dataId(L.id), 'go', 'Play ' + (L.unit ? L.title : L.long))
+      acts: act('teach-play', '▶ Play', dataId(L.id), 'go', 'Play ' + (L.unit ? L.title : L.long)) + editAct(L, L.unit ? L.title : L.long)
     });
   }
   function practiceHtml() {
-    const us = RR.TeachUnits.levels();
-    return '<h4 class="lb-sub">Lessons</h4>' + RR.TEACH.map(teachRow).join('') +
+    const us = RR.teachExercises();
+    return '<h4 class="lb-sub">Lessons</h4>' + RR.teachLessons().map(teachRow).join('') +
+      RR.note('lb-pr', '✎ changes a lesson: the app’s six stay as they are, and your change becomes your own copy, right under it.') +
       '<h4 class="lb-sub">Your exercises</h4>' + (us.length ? us.map(teachRow).join('') : '<div class="lb-empty">None yet — a melody set of yours becomes one.</div>') +
       '<div class="lb-more"><button type="button" class="h-link" data-lb="make-unit">+ Make an exercise from your melodies…</button></div>';
   }
@@ -209,12 +227,11 @@
         '<button type="button" class="pill-btn primary" data-lb="leave">Leave the lesson</button></div>' +
         '<div class="lb-prefs lb-prefs-open">' + RR.Settings.prefsHtml() + '</div>';
     }
-    const sets = RR.Sets.list().filter(s => !/^lesson/.test(s.id));
     return nowHtml() + btnsHtml() + newSesHtml() +
       folder('ses', IC.ses, 'My sessions', RR.Sessions.list().length, sessionsHtml) +
-      folder('mel', IC.mel, 'My melodies', sets.length, melodiesHtml) +
+      folder('mel', IC.mel, 'My melodies', mySets().length, melodiesHtml) +
       folder('songs', IC.song, 'Songs', RR.teachSongs().length, songsHtml) +
-      folder('practice', IC.practice, 'Practice', RR.TEACH.length + RR.TeachUnits.levels().length, practiceHtml) +
+      folder('practice', IC.practice, 'Practice', RR.teachLessons().length + RR.teachExercises().length, practiceHtml) +
       folder('levels', IC.levels, 'Levels', RR.LEVELS.length, levelsHtml) +
       folder('prefs', IC.prefs, 'Settings', '', () => '<div class="lb-prefs">' + RR.Settings.prefsHtml() + '</div>');
   }

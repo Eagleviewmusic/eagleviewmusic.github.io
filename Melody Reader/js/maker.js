@@ -86,7 +86,7 @@
     if (RR.Melodies) RR.Melodies.close();
     if (RR.View) RR.View.go('play');                // the music card is the editor (from the home page too)
     G.pause(); clearTimeout(G.autoT);
-    M.active = true; M.setId = setId; M.changed = false;
+    M.active = true; M.setId = setId; M.changed = false; M.copied = null;
     M.value = 4;
     $('#app').classList.add('making');
     $('#mk-set').textContent = set.title;
@@ -190,9 +190,16 @@
     const set = RR.Sets.get(M.setId);
     if (!hasNotes() && !(M.index === null && !M.melody.notes.length && set && set.melodies.length)) { RR.toast('Write at least one note first — strike a bar'); return; }
     if (!(await commit())) return;
-    RR.toast('Saved in ' + RR.Sets.get(M.setId).title);
+    const into = RR.Sets.get(M.setId);
+    RR.toast(M.copied ? 'Saved in your copy, “' + into.title + '” — it’s in ' + (/^songbook:/.test(M.copied) ? 'Songs' : 'Practice') + ', under the original' : 'Saved in ' + into.title);
     leave(true);
   }
+  /* the app's own song or lesson written into: from then on, your copy of it (sets.js copyOnWrite) */
+  RR.Sets.onCopied((from, rec) => {
+    if (!M.active || M.setId !== from) return;
+    M.setId = rec.id; M.copied = from;
+    $('#mk-set').textContent = rec.title;
+  });
 
   /* ---------------- writing ---------------- */
   function add(p) {
@@ -235,7 +242,7 @@
   function hear() {
     if (M.timers.length) { stopHear(); return; }
     if (!M.melody.notes.length || !RR.Sound.ctx) return;
-    const spt = 60 / RR.paceTempo(G.setup, RR.listenPace()) / 4;
+    const spt = 60 / RR.listenTempo() / 4;
     let t = RR.Sound.now() + 0.1;
     $('#mk-hear').classList.add('playing');
     M.melody.notes.forEach(n => {

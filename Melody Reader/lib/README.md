@@ -6,6 +6,7 @@
 | `evm-count-in.js`, `evm-count-in.css` | `Claude Apps/EVM Library/evm-count-in.js` (+ `.css`) | With the beat's count-in: priming the sound, the "Get ready 1 2 3 4" card |
 | `evm-library.js` | `Claude Apps/EVM Library/evm-library.js` | the family library rules for My melodies (ids, stamps, the import rule, envelopes) |
 | `evm-shelf.js`, `evm-shelf.css` | `Claude Apps/EVM Library/evm-shelf.js` (+ `.css`) | the Teacher Library shelf in My melodies |
+| `instruments/js/virtual-instruments.js` | `Claude Apps/Virtual Instrument Assets/js/virtual-instruments.js` | the metronome's Drum beat — Ostinato Builder's kit (2026-10-13; see `instruments/README.md`) |
 
 Byte-identical copies, taken 2026-10-03. Change the authoritative file, then
 copy it here and `cmp` to confirm. (`EVM Library/check-copies.sh` lists the
