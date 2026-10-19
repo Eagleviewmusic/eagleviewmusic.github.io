@@ -283,7 +283,9 @@
     p.then(l => {
       if (tok !== linkTok) return;
       linkNow = l; out.value = l;
-      const len = $('#mel-body .lb-link-len'); if (len) len.textContent = l.length.toLocaleString() + ' characters';
+      const len = $('#mel-body .lb-link-len');
+      // over 255 (2026-10-19): Schoology, and many sites' link boxes, take no more — a cut link opens the home page
+      if (len) { len.textContent = l.length.toLocaleString() + ' characters' + (l.length > 255 ? ' — long: Schoology and some sites cut links over 255' : ''); len.classList.toggle('long', l.length > 255); }
     });
     return p;
   }

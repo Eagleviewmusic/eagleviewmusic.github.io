@@ -1725,6 +1725,7 @@ html.view-home .app-home { display: none; }
 .lb-copy { display: inline-flex; align-items: center; gap: 8px; }
 .lb-copy .lb-i { width: 18px; height: 18px; }
 .lb-link-len { color: var(--ink-soft); font-size: 13px; margin-left: 10px; }
+.lb-link-len.long { color: var(--late); font-weight: 600; }
 /* the buttons: Song Writer's row — white with a line, the first one filled */
 .lb-btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
 .lb-btn { display: inline-flex; align-items: center; gap: 8px; background: #fff; box-shadow: inset 0 0 0 2px #e6dac4; padding: 10px 17px; font-size: 15.5px; }

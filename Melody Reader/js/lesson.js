@@ -47,6 +47,11 @@
    still makes the long form (p= m= ss= b= t= tempo=, each base64url), and
    links of either form made before keep opening. A short link that can't
    be read (cut short) opens nothing: the app opens as usual and says so.
+   SHORTER STILL (2026-10-19, the user's: a Round's ~500-character link
+   was too long for Schoology): a short link now carries only what isn't
+   a default — against LINK_1, a copy of the day's defaults kept here and
+   never changed — and its melodies as a few letters each; it opens at the
+   folder (no index.html). A generated Round is under 200 characters.
 
    Sets travel as their melodies, never a library id: the family rule is
    that lesson payloads carry no item header, so a lesson can never
@@ -82,6 +87,86 @@
     return out;
   }
   const unpacked = {};       // a short link's `z`, read before the app started: its data (or null: it didn't read)
+
+  /* ---- shorter still: only what isn't a default (2026-10-19, the user's: a Round of generated notes was "too
+     long for Schoology", which sent the class to the home page — every link carried all ~35 settings, ~500
+     characters) ----
+     A short link made from now on says `v: 1` and carries only what differs from LINK_1: the defaults of
+     2026-10-19, written out here and NEVER to be changed (new defaults would be a LINK_2, with v: 2). So every
+     setting still travels (the 2026-10-08 rule) — the unchanged ones by the version number — and a later change
+     of RR.DEFAULTS can't change what an old link plays. Melodies go in as a few letters each: the beats, then
+     each note and its length, then the title ('4E4qD4qC4h|Hot Cross Buns 1'; z = a rest). A generated Round:
+     ~500 → under 200 characters. Links without `v` (made before) are read as they always were.
+     A LEVEL goes by its number (`lv`) and only what differs from the level as made (your changes to it, a round's
+     length …) — as Practice's lessons and the Songbook's songs go by name: Level 15 was 421 characters, now
+     under 100. (So a level redone later opens redone, with the link's changes on top.) */
+  const LINK_1 = {
+    p: {
+      notes: ['C4', 'D4', 'E4', 'F4', 'G4'], moves: 'steps', endDo: true, tricky: false, grey: false,
+      rhythms: ['q', 'h'], time: [4, 4], bars: 1, endLong: true, times: [[4, 4]], pickup: false,
+      leaps: ['P4', 'P5'], endLa: false, focus: [], practice: true, practiceStart: 'on', oneGo: false, flash: 0,
+      gold: 11, game: 'round5', clockSecs: 60, song: null, songPicks: [], from: 'both', auto: true,
+      colour: 'always', letters: true, nums: true, glow: 'after2', labels: 'none', staff: 'plain', beat: 'click',
+      playHidden: false, playLights: true, songs: []
+    },
+    look: { colour: 'solid', staff: 'notes', labels: 'letters', auto: false, beat: 'click' },
+    b: { per: 1, rounds: 3, tools: true },
+    tempo: 72
+  };
+  const obj = x => x && typeof x === 'object' && !Array.isArray(x) ? x : {};
+  const less = (o, base) => {
+    const out = {};
+    Object.keys(o).forEach(k => { if (JSON.stringify(o[k]) !== JSON.stringify(base[k])) out[k] = o[k]; });
+    return out;
+  };
+  const DUR = { 1: 's', 2: 'e', 3: 'f', 4: 'q', 6: 'r', 8: 'h', 12: 'i', 16: 'w' };     // a note's length in ticks
+  const TICKS = {};
+  Object.keys(DUR).forEach(t => { TICKS[DUR[t]] = +t; });
+  const melIn = m => m.time[0] + m.notes.map(n => (n.p || 'z') + DUR[n.t]).join('') + (m.title ? '|' + m.title : '');
+  function melOut(s) {
+    if (typeof s !== 'string') return null;
+    const bar = s.indexOf('|'), code = bar < 0 ? s : s.slice(0, bar);
+    if (!/^[234]/.test(code)) return null;
+    const notes = [], re = /([A-G]\d|z)([sefqrhiw])/g;
+    let x, at = 1;
+    while ((x = re.exec(code)) && x.index === at) { notes.push({ p: x[1] === 'z' ? null : x[1], t: TICKS[x[2]] }); at = re.lastIndex; }
+    return at === code.length ? { title: bar < 0 ? '' : s.slice(bar + 1), time: [+code[0], 4], notes } : null;   // a stray letter: not a melody
+  }
+  const setIn = s => [s.title || ''].concat(s.melodies.map(melIn));
+  const setOut = a => Array.isArray(a) ? { title: a[0], melodies: a.slice(1).map(melOut).filter(Boolean) } : null;
+  /* the parts as a short link carries them … */
+  const levelOk = n => Number.isInteger(n) && n >= 1 && n <= RR.LEVELS.length;
+  function trim(d) {
+    const o = { v: 1 };
+    if (d.p && levelOk(d.lv)) { o.lv = d.lv; o.p = less(d.p, RR.originalLevel(d.lv)); }
+    else if (d.p) o.p = less(d.p, LINK_1.p);
+    if (d.m) o.m = setIn(d.m);
+    if (d.ss) o.ss = d.ss.map(setIn);
+    if (d.b) o.b = less(d.b, LINK_1.b);
+    if (d.t) {
+      o.t = Object.assign({}, d.t);
+      const look = d.t.look ? less(d.t.look, LINK_1.look) : {};
+      if (Object.keys(look).length) o.t.look = look; else delete o.t.look;
+    }
+    if (d.tempo != null && d.tempo !== LINK_1.tempo) o.tempo = d.tempo;
+    return o;
+  }
+  /* … and whole again: null when it's a kind of link this app doesn't know (a newer one) */
+  function untrim(d) {
+    if (d.v == null) return d;                    // made before 2026-10-19: every part whole
+    if (d.v !== 1) return null;
+    const o = { tempo: d.tempo != null ? d.tempo : LINK_1.tempo };
+    if (d.lv != null && !levelOk(d.lv)) return null;            // a level this app doesn't have
+    if (d.p) o.p = Object.assign(d.lv ? RR.originalLevel(d.lv) : RR.clone(LINK_1.p), obj(d.p));
+    if (d.m) o.m = setOut(d.m);
+    if (Array.isArray(d.ss)) o.ss = d.ss.map(setOut);
+    if (d.b) o.b = Object.assign(RR.clone(LINK_1.b), obj(d.b));
+    if (d.t) o.t = Object.assign({}, obj(d.t), { look: Object.assign({}, LINK_1.look, obj(obj(d.t).look)) });
+    return o;
+  }
+  /* where a short link opens: the folder, not index.html, on the web (10 characters); a space in the name is + */
+  const linkBase = () => RR.pageBase().replace(/^(https?:\/\/.*\/)index\.html$/, '$1');
+  const nameParam = name => encodeURIComponent(clip(name, 40)).replace(/%20/g, '+');
 
   /* ---- what the link carries ---- */
   /* a practice (a level, a session of Rounds, Games or Battle, Generated, a set): { p, m, ss, b } */
@@ -138,8 +223,8 @@
   async function shortLink(name, d) {
     if (!canPack) return longLink(name, d);
     try {
-      return RR.pageBase() + '?lesson=' + encodeURIComponent(clip(name, 40)) + '&z=~' +
-        toB64u(await streamBytes(new TextEncoder().encode(JSON.stringify(d)), new CompressionStream('deflate')));
+      return linkBase() + '?lesson=' + nameParam(name) + '&z=~' +
+        toB64u(await streamBytes(new TextEncoder().encode(JSON.stringify(trim(d))), new CompressionStream('deflate')));
     } catch (_) { return longLink(name, d); }
   }
 
@@ -172,6 +257,7 @@
       const G = RR.Game, m = G.mode;
       const d = m.kind === 'teach' ? teachData(m, RR.Teach.at, from) : practiceData(G.setup, G.playingSet(), G.battle);
       if (d) d.tempo = G.tempo;
+      if (d && m.kind === 'level') d.lv = m.n;           // a short link names the level (2026-10-19)
       return d;
     },
     longLink, shortLink,
@@ -215,7 +301,7 @@
       const z = q.get('z');
       let d;
       if (z) {
-        d = z.charAt(0) === '~' ? unpacked[z] : null;
+        d = z.charAt(0) === '~' && unpacked[z] ? untrim(unpacked[z]) : null;
         if (!d) return { name, lost: true };
       } else {
         d = {};

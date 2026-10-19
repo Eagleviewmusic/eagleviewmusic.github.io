@@ -873,6 +873,48 @@
         const junk = await open(base + '?lesson=X&z=~not-deflate');
         check('A short link cut short, or naming a lesson or song that isn’t here, or a unit without its melodies, opens nothing (lost: the app opens as usual and says so)',
           cut.lost && gone.lost && noSet.lost && junk.lost && L.needsUnpack(uHref) && !L.needsUnpack(base + '?lesson=X&p=e30'));
+        // shorter still (2026-10-19): only what isn't a default, melodies as letters — a generated Round fits Schoology's 255
+        const round = Object.assign(RR.clone(RR.DEFAULTS), { notes: ['C4', 'D4', 'E4', 'G4'], from: 'made', set: null });
+        const rHref = await L.shortLink('Monday’s Xylo Workout', { p: round, tempo: 72 }), r = await open(rHref);
+        delete round.set;
+        const twoBar = { title: 'Two bars | 3/4', time: [3, 4], notes: [{ p: 'A5', t: 6 }, { p: null, t: 2 }, { p: 'C4', t: 4 }, { p: 'E4', t: 1 }, { p: 'G4', t: 3 }, { p: 'C5', t: 8 }] };
+        const whole = { title: '', time: [4, 4], notes: [{ p: 'D5', t: 12 }, { p: 'F4', t: 4 }, { p: 'G5', t: 16 }] };
+        const sm = { title: 'Week 9', melodies: m.melodies.concat(twoBar, whole) };
+        const sHref = await L.shortLink('Set | round', { p: Object.assign(RR.clone(RR.DEFAULTS), { from: 'set', set: null, game: 'round12', beat: 'drums' }), m: sm, b: { teams: [{ name: 'Eagles', colour: '#a855f7' }, { name: 'Blue team', colour: '#3b82f6' }], per: 2, rounds: 3, tools: true }, tempo: 104 });
+        const sr = await open(sHref);
+        const teachHref = await L.shortLink('Mi So La', { t: { id: 'L2', at: 2, look: RR.clone(RR.TEACH_LOOK) } }), tr = await open(teachHref);
+        const q = href => href.length - href.indexOf('?');            // the link less the page's address (which depends on where it's served)
+        check('Short links carry only what isn’t a default (v: 1): a generated Round is under 150 characters after the address, which is the folder; sets, battles, looks and the tempo come back whole',
+          q(rHref) < 150 && !/index\.html/.test(rHref) && /lesson=Monday%E2%80%99s\+Xylo\+Workout&/.test(rHref) && r.name === 'Monday’s Xylo Workout' &&
+          JSON.stringify(r.practice) === JSON.stringify(RR.sanitize(round)) && r.tempo === 72 && !r.bad &&
+          sr.set.melodies.length === 5 && JSON.stringify(sr.set.melodies[3]) === JSON.stringify(twoBar) && JSON.stringify(sr.set.melodies[4]) === JSON.stringify(whole) && sr.set.title === 'Week 9' && sr.name === 'Set | round' &&
+          sr.practice.game === 'round12' && sr.practice.beat === 'drums' && sr.practice.from === 'set' && sr.battle.per === 2 && sr.battle.rounds === 3 && sr.battle.tools === true &&
+          sr.battle.teams[0].name === 'Eagles' && sr.tempo === 104 &&
+          JSON.stringify(tr.teach.look) === JSON.stringify(RR.TEACH_LOOK) && tr.tempo === 72,
+          'after the address: ' + q(rHref) + ' characters for a generated Round (all of it was ~450); ' + q(sHref) + ' for a battle with five melodies; ' + q(teachHref) + ' for a Practice lesson');
+        // a level goes by its number and only its differences from the level as made
+        let lvSame = true, lvMax = 0;
+        for (const l of RR.LEVELS) {
+          const p = Object.assign(RR.practiceOfLevel(l.n), { set: null }), href = await L.shortLink('Level ' + l.n, { p, lv: l.n, tempo: 72 }), back = await open(href);
+          if (!back || JSON.stringify(back.practice) !== JSON.stringify(RR.sanitize(p)) || back.bad) lvSame = false;
+          lvMax = Math.max(lvMax, q(href));
+        }
+        const lv9 = Object.assign(RR.practiceOfLevel(9), { set: null, game: 'round12', colour: 'solid' });
+        const lvBack = await open(await L.shortLink('Level 9', { p: lv9, lv: 9, tempo: 72 }));
+        check('A short level link names its level and carries only what differs from it (the round’s length, your changes); every level comes back whole',
+          lvSame && lvMax < 70 && JSON.stringify(lvBack.practice) === JSON.stringify(RR.sanitize(lv9)) && !lvBack.bad, 'longest level link ' + lvMax + ' characters after the address');
+        // a link made before (every part whole, no v) still opens; a newer kind of link than this app reads opens nothing
+        const pack = async o => {
+          const bytes = new Uint8Array(await new Response(new Blob([new TextEncoder().encode(JSON.stringify(o))]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
+          let s = '';
+          bytes.forEach(c => { s += String.fromCharCode(c); });
+          return base + '?lesson=Old&z=~' + btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        };
+        const oldP = Object.assign(RR.clone(RR.DEFAULTS), { notes: ['E4', 'G4'], game: 'round7' }); delete oldP.set;
+        const old = await open(await pack({ p: oldP, m: { title: 'Old set', melodies: m.melodies }, tempo: 80 }));
+        const newer = await open(await pack({ v: 2, p: {} })), noLevel = await open(await pack({ v: 1, lv: 16, p: {} }));
+        check('A short link made before 2026-10-19 (every setting whole) still opens as it was; a newer kind (v: 2), or a level this app doesn’t have, opens nothing',
+          JSON.stringify(old.practice.notes) === '["E4","G4"]' && old.practice.game === 'round7' && old.set.melodies.length === 3 && old.tempo === 80 && !old.bad && newer.lost && noLevel.lost);
         // the long form (a browser that can't deflate) carries Practice and the tempo too; a look and a tempo out of range are made safe
         const lf = L.parse(L.longLink('Old way', { t: { id: 'A2', at: 9, look: { colour: 'neon', beat: 'drums' } }, tempo: 400 }));
         check('The long form carries Practice too; an unknown look part becomes the usual one, a tempo is snapped to the dial',
