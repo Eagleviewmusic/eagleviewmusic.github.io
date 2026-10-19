@@ -6,6 +6,9 @@ const GARDEN_STAGES = 6;
 // The user can change these in Settings > Garden Growth.
 const GARDEN_GROWTH_DEFAULTS = { weekly: [1, 1, 1, 1, 1], daily: [1, 1, 2, 2, 2] };
 const GARDEN_GROWTH_MAX = 20;
+// Day one of every class's garden (user, 2026-10-19): attendance from this day on grows the
+// plants, whatever came before. Local midnight, 12 October 2026.
+const GARDEN_DAY_ONE = new Date(2026, 9, 12).getTime();
 // Garden sizes in px, kept in step with the .layout-garden rules in styles.css. A "pot" width
 // here is the width of its picture (--garden-w); each pot stands on a shelf in a slightly
 // narrower slot, so full-grown leaves may overlap a neighbour's a little.
@@ -1099,7 +1102,8 @@ class SeatingChartApp {
               date: d.date || '',
               day: d.day || '',
               timestamp: typeof d.timestamp === 'number' ? d.timestamp : Date.now(),
-              statuses: (d.statuses && typeof d.statuses === 'object') ? { ...d.statuses } : {}
+              statuses: (d.statuses && typeof d.statuses === 'object') ? { ...d.statuses } : {},
+              ...(typeof d.takenAt === 'number' ? { takenAt: d.takenAt } : {})
             };
           }).filter(Boolean);
           c.attendanceDates.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
@@ -2375,7 +2379,9 @@ class SeatingChartApp {
             date: dateStr,
             day: dayStr,
             timestamp: timestamp,
-            statuses: statuses
+            statuses: statuses,
+            // When it was first saved, so the Garden knows whether a replant came before or after
+            takenAt: Date.now()
           });
         }
 
@@ -8371,6 +8377,7 @@ class SeatingChartApp {
             const existingIdx = currentClass.attendanceDates.findIndex(d => 
               d.id === this.draftAttendanceDate.id || d.date === this.draftAttendanceDate.date
             );
+            const existing = existingIdx >= 0 ? currentClass.attendanceDates[existingIdx] : null;
             const savedRecord = {
               id: this.draftAttendanceDate.id || ('date_' + Date.now()),
               date: this.draftAttendanceDate.date,
@@ -8378,6 +8385,9 @@ class SeatingChartApp {
               timestamp: this.draftAttendanceDate.timestamp || Date.now(),
               statuses: { ...(this.draftAttendanceDate.statuses || {}) }
             };
+            // When the date was first saved (for the Garden's order of events); kept on a redo
+            if (!existing) savedRecord.takenAt = Date.now();
+            else if (typeof existing.takenAt === 'number') savedRecord.takenAt = existing.takenAt;
             if (existingIdx >= 0) {
               currentClass.attendanceDates[existingIdx] = savedRecord;
             } else {
@@ -9039,9 +9049,7 @@ class SeatingChartApp {
       // once and kept in currentClass.gardenPlants.
       renderGardenLayout(container, currentClass) {
         container.className = 'chart-container layout-garden';
-        const isNewGarden = isNaN(Date.parse(currentClass.gardenStart));
-        if (isNewGarden) currentClass.gardenStart = new Date().toISOString();
-        if (this.assignGardenPlants(currentClass) || isNewGarden) this.saveData();
+        if (this.assignGardenPlants(currentClass)) this.saveData();
         this.preloadGardenImages();
 
         const space = this.getGardenSpace();
@@ -9257,12 +9265,14 @@ class SeatingChartApp {
         });
       }
 
+      // A pot is at stage 1 until it has grown for stage 1's classes, then stage 2, and so on
+      // (weekly defaults: none = stage 1, one class = stage 2, ... five = full bloom)
       getGardenStageFor(sessions, pace) {
         const lengths = this.gardenGrowth[pace] || GARDEN_GROWTH_DEFAULTS.weekly;
         let through = 0;
         for (let stage = 1; stage < GARDEN_STAGES; stage++) {
           through += lengths[stage - 1];
-          if (sessions <= through) return stage;
+          if (sessions < through) return stage;
         }
         return GARDEN_STAGES;
       }
@@ -9274,20 +9284,25 @@ class SeatingChartApp {
       }
 
       // Day one of the class's garden: everyone starts at stage 1 then, whatever their attendance
-      // before. Set the first time the class's Garden is shown.
+      // before. For every class that's GARDEN_DAY_ONE (it used to be the day each class's Garden
+      // was first opened, so classes opened late ignored the classes before). Only the Star Wars
+      // sample keeps the start saved with it, because its episodes are dated August to October.
       getGardenStartDay(currentClass) {
-        const start = Date.parse(currentClass && currentClass.gardenStart);
-        return this.gardenDay(isNaN(start) ? Date.now() : start);
+        const isSample = currentClass && String(currentClass.id || '').startsWith('class-star-wars-');
+        const own = isSample ? Date.parse(currentClass.gardenStart) : NaN;
+        return isNaN(own) ? GARDEN_DAY_ONE : this.gardenDay(own);
       }
 
       // The student's current plant: how many classes it has grown (`sessions`), its `stage`, and
       // every plant start so far (`starts`: 'first', then 'r<day>' for each replant, 'e<id>' for
       // each Edit Garden "grow something else").
-      // Only classes from the garden's day one count. Marked present = one more class. An absence
+      // Only classes from the garden's day one count. Every pot starts at stage 1, and grows the
+      // moment attendance is saved: marked present = one more class (user, 2026-10-19). An absence
       // just means no growth that day (user, 2026-10-13: the plant waits, it doesn't start over);
-      // classes with no mark are skipped the same way. A replant starts a new plant that same day,
-      // which counts as its first class. An Edit Garden change puts the plant at the start of its
-      // stage. On any one day the class comes first, then replants and edits in the order made.
+      // classes with no mark are skipped the same way. A replant starts a new plant at stage 1,
+      // which grows from the next attendance saved. An Edit Garden change puts the plant at the
+      // start of its stage. On any one day things count in the order they happened: attendance at
+      // the time it was first saved (`takenAt`), else before that day's replants and edits.
       getGardenGrowth(currentClass, student) {
         const pace = this.getAttendancePace(currentClass);
         const firstDay = this.getGardenStartDay(currentClass);
@@ -9295,7 +9310,8 @@ class SeatingChartApp {
         (Array.isArray(currentClass.attendanceDates) ? currentClass.attendanceDates : []).forEach(d => {
           if (!d || !d.statuses) return;
           const day = this.gardenDay(typeof d.timestamp === 'number' ? d.timestamp : (Date.parse(d.date) || 0));
-          if (day >= firstDay) events.push({ type: 'class', day, time: 0, status: d.statuses[student] });
+          const taken = typeof d.takenAt === 'number' && this.gardenDay(d.takenAt) === day ? d.takenAt : day;
+          if (day >= firstDay) events.push({ type: 'class', day, time: taken, status: d.statuses[student] });
         });
         (Array.isArray(currentClass.gardenBorder) ? currentClass.gardenBorder : []).forEach(f => {
           const time = f && f.student === student ? Date.parse(f.date) : NaN;
@@ -9305,13 +9321,13 @@ class SeatingChartApp {
           const time = edit && edit.student === student ? Date.parse(edit.date) : NaN;
           if (!isNaN(time)) events.push({ type: 'edit', day: this.gardenDay(time), time, edit });
         });
-        events.sort((a, b) => a.day - b.day || (a.type === 'class' ? 0 : 1) - (b.type === 'class' ? 0 : 1) || a.time - b.time);
+        events.sort((a, b) => a.day - b.day || a.time - b.time || (a.type === 'class' ? 0 : 1) - (b.type === 'class' ? 0 : 1));
 
         let count = 0;
         const starts = ['first'];
         events.forEach(e => {
           if (e.type === 'replant') {
-            count = 1;
+            count = 0;
             starts.push(`r${e.day}`);
           } else if (e.type === 'edit') {
             if (e.edit.newPlant) starts.push(`e${e.edit.id}`);
@@ -9323,11 +9339,11 @@ class SeatingChartApp {
         return { sessions: count, stage: this.getGardenStageFor(count, pace), starts };
       }
 
-      // The class count at which a stage begins (stage 1 begins at the first class)
+      // The class count at which a stage begins (stage 1 begins before any class)
       gardenFirstClassOf(stage, pace) {
         const lengths = this.gardenGrowth[pace] || GARDEN_GROWTH_DEFAULTS.weekly;
         const target = Math.min(GARDEN_STAGES, Math.max(1, parseInt(stage, 10) || 1));
-        return 1 + lengths.slice(0, target - 1).reduce((a, b) => a + b, 0);
+        return lengths.slice(0, target - 1).reduce((a, b) => a + b, 0);
       }
 
       // ---- Edit Garden (Settings): fixing a class's garden by hand. It stays on only while that
@@ -9501,7 +9517,7 @@ class SeatingChartApp {
               ? paces.map(pace => stepper(pace, stage - 1)).join('')
               : '<div class="growth-until">until replanted</div><div class="growth-until">until replanted</div>'}`;
         }
-        const total = pace => draft[pace].reduce((a, b) => a + b, 0) + 1;
+        const total = pace => draft[pace].reduce((a, b) => a + b, 0);
         document.getElementById('gardenGrowthGrid').innerHTML = `
           <div></div>
           <div class="growth-head">Weekly<small>meets once a week</small></div>
@@ -12288,7 +12304,7 @@ class SeatingChartApp {
           seat.title = stage === GARDEN_STAGES
             ? 'Full bloom. Click the flower to replant it.'
             : sessions === 0
-              ? 'New pot: it starts growing at the next class'
+              ? 'New pot: it grows when attendance is taken'
               : `Stage ${stage} of ${GARDEN_STAGES} (${sessions} ${sessions === 1 ? 'class' : 'classes'})`;
         }
 
