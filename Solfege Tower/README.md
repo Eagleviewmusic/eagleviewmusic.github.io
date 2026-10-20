@@ -7,6 +7,16 @@ which tower is on the left. Key and scale are shared by the two towers; each has
 Built for embedding: the towers always fit the frame, as large as the frame
 allows, and the menu is an overlay that takes no space from them.
 
+## The chords bend the melody
+
+With both towers up, a held chord whose notes leave the scale bends the melody's matching
+degree while it is held: V/V in C major (D F♯ A) turns Fa into Fi, IV/IV (B♭ D F) turns
+Ti into Te, Lydian's IV (F natural) turns Fi into Fa. The rule is by letter name: a chord
+tone outside the scale alters the degree that shares its letter, by the semitone between
+them. The bent button is relabelled (Fi, or F♯ in letter view) with a white inset ring and
+re-pitches, and comes back the moment the chord is released. `harmonicAlterations()` in
+`js/chord-tower.js` computes it; `setHarmony()` in `js/melody-tower.js` applies it.
+
 ## Links
 
 `?tower=both&left=chord&key=G&scale=major&timbre=triangle&chordTimbre=voice`

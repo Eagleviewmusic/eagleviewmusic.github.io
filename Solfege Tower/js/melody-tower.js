@@ -16,6 +16,7 @@ ST.MelodyTower = class MelodyTower extends ST.Tower {
     this.letterNames = {};
     this.colors = {};
     this.noteFrequencies = {};
+    this.harmony = {};   // degree index (0 = Do) → +1 / −1 asked by a held chord (Both mode)
 
     // Left-hand keys never shift up an octave; the right hand (and a finger) does when 8va is on.
     this.leftHandKeys = new Set(['z', 'x', 'c', 'v', 'a', 's', 'd', 'f', 'q', 'w', 'e', 'r', '1', '2', '3', '4']);
@@ -53,6 +54,37 @@ ST.MelodyTower = class MelodyTower extends ST.Tower {
   get keyName() { return ST.melody.getEffectiveKeyName(this.app.state.keyIndex, this.app.state.scale); }
   buttonIdFor(key) { return this.keyToId[key] || key; }
   buttonFor(key) { return this.buttons.find(b => b.keys.includes(key)); }
+  degreeOf(btn) { return 'CDEFGAB'.indexOf(btn.note.charAt(0)); }
+  altFor(btn) { return this.harmony[this.degreeOf(btn)] || 0; }
+
+  // ---- a chord's chromatic note, shown and heard on the melody ----
+  static alterSyllable(s, alt) {
+    if (!s || !alt) return s;
+    const map = alt > 0 ? ST.MelodyTower.RAISE : ST.MelodyTower.LOWER;
+    return map[s] || s;
+  }
+  static alterLetter(name, alt) {   // 'F' → 'F♯', 'B♭' → 'B', 'F♯' → 'F' …
+    if (!name || !alt) return name;
+    const letter = name.charAt(0);
+    let acc = 0;
+    for (const ch of name.slice(1)) { if (ch === '♯') acc += 1; else if (ch === '♭') acc -= 1; else if (ch === '𝄪') acc += 2; else if (ch === '𝄫') acc -= 2; }
+    acc += alt;
+    const sign = acc > 0 ? (acc === 1 ? '♯' : '𝄪') : acc < 0 ? (acc === -1 ? '♭' : '𝄫') : '';
+    return letter + sign;
+  }
+  setHarmony(alts) {
+    const changed = new Set();
+    for (let d = 0; d < 7; d++) if ((this.harmony[d] || 0) !== (alts[d] || 0)) changed.add(d);
+    if (!changed.size) return;
+    this.harmony = Object.assign({}, alts);
+    this.updateNames();
+    for (const id of [...this.held]) {               // a held note moves with the chord
+      const btn = this.buttonFor(id);
+      if (!btn || !changed.has(this.degreeOf(btn))) continue;
+      ['_0', '_1', '_-1'].forEach(s => this.synth.stop(id + s));
+      this.play(id, { pointer: this.pointerHeld.has(id) });
+    }
+  }
 
   // ---- theory ----
   updateMappings() {
@@ -82,8 +114,8 @@ ST.MelodyTower = class MelodyTower extends ST.Tower {
     const i = ['Do', 'Re', 'Mi', 'Fa', 'So', 'La', 'Ti'].indexOf(base);
     return (scale && i > -1 && scale.solfege[i]) || base;
   }
-  textColorFor(solfege) {
-    const note = this.letterNames[solfege];
+  textColorFor(solfege, alt) {
+    const note = ST.MelodyTower.alterLetter(this.letterNames[solfege], alt || 0);
     const acc = note && ST.melody.noteAccidentalMap[note];
     if (acc === 'flat' || acc === 'double-flat') return ST.melody.DARK_BLUE;
     if (acc === 'sharp' || acc === 'double-sharp') return ST.melody.DARK_RED;
@@ -94,9 +126,12 @@ ST.MelodyTower = class MelodyTower extends ST.Tower {
       const div = this.buttonRefs[btn.keys[0]];
       if (!div) return;
       const solfege = this.solfegeFor(btn.keys[0]);
-      const note = this.letterNames[solfege];
-      div.textContent = this.nameMode === 'solfege' ? (solfege || btn.name) : (note || solfege);
-      div.style.color = this.textColorFor(solfege);
+      const alt = this.altFor(btn);
+      const shown = ST.MelodyTower.alterSyllable(solfege, alt);
+      const note = ST.MelodyTower.alterLetter(this.letterNames[solfege], alt);
+      div.textContent = this.nameMode === 'solfege' ? (shown || btn.name) : (note || shown);
+      div.style.color = this.textColorFor(solfege, alt);
+      div.classList.toggle('altered', !!alt);
     });
     this.refitLabels();
   }
@@ -106,7 +141,7 @@ ST.MelodyTower = class MelodyTower extends ST.Tower {
       if (!div) return;
       const solfege = this.solfegeFor(btn.keys[0]);
       div.style.backgroundColor = this.colors[solfege] || '#ccc';
-      div.style.color = this.textColorFor(solfege);
+      div.style.color = this.textColorFor(solfege, this.altFor(btn));
     });
   }
   toggleNames() { this.nameMode = this.nameMode === 'solfege' ? 'letters' : 'solfege'; }
@@ -156,7 +191,7 @@ ST.MelodyTower = class MelodyTower extends ST.Tower {
     if (!base) return;
     this.held.add(id);
     const acc = this.getAccidentalShift(0);
-    let freq = base * Math.pow(2, acc / 12);
+    let freq = base * Math.pow(2, (acc + this.altFor(btn)) / 12);
     if (this.octaveActive && (pointer || !this.leftHandKeys.has(id))) freq *= 2;
     this.synth.start(`${id}_${acc}`, freq);
   }
@@ -201,3 +236,5 @@ ST.MelodyTower = class MelodyTower extends ST.Tower {
     return { bg: ST.melody.KEY_COLORS[note.charAt(0)] || '#ccc', fg: this.textColorFor(solfege) };
   }
 };
+ST.MelodyTower.RAISE = { Do: 'Di', Ra: 'Re', Re: 'Ri', Me: 'Mi', Fa: 'Fi', Se: 'So', So: 'Si', Le: 'La', La: 'Li', Te: 'Ti' };
+ST.MelodyTower.LOWER = { Di: 'Do', Re: 'Ra', Ri: 'Re', Mi: 'Me', Fi: 'Fa', So: 'Se', Si: 'So', La: 'Le', Li: 'La', Ti: 'Te' };

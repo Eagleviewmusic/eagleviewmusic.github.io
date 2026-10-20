@@ -29,6 +29,40 @@ ST.ChordTower = class ChordTower extends ST.Tower {
   chordNames() { return ST.chords.letterNames[this.scale][this.keyName] || []; }
   rootOf(name) { return name ? name.charAt(0).toUpperCase() : null; }
 
+  // ---- what the held chords ask of the melody ----
+  // A chord tone outside the scale (V/V's F♯ in C major) alters the scale degree that
+  // shares its letter, by the semitone between them: { degreeIndex: +1 | -1 }, degree 0 = Do.
+  // Chords are written in C, so this is key-free: the melody applies it in the real key.
+  harmonicAlterations() {
+    const alts = {};
+    const scale = ST.melody.scaleDefinitions[this.scale];
+    const spelling = ST.melody.scaleSpellings.C[this.scale];
+    if (!scale || !spelling) return alts;
+    const PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+    const pcOf = name => {   // 'F#4' / 'Bb3' / 'F♯' → pitch class
+      let pc = PC[name.charAt(0)];
+      for (const ch of name.slice(1)) { if (ch === '#' || ch === '♯') pc += 1; else if (ch === 'b' || ch === '♭') pc -= 1; }
+      return ((pc % 12) + 12) % 12;
+    };
+    const scalePcs = scale.intervals.map(i => i % 12);
+    for (const id of this.held) {
+      const chord = this.chordFor(id);
+      if (!chord) continue;
+      chord.notes['C'].forEach(n => {
+        const name = n.replace(/\d+$/, '');
+        const pc = pcOf(name);
+        if (scalePcs.includes(pc)) return;                       // in the scale: nothing to do
+        const d = spelling.findIndex(sp => sp.charAt(0) === name.charAt(0));
+        if (d < 0) return;
+        const diff = ((pc - scalePcs[d]) % 12 + 12) % 12;
+        if (diff === 1) alts[d] = 1;
+        else if (diff === 11) alts[d] = -1;
+      });
+    }
+    return alts;
+  }
+  harmonyChanged() { if (this.app.onChordsChanged) this.app.onChordsChanged(); }
+
   // ---- names and colours ----
   updateNames() {
     const names = this.chordNames();
@@ -84,11 +118,13 @@ ST.ChordTower = class ChordTower extends ST.Tower {
       return f ? f * Math.pow(2, total / 12) : 0;
     });
     this.synth.start(`${id}_${acc}`, freqs);
+    this.harmonyChanged();
   }
   stop(id) {
     this.held.delete(id);
     delete this.heldMods[id];
     ['_0', '_1', '_-1'].forEach(s => this.synth.stop(id + s));
+    this.harmonyChanged();
   }
   retrigger() {
     for (const id of this.held) {

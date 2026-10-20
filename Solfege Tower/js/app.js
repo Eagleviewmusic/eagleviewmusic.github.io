@@ -33,6 +33,7 @@
   const KINDS = ['melody', 'chord'];
   const state = { mode: 'melody', left: 'melody', keyIndex: 0, scale: 'major', timbre: { melody: 'triangle', chord: 'triangle' } };
   const app = { state, towers: {} };
+  ST.app = app;   // for the console
   const towers = app.towers;
   const stage = $('#stage');
   towers.melody = new ST.MelodyTower(app);
@@ -123,6 +124,12 @@
     vis.forEach(t => t.resize(f.w, f.cell * t.rowCount));
   }
 
+  // A held chord with a note outside the scale bends the melody's matching degree
+  // (V/V's F♯ makes Fa into Fi) — only while both towers are up.
+  app.onChordsChanged = () => {
+    towers.melody.setHarmony(state.mode === 'both' ? towers.chord.harmonicAlterations() : {});
+  };
+
   // ---------- applying state ----------
   function applyMode() {
     const vis = visibleKinds();
@@ -134,12 +141,15 @@
       t.el.style.order = String(vis.indexOf(k));
     });
     layout();
+    app.onChordsChanged();
     syncMenu();
     paintModalKeyboard();
   }
   function applyTheory() {
     towers.melody.updateMappings();
+    towers.melody.harmony = {};
     KINDS.forEach(k => { towers[k].updateColors(); towers[k].updateNames(); });
+    app.onChordsChanged();
     syncMenu();
     paintModalKeyboard();
   }
