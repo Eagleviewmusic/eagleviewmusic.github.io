@@ -252,7 +252,7 @@
         '<tr><td>Xylophone hint</td><td>' + seg('glow', [['never', 'Never'], ['after2', 'After 2 slips'], ['always', 'Always']], s.glow) + '</td></tr>' +
         '<tr><td>Grey out unused bars</td><td>' + seg('grey', [['true', 'On'], ['false', 'Off']], String(!!s.grey)) + '</td></tr>' +
         '<tr><td>Text below the notes</td><td>' + seg('labels', [['letters', 'Letter Name'], ['solfege', 'Solfege Name'], ['none', 'Nothing']], s.labels) + '</td></tr>' +
-        '<tr><td>Practice</td><td>' + seg('practiceMode', [['on', 'On (default)'], ['off', 'Off (default)'], ['disabled', 'Disabled']], practiceMode(s)) + '</td></tr>' +
+        '<tr><td>Practice</td><td>' + seg('practiceMode', [['on', 'On'], ['off', 'Off (default)'], ['disabled', 'Disabled']], practiceMode(s)) + '</td></tr>' +
         '<tr><td>Play button</td><td>' + seg('playMode', [['anim', 'Animates music and bars'], ['sound', 'Plays sounds only'], ['off', 'Disabled']], playMode(s)) + '</td></tr>' +
         // the metronome's sound (2026-10-13, the user's: "the metronome choice of click or drum beat") — Tools has it too
         '<tr><td>Metronome</td><td>' + seg('beat', [['click', 'Click'], ['drums', 'Drum beat']], s.beat === 'drums' ? 'drums' : 'click') +

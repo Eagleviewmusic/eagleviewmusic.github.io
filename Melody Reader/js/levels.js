@@ -47,7 +47,7 @@
     rhythms: ['q', 'h'], time: [4, 4], bars: 1, endLong: true,
     times: [[4, 4]], pickup: false,                                    // times: each melody's meter, one of these (time = the first); pickup: half the melodies start with one
     leaps: ['P4', 'P5'], endLa: false, focus: [],                      // leaps (with Leaps too): 'P4' 'P5' 'M6'; endLa: half the melodies La-based; focus: a level's new notes and rhythms, more often
-    practice: true, practiceStart: 'on', oneGo: false, flash: 0,      // practiceStart: 'off' = each melody starts in Test (the metronome's tempo is the dial's, not a practice's: 2026-10-13)
+    practice: true, practiceStart: 'off', oneGo: false, flash: 0,     // practiceStart: 'off' = each melody starts in Test — live — and Practice (the pause) is a press away; Off since 2026-10-19, the user's: "turn off the pause button so it defaults as live. Let the user press pause if they want it" (the metronome's tempo is the dial's, not a practice's: 2026-10-13)
     gold: 11,                                                          // a gold star from this many points (of 20): over 10
     game: 'round5', clockSecs: 60, song: null, songPicks: [], from: 'both', auto: true,   // songPicks: the Song format's songs ('ode', 'set:<id>'), in order
     colour: 'always', letters: true, nums: true, glow: 'after2', labels: 'none',   // colour: 'solid' · 'always' (transparent until played) · 'lit' · 'black'; labels: 'none' · 'letters' · 'solfege'
@@ -188,7 +188,7 @@
       (p.rhythms.some(r => C[r] && C[r].rest && kinds.includes(C[r].meter)) ? ' · rests' : '') +
       (times.length > 1 || times[0][0] !== 4 || times[0][1] !== 4 ? ' · ' + times.map(RR.meterText).join(' & ') : '') + (p.pickup ? ' · pick-ups' : '') +
       (p.moves === 'leaps' ? ' · leaps of ' + p.leaps.map(k => LEAP_WORD[k]).join(', ') : '') + (p.endLa ? ' · La-based too' : '') +
-      (p.practice ? (p.practiceStart === 'off' ? ' · Practice off' : '') : ' · no Practice') + (p.flash ? ' · Flash' : '') + (p.gold !== RR.DEFAULTS.gold ? ' · ★ ' + p.gold + '+' : '');
+      (p.practice ? (p.practiceStart !== RR.DEFAULTS.practiceStart ? (p.practiceStart === 'off' ? ' · Practice off' : ' · Practice on') : '') : ' · no Practice') + (p.flash ? ' · Flash' : '') + (p.gold !== RR.DEFAULTS.gold ? ' · ★ ' + p.gold + '+' : '');
   };
 
   /* ---- Battle Mode: the teams' colours, and a battle made safe ----
@@ -247,6 +247,20 @@
     },
     reset(n) { const all = readEdits(); delete all[n]; RR.save(RR.KEY.levels, all); }
   };
+
+  /* Practice Off is the usual now (2026-10-19). Once on each browser, what had Practice On only because it was
+     the usual goes Off: the practice the Generate window starts from, a Custom practice being played, and your
+     changes to a level (the levels are Off now, so On there was the level's, not yours). Named sessions keep
+     what they have — Practice in a session's ✎ page changes it */
+  if (!RR.device.liveDefault) {
+    const off = p => { if (p && typeof p === 'object' && p.practiceStart === 'on') { p.practiceStart = 'off'; return true; } return false; };
+    off(RR.device.gen);
+    if (RR.device.practice && RR.device.practice.kind === 'custom') off(RR.device.practice.practice);
+    const all = readEdits();
+    if (Object.keys(all).filter(n => off(all[n])).length) RR.save(RR.KEY.levels, all);
+    RR.device.liveDefault = true;
+    RR.saveDevice();
+  }
 
   /* ---- My sessions ----
      A session is a named practice of your own — the notes, the rhythms, the

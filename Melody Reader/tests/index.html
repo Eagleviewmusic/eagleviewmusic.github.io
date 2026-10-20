@@ -353,8 +353,9 @@
         check('Sixteenths, dotted notes, rests and leaps make a melody harder to read', M.difficulty(busy).total > M.difficulty(easy).total * 2 && M.difficulty(busy).pitch > M.difficulty(easy).pitch);
       })();
       // the Helps' wording and choices (2026-10-06)
-      check('Practice is On, Off (each melody starts in Test) or Disabled', RR.DEFAULTS.practiceStart === 'on' &&
-        RR.sanitize({ practiceStart: 'off' }).practiceStart === 'off' && RR.sanitize({ practiceStart: 'maybe' }).practiceStart === 'on' &&
+      check('Practice is On, Off (each melody starts in Test — the usual since 2026-10-19) or Disabled; the levels start in Test too', RR.DEFAULTS.practiceStart === 'off' &&
+        RR.sanitize({ practiceStart: 'on' }).practiceStart === 'on' && RR.sanitize({ practiceStart: 'maybe' }).practiceStart === 'off' &&
+        RR.LEVELS.every(l => l.practiceStart === 'off') && !/Practice/.test(RR.summary(RR.DEFAULTS)) && / · Practice on/.test(RR.summary(Object.assign(RR.clone(RR.DEFAULTS), { practiceStart: 'on' }))) &&
         RR.sanitize({ practice: false }).practice === false);
       check('Text below the notes: letter names, solfège names or nothing (old rhythm syllables read as nothing)',
         RR.sanitize({ labels: 'solfege' }).labels === 'solfege' && RR.sanitize({ labels: 'syllables' }).labels === 'none' &&
@@ -884,7 +885,7 @@
         const sr = await open(sHref);
         const teachHref = await L.shortLink('Mi So La', { t: { id: 'L2', at: 2, look: RR.clone(RR.TEACH_LOOK) } }), tr = await open(teachHref);
         const q = href => href.length - href.indexOf('?');            // the link less the page's address (which depends on where it's served)
-        check('Short links carry only what isn’t a default (v: 1): a generated Round is under 150 characters after the address, which is the folder; sets, battles, looks and the tempo come back whole',
+        check('Short links carry only what isn’t a default (v: 2): a generated Round is under 150 characters after the address, which is the folder; sets, battles, looks and the tempo come back whole',
           q(rHref) < 150 && !/index\.html/.test(rHref) && /lesson=Monday%E2%80%99s\+Xylo\+Workout&/.test(rHref) && r.name === 'Monday’s Xylo Workout' &&
           JSON.stringify(r.practice) === JSON.stringify(RR.sanitize(round)) && r.tempo === 72 && !r.bad &&
           sr.set.melodies.length === 5 && JSON.stringify(sr.set.melodies[3]) === JSON.stringify(twoBar) && JSON.stringify(sr.set.melodies[4]) === JSON.stringify(whole) && sr.set.title === 'Week 9' && sr.name === 'Set | round' &&
@@ -912,9 +913,13 @@
         };
         const oldP = Object.assign(RR.clone(RR.DEFAULTS), { notes: ['E4', 'G4'], game: 'round7' }); delete oldP.set;
         const old = await open(await pack({ p: oldP, m: { title: 'Old set', melodies: m.melodies }, tempo: 80 }));
-        const newer = await open(await pack({ v: 2, p: {} })), noLevel = await open(await pack({ v: 1, lv: 16, p: {} }));
-        check('A short link made before 2026-10-19 (every setting whole) still opens as it was; a newer kind (v: 2), or a level this app doesn’t have, opens nothing',
-          JSON.stringify(old.practice.notes) === '["E4","G4"]' && old.practice.game === 'round7' && old.set.melodies.length === 3 && old.tempo === 80 && !old.bad && newer.lost && noLevel.lost);
+        const newer = await open(await pack({ v: 3, p: {} })), noLevel = await open(await pack({ v: 1, lv: 16, p: {} }));
+        // v: 1 (made before Practice Off became the usual) keeps Practice On; v: 2 is Off unless it says so
+        const v1 = await open(await pack({ v: 1, p: { notes: ['C4', 'E4'] } })), v2 = await open(await pack({ v: 2, p: { notes: ['C4', 'E4'] } }));
+        const v2on = await open(await L.shortLink('On', { p: Object.assign(RR.clone(RR.DEFAULTS), { practiceStart: 'on', set: null }) }));
+        check('A short link made before 2026-10-19 (every setting whole) still opens as it was; a newer kind (v: 3), or a level this app doesn’t have, opens nothing; a v: 1 link keeps its Practice On, v: 2 is Off unless it says On',
+          JSON.stringify(old.practice.notes) === '["E4","G4"]' && old.practice.game === 'round7' && old.set.melodies.length === 3 && old.tempo === 80 && !old.bad && newer.lost && noLevel.lost &&
+          v1.practice.practiceStart === 'on' && v1.practice.notes.join() === 'C4,E4' && v2.practice.practiceStart === 'off' && v2on.practice.practiceStart === 'on');
         // the long form (a browser that can't deflate) carries Practice and the tempo too; a look and a tempo out of range are made safe
         const lf = L.parse(L.longLink('Old way', { t: { id: 'A2', at: 9, look: { colour: 'neon', beat: 'drums' } }, tempo: 400 }));
         check('The long form carries Practice too; an unknown look part becomes the usual one, a tempo is snapped to the dial',

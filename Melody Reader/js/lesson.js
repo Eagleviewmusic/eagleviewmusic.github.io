@@ -99,7 +99,9 @@
      ~500 → under 200 characters. Links without `v` (made before) are read as they always were.
      A LEVEL goes by its number (`lv`) and only what differs from the level as made (your changes to it, a round's
      length …) — as Practice's lessons and the Songbook's songs go by name: Level 15 was 421 characters, now
-     under 100. (So a level redone later opens redone, with the link's changes on top.) */
+     under 100. (So a level redone later opens redone, with the link's changes on top.)
+     v: 2 (2026-10-19, the same day): Practice Off became the usual (practiceStart 'off' — each melody opens
+     live), so LINK_2 is LINK_1 with that one change; a v: 1 link keeps its Practice On. */
   const LINK_1 = {
     p: {
       notes: ['C4', 'D4', 'E4', 'F4', 'G4'], moves: 'steps', endDo: true, tricky: false, grey: false,
@@ -113,6 +115,8 @@
     b: { per: 1, rounds: 3, tools: true },
     tempo: 72
   };
+  const LINK_2 = { p: Object.assign({}, LINK_1.p, { practiceStart: 'off' }), look: LINK_1.look, b: LINK_1.b, tempo: LINK_1.tempo };
+  const LINKS = { 1: LINK_1, 2: LINK_2 }, V = 2;      // V: the version a link is made in
   const obj = x => x && typeof x === 'object' && !Array.isArray(x) ? x : {};
   const less = (o, base) => {
     const out = {};
@@ -137,31 +141,32 @@
   /* the parts as a short link carries them … */
   const levelOk = n => Number.isInteger(n) && n >= 1 && n <= RR.LEVELS.length;
   function trim(d) {
-    const o = { v: 1 };
+    const o = { v: V }, LINK = LINKS[V];
     if (d.p && levelOk(d.lv)) { o.lv = d.lv; o.p = less(d.p, RR.originalLevel(d.lv)); }
-    else if (d.p) o.p = less(d.p, LINK_1.p);
+    else if (d.p) o.p = less(d.p, LINK.p);
     if (d.m) o.m = setIn(d.m);
     if (d.ss) o.ss = d.ss.map(setIn);
-    if (d.b) o.b = less(d.b, LINK_1.b);
+    if (d.b) o.b = less(d.b, LINK.b);
     if (d.t) {
       o.t = Object.assign({}, d.t);
-      const look = d.t.look ? less(d.t.look, LINK_1.look) : {};
+      const look = d.t.look ? less(d.t.look, LINK.look) : {};
       if (Object.keys(look).length) o.t.look = look; else delete o.t.look;
     }
-    if (d.tempo != null && d.tempo !== LINK_1.tempo) o.tempo = d.tempo;
+    if (d.tempo != null && d.tempo !== LINK.tempo) o.tempo = d.tempo;
     return o;
   }
   /* … and whole again: null when it's a kind of link this app doesn't know (a newer one) */
   function untrim(d) {
     if (d.v == null) return d;                    // made before 2026-10-19: every part whole
-    if (d.v !== 1) return null;
-    const o = { tempo: d.tempo != null ? d.tempo : LINK_1.tempo };
+    const LINK = LINKS[d.v];
+    if (!LINK) return null;
+    const o = { tempo: d.tempo != null ? d.tempo : LINK.tempo };
     if (d.lv != null && !levelOk(d.lv)) return null;            // a level this app doesn't have
-    if (d.p) o.p = Object.assign(d.lv ? RR.originalLevel(d.lv) : RR.clone(LINK_1.p), obj(d.p));
+    if (d.p) o.p = Object.assign(d.lv ? RR.originalLevel(d.lv) : RR.clone(LINK.p), obj(d.p));
     if (d.m) o.m = setOut(d.m);
     if (Array.isArray(d.ss)) o.ss = d.ss.map(setOut);
-    if (d.b) o.b = Object.assign(RR.clone(LINK_1.b), obj(d.b));
-    if (d.t) o.t = Object.assign({}, obj(d.t), { look: Object.assign({}, LINK_1.look, obj(obj(d.t).look)) });
+    if (d.b) o.b = Object.assign(RR.clone(LINK.b), obj(d.b));
+    if (d.t) o.t = Object.assign({}, obj(d.t), { look: Object.assign({}, LINK.look, obj(obj(d.t).look)) });
     return o;
   }
   /* where a short link opens: the folder, not index.html, on the web (10 characters); a space in the name is + */
