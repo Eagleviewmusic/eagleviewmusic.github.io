@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Solfege Tower</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Melody Tower and Chord Tower in one frame: play one, or both side by side, with the shared key and scale.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    try {
+      if (window.self !== window.top) document.documentElement.classList.add('in-iframe');
+    } catch (e) {
+      document.documentElement.classList.add('in-iframe');
+    }
+  </script>
+  <!-- EVM visit counter: one anonymous count each time an app is opened. What is sent, and what never is: /what-we-count.html -->
+  <script>
+    (function () {
+      var off = false;
+      try { off = localStorage.getItem('skipgc') === 't'; } catch (e) {}
+      if (location.hash === '#toggle-goatcounter') {   // the teacher's own browsers opt out here (and back in)
+        try { off ? localStorage.removeItem('skipgc') : localStorage.setItem('skipgc', 't'); } catch (e) {}
+        alert(off ? 'Visits from this browser will be counted again.' : 'Visits from this browser will no longer be counted.');
+        return;
+      }
+      if (off || navigator.webdriver) return;
+      if (navigator.globalPrivacyControl || navigator.doNotTrack === '1' || window.doNotTrack === '1') return;   // the visitor asked not to be counted
+      if (!/(^|\.)eagleviewmusic\.com$/.test(location.hostname)) return;   // testing, or a copy on another site
+      try { if (window.top !== window && parent.location.host) return; } catch (e) {}   // framed by another of our apps (the Music Stand), which counts itself
+      try {
+        var p = decodeURIComponent(location.pathname).replace(/index\.html$/, '');
+        var r = document.referrer.split(/[?#]/)[0];   // where the visit came from, never the rest of a link
+        var u = 'https://eagleviewmusic.goatcounter.com/count?p=' + encodeURIComponent(p) +
+          (r ? '&r=' + encodeURIComponent(r) : '') + '&s=' + screen.width + '&rnd=' + Math.random().toString(36).slice(2, 7);
+        if (!(navigator.sendBeacon && navigator.sendBeacon(u))) new Image().src = u;
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <div id="stage" aria-label="Solfege Tower"></div>
+
+  <button id="menu-button" class="menu-button" type="button" aria-label="Open the menu" aria-expanded="false" aria-controls="menu">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+    </svg>
+  </button>
+
+  <div id="menu" class="menu" hidden>
+    <div class="menu-backdrop" data-close></div>
+    <div class="menu-panel" role="dialog" aria-modal="true" aria-label="Solfege Tower menu">
+      <button class="menu-close" type="button" aria-label="Close the menu" data-close>&times;</button>
+      <a class="back-hub-btn" href="../index.html">&larr; Eagle View Music</a>
+      <h1 class="app-title">Solfege Tower</h1>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Tower</div>
+        <div class="seg" id="mode-seg" role="group" aria-label="Which tower to show">
+          <button type="button" data-mode="melody" aria-pressed="true">Melody</button>
+          <button type="button" data-mode="chord" aria-pressed="false">Chord</button>
+          <button type="button" data-mode="both" aria-pressed="false">Both</button>
+        </div>
+        <button type="button" class="control-area swap-button" id="swap-button" hidden aria-label="Swap the two towers' sides">
+          <span id="swap-left">Melody</span><span class="swap-arrows" aria-hidden="true">&#8644;</span><span id="swap-right">Chord</span>
+        </button>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Key</div>
+        <div class="control-row">
+          <div class="control-area key-control" tabindex="0" aria-label="Key control">
+            <div class="arrow" id="key-left">&#9664;</div><div id="key-name">C</div><div class="arrow" id="key-right">&#9654;</div>
+          </div>
+          <div class="control-area scale-control">
+            <select id="scale-select" class="scale-dropdown" aria-label="Scale"></select>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Timbre</div>
+        <div class="timbre-row" id="timbre-melody">
+          <span class="timbre-label">Melody</span>
+          <div class="control-area timbre-control" tabindex="0" aria-label="Melody timbre">
+            <div class="arrow arrow-left">&#9664;</div><div class="waveform-name">triangle</div><div class="arrow arrow-right">&#9654;</div>
+          </div>
+        </div>
+        <div class="timbre-row" id="timbre-chord">
+          <span class="timbre-label">Chord</span>
+          <div class="control-area timbre-control" tabindex="0" aria-label="Chord timbre">
+            <div class="arrow arrow-left">&#9664;</div><div class="waveform-name">triangle</div><div class="arrow arrow-right">&#9654;</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <button type="button" class="control-area keyboard-button" id="keyboard-button">Computer Keyboard layout</button>
+      </div>
+
+      <div class="sidebar-section share-section">
+        <button type="button" class="control-area share-button" id="share-button" aria-label="Share this setup as a link">Share this setup as a link</button>
+        <div class="share-output-container" id="share-output-container" style="display:none">
+          <input type="text" readonly class="share-url-input" id="share-url-input" aria-label="Shareable link">
+          <button type="button" class="share-copy-btn" id="share-copy-btn">Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="keyboard-modal" class="modal" role="dialog" aria-label="Computer keyboard layout">
+    <div class="modal-content">
+      <button class="close-button" type="button" aria-label="Close">&times;</button>
+      <div class="modal-heading" id="modal-heading"></div>
+      <div id="simulated-keyboard"></div>
+      <div class="key-legend" id="key-legend"></div>
+    </div>
+  </div>
+
+  <script src="js/data-melody.js"></script>
+  <script src="js/data-chords.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/tower.js"></script>
+  <script src="js/melody-tower.js"></script>
+  <script src="js/chord-tower.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

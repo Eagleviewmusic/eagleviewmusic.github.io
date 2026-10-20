@@ -1,0 +1,507 @@
+/* Solfege Tower — Melody Tower + Chord Tower in one frame.
+   The tower styles are the pair's shared style.css; the sidebar became a pop-out menu. */
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #fff;
+  font-family: 'EB Garamond', Garamond, 'Times New Roman', Times, serif;
+  -webkit-text-size-adjust: 100%;
+}
+[hidden] { display: none !important; }
+
+/* ---- the stage: the whole frame, the towers centred and as big as it allows ---- */
+#stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.tower {
+  position: relative;
+  flex: none;
+}
+.grid {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/* ---- cells and note buttons (shared tower design) ---- */
+.cell, .note-button {
+  border-radius: 1vmin;
+  position: absolute;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  color: white;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition: transform 0.1s, background-color 0.3s, font-size 0.2s, color 0.3s;
+  outline: none;
+  min-width: 0;
+  min-height: 0;
+  background: transparent;
+  z-index: 1;
+  font-family: 'EB Garamond', Garamond, 'Times New Roman', Times, serif;
+  letter-spacing: 0.02em;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+}
+.note-button { z-index: 2; cursor: pointer; }
+.active { transform: scale(1.30); z-index: 10; }
+
+.cell img.solfege-img {
+  max-width: 80%;
+  max-height: 80%;
+  width: auto;
+  height: auto;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+  margin: auto;
+  background: transparent;
+}
+
+/* Naming toggle in cell 6d */
+.toggle-cell-border { border: 2px solid #ddd; box-sizing: border-box; }
+.chord-toggle-btn {
+  padding: 0;
+  margin: 0;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 1vmin;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: inherit;
+  line-height: 1;
+  overflow: hidden;
+  font-family: 'EB Garamond', Garamond, 'Times New Roman', Times, serif;
+  font-weight: bold;
+  color: #222;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+}
+.chord-toggle-btn:hover { background: #f4f8ff; }
+.chord-toggle-btn:focus-visible { outline: 2px solid #007AFF; }
+.stepped-labels {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 2px;
+  font-family: 'EB Garamond', Garamond, 'Times New Roman', Times, serif;
+  font-weight: bold;
+  line-height: 1;
+  color: #222;
+  user-select: none;
+  pointer-events: none;
+}
+.stepped-letters .step { font-size: 0.52em; display: inline-block; line-height: 1; }
+.stepped-solfege .step { font-size: 0.38em; display: inline-block; line-height: 1; letter-spacing: -0.02em; }
+.stepped-romans .step { font-size: 0.46em; display: inline-block; line-height: 1; letter-spacing: -0.02em; }
+.stepped-labels .step-1 { transform: translateY(28%); }
+.stepped-labels .step-2 { transform: translateY(0%); }
+.stepped-labels .step-3 { transform: translateY(-28%); }
+.accidental { font-size: 0.75em; position: relative; top: -0.15em; }
+
+/* 8va in cell 5d (melody) */
+.octave-btn {
+  width: 100%;
+  height: 100%;
+  border: 1px solid #ccc;
+  border-radius: 1vmin;
+  background-color: white;
+  color: black;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'EB Garamond', Garamond, 'Times New Roman', Times, serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  user-select: none;
+}
+.octave-btn.active { background-color: #34C759 !important; color: white !important; transform: none !important; }
+.octave-sup { vertical-align: top; font-size: 0.75em; position: relative; top: -0.4em; }
+
+/* ---- the menu button: just an icon, top left ---- */
+.menu-button {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #001f3f;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 50;
+  transition: transform 0.15s, background-color 0.4s ease;
+}
+.menu-button svg { width: 20px; height: 20px; display: block; }
+.menu-button:hover { transform: scale(1.06); }
+.menu-button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 4px rgba(0,0,0,0.35); }
+.menu-open .menu-button { visibility: hidden; }
+
+/* ---- the menu: an overlay, so the towers never lose space to it ---- */
+.menu { position: fixed; inset: 0; z-index: 60; }
+.menu-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.18); }
+.menu-panel {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 270px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: clamp(10px, 1.8vh, 16px) clamp(10px, 1.5vw, 14px) clamp(12px, 2vh, 18px);
+  border-radius: 14px;
+  background: #001f3f;
+  border: 2px solid #001a33;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: clamp(8px, 1.8vh, 16px);
+  animation: slideIn 0.2s ease-out;
+  transition: background-color 0.4s ease, border-color 0.4s ease;
+}
+.menu-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.menu-close:hover { background: rgba(255, 255, 255, 0.32); }
+
+.back-hub-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.2s ease;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+.back-hub-btn:hover { background: rgba(255, 255, 255, 0.28); color: #38bdf8; border-color: #38bdf8; }
+
+.app-title {
+  font-family: 'Pacifico', cursive;
+  margin: clamp(2px, 0.6vh, 4px) 0;
+  font-size: clamp(18px, 3.5vh, 26px);
+  font-weight: normal;
+  color: white;
+  text-align: center;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.35);
+  user-select: none;
+}
+
+.sidebar-section { display: flex; flex-direction: column; gap: clamp(4px, 1vh, 6px); width: 100%; }
+.sidebar-section-title {
+  font-size: clamp(0.8rem, 1.8vh, 1.1rem);
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-left: 2px;
+}
+.control-row { display: flex; flex-direction: row; gap: 8px; width: 100%; align-items: stretch; }
+
+.control-area {
+  outline: none;
+  border-radius: clamp(5px, 1vmin, 8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(0.78rem, 1.6vh, 1rem);
+  padding: clamp(0.25em, 0.8vh, 0.45em) clamp(0.35em, 0.8vw, 0.6em);
+  background: #fff;
+  color: #333;
+  white-space: nowrap;
+  margin: 0;
+  font-family: inherit;
+  transition: background-color 0.3s, color 0.3s, box-shadow 0.2s;
+  cursor: pointer;
+  border: 1px solid #ddd;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+  box-sizing: border-box;
+}
+.control-area:focus-visible { box-shadow: 0 0 0 3px rgba(255,255,255,0.7); }
+.key-control { flex: 1.1; min-width: 0; justify-content: space-between; }
+.key-control #key-name { font-weight: bold; font-size: clamp(0.85rem, 1.8vh, 1.15rem); }
+.scale-control { flex: 1.4; min-width: 0; }
+.scale-dropdown {
+  background: transparent;
+  border: none;
+  font-size: clamp(0.75rem, 1.5vh, 0.95rem);
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+  outline: none;
+  padding: 0;
+  margin: 0;
+  text-align: center;
+  text-align-last: center;
+  width: 100%;
+  font-weight: 600;
+  -moz-appearance: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.timbre-row { display: flex; align-items: center; gap: 8px; width: 100%; }
+.timbre-label {
+  flex: 0 0 3.6em;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: bold;
+  font-size: clamp(0.78rem, 1.6vh, 1rem);
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+  margin-left: 2px;
+}
+.timbre-control { flex: 1; min-width: 0; justify-content: space-between; padding: clamp(0.3em, 0.8vh, 0.5em) clamp(0.4em, 1vw, 0.8em); }
+.timbre-control .waveform-name { font-weight: 600; text-transform: capitalize; font-size: clamp(0.75rem, 1.5vh, 0.95rem); }
+.arrow { cursor: pointer; padding: 0.2em 0.4em; user-select: none; font-size: 1.1em; font-family: inherit; transition: transform 0.1s; }
+.arrow:hover { transform: scale(1.2); }
+
+/* Tower: Melody / Chord / Both */
+.seg {
+  display: flex;
+  width: 100%;
+  background: #fff;
+  border-radius: clamp(5px, 1vmin, 8px);
+  border: 1px solid #ddd;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+.seg button {
+  flex: 1;
+  border: 0;
+  border-right: 1px solid #e5e5e5;
+  background: transparent;
+  padding: clamp(0.35em, 1vh, 0.6em) 0.3em;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: clamp(0.78rem, 1.6vh, 1rem);
+  color: #333;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.seg button:last-child { border-right: 0; }
+.seg button:hover { background: #f0f4f8; }
+.seg button[aria-pressed="true"] { background: #007AFF; color: #fff; }
+.seg button:focus-visible { outline: 2px solid #007AFF; outline-offset: -2px; }
+
+.swap-button { width: 100%; gap: 10px; margin-top: 4px; font-weight: 600; }
+.swap-button:hover { background: #f0f4f8; }
+.swap-arrows { font-size: 1.2em; line-height: 1; }
+
+.keyboard-button, .share-button {
+  width: 100%;
+  padding: clamp(0.35em, 1vh, 0.65em) clamp(0.4em, 1vw, 0.8em);
+  font-weight: 600;
+  text-align: center;
+}
+.keyboard-button:hover, .share-button:hover { background-color: #f0f4f8; box-shadow: 0 3px 6px rgba(0,0,0,0.15); }
+.keyboard-button:active, .share-button:active { transform: translateY(1px); }
+
+.share-section { margin-top: 2px; }
+.share-output-container {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  margin-top: 8px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 6px 8px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+  animation: fadeIn 0.2s ease-in-out;
+}
+.share-url-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  background: #f8f9fa;
+  color: #333;
+  font-family: inherit;
+  outline: none;
+  text-overflow: ellipsis;
+}
+.share-url-input:focus { border-color: #007AFF; background: #fff; }
+.share-copy-btn {
+  padding: 6px 12px;
+  background-color: #007AFF;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-family: inherit;
+  transition: background-color 0.2s, transform 0.1s;
+}
+.share-copy-btn:hover { background-color: #0056b3; }
+.share-copy-btn:active { transform: scale(0.96); }
+.share-copy-btn.copied { background-color: #34C759; }
+
+/* ---- the keyboard picture ---- */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.5);
+  animation: fadeIn 0.3s;
+}
+.modal.open { display: block; }
+.modal-content {
+  background-color: #fefefe;
+  margin: 8vh auto;
+  padding: 20px;
+  border: 1px solid #888;
+  width: 80%;
+  max-width: 650px;
+  border-radius: 10px;
+  position: relative;
+  box-sizing: border-box;
+  animation: slideIn 0.3s;
+}
+.close-button {
+  position: absolute;
+  top: 6px;
+  right: 12px;
+  border: 0;
+  background: transparent;
+  color: #aaa;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  line-height: 1;
+  font-family: inherit;
+}
+.close-button:hover, .close-button:focus { color: black; }
+.modal-heading {
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #333;
+  margin: 0 28px 10px 0;
+}
+#simulated-keyboard {
+  padding: 15px;
+  background: #d1d5db;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border: 1px solid #bbb;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
+}
+.keyboard-row { display: flex; justify-content: center; gap: 5px; }
+.key {
+  background: linear-gradient(to bottom, #fcfcfc, #e8e8e8);
+  border: 1px solid #b4b4b4;
+  border-radius: 4px;
+  padding: 10px;
+  font-size: 1.1em;
+  font-family: Arial, sans-serif;
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  box-shadow: 0 2px 0px rgba(0,0,0,0.1);
+  text-transform: uppercase;
+  font-weight: bold;
+  color: #333;
+  cursor: default;
+  user-select: none;
+  transition: all 0.05s ease;
+}
+.key-spacer { background: transparent; border-color: transparent; box-shadow: none; pointer-events: none; }
+.key.pressed { background: linear-gradient(to top, #fcfcfc, #e8e8e8); box-shadow: inset 0 1px 2px rgba(0,0,0,0.15); transform: translateY(1px); }
+.key-sharp { background: #990000; color: white; }
+.key-flat { background: #000099; color: white; }
+/* both towers: a seam between the keyboard's two halves */
+#simulated-keyboard.split .keyboard-row .key:nth-child(6) { margin-left: 14px; }
+#simulated-keyboard.split { position: relative; }
+#simulated-keyboard.split::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(0,0,0,0.18);
+  border-radius: 1px;
+}
+.key-legend {
+  margin-top: 12px;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 0.86rem;
+  color: #444;
+  line-height: 1.5;
+}
+.key-legend b { color: #111; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideIn { from { transform: translateY(-14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+@media (max-width: 680px) {
+  .modal-content { width: 95%; margin: 4vh auto; padding: 12px; }
+  #simulated-keyboard { gap: 3px; padding: 10px; }
+  .keyboard-row { gap: 3px; }
+  .key { padding: 6px 2px; font-size: 0.9em; border-radius: 3px; }
+  #simulated-keyboard.split .keyboard-row .key:nth-child(6) { margin-left: 8px; }
+}
+@media (max-height: 500px) {
+  .modal-content { margin: 2vh auto; padding: 10px; }
+  #simulated-keyboard { padding: 6px; gap: 2px; }
+  .key { padding: 4px 2px; font-size: 0.75rem; }
+  .menu-panel { gap: 8px; padding: 10px; }
+}
+@media (max-width: 360px) {
+  .menu-panel { width: calc(100vw - 16px); }
+}
