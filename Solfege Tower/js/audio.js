@@ -37,7 +37,7 @@ ST.audio = (function () {
   chordCompressor.threshold.value = -24; chordCompressor.knee.value = 30; chordCompressor.ratio.value = 12;
   chordCompressor.attack.value = 0.003; chordCompressor.release.value = 0.25;
   chordCompressor.connect(context.destination);
-  const CHORD_VOLUME = 0.4;
+  const CHORD_VOLUME = 0.36;   // Chord Tower had 0.4; 10% quieter beside the melody
 
   function resume() {
     if (context.state !== 'running') { try { context.resume(); } catch (e) {} }
