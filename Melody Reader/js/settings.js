@@ -208,6 +208,8 @@
       return '<div class="sec"><h3>Choose the Notes</h3>' +
         '<div class="notes-pick">' + RR.Eng.picker(s.notes) +
         '<div class="pick-xylo">' + RR.BARS.map(b => '<button type="button" data-note="' + b.id + '" class="' + (s.notes.includes(b.id) ? '' : 'off') + '" style="--c:' + b.colour + ';--len:' + (b.len * 0.8) + '%" aria-pressed="' + s.notes.includes(b.id) + '" aria-label="' + b.id + '">' + b.letter + '</button>').join('') + '</div></div>' +
+        // right under the bars being picked (2026-10-20, the user's: "the natural place where this question should be asked"; was in Look & Feel)
+        row('Grey out unused bars', seg('grey', [['true', 'On'], ['false', 'Off']], String(!!s.grey))) +
         row('Melodic Difficulty', seg('moves', [['steps', 'Steps'], ['skips', 'Steps and skips'], ['leaps', 'Leaps too']], s.moves)) +
         // which leaps (2026-10-07): a 4th, a 5th, a major 6th — any two of them in one melody
         (s.moves === 'leaps' ? row('Leaps of a', '<div class="seg" role="group" aria-label="Which leaps">' + [['P4', '4th'], ['P5', '5th'], ['M6', 'Major 6th']].map(o =>
@@ -250,7 +252,6 @@
         '<tr><td>Staff Color</td><td>' + seg('staff', [['notes', 'Its Notes’ Lines'], ['all', 'All Lines'], ['plain', 'Black']], s.staff || 'plain') + '</td></tr>' +
         '<tr><td>Xylophone Bar</td><td>' + seg('barText', [['letters', 'Letter Name'], ['numbers', 'Number'], ['both', 'Both'], ['neither', 'Neither']], barText(s)) + '</td></tr>' +
         '<tr><td>Xylophone hint</td><td>' + seg('glow', [['never', 'Never'], ['after2', 'After 2 slips'], ['always', 'Always']], s.glow) + '</td></tr>' +
-        '<tr><td>Grey out unused bars</td><td>' + seg('grey', [['true', 'On'], ['false', 'Off']], String(!!s.grey)) + '</td></tr>' +
         '<tr><td>Text below the notes</td><td>' + seg('labels', [['letters', 'Letter Name'], ['solfege', 'Solfege Name'], ['none', 'Nothing']], s.labels) + '</td></tr>' +
         '<tr><td>Practice</td><td>' + seg('practiceMode', [['on', 'On'], ['off', 'Off (default)'], ['disabled', 'Disabled']], practiceMode(s)) + '</td></tr>' +
         '<tr><td>Play button</td><td>' + seg('playMode', [['anim', 'Animates music and bars'], ['sound', 'Plays sounds only'], ['off', 'Disabled']], playMode(s)) + '</td></tr>' +
