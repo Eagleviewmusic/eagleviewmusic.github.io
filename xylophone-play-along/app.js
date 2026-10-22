@@ -1,5 +1,5 @@
 /* Xylophone Basics Play-Along: a Xylophone Basics video beside a playable 7-bar xylophone (C D E F G A B,
-   C4–B4, the octave the videos play in). The bars a video uses are always on; the unused ones switch on
+   C4–B4, the octave the videos play in, or C5–B5 with Play higher octave). The bars a video uses are always on; the unused ones switch on
    and off together in Settings. The video sits on the left or right, or on top when the screen is tall. */
 (() => {
   'use strict';
@@ -21,7 +21,7 @@
   const pct = i => (100 - i * 4) / 100;
 
   const VIDEOS = window.XB_VIDEOS;
-  const DEFAULTS = { side: 'left', sound: 'vibraphone', xyloVol: 70, videoVol: 100, unused: false, keys: false };
+  const DEFAULTS = { side: 'left', sound: 'vibraphone', high: false, xyloVol: 70, videoVol: 100, unused: false, keys: false };
   const store = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
@@ -117,7 +117,7 @@
 
   function strike(i) {
     if (i < 0 || !playable(i)) return false;
-    sound.play(i, BARS[i].freq);
+    sound.play(i, BARS[i].freq * (S.high ? 2 : 1));
     if (barEls[i].animate) barEls[i].animate([{ scale: 1 }, { scale: 0.95 }, { scale: 1 }], { duration: 100, easing: 'ease-in-out' });
     return true;
   }
@@ -375,6 +375,7 @@
     S[k] = v;
     store.set('xbpa.settings', S);
     if (k === 'sound') { sound.instrument = v; demo(); }
+    if (k === 'high') demo();
     if (k === 'xyloVol') sound.setVolume(v / 100);
     if (k === 'videoVol') applyVideoVolume();
     if (k === 'side') layout();
