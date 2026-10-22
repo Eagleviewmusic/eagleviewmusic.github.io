@@ -30,14 +30,51 @@ button:focus-visible, input:focus-visible { outline: 3px solid #fbbf24; outline-
   flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 10px;
   padding: 8px max(12px, env(safe-area-inset-right)) 4px max(12px, env(safe-area-inset-left));
 }
 
+/* the way back to the hub and the app's name, as in the Rainbow Xylophone (no way back inside a frame) */
+.home-btn {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 42px;
+  margin-top: 2px;
+  padding: 0 14px 0 9px;
+  border-radius: 999px;
+  color: #3e2723;
+  font-weight: 600;
+  font-size: 16px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.home-btn svg { width: 20px; height: 20px; }
+.in-iframe .home-btn { display: none; }
+.app-title {
+  flex: 0 0 auto;
+  margin: 0;
+  line-height: 46px;
+  color: #fff;
+  font-weight: 700;
+  font-size: clamp(20px, 2.2vw, 30px);
+  letter-spacing: 0.025em;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  filter: drop-shadow(0 4px 3px rgba(0, 0, 0, 0.07)) drop-shadow(0 2px 2px rgba(0, 0, 0, 0.06));
+}
+@media (max-width: 1279px) {   /* the word only on wide screens, so the tabs stay on one row */
+  .home-btn { width: 42px; padding: 0; justify-content: center; }
+  .home-btn span { display: none; }
+}
+@media (max-width: 639px) {
+  html:not(.in-iframe) .app-title { display: none; }
+}
+
 .tabs { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; padding: 2px; }
 
-.tab, .gear {
+.tab, .gear, .home-btn {
   background: rgba(255, 255, 255, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 10px;
@@ -47,8 +84,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid #fbbf24; outline-
   cursor: pointer;
   transition: background 0.2s, transform 0.1s;
 }
-.tab:hover, .gear:hover { background: rgba(255, 255, 255, 0.38); }
-.tab:active, .gear:active { transform: scale(0.95); }
+.tab:hover, .gear:hover, .home-btn:hover { background: rgba(255, 255, 255, 0.38); }
+.tab:active, .gear:active, .home-btn:active { transform: scale(0.95); }
+.topbar .home-btn { border-radius: 999px; }
 
 .tab {
   flex: 0 0 auto;
@@ -90,6 +128,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid #fbbf24; outline-
 
 .gear {
   flex: 0 0 auto;
+  margin-left: auto;
   width: 42px;
   height: 42px;
   display: grid;
