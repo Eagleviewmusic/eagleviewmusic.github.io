@@ -7,6 +7,9 @@
    Two ways to sound a note: play()/stop() for a key held down now, and
    schedule() for a note laid down ahead of time on the audio clock with
    its own length (a player that schedules a whole song — Song Writer).
+   A third, render(), plays a whole song into a buffer faster than real
+   time through the same voices and chain, for a file to download (the
+   Virtual Keyboard's recorder).
    ========================================================================== */
 const Audio = (() => {
   let ctx = null;
@@ -34,41 +37,50 @@ const Audio = (() => {
   };
   const PRESET_ORDER = ['piano', 'epiano', 'pluck', 'marimba', 'bell', 'organ', 'pad', 'strings', 'voice', 'sine', 'triangle', 'square', 'sawtooth'];
 
-  let voiceWave = null;
-  let organWave = null;
-
   function ensure() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return ctx; }
     const AC = window.AudioContext || window.webkitAudioContext;
     ctx = new AC({ latencyHint: 'interactive' });
-
-    mixBus = ctx.createGain(); mixBus.gain.value = 0.9;
-    hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 60; hp.Q.value = 0.7;
-    comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -18; comp.knee.value = 24; comp.ratio.value = 4; comp.attack.value = 0.006; comp.release.value = 0.22;
-    master = ctx.createGain(); master.gain.value = 0.9;
-
-    dryGain = ctx.createGain(); dryGain.gain.value = 1;
-    reverb = ctx.createConvolver(); reverb.buffer = makeImpulse(1.9, 2.6);
-    reverbGain = ctx.createGain(); reverbGain.gain.value = 0.32;
-
-    mixBus.connect(dryGain); dryGain.connect(hp);
-    mixBus.connect(reverb); reverb.connect(reverbGain); reverbGain.connect(hp);
-    hp.connect(comp); comp.connect(master); master.connect(ctx.destination);
-
-    // custom 'voice' wave (from the towers) and an organ drawbar wave
-    const n = 20, real = new Float32Array(n), imag = new Float32Array(n);
-    real[1] = 1; real[2] = 0.15; real[3] = 0.1; real[4] = 0.05;
-    voiceWave = ctx.createPeriodicWave(real, imag);
-    const or = new Float32Array(16), oi = new Float32Array(16);
-    or[1] = 1; or[2] = 0.6; or[3] = 0.35; or[4] = 0.4; or[6] = 0.2; or[8] = 0.15;
-    organWave = ctx.createPeriodicWave(or, oi);
+    ({ mixBus, hp, comp, master, dryGain, reverb, reverbGain } = buildChain(ctx));
     return ctx;
   }
 
-  function makeImpulse(seconds, decay) {
-    const rate = ctx.sampleRate, len = Math.floor(rate * seconds);
-    const buf = ctx.createBuffer(2, len, rate);
+  /* The master chain on a context — the live one, or render()'s offline one. */
+  function buildChain(c) {
+    const mixBus = c.createGain(); mixBus.gain.value = 0.9;
+    const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 60; hp.Q.value = 0.7;
+    const comp = c.createDynamicsCompressor();
+    comp.threshold.value = -18; comp.knee.value = 24; comp.ratio.value = 4; comp.attack.value = 0.006; comp.release.value = 0.22;
+    const master = c.createGain(); master.gain.value = 0.9;
+
+    const dryGain = c.createGain(); dryGain.gain.value = 1;
+    const reverb = c.createConvolver(); reverb.buffer = makeImpulse(c, 1.9, 2.6);
+    const reverbGain = c.createGain(); reverbGain.gain.value = 0.32;
+
+    mixBus.connect(dryGain); dryGain.connect(hp);
+    mixBus.connect(reverb); reverb.connect(reverbGain); reverbGain.connect(hp);
+    hp.connect(comp); comp.connect(master); master.connect(c.destination);
+    return { mixBus, hp, comp, master, dryGain, reverb, reverbGain };
+  }
+
+  // custom 'voice' wave (from the towers) and an organ drawbar wave, made once per context
+  const waves = new WeakMap();
+  function wavesOf(c) {
+    let w = waves.get(c);
+    if (!w) {
+      const n = 20, real = new Float32Array(n), imag = new Float32Array(n);
+      real[1] = 1; real[2] = 0.15; real[3] = 0.1; real[4] = 0.05;
+      const or = new Float32Array(16), oi = new Float32Array(16);
+      or[1] = 1; or[2] = 0.6; or[3] = 0.35; or[4] = 0.4; or[6] = 0.2; or[8] = 0.15;
+      w = { voice: c.createPeriodicWave(real, imag), organ: c.createPeriodicWave(or, oi) };
+      waves.set(c, w);
+    }
+    return w;
+  }
+
+  function makeImpulse(c, seconds, decay) {
+    const rate = c.sampleRate, len = Math.floor(rate * seconds);
+    const buf = c.createBuffer(2, len, rate);
     for (let ch = 0; ch < 2; ch++) {
       const d = buf.getChannelData(ch);
       for (let i = 0; i < len; i++) {
@@ -91,6 +103,7 @@ const Audio = (() => {
 
   /* Build one note of a voice. Returns { stop(when) } */
   function buildNote(freq, preset, out, when, velocity) {
+    const ctx = out.context; // the live context, or render()'s offline one
     const P = PRESETS[preset] || PRESETS.piano;
     const now = when;
     const env = ctx.createGain(); env.gain.value = 0;
@@ -117,12 +130,12 @@ const Audio = (() => {
         const g2 = ctx.createGain(); g2.gain.value = 0.12; o2.connect(g2); g2.connect(filt); oscs.push(o2);
       }
     } else if (P.kind === 'organ') {
-      const o = ctx.createOscillator(); o.setPeriodicWave(organWave); o.frequency.value = freq; o.connect(filt); oscs.push(o);
+      const o = ctx.createOscillator(); o.setPeriodicWave(wavesOf(ctx).organ); o.frequency.value = freq; o.connect(filt); oscs.push(o);
       const trem = ctx.createOscillator(); trem.frequency.value = 5.5;
       const tg = ctx.createGain(); tg.gain.value = 0.06;
       trem.connect(tg); tg.connect(env.gain); extras.push(trem); oscs.push(trem);
     } else if (P.kind === 'voice') {
-      const o = ctx.createOscillator(); o.setPeriodicWave(voiceWave); o.frequency.value = freq; o.connect(filt); oscs.push(o);
+      const o = ctx.createOscillator(); o.setPeriodicWave(wavesOf(ctx).voice); o.frequency.value = freq; o.connect(filt); oscs.push(o);
       const lfo = ctx.createOscillator(); lfo.frequency.setValueAtTime(1.5, now); lfo.frequency.linearRampToValueAtTime(5, now + 1);
       const lg = ctx.createGain(); lg.gain.value = freq * 0.006; lfo.connect(lg); lg.connect(o.frequency); oscs.push(lfo);
     }
@@ -187,16 +200,41 @@ const Audio = (() => {
     const out = sideGain(side);
     const now = ctx.currentTime;
     timed.forEach((v, id) => { if (v.end < now) timed.delete(id); });
+    const id = ++voiceSeq;
+    timed.set(id, lay(out, freqs, preset, Math.max(when || 0, now + 0.002), hold, level));
+    return id;
+  }
+
+  /* A note (or chord) into `out` from t0, let go `hold` seconds later —
+     schedule() and render() both lay their notes down this way. */
+  function lay(out, freqs, preset, t0, hold, level) {
     const P = PRESETS[preset] || PRESETS.piano;
-    const t0 = Math.max(when || 0, now + 0.002);
     const n = freqs.length;
     const velocity = (level === undefined ? 1 : level) * (n > 1 ? Math.min(1, 1.15 / Math.sqrt(n)) : 1);
     const notes = freqs.map((f, i) => buildNote(f, preset, out, t0 + (n > 1 ? i * 0.006 : 0), velocity));
     const off = t0 + Math.max(hold || 0, P.attack + 0.02);
     notes.forEach(nt => nt.release(off));
-    const id = ++voiceSeq;
-    timed.set(id, { notes, end: off + P.release + 0.1 });
-    return id;
+    return { notes, end: off + P.release + 0.1 };
+  }
+
+  /* Play a whole song into a stereo AudioBuffer, faster than real time, with
+     the voices, reverb and compressor the speakers hear. Needs no click to
+     wake the sound. song = { seconds, room (0–1, as setReverb), rate?,
+     parts: [{ level (as setLevel), notes: [{ freqs, preset, at, hold, level }] }] }
+     with `at` and `hold` in seconds from the start. */
+  function render(song) {
+    const rate = song.rate || 44100;
+    const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const off = new OAC(2, Math.max(1, Math.ceil(song.seconds * rate)), rate);
+    const chain = buildChain(off);
+    if (song.room != null) chain.reverbGain.gain.value = song.room * 0.7;
+    song.parts.forEach(part => {
+      const g = off.createGain();
+      g.gain.value = part.level === undefined ? 0.8 : part.level;
+      g.connect(chain.mixBus);
+      part.notes.forEach(nt => lay(g, nt.freqs, nt.preset, Math.max(0, nt.at), nt.hold, nt.level));
+    });
+    return off.startRendering();
   }
 
   function stop(id) {
@@ -209,5 +247,5 @@ const Audio = (() => {
   }
   function stopAll() { [...voices.keys(), ...timed.keys()].forEach(stop); }
 
-  return { ensure, play, schedule, stop, stopAll, setLevel, setReverb, PRESETS, PRESET_ORDER };
+  return { ensure, play, schedule, render, stop, stopAll, setLevel, setReverb, PRESETS, PRESET_ORDER };
 })();

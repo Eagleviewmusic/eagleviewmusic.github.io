@@ -602,6 +602,161 @@ body.keys-view .keyboard { display: none; }
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+/* ---------------- recorder (four tracks) ---------------- */
+.rec-toggle::before {
+  content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  margin-right: 7px; vertical-align: 0; background: #ff453a;
+}
+.rec-toggle[aria-pressed="true"]::before { box-shadow: 0 0 0 2px rgba(255,255,255,0.75); }
+
+.recorder {
+  --rec: #ff453a;
+  width: calc(100% - 20px); max-width: 1000px; margin: 0 auto 24px;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 12px; border-radius: 16px;
+  background: var(--bg-2); border: 1px solid var(--line);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+  user-select: none; -webkit-user-select: none;
+}
+.recorder[hidden] { display: none; }
+.recorder.is-recording { border-color: color-mix(in srgb, var(--rec) 60%, transparent); }
+
+.rec-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; }
+.rec-transport { display: flex; gap: 6px; }
+.rec-tbtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 42px; height: 42px; padding: 0; border-radius: 12px;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--text);
+}
+.rec-tbtn svg { width: 22px; height: 22px; fill: currentColor; stroke: currentColor; stroke-width: 0; }
+.rec-tbtn:hover { border-color: var(--text-3); }
+.rec-tbtn:disabled { opacity: 0.4; cursor: default; }
+.rec-play.on { background: var(--tonic); color: var(--tonic-ink); border-color: transparent; }
+.rec-record svg { color: var(--rec); }
+.rec-record.on { background: var(--rec); border-color: transparent; animation: rec-pulse 1.1s ease-in-out infinite; }
+.rec-record.on svg { color: #fff; }
+@keyframes rec-pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--rec) 30%, transparent); } }
+
+.rec-pos {
+  min-width: 118px; font-family: var(--font-block); font-weight: 600; font-size: 19px;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.recorder.is-recording .rec-pos { color: var(--rec); }
+
+.rec-settings { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.rec-tempo {
+  display: flex; align-items: center; height: 32px; padding: 0 2px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--surface);
+}
+.rec-step {
+  width: 26px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent;
+  color: var(--text-2); font-weight: 800; font-size: 16px;
+}
+.rec-step:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
+.rec-tempo-input {
+  width: 42px; height: 28px; padding: 0; border: 0; background: transparent; text-align: center;
+  font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; -moz-appearance: textfield;
+}
+.rec-tempo-input::-webkit-inner-spin-button, .rec-tempo-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.rec-tempo-input:focus { outline: 2px solid color-mix(in srgb, var(--tonic) 70%, transparent); border-radius: 4px; }
+.rec-unit { padding: 0 8px 0 2px; font-size: 11px; font-weight: 800; color: var(--text-3); }
+.recorder .select { height: 32px; background-position: calc(100% - 15px) 13px, calc(100% - 10px) 13px; }
+.recorder button:disabled, .recorder input:disabled, .recorder select:disabled { opacity: 0.45; cursor: default; }
+
+/* the tracks: controls on the left, the lane of notes on the right */
+.rec-tracks { display: flex; flex-direction: column; gap: 6px; }
+.rec-row { display: grid; grid-template-columns: 318px minmax(0, 1fr); gap: 8px; align-items: center; }
+.rec-ctl { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.rec-arm {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none;
+  width: 54px; height: 34px; padding: 0; border-radius: 999px;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--text-2);
+  font-family: var(--font-block); font-weight: 700; font-size: 16px;
+}
+.rec-arm-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-3); opacity: 0.6; }
+.rec-arm-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%; background: var(--tc); color: #1c1c1e; font-size: 14px;
+}
+.rec-arm[aria-pressed="true"] { border-color: var(--rec); box-shadow: inset 0 0 0 1px var(--rec); color: var(--text); }
+.rec-arm[aria-pressed="true"] .rec-arm-dot { background: var(--rec); opacity: 1; }
+.rec-track.taking .rec-arm-dot { animation: rec-blink 0.9s steps(2, jump-none) infinite; }
+@keyframes rec-blink { 50% { opacity: 0.25; } }
+.rec-sound { flex: 1; min-width: 0; max-width: none; }
+.rec-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 32px; height: 32px; padding: 0; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--text-2);
+}
+.rec-icon-btn:hover:not(:disabled) { color: var(--text); border-color: var(--line-strong); }
+.rec-mute[aria-pressed="true"] { background: var(--text-3); color: var(--bg); border-color: transparent; }
+.rec-vol { width: 64px; flex: none; accent-color: var(--tc); }
+
+.rec-lane {
+  position: relative; height: 50px; border-radius: 8px; overflow: hidden; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line);
+  box-shadow: inset 3px 0 0 var(--tc, transparent);
+}
+.rec-track.armed .rec-lane { border-color: color-mix(in srgb, var(--rec) 45%, var(--line)); }
+.rec-track.taking .rec-lane { border-color: var(--rec); }
+.rec-ruler { height: 20px; background: transparent; border-color: transparent; box-shadow: none; }
+.rec-lane canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.rec-head {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 2px; margin-left: -1px;
+  background: var(--text); opacity: 0.85; pointer-events: none; will-change: transform;
+}
+.recorder.is-recording .rec-head { background: var(--rec); opacity: 1; }
+.rec-ruler .rec-head { border-radius: 2px; }
+
+.rec-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.rec-timing { text-decoration: none; color: var(--text-2); font-weight: 700; }
+.rec-timing u { color: #8ab4ff; text-underline-offset: 3px; }
+/* on a light page the usual link blue is too pale */
+:root[data-theme="light"] .rec-timing u, :root[data-theme="light"] .sheet .link-btn { color: #2563c9; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .rec-timing u, :root:not([data-theme="dark"]) .sheet .link-btn { color: #2563c9; }
+}
+.rec-timing:hover { color: var(--text); }
+.rec-save-btn { margin-left: auto; }
+#rec-name { flex: none; } /* .text-field grows along a row; in this column it would collapse */
+
+/* Line up the timing: a dot per click, and a big pad to tap */
+.cal-dots { display: flex; justify-content: center; gap: 7px; flex-wrap: wrap; }
+.cal-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--surface-2); border: 2px solid var(--line-strong);
+  transition: transform 0.08s ease, background 0.08s ease;
+}
+.cal-dot.listen { border-style: dashed; }
+.cal-dot.lit { background: var(--tonic); border-color: var(--tonic); transform: scale(1.3); }
+.cal-dot.hit { background: #2DB86A; border-color: #2DB86A; }
+.cal-pad {
+  height: 92px; border-radius: 18px; border: 2px solid var(--line-strong);
+  background: var(--surface); color: var(--text);
+  font-family: var(--font-block); font-weight: 600; font-size: 24px;
+  touch-action: manipulation;
+}
+.cal-pad:hover { border-color: var(--text-3); }
+.cal-pad.running { border-color: var(--tonic); }
+.cal-pad.beat { animation: cal-beat 0.22s ease-out; }
+.cal-pad.tapped { background: color-mix(in srgb, #2DB86A 25%, var(--surface)); }
+@keyframes cal-beat { from { box-shadow: 0 0 0 7px color-mix(in srgb, var(--tonic) 40%, transparent); } to { box-shadow: 0 0 0 0 transparent; } }
+.cal-msg { margin: 0; min-height: 2.9em; font-size: 14px; font-weight: 700; line-height: 1.45; color: var(--text); text-align: center; }
+.cal-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); }
+.cal-row output { width: 64px; }
+
+@media (max-width: 760px) {
+  /* each track: its controls, then its lane under them */
+  .rec-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .rec-ctl-spacer { display: none; }
+  .rec-track { padding-top: 4px; }
+  .rec-settings { margin-left: 0; }
+  .rec-vol { width: 80px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rec-record.on, .rec-track.taking .rec-arm-dot, .cal-pad.beat { animation: none; }
+}
+
 /* ---------------- narrower screens ---------------- */
 /* two lines: brand and actions, then key & scale across the middle */
 @media (max-width: 860px) {

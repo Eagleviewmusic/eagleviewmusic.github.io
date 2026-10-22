@@ -101,6 +101,7 @@
   <select id="sound-select" class="select sound-select" aria-label="Sound"></select>
   <button class="quick-btn" id="focus-btn" type="button" aria-pressed="false" title="Focus: only the notes of the scale can be played">Focus</button>
   <button class="quick-btn layout-btn" id="layout-btn" type="button" title="Switch the computer keys between Flex and Chromatic (explained in Settings)">Flex</button>
+  <button class="quick-btn rec-toggle" id="recorder-btn" type="button" aria-pressed="false" aria-controls="recorder" title="The four-track recorder">Record</button>
 </div>
 
 <!-- ================= INSTRUMENT ================= -->
@@ -116,6 +117,50 @@
     <p class="qwerty-legend" id="qwerty-legend" hidden></p>
   </div>
 </main>
+
+<!-- ================= RECORDER (four tracks; recorder.js) ================= -->
+<section class="recorder" id="recorder" aria-label="Recorder" hidden>
+  <div class="rec-bar">
+    <div class="rec-transport">
+      <button class="rec-tbtn" id="rec-home" type="button" aria-label="Back to the start" title="Back to the start">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6v12" fill="none" stroke-width="2.4"/><path d="M18 6.5v11l-8.5-5.5z"/></svg>
+      </button>
+      <button class="rec-tbtn rec-play" id="rec-play" type="button" aria-label="Play" title="Play (Space)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+      </button>
+      <button class="rec-tbtn rec-record" id="rec-record" type="button" aria-pressed="false" aria-label="Record" title="Record">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/></svg>
+      </button>
+    </div>
+    <div class="rec-pos" id="rec-pos">Bar 1 · 1</div>
+    <div class="rec-settings">
+      <div class="rec-tempo" role="group" aria-label="Tempo">
+        <button class="rec-step" id="rec-tempo-down" type="button" aria-label="Slower">−</button>
+        <input class="rec-tempo-input" id="rec-tempo" type="number" min="40" max="220" step="1" inputmode="numeric" aria-label="Tempo, beats a minute">
+        <button class="rec-step" id="rec-tempo-up" type="button" aria-label="Faster">+</button>
+        <span class="rec-unit">bpm</span>
+      </div>
+      <select class="select rec-meter" id="rec-meter" aria-label="Time signature">
+        <option value="2/4">2/4</option>
+        <option value="3/4">3/4</option>
+        <option value="4/4">4/4</option>
+        <option value="6/8">6/8 (in 2)</option>
+      </select>
+      <button class="quick-btn" id="rec-countin" type="button" aria-pressed="true" title="A bar of clicks before recording starts">Count-in</button>
+      <select class="select rec-click" id="rec-click" aria-label="Metronome">
+        <option value="record">Click when recording</option>
+        <option value="always">Click always</option>
+        <option value="off">No click</option>
+      </select>
+    </div>
+  </div>
+  <div class="rec-tracks" id="rec-tracks"></div>
+  <div class="rec-foot">
+    <button class="btn btn-sm" id="rec-undo" type="button">Undo</button>
+    <button class="link-btn rec-timing" id="rec-timing" type="button">Timing</button>
+    <button class="btn btn-sm btn-primary rec-save-btn" id="rec-save" type="button">Save as MP3…</button>
+  </div>
+</section>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -242,6 +287,12 @@
       </section>
 
       <section class="panel-section">
+        <h3>Recording timing</h3>
+        <p class="panel-note">Speakers, headphones and the keyboard each add a little delay, so a line recorded along with the other tracks lands late. Tap along with a click to measure it on this device. <span id="set-delay"></span></p>
+        <div class="row-wrap"><button class="btn" id="settings-calibrate" type="button">Calibrate…</button></div>
+      </section>
+
+      <section class="panel-section">
         <h3>Background</h3>
         <div class="chip-row" role="radiogroup" aria-label="Background">
           <label class="chip"><input type="radio" name="theme" value="dark"><span>Dark</span></label>
@@ -254,9 +305,69 @@
   </div>
 </div>
 
-<!-- audio.js and theory.js are copies of the files in Digital Accordion/: change them there, then copy them here. -->
+<!-- ================= SHEET: SAVE THE RECORDING ================= -->
+<div class="sheet-backdrop" id="rec-save-sheet">
+  <div class="sheet" role="dialog" aria-label="Save the recording">
+    <div class="sheet-head"><h2>Save the recording</h2><button class="sheet-close" type="button" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body sheet-scroll">
+      <section class="panel-section">
+        <h3>Name</h3>
+        <input type="text" class="text-field" id="rec-name" maxlength="60" placeholder="Keyboard recording" aria-label="Name of the recording">
+      </section>
+      <section class="panel-section">
+        <h3>Song file</h3>
+        <p class="panel-note">The tracks mixed into one file, each at its own volume, with the Room setting. Muted tracks and the click are left out. MP3 is small and plays almost anywhere; WAV is full quality and larger.</p>
+        <div class="row-wrap">
+          <button class="btn btn-primary" id="rec-mp3" type="button">Download MP3</button>
+          <button class="btn" id="rec-wav" type="button">Download WAV</button>
+        </div>
+        <span class="status-msg" id="rec-save-status" role="status"></span>
+      </section>
+      <section class="panel-section">
+        <h3>Project file</h3>
+        <p class="panel-note">The notes themselves, to keep a copy or open the recording on another computer. This browser also keeps your recording by itself.</p>
+        <div class="row-wrap">
+          <button class="btn" id="rec-project-dl" type="button">Download project</button>
+          <button class="btn" id="rec-project-open" type="button">Open a project…</button>
+          <input type="file" id="rec-project-file" accept=".json,application/json" hidden>
+        </div>
+      </section>
+      <section class="panel-section">
+        <h3>Start over</h3>
+        <p class="panel-note">Clears all four tracks. Undo brings them back.</p>
+        <div class="row-wrap"><button class="btn" id="rec-new" type="button">New recording</button></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SHEET: LINE UP THE TIMING ================= -->
+<div class="sheet-backdrop" id="cal-sheet">
+  <div class="sheet sheet-narrow" role="dialog" aria-label="Line up the timing">
+    <div class="sheet-head"><h2>Line up the timing</h2><button class="sheet-close" type="button" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body">
+      <p class="panel-note">Speakers, headphones and the keyboard each add a little delay, so notes played along with the other tracks land late. Tap along with a steady click and the recorder measures it, then moves your recordings earlier by that much.</p>
+      <div class="cal-dots" id="cal-dots" aria-hidden="true"></div>
+      <button class="cal-pad" id="cal-pad" type="button">Start</button>
+      <p class="cal-msg" id="cal-msg" role="status"></p>
+      <div class="volume-row cal-row">
+        <span class="cal-label">Delay</span>
+        <input type="range" id="cal-range" min="-150" max="600" step="5" aria-label="Recording delay in milliseconds">
+        <output id="cal-value" for="cal-range">0 ms</output>
+      </div>
+      <p class="sheet-hint">Changed headphones or speakers? Run it again: Bluetooth adds the most. <button class="link-btn" id="cal-reset" type="button">Use the browser’s figure</button></p>
+    </div>
+  </div>
+</div>
+
+<!-- audio.js and theory.js are copies of the files in Digital Accordion/: change them there, then copy them here.
+     lib/evm-count-in.* are copies of EVM Library/'s (check-copies.sh); vendor/lame.min.js is lamejs (LAME-NOTICE.txt). -->
+<link rel="stylesheet" href="lib/evm-count-in.css">
 <script src="audio.js"></script>
 <script src="theory.js"></script>
+<script src="lib/evm-count-in.js"></script>
+<script src="vendor/lame.min.js"></script>
 <script src="script.js"></script>
+<script src="recorder.js"></script>
 </body>
 </html>

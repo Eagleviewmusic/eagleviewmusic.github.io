@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Xylophone Basics Play-Along</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- EVM visit counter: one anonymous count each time an app is opened. What is sent, and what never is: /what-we-count.html -->
+  <script>
+    (function () {
+      var off = false;
+      try { off = localStorage.getItem('skipgc') === 't'; } catch (e) {}
+      if (location.hash === '#toggle-goatcounter') {   // the teacher's own browsers opt out here (and back in)
+        try { off ? localStorage.removeItem('skipgc') : localStorage.setItem('skipgc', 't'); } catch (e) {}
+        alert(off ? 'Visits from this browser will be counted again.' : 'Visits from this browser will no longer be counted.');
+        return;
+      }
+      if (off || navigator.webdriver) return;
+      if (navigator.globalPrivacyControl || navigator.doNotTrack === '1' || window.doNotTrack === '1') return;   // the visitor asked not to be counted
+      if (!/(^|\.)eagleviewmusic\.com$/.test(location.hostname)) return;   // testing, or a copy on another site
+      try { if (window.top !== window && parent.location.host) return; } catch (e) {}   // framed by another of our apps (the Music Stand), which counts itself
+      try {
+        var p = decodeURIComponent(location.pathname).replace(/index\.html$/, '');
+        var r = document.referrer.split(/[?#]/)[0];   // where the visit came from, never the rest of a link
+        var u = 'https://eagleviewmusic.goatcounter.com/count?p=' + encodeURIComponent(p) +
+          (r ? '&r=' + encodeURIComponent(r) : '') + '&s=' + screen.width + '&rnd=' + Math.random().toString(36).slice(2, 7);
+        if (!(navigator.sendBeacon && navigator.sendBeacon(u))) new Image().src = u;
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Videos"></nav>
+    <button class="gear" id="gear" type="button" aria-label="Settings" aria-expanded="false" aria-controls="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+    </button>
+
+    <div class="panel" id="settings" role="dialog" aria-label="Settings" hidden>
+      <div class="row">
+        <span class="label">Video side</span>
+        <div class="seg" data-set="side">
+          <button type="button" data-v="left">Left</button>
+          <button type="button" data-v="right">Right</button>
+        </div>
+      </div>
+      <p class="hint" id="tall-hint">On a tall screen the video sits on top.</p>
+
+      <div class="row">
+        <span class="label">Sound</span>
+        <div class="seg" data-set="sound">
+          <button type="button" data-v="vibraphone">Vibraphone</button>
+          <button type="button" data-v="marimba">Marimba</button>
+        </div>
+      </div>
+
+      <label class="row">
+        <span class="label">Xylophone volume</span>
+        <span class="slider"><input type="range" min="0" max="100" step="1" data-set="xyloVol" aria-label="Xylophone volume"><output></output></span>
+      </label>
+
+      <label class="row">
+        <span class="label">Video volume</span>
+        <span class="slider"><input type="range" min="0" max="100" step="1" data-set="videoVol" aria-label="Video volume"><output></output></span>
+      </label>
+      <p class="hint" id="ios-hint" hidden>iPad and iPhone set the video’s volume with their own buttons; here it can only mute (0).</p>
+
+      <div class="row">
+        <span class="label">Unused bars <span class="names" id="unused-names"></span></span>
+        <button type="button" class="switch" role="switch" data-set="unused" aria-label="Unused bars"><span></span></button>
+      </div>
+
+      <div class="row">
+        <span class="label">Show keys <span class="names" id="key-names"></span></span>
+        <button type="button" class="switch" role="switch" data-set="keys" aria-label="Show keys"><span></span></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="stage" id="stage" tabindex="-1">
+    <div class="video-box" id="video-box">
+      <div id="yt"></div>
+      <div class="video-msg" id="video-msg" hidden>
+        <p></p>
+        <a id="video-link" target="_blank" rel="noopener">Open it on YouTube</a>
+      </div>
+    </div>
+
+    <div class="frame" id="frame">
+      <svg class="rails" id="rails" aria-hidden="true"></svg>
+      <div class="handle left"></div>
+      <div class="handle right"></div>
+      <div class="bars" id="bars"></div>
+    </div>
+  </main>
+
+  <script src="videos.js"></script>
+  <script src="sound.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

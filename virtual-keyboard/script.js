@@ -36,10 +36,13 @@ function freqOf(note) {
   return 440 * Math.pow(2, (noteNum - A4num) / 12);
 }
 
+// Every note played also goes to the recorder (recorder.js), which keeps it
+// only while a track is being recorded.
 function startNote(finalNote) {
   wakeAudio();
   if (active.has(finalNote)) stopNote(finalNote); // retrigger
   active.set(finalNote, Audio.play(SOUND_SIDE, [freqOf(finalNote)], currentSound));
+  if (window.Recorder) Recorder.noteOn(finalNote);
 }
 
 function stopNote(finalNote) {
@@ -47,6 +50,7 @@ function stopNote(finalNote) {
   if (voice === undefined) return;
   Audio.stop(voice);
   active.delete(finalNote);
+  if (window.Recorder) Recorder.noteOff(finalNote);
 }
 
 const noteColors = {
@@ -769,6 +773,8 @@ const shiftKeyMap = {
 
 document.addEventListener('keydown', (e) => {
   if (e.repeat || downKeys.has(e.code)) return;
+  // typing a name (the recorder's) or a number plays nothing
+  if (e.target.closest && e.target.closest('input[type="text"], input[type="number"], textarea')) return;
 
   const layoutMode = currentToggleStates.layout;
   const octaves = getActiveOctaveCount();
@@ -1169,6 +1175,7 @@ function renderChrome() {
   roomValue.textContent = Math.round(room * 100) + '%';
 
   if (librarySheet.classList.contains('open')) renderLibrary();
+  if (window.Recorder) Recorder.syncSound(); // the track being recorded plays in the keyboard's sound
   document.title = `${tonicName()} ${scaleName(scaleId)} — Virtual Keyboard`;
 }
 
