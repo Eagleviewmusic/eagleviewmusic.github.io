@@ -1,27 +1,39 @@
-/* Xylophone Basics Play-Along: a Xylophone Basics video beside a playable 7-bar xylophone (C D E F G A B,
-   C4–B4, the octave the videos play in, or C5–B5 with Play higher octave). The bars a video uses are always on; the unused ones switch on
-   and off together in Settings. The video sits on the left or right, or on top when the screen is tall. */
+/* Xylophone Basics Play-Along: a Xylophone Basics video beside a playable instrument — a 7-bar xylophone
+   (C D E F G A B, vibraphone or marimba sound) or a C–B piano with its black keys (the Virtual Keyboard's
+   piano sound). Notes are C4–B4, the octave the videos play in, or C5–B5 with Play higher octave. The notes a
+   video uses are always on; the others (and the black keys) switch on and off together in Settings. The video
+   sits on the left or right, or on top when the screen is tall. */
 (() => {
   'use strict';
 
-  const BARS = [
-    { letter: 'C', freq: 261.63, color: '#ef4444' },
-    { letter: 'D', freq: 293.66, color: '#f97316' },
-    { letter: 'E', freq: 329.63, color: '#facc15' },
-    { letter: 'F', freq: 349.23, color: '#22c55e' },
-    { letter: 'G', freq: 392.00, color: '#2dd4bf' },
-    { letter: 'A', freq: 440.00, color: '#3b82f6' },
-    { letter: 'B', freq: 493.88, color: '#a855f7' },
+  /* the twelve notes, by pitch class. Bar colours are the Rainbow Xylophone's, key colours the Virtual
+     Keyboard's (white keys: the top half; black keys: while pressed). */
+  const NOTES = [
+    { name: 'C', bar: '#ef4444', key: '#FF3B30' },
+    { name: 'C#', black: 'C♯<br>D♭', key: '#ff6818' },
+    { name: 'D', bar: '#f97316', key: '#FF9500' },
+    { name: 'D#', black: 'D♯<br>E♭', key: '#ffb000' },
+    { name: 'E', bar: '#facc15', key: '#FFCC00' },
+    { name: 'F', bar: '#22c55e', key: '#34C759' },
+    { name: 'F#', black: 'F♯<br>G♭', key: '#32c490' },
+    { name: 'G', bar: '#2dd4bf', key: '#30c0c6' },
+    { name: 'G#', black: 'G♯<br>A♭', key: '#189de2' },
+    { name: 'A', bar: '#3b82f6', key: '#007AFF' },
+    { name: 'A#', black: 'A♯<br>B♭', key: '#5866ee' },
+    { name: 'B', bar: '#a855f7', key: '#AF52DE' },
   ];
-  /* the Rainbow Xylophone's keys for bars 1–7: the number row (the labels show these), the number pad,
-     and the Q row */
+  NOTES.forEach((n, pc) => { n.pc = pc; n.freq = 440 * Math.pow(2, (pc - 9) / 12); });
+  const WHITES = NOTES.filter(n => !n.black);   // the bars, the white keys
+  const BLACKS = NOTES.filter(n => n.black);
+  /* the Rainbow Xylophone's keys for bars (and white keys) 1–7: the number row (the labels show these),
+     the number pad, and the Q row */
   const KEYS = {};
-  BARS.forEach((b, i) => { KEYS['Digit' + (i + 1)] = i; KEYS['Numpad' + (i + 1)] = i; KEYS['Key' + 'QWERTYU'[i]] = i; });
+  WHITES.forEach((n, i) => { KEYS['Digit' + (i + 1)] = n.pc; KEYS['Numpad' + (i + 1)] = n.pc; KEYS['Key' + 'QWERTYU'[i]] = n.pc; });
   /* each bar's length: the Rainbow Xylophone's, 4% shorter per bar */
   const pct = i => (100 - i * 4) / 100;
 
   const VIDEOS = window.XB_VIDEOS;
-  const DEFAULTS = { side: 'left', sound: 'vibraphone', high: false, xyloVol: 70, videoVol: 100, unused: false, keys: false };
+  const DEFAULTS = { side: 'left', sound: 'vibraphone', high: false, xyloVol: 70, videoVol: 100, unused: false, names: true, keys: false };
   const store = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
@@ -29,26 +41,49 @@
   const S = Object.assign({}, DEFAULTS, store.get('xbpa.settings'));
 
   const $ = id => document.getElementById(id);
-  const stage = $('stage'), frame = $('frame'), videoBox = $('video-box'), panel = $('settings'), gear = $('gear');
+  const stage = $('stage'), frame = $('frame'), pianoEl = $('piano'), videoBox = $('video-box'),
+    panel = $('settings'), gear = $('gear');
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const focusStage = () => stage.focus({ preventScroll: true });
+  const piano = () => S.sound === 'piano';
 
-  const sound = new XyloSound();
-  sound.instrument = S.sound;
-  sound.setVolume(S.xyloVol / 100);
+  /* the mallets: the Rainbow Xylophone's engine (sound.js) */
+  const mallets = new XyloSound();
+  if (!piano()) mallets.instrument = S.sound;
+  mallets.setVolume(S.xyloVol / 100);
+
+  /* the piano: the Virtual Keyboard's engine (audio.js, a copy of Digital Accordion's) at its level and room;
+     a key sounds while it is held */
+  const voices = new Map();   // pc → the piano voice of a held key
+  let pianoAwake = false;
+  const pianoLevel = () => 0.8 * S.xyloVol / 70;   // 70 (the default) = the Virtual Keyboard's level
+  function wakePiano() {
+    Audio.ensure();
+    if (pianoAwake) return;
+    pianoAwake = true;
+    Audio.setReverb(0.35);
+    Audio.setLevel('keys', pianoLevel());
+  }
+  function hush(pc) {
+    if (!voices.has(pc)) return;
+    Audio.stop(voices.get(pc));
+    voices.delete(pc);
+  }
 
   let video = pickVideo();
-  let barEls = [];
-  let geo = { px: 0, py: 0, bw: 1, gap: 0, bh: 0 };   // the xylophone's measures, from layoutXylophone
-  const held = BARS.map(() => 0);   // how many fingers, mice and keys hold each bar down
+  const barEls = [], keyEls = [];   // by pitch class (bars: whites only)
+  let geo = { px: 0, py: 0, bw: 1, gap: 0, bh: 0 };    // the xylophone's measures, from layoutXylophone
+  let pgeo = { p: 0, ww: 1, wh: 0, bw: 0, bh: 0 };     // the piano's, from layoutPiano
+  const held = NOTES.map(() => 0);   // how many fingers, mice and keys hold each note down
 
   function pickVideo() {
     const slug = decodeURIComponent(location.hash.slice(1)).toLowerCase() || store.get('xbpa.video');
     return VIDEOS.find(v => v.slug === slug) || VIDEOS[0];
   }
-  const used = i => video.notes.includes(BARS[i].letter);
-  const playable = i => used(i) || S.unused;
-  const colourOf = letter => BARS.find(b => b.letter === letter).color;
+  const used = pc => video.notes.includes(NOTES[pc].name);
+  const playable = pc => used(pc) || S.unused;
+  const elOf = pc => (piano() ? keyEls : barEls)[pc];
+  const colourOf = letter => NOTES.find(n => n.name === letter).bar;
 
   /* ---------- tabs: one per video, its notes as little bars ---------- */
 
@@ -81,97 +116,145 @@
     store.set('xbpa.video', v.slug);
     history.replaceState(null, '', '#' + v.slug);
     drawTabs();
-    refreshBars();
+    refreshInstrument();
     refreshSettings();
     $('video-link').href = 'https://youtu.be/' + v.youtube;
     if (ytReady) { $('video-msg').hidden = true; player.cueVideoById(v.youtube); }
   }
   addEventListener('hashchange', () => choose(pickVideo()));
 
-  /* ---------- the xylophone ---------- */
+  /* ---------- the instruments ---------- */
 
-  function drawBars() {
-    const row = $('bars');
-    barEls = BARS.map((b, i) => {
+  function drawXylophone() {
+    WHITES.forEach((n, i) => {
       const el = document.createElement('div');
       el.className = 'bar';
-      el.dataset.i = i;
       el.setAttribute('role', 'button');
-      el.style.setProperty('--c', b.color);
+      el.style.setProperty('--c', n.bar);
       el.style.setProperty('--pct', pct(i));
-      el.innerHTML = '<span class="bolt top"></span><span class="letter">' + b.letter + '</span>' +
+      el.innerHTML = '<span class="bolt top"></span><span class="letter">' + n.name + '</span>' +
         '<span class="key">' + (i + 1) + '</span><span class="bolt bottom"></span>';
-      row.appendChild(el);
-      return el;
+      $('bars').appendChild(el);
+      barEls[n.pc] = el;
     });
-    refreshBars();
   }
 
-  function refreshBars() {
-    barEls.forEach((el, i) => {
-      el.classList.toggle('off', !playable(i));
-      el.setAttribute('aria-label', playable(i) ? 'Play ' + BARS[i].letter : BARS[i].letter + ', switched off');
+  function drawPiano() {
+    NOTES.forEach(n => {
+      const el = document.createElement('div');
+      el.className = 'pkey ' + (n.black ? 'black' : 'white');
+      el.setAttribute('role', 'button');
+      el.style.setProperty('--c', n.key);
+      el.innerHTML = n.black ? '<span class="name">' + n.black + '</span>'
+        : '<span class="name">' + n.name + '</span><span class="key">' + (WHITES.indexOf(n) + 1) + '</span>';
+      $('pkeys').appendChild(el);
+      keyEls[n.pc] = el;
     });
+  }
+
+  function refreshInstrument() {
+    frame.classList.toggle('tray', piano());   // the piano sits on the xylophone's brown tray, bars and rails gone
+    pianoEl.hidden = !piano();
+    const label = n => n.black ? n.black.replace('<br>', ' / ') : n.name;
+    [barEls, keyEls].forEach(els => els.forEach((el, pc) => {
+      if (!el) return;
+      el.classList.toggle('off', !playable(pc));
+      el.setAttribute('aria-label', playable(pc) ? 'Play ' + label(NOTES[pc]) : label(NOTES[pc]) + ', switched off');
+    }));
+    document.body.classList.toggle('show-names', !!S.names);
     document.body.classList.toggle('show-keys', !!S.keys);
   }
 
-  function strike(i) {
-    if (i < 0 || !playable(i)) return false;
-    sound.play(i, BARS[i].freq * (S.high ? 2 : 1));
-    if (barEls[i].animate) barEls[i].animate([{ scale: 1 }, { scale: 0.95 }, { scale: 1 }], { duration: 100, easing: 'ease-in-out' });
-    return true;
-  }
-  function press(i) {
-    if (!strike(i)) return -1;
-    if (held[i]++ === 0) barEls[i].classList.add('down');
-    return i;
-  }
-  function release(i) {
-    if (i >= 0 && held[i] > 0 && --held[i] === 0) barEls[i].classList.remove('down');
+  /* let go of everything (switching instruments) */
+  function releaseAll() {
+    held.fill(0);
+    [...barEls, ...keyEls].forEach(el => el && el.classList.remove('down'));
+    [...voices.keys()].forEach(hush);
   }
 
-  /* fingers and the mouse: each pointer strikes the bar it lands on, and every bar it slides onto.
-     Which bar is worked out from the layout, not from what is drawn: a struck bar shrinks for a moment,
-     and a finger near its edge would otherwise slip off and strike it again. Each bar owns half the gap
-     on either side, and a little past its ends, so no tap lands in a dead spot. */
-  const pointers = new Map();   // pointerId → the bar it holds, or -1
+  function strike(pc) {
+    if (pc < 0 || !playable(pc)) return false;
+    const freq = NOTES[pc].freq * (S.high ? 2 : 1);
+    if (piano()) {
+      wakePiano();
+      hush(pc);
+      voices.set(pc, Audio.play('keys', [freq], 'piano'));
+    } else {
+      mallets.play(pc, freq);
+      const el = barEls[pc];
+      if (el.animate) el.animate([{ scale: 1 }, { scale: 0.95 }, { scale: 1 }], { duration: 100, easing: 'ease-in-out' });
+    }
+    return true;
+  }
+  function press(pc) {
+    if (!strike(pc)) return -1;
+    if (held[pc]++ === 0) elOf(pc).classList.add('down');
+    return pc;
+  }
+  function release(pc) {
+    if (pc < 0 || held[pc] <= 0 || --held[pc] > 0) return;
+    elOf(pc).classList.remove('down');
+    hush(pc);   // a piano key stops when let go; the bars ring on
+  }
+
+  /* fingers and the mouse: each pointer plays the bar or key it lands on, and every one it slides onto.
+     Which one is worked out from the layout, not from what is drawn: a struck bar shrinks for a moment, and a
+     finger near its edge would otherwise slip off and strike it again. Each bar owns half the gap on either
+     side, and a little past its ends, so no tap lands in a dead spot. */
   const barAt = (x, y) => {
     const r = frame.getBoundingClientRect(), g = geo, slot = g.bw + g.gap;
     const i = Math.floor((x - r.left - 4 - g.px + g.gap / 2) / slot);
-    if (i < 0 || i >= BARS.length) return -1;
+    if (i < 0 || i >= WHITES.length) return -1;
     const h = g.bh * pct(i), top = r.top + 4 + g.py + (g.bh - h) / 2, slack = g.py * 0.6;
-    return y >= top - slack && y <= top + h + slack ? i : -1;
+    return y >= top - slack && y <= top + h + slack ? WHITES[i].pc : -1;
   };
-  frame.addEventListener('pointerdown', e => {
-    if (e.button > 0) return;
-    e.preventDefault();
-    try { frame.setPointerCapture(e.pointerId); } catch (err) {}
-    pointers.set(e.pointerId, press(barAt(e.clientX, e.clientY)));
-  });
-  frame.addEventListener('pointermove', e => {
-    if (!pointers.has(e.pointerId)) return;
-    const i = barAt(e.clientX, e.clientY), was = pointers.get(e.pointerId);
-    if (i === was) return;
-    release(was);
-    pointers.set(e.pointerId, press(i));
-  });
+  /* black keys first (they sit on top), then the white key under the finger */
+  const blackLeft = n => (WHITES.findIndex(w => w.pc === n.pc - 1) + 1) * pgeo.ww - pgeo.bw / 2;
+  const keyAt = (x, y) => {
+    const r = pianoEl.getBoundingClientRect(), g = pgeo;
+    if (x < r.left || x > r.right || y < r.top || y > r.bottom) return -1;
+    const fx = clamp(x - r.left - g.p, 0, 7 * g.ww - 0.01), fy = y - r.top - g.p;
+    if (fy <= g.bh) {
+      const b = BLACKS.find(n => fx >= blackLeft(n) && fx < blackLeft(n) + g.bw);
+      if (b) return b.pc;
+    }
+    return WHITES[Math.floor(fx / g.ww)].pc;
+  };
+  const noteAt = (x, y) => piano() ? keyAt(x, y) : barAt(x, y);
+
+  const pointers = new Map();   // pointerId → the note it holds, or -1
   const lift = e => {
     if (!pointers.has(e.pointerId)) return;
     release(pointers.get(e.pointerId));
     pointers.delete(e.pointerId);
   };
-  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => frame.addEventListener(t, lift));
-  frame.addEventListener('contextmenu', e => e.preventDefault());
+  [frame, pianoEl].forEach(el => {
+    el.addEventListener('pointerdown', e => {
+      if (e.button > 0) return;
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch (err) {}
+      pointers.set(e.pointerId, press(noteAt(e.clientX, e.clientY)));
+    });
+    el.addEventListener('pointermove', e => {
+      if (!pointers.has(e.pointerId)) return;
+      const pc = noteAt(e.clientX, e.clientY), was = pointers.get(e.pointerId);
+      if (pc === was) return;
+      release(was);
+      pointers.set(e.pointerId, press(pc));
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => el.addEventListener(t, lift));
+    el.addEventListener('contextmenu', e => e.preventDefault());
+  });
 
   /* keys */
-  const keysDown = new Map();   // code → bar
+  const keysDown = new Map();   // code → note
   addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === 'Escape') { openPanel(false); return; }
-    const i = KEYS[e.code];
-    if (i !== undefined) {
+    const pc = KEYS[e.code];
+    if (pc !== undefined) {
       e.preventDefault();
-      if (!e.repeat && !keysDown.has(e.code)) keysDown.set(e.code, press(i));
+      if (!e.repeat && !keysDown.has(e.code)) keysDown.set(e.code, press(pc));
       return;
     }
     /* Space plays and pauses the video (the video's own keys are off, so the number keys never jump it) */
@@ -186,7 +269,7 @@
     keysDown.delete(e.code);
   });
 
-  /* Clicking the video gives it the keyboard, and then the number keys would never reach the xylophone:
+  /* Clicking the video gives it the keyboard, and then the number keys would never reach the instrument:
      take the keyboard straight back (the click still plays or pauses the video). */
   addEventListener('blur', () => {
     keysDown.forEach(release);
@@ -213,14 +296,14 @@
     const B = 8;   // the video box's border, both sides together
     let v, x;
     if (tall) {
-      /* video on top, at most 45% of the height; the xylophone below */
+      /* video on top, at most 45% of the height; the instrument below */
       let vw = W - 2 * pad, vh = (vw - B) * 9 / 16 + B;
       const most = (H - 2 * pad - gap) * 0.45;
       if (vh > most) { vh = most; vw = (vh - B) * 16 / 9 + B; }
       v = { x: (W - vw) / 2, y: pad, w: vw, h: vh };
       x = { x: pad, y: pad + vh + gap, w: W - 2 * pad, h: H - 2 * pad - gap - vh };
     } else {
-      /* side by side: the xylophone gets about 42% of the width, the video the rest (as tall as fits) */
+      /* side by side: the instrument gets about 42% of the width, the video the rest (as tall as fits) */
       const A = W - 2 * pad - gap;
       let xw = clamp(A * 0.42, Math.min(340, A * 0.5), 760);
       let vw = A - xw, vh = (vw - B) * 9 / 16 + B;
@@ -230,14 +313,15 @@
       x = { x: left ? pad + vw + gap : pad, y: pad, w: xw, h: H - 2 * pad };
     }
     place(videoBox, v);
-    layoutXylophone(x);
+    layoutXylophone(x);   // the tray is the xylophone's size either way (the piano is a little wider: the user likes it)
+    if (piano()) layoutPiano(x);
     $('tall-hint').hidden = !tall;
     panel.querySelector('[data-set="side"]').classList.toggle('disabled', tall);
   }
 
   /* bars as wide as the space allows (up to 120 px), about 7 times as long, the Rainbow Xylophone's
      padding and gaps scaled to them */
-  function layoutXylophone(r) {
+  function xyloSize(r) {
     const room = 14;   // the handles stick out past the frame
     const W = r.w - 2 * room, H = r.h - 8;
     const guess = W / 8.4;
@@ -245,7 +329,11 @@
     const bw = clamp((W - 2 * px - 6 * gap - 8) / 7, 18, 120);
     const py = clamp(bw * 0.3, 12, 32);
     const bh = Math.max(60, Math.min(bw * 7, H - 2 * py - 8));
-    const fw = 7 * bw + 6 * gap + 2 * px + 8, fh = bh + 2 * py + 8;
+    return { px, gap, bw, py, bh, fw: 7 * bw + 6 * gap + 2 * px + 8, fh: bh + 2 * py + 8 };
+  }
+
+  function layoutXylophone(r) {
+    const { px, gap, bw, py, bh, fw, fh } = xyloSize(r);
     place(frame, { x: r.x + (r.w - fw) / 2, y: r.y + (r.h - fh) / 2, w: fw, h: fh });
     const bolt = clamp(bw * 0.15, 8, 14), boltAt = clamp(bw * 0.15, 7, 14);
     const vars = {
@@ -264,7 +352,7 @@
     const top = i => py + bh * (1 - pct(i)) / 2;
     const upper = i => top(i) + boltAt + bolt / 2;
     const lower = i => top(i) + bh * pct(i) - 4 - boltAt - bolt / 2;
-    const ext = bw / 2 + px * 0.55, last = BARS.length - 1;
+    const ext = bw / 2 + px * 0.55, last = WHITES.length - 1;
     const line = y => {
       const m = (y(last) - y(0)) / (cx(last) - cx(0));
       return '<line x1="' + (cx(0) - ext) + '" y1="' + (y(0) - m * ext) + '" x2="' + (cx(last) + ext) +
@@ -272,6 +360,28 @@
     };
     $('rails').innerHTML = '<g stroke="#2d1b15" stroke-width="' + clamp(bw * 0.2, 6, 16) +
       '" stroke-linecap="round">' + line(upper) + line(lower) + '</g>';
+  }
+
+  /* the Virtual Keyboard's piano, its keys up to 130 px wide; the whole keyboard as tall as the xylophone's
+     B bar would be in the same space (the user's measure: it looks more natural than keys that fill it).
+     Black keys 60% as wide and 62.5% as long, as in the Virtual Keyboard. */
+  function layoutPiano(r) {
+    const m = 6;
+    const W = r.w - 2 * m;
+    const p = clamp(W * 0.015, 6, 12);
+    const ww = clamp((W - 2 * p) / 7, 24, 130);
+    const fh = Math.max(80, xyloSize(r).bh * pct(WHITES.length - 1)), wh = fh - 2 * p;
+    const bw = ww * 0.6, bh = wh * 0.625;
+    const fw = 7 * ww + 2 * p;
+    place(pianoEl, { x: r.x + (r.w - fw) / 2, y: r.y + (r.h - fh) / 2, w: fw, h: fh });
+    pgeo = { p, ww, wh, bw, bh };
+    const vars = {
+      '--p': p, '--ww': ww, '--wh': wh, '--kbw': bw, '--kbh': bh,
+      '--name': clamp(ww * 0.36, 14, 40), '--bname': clamp(bw * 0.36, 9, 20), '--keyfs': clamp(ww * 0.28, 12, 26),
+    };
+    for (const k in vars) pianoEl.style.setProperty(k, vars[k] + 'px');
+    WHITES.forEach((n, i) => { keyEls[n.pc].style.left = i * ww + 'px'; });
+    BLACKS.forEach(n => { keyEls[n.pc].style.left = blackLeft(n) + 'px'; });
   }
 
   /* ---------- the video (YouTube's player, so its volume can be set) ---------- */
@@ -351,9 +461,10 @@
     else if (panel.contains(document.activeElement) || document.activeElement === gear) focusStage();
   }
   gear.addEventListener('click', () => openPanel());
-  /* a click anywhere else closes it — except on the xylophone, so it can be played while the volume is set */
+  /* a click anywhere else closes it — except on the instrument, so it can be played while the volume is set */
   document.addEventListener('pointerdown', e => {
-    if (!panel.hidden && !panel.contains(e.target) && !gear.contains(e.target) && !frame.contains(e.target)) openPanel(false);
+    if (panel.hidden || [panel, gear, frame, pianoEl].some(el => el.contains(e.target))) return;
+    openPanel(false);
   });
 
   function refreshSettings() {
@@ -365,25 +476,40 @@
       inp.nextElementSibling.textContent = S[inp.dataset.set];
     });
     panel.querySelectorAll('.switch').forEach(sw => sw.setAttribute('aria-checked', !!S[sw.dataset.set]));
-    const unused = BARS.filter((b, i) => !used(i)).map(b => b.letter);
+    const unused = WHITES.filter(n => !used(n.pc)).map(n => n.name);
     $('unused-names').textContent = unused.join(' ');
-    panel.querySelector('[data-set="unused"]').closest('.row').hidden = !unused.length;
-    $('key-names').textContent = BARS.map((b, i) => i + 1).filter(n => playable(n - 1)).join(' ');
+    /* the piano always has unused keys (the black ones); the xylophone may not */
+    panel.querySelector('[data-set="unused"]').closest('.row').hidden = !unused.length && !piano();
+    $('key-names').textContent = WHITES.map((n, i) => playable(n.pc) ? i + 1 : 0).filter(Boolean).join(' ');
   }
 
   function set(k, v) {
     S[k] = v;
     store.set('xbpa.settings', S);
-    if (k === 'sound') { sound.instrument = v; demo(); }
+    if (k === 'sound') {
+      releaseAll();
+      if (!piano()) mallets.instrument = v;
+      refreshInstrument();
+      layout();
+      demo();
+    }
     if (k === 'high') demo();
-    if (k === 'xyloVol') sound.setVolume(v / 100);
+    if (k === 'xyloVol') {
+      mallets.setVolume(v / 100);
+      if (pianoAwake) Audio.setLevel('keys', pianoLevel());
+    }
     if (k === 'videoVol') applyVideoVolume();
     if (k === 'side') layout();
-    if (k === 'unused' || k === 'keys') refreshBars();
+    if (k === 'unused' || k === 'names' || k === 'keys') refreshInstrument();
     refreshSettings();
   }
-  /* a note to hear the sound or volume just chosen: the video's lowest */
-  const demo = () => strike(BARS.findIndex((b, i) => used(i)));
+  /* a note to hear the sound or volume just chosen: the video's lowest (a piano key let go after a moment) */
+  function demo() {
+    const pc = WHITES.find(n => used(n.pc)).pc;
+    if (held[pc] || !strike(pc) || !piano()) return;
+    const v = voices.get(pc);
+    setTimeout(() => { if (voices.get(pc) === v && !held[pc]) hush(pc); }, 450);
+  }
 
   panel.addEventListener('click', e => {
     const b = e.target.closest('.seg button'), sw = e.target.closest('.switch');
@@ -401,7 +527,9 @@
 
   history.replaceState(null, '', '#' + video.slug);
   drawTabs();
-  drawBars();
+  drawXylophone();
+  drawPiano();
+  refreshInstrument();
   refreshSettings();
   layout();
   new ResizeObserver(layout).observe(stage);

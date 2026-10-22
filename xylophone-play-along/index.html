@@ -50,10 +50,11 @@
       <p class="hint" id="tall-hint">On a tall screen the video sits on top.</p>
 
       <div class="row">
-        <span class="label">Sound</span>
+        <span class="label">Instrument</span>
         <div class="seg" data-set="sound">
           <button type="button" data-v="vibraphone">Vibraphone</button>
           <button type="button" data-v="marimba">Marimba</button>
+          <button type="button" data-v="piano">Piano</button>
         </div>
       </div>
 
@@ -63,8 +64,8 @@
       </div>
 
       <label class="row">
-        <span class="label">Xylophone volume</span>
-        <span class="slider"><input type="range" min="0" max="100" step="1" data-set="xyloVol" aria-label="Xylophone volume"><output></output></span>
+        <span class="label">Instrument volume</span>
+        <span class="slider"><input type="range" min="0" max="100" step="1" data-set="xyloVol" aria-label="Instrument volume"><output></output></span>
       </label>
 
       <label class="row">
@@ -74,8 +75,13 @@
       <p class="hint" id="ios-hint" hidden>iPad and iPhone set the video’s volume with their own buttons; here it can only mute (0).</p>
 
       <div class="row">
-        <span class="label">Show unused bars <span class="names" id="unused-names"></span></span>
-        <button type="button" class="switch" role="switch" data-set="unused" aria-label="Show unused bars"><span></span></button>
+        <span class="label">Activate unused bars/keys <span class="names" id="unused-names"></span></span>
+        <button type="button" class="switch" role="switch" data-set="unused" aria-label="Activate unused bars/keys"><span></span></button>
+      </div>
+
+      <div class="row">
+        <span class="label">Show note names</span>
+        <button type="button" class="switch" role="switch" data-set="names" aria-label="Show note names"><span></span></button>
       </div>
 
       <div class="row">
@@ -100,10 +106,16 @@
       <div class="handle right"></div>
       <div class="bars" id="bars"></div>
     </div>
+
+    <div class="piano" id="piano" hidden>
+      <div class="pkeys" id="pkeys"></div>
+    </div>
   </main>
 
   <script src="videos.js"></script>
   <script src="sound.js"></script>
+  <!-- audio.js is a copy of Digital Accordion/audio.js (the Virtual Keyboard's piano): change it there, then copy it here. -->
+  <script src="audio.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

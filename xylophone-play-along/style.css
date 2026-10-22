@@ -122,8 +122,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid #fbbf24; outline-
 .row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;   /* a long control (Instrument's three choices) drops under its label on a phone */
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
   min-height: 52px;
   padding: 6px 0;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -135,10 +136,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid #fbbf24; outline-
 .hint { margin: -4px 0 8px; font-size: 12.5px; line-height: 1.35; color: rgba(255, 255, 255, 0.65); }
 .hint[hidden] { display: none; }
 
-.seg { display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: rgba(0, 0, 0, 0.28); }
+.seg { display: flex; gap: 2px; margin-left: auto; padding: 3px; border-radius: 9px; background: rgba(0, 0, 0, 0.28); }
 .seg button {
   border: 0;
-  padding: 7px 11px;
+  padding: 7px 10px;
   border-radius: 7px;
   background: transparent;
   color: rgba(255, 255, 255, 0.75);
@@ -150,7 +151,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid #fbbf24; outline-
 .seg button.on { background: #fbbf24; color: #3e2723; font-weight: 700; }
 .seg.disabled { opacity: 0.45; pointer-events: none; }
 
-.slider { display: flex; align-items: center; gap: 8px; }
+.slider { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .slider input { width: 128px; accent-color: #fbbf24; cursor: pointer; }
 .slider output { min-width: 2.4em; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 
@@ -319,4 +320,60 @@ button:focus-visible, input:focus-visible { outline: 3px solid #fbbf24; outline-
   text-align: center;
 }
 .show-keys .key { display: block; }
+body:not(.show-names) .letter, body:not(.show-names) .pkey .name { display: none; }
 .bar.off .letter, .bar.off .key { display: none; }
+
+/* the piano: the Virtual Keyboard's (sizes from app.js: --p padding, --ww/--wh white keys, --kbw/--kbh black
+   keys, --name/--bname note names, --keyfs key bindings) */
+.piano {
+  position: absolute;
+  background: #111;
+  border-radius: 10px;
+  box-shadow: 10px 10px 30px rgba(0, 0, 0, 0.5);
+  touch-action: none;
+}
+.piano[hidden] { display: none; }
+.frame.tray .bars, .frame.tray .rails { display: none; }
+.pkeys { position: absolute; inset: var(--p); }
+
+.pkey {
+  position: absolute;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  cursor: pointer;
+}
+.pkey.white {
+  z-index: 1;
+  width: var(--ww);
+  height: var(--wh);
+  gap: calc(var(--name) * 0.3);
+  padding-bottom: calc(var(--name) * 0.6);
+  background: linear-gradient(to bottom, var(--c) 50%, #fff 50%);   /* the colour on the top half */
+  border: 1px solid #999;
+  border-radius: 6px 6px 10px 10px;
+}
+.pkey.black {
+  z-index: 3;
+  width: var(--kbw);
+  height: var(--kbh);
+  padding-bottom: calc(var(--bname) * 0.6);
+  background: linear-gradient(#111, #333);
+  border: 1px solid #000;
+  border-radius: 6px 6px 8px 8px;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.6), inset 0 -2px 0 rgba(255, 255, 255, 0.05);
+}
+@media (hover: hover) {
+  .pkey:not(.off):hover { filter: brightness(1.04); }
+}
+.pkey.down { background: var(--c); }   /* the whole key in its colour while held */
+.pkey.white.off { background: #8f8f8f; border-color: #6e6e6e; cursor: default; }
+.pkey.black.off { background: #4a4a4a; box-shadow: none; cursor: default; }
+
+.pkey .name { font-weight: 700; line-height: 1.05; text-align: center; }
+.pkey.white .name { font-size: var(--name); color: #1c1c1e; }
+.pkey.black .name { font-size: var(--bname); color: #fff; }
+.pkey .key { font-size: var(--keyfs); background: #3e2723; color: #fff; border-bottom-color: rgba(0, 0, 0, 0.45); }
+.pkey.off .name, .pkey.off .key { display: none; }
