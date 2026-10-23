@@ -780,3 +780,7 @@ body.keys-view .keyboard { display: none; }
   .key-grid { grid-template-columns: repeat(4, 1fr); }
   .quick-label { display: none; }
 }
+
+/* In the Recording Studio (?embed=studio) the studio records: this app's own
+   recorder and its timing setting are left out (script.js joinStudio). */
+.in-studio #recorder-btn, .in-studio #recorder, .in-studio #settings-recording { display: none !important; }

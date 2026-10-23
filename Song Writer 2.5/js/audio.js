@@ -281,6 +281,7 @@
     playNoteElement, playHarmony, tone, click, noteOn, noteOff,
     playMidi(midi) { playNote(M.midiToFreq(midi)); },
     applyMix, previewMelody, previewChords, soundGroups, CHORD_PLAY_HOLD,
+    mix, PLAYER_PEAK, CHORD_LEVEL,      // read by js/studio-bridge.js (the Recording Studio)
     hasSound: id => !!E.PRESETS[id]
   };
 })();

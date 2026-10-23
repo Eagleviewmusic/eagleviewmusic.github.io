@@ -36,6 +36,20 @@ function freqOf(note) {
   return 440 * Math.pow(2, (noteNum - A4num) / 12);
 }
 
+// THE RECORDING STUDIO: framed by it (?embed=studio), every note played here is
+// told to the studio too, which records it onto a track (Recording Studio/README.md,
+// "The instrument link"). The studio has the tracks, so this app's own recorder
+// is left out (recorder.js).
+function joinStudio(app) {
+  try {
+    if (new URLSearchParams(location.search).get('embed') !== 'studio') return null;
+    if (window.parent === window || !window.parent.EVMStudio) return null;
+    return window.parent.EVMStudio.join(window, app);
+  } catch (e) { return null; }   // framed by another site: not the studio
+}
+const STUDIO = joinStudio('virtual-keyboard');
+if (STUDIO) document.documentElement.classList.add('in-studio');
+
 // Every note played also goes to the recorder (recorder.js), which keeps it
 // only while a track is being recorded.
 function startNote(finalNote) {
@@ -43,6 +57,7 @@ function startNote(finalNote) {
   if (active.has(finalNote)) stopNote(finalNote); // retrigger
   active.set(finalNote, Audio.play(SOUND_SIDE, [freqOf(finalNote)], currentSound));
   if (window.Recorder) Recorder.noteOn(finalNote);
+  if (STUDIO) STUDIO.on(finalNote, [freqOf(finalNote)], currentSound, BASE_LEVEL * volume);
 }
 
 function stopNote(finalNote) {
@@ -51,6 +66,7 @@ function stopNote(finalNote) {
   Audio.stop(voice);
   active.delete(finalNote);
   if (window.Recorder) Recorder.noteOff(finalNote);
+  if (STUDIO) STUDIO.off(finalNote);
 }
 
 const noteColors = {
@@ -1548,6 +1564,12 @@ function layoutFromUrl() {
 
 // -------- START --------
 try { if (window.self !== window.top) root.classList.add('in-iframe'); } catch (e) { root.classList.add('in-iframe'); }
+// What the studio may ask: put a track's sound back on the keyboard when that
+// track is picked again, and let go of every key.
+if (STUDIO) STUDIO.offer({
+  setSound(id) { if (Audio.PRESETS[id] && id !== currentSound) { currentSound = id; renderChrome(); } },
+  releaseAll() { [...active.keys()].forEach(stopNote); }
+});
 fillSoundSelect();
 drawKeyboard(currentOctaves);
 showTheme();

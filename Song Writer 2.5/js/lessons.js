@@ -201,6 +201,8 @@
   }
 
   function bootFromUrl() {
+    // the Recording Studio's hidden frame (js/embed.js) never opens a lesson — not even this tab's
+    if (window.EVM_STUDIO_EMBED) return null;
     const payload = checkUrlForLesson();
     if (payload) return openLesson(payload);
     return reopenFromSession();

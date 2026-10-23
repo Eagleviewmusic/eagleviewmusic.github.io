@@ -785,7 +785,22 @@ function octaveActive(source) {
 
 /* ==================================================================
    PLAYING
+   ------------------------------------------------------------------
+   THE RECORDING STUDIO: framed by it (?embed=studio), every block played
+   here is told to the studio too, which records it onto a track
+   (Recording Studio/README.md, "The instrument link"): the notes
+   sounding, the side's sound and the side's level.
    ================================================================== */
+function joinStudio(app) {
+  try {
+    if (new URLSearchParams(location.search).get('embed') !== 'studio') return null;
+    if (window.parent === window || !window.parent.EVMStudio) return null;
+    return window.parent.EVMStudio.join(window, app);
+  } catch (e) { return null; }   // framed by another site: not the studio
+}
+const studio = joinStudio('digital-accordion');
+const sideLevel = side => layout.sound[side === 'chords' ? 'chordsLevel' : 'melodyLevel'];
+
 function startBlock(side, id, source) {
   if (held.has(source)) return;
   const b = getBlock(side, id);
@@ -793,6 +808,7 @@ function startBlock(side, id, source) {
   const preset = layout.sound[side];
   const freqs = freqsFor(side, b, source);
   const voice = Audio.play(side, freqs, preset);
+  if (studio) studio.on(source, freqs, preset, sideLevel(side));
   // a melody note keeps the pitch it was pressed with, bent or not, until it is let go
   held.set(source, { voice, side, id, freqs, latch: side === 'melody' ? melodyEffective(b) : null });
   bumpActive(side, id, 1);
@@ -802,6 +818,7 @@ function stopBlock(source) {
   const h = held.get(source);
   if (!h) return;
   Audio.stop(h.voice);
+  if (studio) studio.off(source);
   held.delete(source);
   bumpActive(h.side, h.id, -1);
   if (h.side === 'chords') updateBend();
@@ -825,6 +842,7 @@ function retriggerHeld(filterSide) {
     Audio.stop(h.voice);
     h.voice = Audio.play(h.side, freqs, layout.sound[h.side]);
     h.freqs = freqs;
+    if (studio) { studio.off(source); studio.on(source, freqs, layout.sound[h.side], sideLevel(h.side)); }
   });
 }
 function bumpActive(side, id, d) {
@@ -2654,6 +2672,7 @@ function layoutFromUrl() {
 
 function start() {
   try { if (window.self !== window.top) document.documentElement.classList.add('in-iframe'); } catch (e) { document.documentElement.classList.add('in-iframe'); }
+  if (studio) studio.offer({ releaseAll: stopAllBlocks });   // what the studio may ask
   document.documentElement.dataset.style = 'accordion';   // the only look
   wireTopbar(); wireSettings();
   let L = layoutFromUrl();

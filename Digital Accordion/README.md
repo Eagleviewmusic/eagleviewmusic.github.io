@@ -512,3 +512,12 @@ a block only removes its circle; rebuilding a side replaces it. Nothing else cha
 
 `.claude/launch.json` has a `digital-accordion` entry (port 8796, as before, so layouts
 saved at `localhost:8796` are still there) serving this folder with `.claude/serve.js`.
+
+## In the Recording Studio
+
+The Recording Studio (`../Recording Studio/`) opens this app in a frame with
+`?embed=studio` and records what is played onto its tracks. `joinStudio()` in
+`script.js` (by PLAYING) joins its link; `startBlock`, `stopBlock` and
+`retriggerHeld` tell it each block's notes, the side's sound and the side's
+level. Outside the studio the link is never made and nothing changes. The
+contract is in `Recording Studio/README.md`, "The instrument link".

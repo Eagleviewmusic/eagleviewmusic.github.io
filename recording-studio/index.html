@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#14171f">
+<script>
+  // Light or dark, chosen in Settings and remembered on this device. Set before
+  // the page paints so it never flashes the other colours.
+  try { var t = localStorage.getItem('evm_studio_theme_v1'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
+  try { if (window.self !== window.top) document.documentElement.classList.add('in-iframe'); } catch (e) { document.documentElement.classList.add('in-iframe'); }
+</script>
+<title>Recording Studio</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lib/evm-count-in.css">
+<link rel="stylesheet" href="style.css">
+  <!-- EVM visit counter: one anonymous count each time an app is opened. What is sent, and what never is: /what-we-count.html -->
+  <script>
+    (function () {
+      var off = false;
+      try { off = localStorage.getItem('skipgc') === 't'; } catch (e) {}
+      if (location.hash === '#toggle-goatcounter') {   // the teacher's own browsers opt out here (and back in)
+        try { off ? localStorage.removeItem('skipgc') : localStorage.setItem('skipgc', 't'); } catch (e) {}
+        alert(off ? 'Visits from this browser will be counted again.' : 'Visits from this browser will no longer be counted.');
+        return;
+      }
+      if (off || navigator.webdriver) return;
+      if (navigator.globalPrivacyControl || navigator.doNotTrack === '1' || window.doNotTrack === '1') return;   // the visitor asked not to be counted
+      if (!/(^|\.)eagleviewmusic\.com$/.test(location.hostname)) return;   // testing, or a copy on another site
+      try { if (window.top !== window && parent.location.host) return; } catch (e) {}   // framed by another of our apps (the Music Stand), which counts itself
+      try {
+        var p = decodeURIComponent(location.pathname).replace(/index\.html$/, '');
+        var r = document.referrer.split(/[?#]/)[0];   // where the visit came from, never the rest of a link
+        var u = 'https://eagleviewmusic.goatcounter.com/count?p=' + encodeURIComponent(p) +
+          (r ? '&r=' + encodeURIComponent(r) : '') + '&s=' + screen.width + '&rnd=' + Math.random().toString(36).slice(2, 7);
+        if (!(navigator.sendBeacon && navigator.sendBeacon(u))) new Image().src = u;
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+
+<!-- ================= TOP BAR ================= -->
+<header class="topbar">
+  <div class="brand">
+    <a class="tb-btn home-btn" href="../index.html" title="Back to Eagle View Music" aria-label="Back to Eagle View Music">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      <span>Eagle View</span>
+    </a>
+    <span class="brand-mark" aria-hidden="true">
+      <svg class="logo" viewBox="0 0 24 24"><use href="#studio-logo"/></svg>
+    </span>
+    <span class="brand-name">Recording Studio</span>
+  </div>
+  <button class="project-chip" id="project-btn" type="button" title="Your projects">
+    <span class="chip-kicker" id="project-kicker">Project</span>
+    <span class="chip-title" id="project-title">Untitled project</span>
+  </button>
+  <div class="tb-right">
+    <button class="tb-btn" id="bring-btn" type="button" title="Bring in an ostinato or a song">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4.5 15.5v3a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3"/></svg>
+      <span class="tb-label">Bring in</span>
+    </button>
+    <button class="tb-btn tb-primary" id="save-btn" type="button" title="Save the song as MP3 or WAV">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>
+      <span class="tb-label">Save song</span>
+    </button>
+    <button class="tb-btn icon-only" id="settings-btn" type="button" aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- ================= TRANSPORT ================= -->
+<div class="transport" id="transport">
+  <div class="tp-buttons">
+    <button class="tp-btn" id="home" type="button" aria-label="Back to the start" title="Back to the start">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path class="bar" d="M6.5 6v12"/><path d="M18 6.5v11l-8.5-5.5z"/></svg>
+    </button>
+    <button class="tp-btn tp-play" id="play" type="button" aria-label="Play" title="Play (Space)"></button>
+    <button class="tp-btn tp-record" id="record" type="button" aria-pressed="false" aria-label="Record" title="Record">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/></svg>
+    </button>
+  </div>
+  <div class="tp-pos" id="pos" aria-live="off">Bar 1 · 1</div>
+  <div class="tp-settings">
+    <div class="tp-tempo" role="group" aria-label="Tempo">
+      <button class="tp-step" id="tempo-down" type="button" aria-label="Slower">−</button>
+      <input class="tp-tempo-input" id="tempo" type="number" min="30" max="300" step="1" inputmode="numeric" aria-label="Tempo, beats a minute">
+      <button class="tp-step" id="tempo-up" type="button" aria-label="Faster">+</button>
+      <span class="tp-unit">bpm</span>
+    </div>
+    <select class="select tp-meter" id="meter" aria-label="Time signature">
+      <option value="2/4">2/4</option>
+      <option value="3/4">3/4</option>
+      <option value="4/4">4/4</option>
+      <option value="5/4">5/4</option>
+      <option value="6/4">6/4</option>
+      <option value="6/8">6/8 (in 2)</option>
+      <option value="9/8">9/8 (in 3)</option>
+      <option value="12/8">12/8 (in 4)</option>
+    </select>
+    <button class="quick-btn" id="countin" type="button" aria-pressed="true" title="A bar of clicks before recording starts">Count-in</button>
+    <select class="select tp-click" id="click" aria-label="Metronome">
+      <option value="record">Click when recording</option>
+      <option value="always">Click always</option>
+      <option value="off">No click</option>
+    </select>
+    <button class="tp-btn tp-undo" id="undo" type="button" aria-label="Undo" title="Undo">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- opened straight from its file (file://), nothing can be recorded: studio.js shows this -->
+<div class="file-note" id="file-note" role="alert" hidden>
+  <strong>Recording is off: this page was opened from its file.</strong>
+  Opened that way, the browser keeps the instruments and the microphone walled off from the studio.
+  Close this tab and double-click <b>“Open the Recording Studio”</b> in the Recording Studio folder instead —
+  it opens the studio in Chrome, ready to record. (On eagleviewmusic.com it just works.)
+</div>
+
+<!-- ================= TRACKS ================= -->
+<main class="desk" id="desk">
+  <section class="tracks-pane" id="tracks-pane" aria-label="Tracks">
+    <div class="tracks" id="tracks"></div>
+  </section>
+
+  <div class="split" id="split" role="separator" aria-orientation="horizontal" aria-label="Drag to share the screen between the tracks and the instrument" tabindex="0"></div>
+
+  <!-- ================= THE INSTRUMENT ================= -->
+  <section class="inst-pane" id="inst-pane" aria-label="Instrument">
+    <div class="inst-bar">
+      <div class="inst-tabs" role="tablist" aria-label="Instrument" id="inst-tabs"></div>
+      <div class="inst-status" id="inst-status"></div>
+      <button class="tb-btn icon-only inst-fold" id="inst-fold" type="button" aria-expanded="true" aria-label="Hide the instrument" title="Hide the instrument">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+    <div class="inst-stage" id="inst-stage">
+      <div class="inst-empty" id="inst-empty">Choose an instrument above to play it here.</div>
+      <div class="voice-panel" id="voice-panel" hidden></div>
+    </div>
+  </section>
+</main>
+
+<!-- frames that only lend their apps' songs (bring-in.js); laid out off screen, never hidden -->
+<div class="bridge-frames" id="bridge-frames" aria-hidden="true"></div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- ================= THE TRACK MENU ================= -->
+<div class="menu" id="track-menu" role="menu" hidden></div>
+
+<!-- ================= SHEET: PROJECTS ================= -->
+<div class="sheet-backdrop" id="projects-sheet">
+  <div class="sheet" role="dialog" aria-label="Projects">
+    <div class="sheet-head"><h2>Projects</h2><button class="sheet-close" type="button" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body sheet-scroll">
+      <section class="panel-section">
+        <h3>This project</h3>
+        <label class="field-label" for="project-name">Name</label>
+        <input class="text-field" id="project-name" type="text" maxlength="60" placeholder="Untitled project" autocomplete="off">
+        <div class="row-wrap">
+          <button class="btn" id="project-copy" type="button">Save a copy</button>
+          <button class="btn" id="project-dl" type="button">Download project file</button>
+          <button class="btn" id="project-open" type="button">Open a project file…</button>
+          <input type="file" id="project-file" accept=".json,application/json" hidden>
+        </div>
+        <p class="panel-note">Projects are kept in this browser as you work. A project file keeps every track, so it can go to another computer or be kept safe.</p>
+        <span class="status-msg" id="project-status" role="status"></span>
+      </section>
+      <section class="panel-section">
+        <div class="section-head">
+          <h3>On this device</h3>
+          <button class="btn btn-primary btn-sm" id="project-new" type="button">New project</button>
+        </div>
+        <div class="project-list" id="project-list"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SHEET: SAVE THE SONG ================= -->
+<div class="sheet-backdrop" id="save-sheet">
+  <div class="sheet sheet-narrow" role="dialog" aria-label="Save the song">
+    <div class="sheet-head"><h2>Save the song</h2><button class="sheet-close" type="button" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body">
+      <p class="sheet-hint">Every track you can hear, mixed into one file — muted tracks are left out, and so is the click.</p>
+      <div class="row-wrap">
+        <button class="btn btn-primary" id="save-mp3" type="button">Download MP3</button>
+        <button class="btn" id="save-wav" type="button">Download WAV</button>
+      </div>
+      <p class="panel-note">MP3 is small and plays anywhere. WAV is the full quality, for editing in another program.</p>
+      <span class="status-msg" id="save-status" role="status"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SHEET: BRING IN ================= -->
+<div class="sheet-backdrop" id="bring-sheet">
+  <div class="sheet" role="dialog" aria-label="Bring in">
+    <div class="sheet-head"><h2 id="bring-title">Bring in</h2><button class="sheet-close" type="button" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body sheet-scroll" id="bring-body"></div>
+  </div>
+</div>
+
+<!-- ================= SHEET: SETTINGS ================= -->
+<div class="sheet-backdrop" id="settings-sheet">
+  <div class="sheet" role="dialog" aria-label="Settings">
+    <div class="sheet-head"><h2>Settings</h2><button class="sheet-close" type="button" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body sheet-scroll">
+      <section class="panel-section">
+        <h3>Playback volume</h3>
+        <div class="volume-row">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+          <input type="range" id="volume-range" min="0" max="100" step="1" aria-label="Playback volume">
+          <output id="volume-value" for="volume-range">100%</output>
+        </div>
+        <p class="panel-note">How loud the tracks and the click play here. The instrument you are playing has its own volume, in its own settings.</p>
+      </section>
+      <section class="panel-section">
+        <h3>Room</h3>
+        <div class="volume-row">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M9.5 15.5a3.5 3.5 0 0 1 5 0M7.5 13a6.5 6.5 0 0 1 9 0"/></svg>
+          <input type="range" id="room-range" min="0" max="100" step="1" aria-label="Room">
+          <output id="room-value" for="room-range">35%</output>
+        </div>
+        <p class="panel-note">The echo of the room the keyboard, accordion and song tracks play in, kept with the project and in the song file. The xylophone and ostinatos play dry, as they do on their own.</p>
+      </section>
+      <section class="panel-section">
+        <h3>Recording timing</h3>
+        <p class="panel-note" id="set-delay">Not measured on this device yet.</p>
+        <div class="row-wrap"><button class="btn" id="settings-calibrate" type="button">Line up the timing…</button></div>
+      </section>
+      <section class="panel-section">
+        <h3>Background</h3>
+        <div class="chip-row" role="radiogroup" aria-label="Background">
+          <label class="chip"><input type="radio" name="theme" value="auto"><span>Like this device</span></label>
+          <label class="chip"><input type="radio" name="theme" value="dark"><span>Dark</span></label>
+          <label class="chip"><input type="radio" name="theme" value="light"><span>Light</span></label>
+        </div>
+      </section>
+      <section class="panel-section">
+        <h3>How it works</h3>
+        <p class="panel-note">Pick a track with its round button, then play the instrument below it. Press <span class="rec-dot-inline"></span> to record onto that track while the others play. A new take replaces what the track had, from where it started to where you stopped — Undo brings it back. <kbd>Space</kbd> plays and stops.</p>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SHEET: LINE UP THE TIMING ================= -->
+<div class="sheet-backdrop" id="cal-sheet">
+  <div class="sheet sheet-narrow" role="dialog" aria-label="Line up the timing">
+    <div class="sheet-head"><h2>Line up the timing</h2><button class="sheet-close" type="button" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body">
+      <p class="sheet-hint">Speakers and headphones each take a moment to play a sound. Tap along with the click and the studio learns how long yours take, so a recording lands right on the beat.</p>
+      <div class="cal-dots" id="cal-dots" aria-hidden="true"></div>
+      <button class="cal-pad" id="cal-pad" type="button">Start</button>
+      <p class="cal-msg" id="cal-msg" role="status"></p>
+      <div class="cal-fine">
+        <label class="field-label" for="cal-range">Move recordings earlier by</label>
+        <div class="volume-row">
+          <input type="range" id="cal-range" min="-150" max="600" step="1">
+          <output id="cal-value" for="cal-range">0 ms</output>
+        </div>
+        <button class="link-btn" id="cal-reset" type="button">Use the browser's own figure</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- the mark: a bank of rainbow faders -->
+    <symbol id="studio-logo" viewBox="0 0 24 24">
+      <rect x="1.5" y="2" width="21" height="20" rx="4" fill="#232836"/>
+      <g stroke="#0d1017" stroke-width="1.6" stroke-linecap="round"><path d="M5.5 5v14M9.75 5v14M14 5v14M18.25 5v14"/></g>
+      <rect x="3.6" y="12" width="3.8" height="3" rx="1" fill="#FF3B30"/>
+      <rect x="7.85" y="7" width="3.8" height="3" rx="1" fill="#FFCC00"/>
+      <rect x="12.1" y="14.5" width="3.8" height="3" rx="1" fill="#34C759"/>
+      <rect x="16.35" y="9" width="3.8" height="3" rx="1" fill="#007AFF"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- The engines. audio.js is a byte-identical copy of Digital Accordion/audio.js (authoritative there);
+     lib/evm-count-in.* copies of EVM Library/'s (check-copies.sh); lib/instruments/js/virtual-instruments.js
+     a copy of Virtual Instrument Assets/js/ (authoritative there); vendor/lame.min.js is lamejs (LAME-NOTICE.txt). -->
+<script src="audio.js"></script>
+<script src="lib/evm-count-in.js"></script>
+<script src="lib/instruments/js/virtual-instruments.js"></script>
+<script src="vendor/lame.min.js"></script>
+<script src="js/xylo.js"></script>
+<script src="js/voices.js"></script>
+<script src="js/studio.js"></script>
+<script src="js/voice.js"></script>
+<script src="js/link.js"></script>
+<script src="js/bring-in.js"></script>
+</body>
+</html>

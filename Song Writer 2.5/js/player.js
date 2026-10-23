@@ -206,6 +206,7 @@
       const cue = { t: at, ev };
       newCues.push(cue);
       if (ev.rest || !melody) return;
+      // js/studio-bridge.js copies these numbers (0.42 / 0.3, 0.96 below, 0.95 for chords): keep them in step
       const level = ev.pitches.length > 1 ? 0.3 : 0.42;
       ev.pitches.forEach(p => {
         // a tie: the pitch is still sounding from the note before (unless

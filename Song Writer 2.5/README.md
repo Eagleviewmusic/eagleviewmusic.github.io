@@ -72,6 +72,66 @@ on screen the app is simply "Song Writer".
 Preview: `.claude/launch.json` entry **song-writer** (port 8797), or the
 `music-stand` server at `http://localhost:8795/Song%20Writer%202.0/`.
 
+## Inside the Recording Studio (`?embed=studio`, 2026-10-22)
+
+The Recording Studio (`../Recording Studio/`, README "Bringing songs in") opens
+this app in a hidden frame at `index.html?embed=studio` and turns a song into
+notes for its own tracks. Outside such a frame nothing below runs.
+
+- **A guest** (`js/embed.js`, the first script on the page): framed and
+  `?embed=studio`, `localStorage` is swapped for a layer that reads through and
+  keeps every write in memory — Ostinato Builder's guard for the Music Stand,
+  copied. `window.EVM_STUDIO_EMBED.forget(key)` drops the frame's own writes
+  for a key. If the swap does not take, the page is the plain app with no bridge.
+- **Quiet**: no "Leave site?" (`library.js` beforeunload), no Teacher Library
+  shelf (it fetches and files songs), no lesson reopened from this tab's
+  sessionStorage (`lessons.bootFromUrl`). The rest of the dialogs only answer a click.
+- **The bridge** (`js/studio-bridge.js`, after `app.js`): `window.SongWriterStudio`,
+  version 1.
+
+```js
+SongWriterStudio.listSongs()  // [{ id, title, updatedAt, sandbox?, starter?, received?, book? }]
+                              //   the live library, in the Library window's order (sandbox first)
+SongWriterStudio.open(id)     // opens it in the frame (memory only) -> plan | null
+SongWriterStudio.load(record) // { title, score }, a library record, a 1.0 { title, content } -> plan | null
+plan = { title, key, scale, meter, bpm, beatTicks, barTicks, pickupTicks, totalTicks,
+  melody: [{ midi, at, ticks, level }],                 // every pitch struck; a tie once, for the chain
+  chords: [{ midis, at, ticks, level, name, id }],      // every chord strike
+  sounds: { melody, chords, melodyVolume, chordVolume, room } }   // SW.audio.mix()
+```
+
+The plan is what `player.js` plays from tick 0, read with its own modules
+(`SW.timing.song`, `SW.track.events`, `SW.chords.midis`), chords included
+whatever Sound → Chords says. Ticks (24 a quarter, 36 a compound beat) may be
+fractional: `ticks` is the player's hold — a note × 0.96 (a tie, the whole
+chain), a strike × 0.95. `level` is the engine's per-note level as
+`lib/audio.js` `schedule()` / `render()` take it: a lone note 1, a note in a
+harmony column 0.3 / 0.42, a chord 0.75 (all its notes in one call). Each side
+plays at 0.8 × its volume; Room is `setReverb(room)`; `tone()` holds a note at
+least 0.08 s. Opening a song saves nothing and makes no sound. The numbers in
+`player.js` `schedulePass` are copied in the bridge: change both. Checked
+2026-10-22 against the player's own calls to `Audio.schedule` during Play
+(Twinkle, a chord progression with a tie and harmony, a 3/4 pick-up song with
+lane chords, 6/8): every note and strike identical.
+
+---
+
+# Song Writer (folder: Song Writer 2.0)
+
+Song Writer 1.0's melody-first song writing — solfège blocks rising over the
+words — rebuilt as the fourth member of the Eagle View Music family beside
+**Rhythm Poetry 2.0, Ostinato Builder 2.0 and the Music Stand**: the same
+frame, the same controls in the same places, the same windows and wording,
+with every 1.0 and 2.0 function kept. Song Writer 1.0 stays untouched beside it.
+
+The redesign (2026-09-25) followed `../Song Writer Redesign/` (DESIGN.md,
+FEATURE-MAP.md, DECISIONS.md — every recommendation taken). The folder keeps
+its name and its storage keys (`song_writer_2_*`), so saved songs carry on;
+on screen the app is simply "Song Writer".
+
+Preview: `.claude/launch.json` entry **song-writer** (port 8797), or the
+`music-stand` server at `http://localhost:8795/Song%20Writer%202.0/`.
+
 ## Files
 
 | File | What it holds |
@@ -96,6 +156,7 @@ Preview: `.claude/launch.json` entry **song-writer** (port 8797), or the
 | `js/lessons.js` | Set up for students: tasks, key & tempo, exercises, `#lesson=` links, preview, Start again. |
 | `js/components/*.js` | Chord panel (+ the corner, the chord editor and the Z X C V B chooser), the row above the words (the old chord lane), keyboard dock, the value circles, and the Edit box (below). |
 | `js/app.js` | Start-up order, the key + time tile, BPM chip, Play, step pad, Present, the keyboard map. |
+| `js/embed.js`, `js/studio-bridge.js` | **Inside the Recording Studio** (2.5, 2026-10-22): the storage guard (first script) and `window.SongWriterStudio` — see that section above. |
 | `lib/theory.js`, `lib/keyblocks-layers.js` | **Vendored** copies of `Digital Accordion/theory.js` and its `lib/keyblocks-layers.js` (the chord-modifier engine) — see `lib/README.md`. |
 | `lib/notation/glyphs-leland.js` | **Vendored** copy of `notation assets/glyphs-leland.js`. |
 | `lib/evm-library.js`, `lib/evm-shelf.*`, `lib/evm-count-in.*` | **Shared** EVM Library modules — byte-identical copies, checked by `../EVM Library/check-copies.sh`. |

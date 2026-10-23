@@ -18,6 +18,8 @@
    window.Recorder = { noteOn, noteOff, syncSound } — script.js calls these.
    ========================================================================== */
 (() => {
+  // In the Recording Studio, the studio's tracks take the place of these four.
+  if (typeof STUDIO !== 'undefined' && STUDIO) return;
   const TRACKS = 4;
   const TRACK_COLORS = ['#F0525A', '#F4A21C', '#2DB86A', '#3B95E6']; // the count-in card's colours
   const STORE_KEY = 'virtual_keyboard_recording_v1';

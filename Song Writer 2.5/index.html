@@ -10,6 +10,9 @@
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="lib/evm-shelf.css">
   <link rel="stylesheet" href="lib/evm-count-in.css">
+  <!-- js/embed.js comes first: inside the Recording Studio's hidden frame (?embed=studio) it swaps
+       localStorage for a read-through, write-to-memory layer before anything else reads it; elsewhere it does nothing -->
+  <script src="js/embed.js"></script>
   <script>
     try {
       if (window.self !== window.top) document.documentElement.classList.add('in-iframe');
@@ -1104,5 +1107,7 @@
 <script src="js/components/note-tools.js"></script>
 <script src="js/keymap.js"></script>
 <script src="js/app.js"></script>
+<!-- js/studio-bridge.js: window.SongWriterStudio, a song as notes for the Recording Studio — only in its frame (js/embed.js) -->
+<script src="js/studio-bridge.js"></script>
 </body>
 </html>

@@ -1201,7 +1201,8 @@
     if (!window.EVMShelf) return;
     EVMShelf.init({
       app: 'song-writer',
-      disabled: !!(SW.lessons && SW.lessons.meta()),
+      // not in a lesson, nor in the Recording Studio's frame (js/embed.js), which must not file songs
+      disabled: !!window.EVM_STUDIO_EMBED || !!(SW.lessons && SW.lessons.meta()),
       load: getStoredLibrary,
       save: saveStoredLibrary,
       incoming: rec => normalizeSong({ ...rec }, rec.id),
@@ -1270,9 +1271,10 @@
 
     // flush on the way out (gated like every other save) — and ask the
     // browser to check first when there are changes nobody is saving
+    // (never in the Recording Studio's hidden frame, js/embed.js: nothing there is the user's)
     window.addEventListener('beforeunload', e => {
       save();
-      if (hasUnsavedChanges()) { e.preventDefault(); e.returnValue = ''; }
+      if (!window.EVM_STUDIO_EMBED && hasUnsavedChanges()) { e.preventDefault(); e.returnValue = ''; }
     });
     document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
   }
@@ -1284,6 +1286,6 @@
     showManageLibraryModal, offerLink, shareLinkFor, hasUnsavedChanges, okToLeave,
     currentId: () => currentSongId,
     currentTitle: () => currentSongTitle,
-    isSandboxId, isDefaultId, SANDBOX_ID
+    isSandboxId, isDefaultId, SANDBOX_ID, STORAGE_KEY
   };
 })();
