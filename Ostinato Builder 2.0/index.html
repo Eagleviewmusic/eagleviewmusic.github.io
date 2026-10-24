@@ -122,6 +122,9 @@
   <button class="present-play" id="present-play-btn" title="Play / stop (Space)">
     <span id="present-play-glyph">&#9654;</span>
   </button>
+  <!-- the same section buttons as the toolbar's, without the + — a class
+       playing along needs them most when the screen is presenting -->
+  <div class="present-sections" id="present-sections" role="group" aria-label="Sections" hidden></div>
   <button class="present-exit" id="present-exit-btn" title="Leave present mode (Esc)">
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M9 9L4 4m0 0v5m0-5h5"/><path d="M15 9l5-5m0 0v5m0-5h-5"/>
@@ -190,6 +193,13 @@
       <button class="step-btn" id="measures-plus" aria-label="One bar more">+</button>
     </div>
 
+    <!-- The sections: up to four, each with music of its own over the same
+         instruments. A tap shows one, a second tap opens its menu; while
+         the music plays, a tap says which plays next. How they follow one
+         another is in View, under While it plays. Drawn by
+         updateSectionPicker(). -->
+    <div class="section-picker" id="section-picker" role="group" aria-label="Sections"></div>
+
     <button class="tool-btn" id="settings-btn" title="View options">
       <svg viewBox="0 0 24 24" width="20" height="20"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
       <span class="tool-label">View</span>
@@ -253,6 +263,34 @@
 </div>
 
 <!-- ============================================================
+     ONE SECTION'S MENU
+     Opened by tapping the section on screen a second time.
+     ============================================================ -->
+<div class="popover section-menu" id="section-menu" role="dialog" aria-labelledby="section-menu-title">
+  <div class="popover-section">
+    <h3 class="popover-title" id="section-menu-title">Section 1</h3>
+    <!-- the + beside the numbers does the same; on a phone there is no
+         room for it, and this is where adding a section goes -->
+    <button class="popover-link" id="section-new-btn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+      <span id="section-new-label">New empty section</span>
+    </button>
+    <button class="popover-link" id="section-copy-btn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+      <span id="section-copy-label">Copy into a new section</span>
+    </button>
+    <button class="popover-link" id="section-clear-btn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20H8l-4-4L14 6l6 6-6 6"/><path d="m9 11 6 6"/></svg>
+      <span>Clear its notes</span>
+    </button>
+    <button class="popover-link popover-link-danger" id="section-delete-btn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      <span id="section-delete-label">Delete this section</span>
+    </button>
+  </div>
+</div>
+
+<!-- ============================================================
      SETTINGS
      ============================================================ -->
 <div class="popover" id="settings-popover" role="dialog" aria-label="What to show">
@@ -302,7 +340,7 @@
       <span>Each line’s own words</span>
       <span class="switch" aria-hidden="true"></span>
     </button>
-    <p class="popover-note" id="words-note">Double-click a syllable under the notes to write your own word there. Space moves on to the next note.</p>
+    <p class="popover-note" id="words-note">Double-click a syllable (double-tap on a tablet) under the notes to write your own word there. Space moves on to the next note.</p>
     <!-- The syllables and words alone, as Rhythm Poetry's Text size. Only
          there while something is spoken on the page. -->
     <div class="popover-field" id="text-size-field" hidden>
@@ -327,6 +365,31 @@
       <span class="switch" aria-hidden="true"></span>
     </button>
     <p class="popover-note">The box of dots above the beat that is sounding, and a box around its notes — either, both or neither. With the dots off, only the notes can light.</p>
+
+    <!-- How the sections follow one another. Part of the piece, so it is
+         saved with it; only here once there is more than one section. -->
+    <div class="section-play" id="section-play" hidden>
+      <span class="section-play-label">Sections</span>
+      <div class="seg" role="group" aria-label="How the sections play">
+        <button class="seg-btn" data-mode="continuous">Continuous</button>
+        <button class="seg-btn" data-mode="loop">Looped</button>
+        <button class="seg-btn" data-mode="arranged">Arranged</button>
+      </div>
+      <p class="popover-note" id="section-play-note"></p>
+
+      <div class="arrangement" id="arrangement" hidden>
+        <div class="arr-steps" id="arr-steps" aria-label="The order"></div>
+        <div class="arr-add" id="arr-add"></div>
+      </div>
+
+      <div class="section-end" id="section-end">
+        <span class="section-play-label">At the end</span>
+        <div class="seg" role="group" aria-label="At the end">
+          <button class="seg-btn" data-end="repeat">Go round again</button>
+          <button class="seg-btn" data-end="stop">Stop</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="popover-section popover-foot" id="layout-settings-section">
@@ -696,7 +759,7 @@
         <div class="switch-list" id="lesson-length"></div>
         <div class="limit-row">
           <label class="field-label" for="lesson-max-measures">Most bars</label>
-          <input type="number" id="lesson-max-measures" class="text-field num" min="1" max="8"
+          <input type="number" id="lesson-max-measures" class="text-field num" min="1" max="16"
                  placeholder="8" />
           <label class="field-label" for="lesson-max-tracks">Most instruments</label>
           <input type="number" id="lesson-max-tracks" class="text-field num" min="1" max="10"
@@ -771,11 +834,13 @@
         <li><span class="help-key">🥁</span>
           <div><b>Change an instrument</b> by tapping its picture. The speaker on the picture mutes that line, and <b>Add</b>, under the last picture, brings in another.</div></li>
         <li><span class="help-key">💬</span>
-          <div><b>Give a line its own words</b> — “wet dogs sleep all day”: with Syllables on (View), double-click one and type. <span class="help-key">Space</span> moves on to the next note, <span class="help-key">Enter</span> finishes.</div></li>
+          <div><b>Give a line its own words</b> — “wet dogs sleep all day”: with Syllables on (View), double-click one (double-tap on a tablet) and type. <span class="help-key">Space</span> moves on to the next note, <span class="help-key">Enter</span> finishes.</div></li>
         <li><span class="help-key">🔊</span>
           <div><b>Balance the instruments</b> in <b>Sound</b>: each one has its own volume, saved with the ostinato.</div></li>
         <li><span class="help-key">＋</span>
-          <div><b>Set the length</b> with the bar counter on the toolbar, or the + and × where the music ends.</div></li>
+          <div><b>Set the length</b> with the bar counter on the toolbar, or the + and × where the music ends — up to sixteen bars.</div></li>
+        <li><span class="help-key">1 2</span>
+          <div><b>Sections:</b> <b>+ Section</b>, beside View, starts another — up to four, each with its own music on the same instruments. Tap a number to see that section, and tap it again to add another or to copy, clear or delete it. How they follow one another is in <b>View</b>, under <b>While it plays</b>: <b>Continuous</b>, <b>Looped</b> (tap a number while it plays and that section comes in next), or <b>Arranged</b> in an order you set. The keys <span class="help-key">1</span>–<span class="help-key">4</span> pick a section too.</div></li>
         <li><span class="help-key">⛶</span>
           <div><b>Present</b> hides every control and fills the screen. Press <span class="help-key">Esc</span> to come back.</div></li>
         <li><span class="help-key">␣</span>

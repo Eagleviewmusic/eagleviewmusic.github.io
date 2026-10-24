@@ -406,8 +406,8 @@ it too and adding an entry to `APPS`.
 | `openLibrarySong(id)` | open a library song; returns `info()` or `null` |
 | `loadSong(record)` | open a song record (a share-link payload, or a copy the stand kept); a `layout` in it is applied, in memory, as the piece's own; returns `info()` or `null` |
 | `snapshot()` | the open song as a record, the same shape the app shares, plus `layout: { layout }` — the build rules it is shown with (EASY's rhythm choices among them), not the dots/EASY switch |
-| `info()` | `{ title, kind, meter, bpm, beatsPerMeasure, beatTicks, pickupBeats, totalBeats, voices:[{ id, label, image?, muted? }] }` |
-| `timeline()` | `{ beatTicks, totalBeats, notes:[{ tick, voice, holdTicks?, gapTicks? }] }` — one pass, every voice, muted ones included |
+| `info()` | `{ title, kind, meter, bpm, beatsPerMeasure, beatTicks, pickupBeats, totalBeats, voices:[{ id, label, image?, muted? }] }`. Ostinato Builder adds `sections`: `null` for one section, else `{ count, bars:[…], mode: 'loop'\|'continuous'\|'arranged', order:[[section, times]…], end: 'repeat'\|'stop', current }` — `totalBeats` is then the section on screen's |
+| `timeline(opts?)` | `{ beatTicks, totalBeats, notes:[{ tick, voice, holdTicks?, gapTicks? }], passes? }` — one pass, every voice, muted ones included. Ostinato Builder's pass is the piece **once through, as it is set to play**: Continuous is every section in turn from the first, Arranged is its order, Looped is the section on screen. `passes:[{ section, beat, beats }]` says which section each stretch is. `opts`: `{ section: k }` for one section alone, `{ play: 'loop'\|'continuous'\|'arranged' }` for another way through |
 | `attachAudio(ctx, out)` | use this context and send sound to `out` instead of the speakers |
 | `sound(voice, opts)` | sound one voice **now** (by `ctx.currentTime`). Poem: `{ holdMs, style: 'tone'\|'drum', strength: 1\|2\|3 }`; ostinato: `{ gapMs }` |
 | `setVoiceMuted(voice, muted)` | ostinato only: show that voice muted in the pane. The mute is the Music Stand's, not the piece's — the song is not changed |
@@ -415,7 +415,8 @@ it too and adding an entry to `APPS`.
 | `onVoiceMute` | ostinato only: set by the Music Stand; the frame calls it when a mute badge in the pane is pressed. Not an edit |
 | `instruments(voice)` | ostinato only: `{ editable, current, items:[{ id, label, alt, image }] }` — what this piece may be played on, lesson policy included |
 | `setInstrument(voice, id)` | ostinato only: change one line's instrument; returns `info()` or `null`. **This is an edit**, and the Music Stand asked for it, so `onEdit` does not fire — the caller reports it |
-| `highlight(beat)` | light a beat (and follow it on the page); `-1` clears |
+| `highlight(beat, section?)` | light a beat (and follow it on the page); `-1` clears. Ostinato Builder: with `section`, the beat is that section's, and the pane brings it on screen first |
+| `setSection(k)` | Ostinato Builder: show section `k` (not an edit); returns `info()` or `null` |
 | `stop()` | clear the lights and settle the page |
 | `getView()` / `setView(patch)` | how the score is shown (see `VIEW_KEYS` in each app). Rhythm Poetry's include `textPct` (words 60–250 %) and `lyricFont` (`rounded`, `reader`, `clear`, `story`); the Music Stand's own View menu for the poem sets both, per pane, without touching the app's settings |
 | `sizing()` | `{ w, h, padW, padH, maxScale, mode: 'page'\|'fit'\|'fixed', fixedScale, layouts? }`. `layouts` is `[{ n, w, h }]` — every shape this score could be drawn in, one per number of bars to a line. It is a list of what the score *could* look like, not of what it currently does, so it must not empty out once the stand has chosen from it |
@@ -423,6 +424,22 @@ it too and adding an entry to `APPS`.
 | `editable` | `false`: all input is swallowed, save for the mute badges. Set it to `true` and the score answers the pointer — see **Editing** below |
 | `onHostKey` | set by the Music Stand; the frame passes keys up so Space works everywhere |
 | `onEdit` | set by the Music Stand; the frame calls it when the score has come out different. Take `snapshot()` and `info()` again on hearing it |
+
+### An ostinato in sections
+
+The stand plays whatever pass `timeline()` hands it, so Continuous and Arranged
+need little more: the whole ostinato goes round under the poem, and the pane
+turns to each section as it is heard (`highlight(beat, section)`). Unlike a
+one-section ostinato it does **not** start again at each of the poem's
+downbeats — an order longer than the poem would never get past its first
+sections — but runs on from the poem's first downbeat (`runsOn` in the plan). The intro (Mixer → Intro) is the
+**first section** that many times, not the whole piece. A **Looped** ostinato is
+one section going round, so the stand shows its sections as buttons — in the
+ostinato's heading, and on the transport in present mode — and on the keys 1–4:
+stopped, a tap shows that section (`setSection`); playing, the one chosen takes
+over the next time the ostinato is back at its top (`ostFrom` in the conductor).
+A change of section redraws the pane as it is heard, so the opening of the new
+one is handed over `SECTION_LEAD` (0.75 s) ahead rather than `LOOKAHEAD`.
 
 ## What embedded mode changes in the apps
 

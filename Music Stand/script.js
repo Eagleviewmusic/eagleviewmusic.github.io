@@ -569,7 +569,11 @@
       const info = state.songs[side] ? sides[side].info : null;
       $(side + '-title').textContent = info ? info.title : 'Choose ' + (side === 'poem' ? 'a poem' : 'an ostinato');
       let meta = '';
-      if (info) {
+      if (info && info.sections) {
+        // an ostinato in sections: how many, and how they follow one another
+        meta = meterText(info) + ' · ' + info.sections.count + ' sections · '
+             + (SECTION_MODES[info.sections.mode] || '');
+      } else if (info) {
         const bars = barsOf(info);
         meta = meterText(info) + ' · ' + bars + (bars === 1 ? ' bar' : ' bars')
              + (info.pickupBeats ? ' + pickup' : '');
@@ -622,8 +626,63 @@
     note.title = title;
     note.hidden = !text;
 
+    renderOstSections();
     refreshLibraryChrome();
   }
+
+  /* ---- an ostinato in sections ----
+     Continuous and Arranged need nothing from here: the pass the
+     ostinato hands over is already the whole of it, in order. Looped is
+     a section going round until another is chosen, so for that one the
+     sections are buttons — in the pane's heading, and in present mode on
+     the transport, where the heading is hidden — and 1–4 on the keys.
+     Stopped, a tap shows that section; playing, it takes over the next
+     time the ostinato comes back to its top. */
+  const SECTION_MODES = { loop: 'Looped', continuous: 'Continuous', arranged: 'Arranged' };
+
+  function renderOstSections() {
+    const info = state.songs.ost ? sides.ost.info : null;
+    const looped = ostLooped(info);
+    const here = play.on && play.ostSection >= 0 ? play.ostSection : (info && info.sections ? info.sections.current : 0);
+    const html = !looped ? '' : info.sections.bars.map((bars, k) => {
+      const title = k === play.ostQueue ? 'Section ' + (k + 1) + ' comes in next — tap again to change your mind'
+        : play.on ? (k === here ? 'Section ' + (k + 1) + ' is going round' : 'Section ' + (k + 1) + ' next')
+        : 'Section ' + (k + 1) + ' (' + bars + (bars === 1 ? ' bar' : ' bars') + ')';
+      return '<button class="sec-chip' + (k === here ? ' active' : '') + (k === play.ostQueue ? ' queued' : '')
+        + '" data-section="' + k + '" title="' + title + '">' + (k + 1) + '</button>';
+    }).join('');
+    ['ost-sections', 'transport-sections'].forEach(id => {
+      const el = $(id);
+      if (!el) return;
+      el.innerHTML = html;
+      el.hidden = !looped;
+    });
+  }
+
+  function chooseOstSection(k) {
+    const s = sides.ost, info = state.songs.ost ? s.info : null;
+    if (!s.bridge || !ostLooped(info) || k < 0 || k >= info.sections.count) return;
+    if (play.on) {
+      const going = play.ostSection >= 0 ? play.ostSection : info.sections.current;
+      play.ostQueue = (play.ostQueue === k || k === going) ? -1 : k;
+    } else {
+      const next = safe(() => s.bridge.setSection(k));
+      if (next) s.info = next;
+      scheduleSplit();   // another section may be another size
+    }
+    renderOstSections();
+  }
+
+  ['ost-sections', 'transport-sections'].forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener('click', e => {
+      const chip = e.target.closest('.sec-chip');
+      if (!chip) return;
+      e.stopPropagation();
+      chooseOstSection(Number(chip.dataset.section));
+    });
+  });
 
   /* Where a pane's song came from, in a word for the heading and a
      sentence for its title: the same words the apps' own song chips use.
@@ -814,7 +873,8 @@
      worked out by resolveBeat() from four landmarks:
 
         count-in   C beats of clicks, if asked for
-        intro      L beats of ostinato alone (the ostinato, L times round)
+        intro      L beats of ostinato alone (its first section, L times
+                   round — the whole ostinato, when it has only one)
         T0         the poem's first downbeat
         passes     the poem, then again if looping; the ostinato starts
                    again at every pass's downbeat, so its bar 1 always
@@ -822,6 +882,15 @@
 
      A pickup comes in on the last beat before T0, over the end of the
      intro.
+
+     An ostinato in sections hands over the whole of itself, once
+     through, in the way it is set to play — every section in turn, or
+     its arranged order — and that is the pass that goes round. It does
+     not start again with each pass of the poem, which would cut it off
+     wherever the poem ends; it runs on from T0, round and round. Looped is
+     the one exception: its pass is one section, and another chosen while
+     it plays (the section buttons, or 1–4) takes over the next time the
+     ostinato comes back to its top, from that beat on (`ostFrom`).
 
      Beats are placed on the audio clock: beat g is at
      audioAnchor + g * secPerBeat. A pump running every few milliseconds
@@ -847,16 +916,28 @@
     timers: new Set(),
     pump: null,
     priming: false,   // Play pressed, the sound still being made ready
-    token: 0          // a start still getting ready is dropped if this moves
+    token: 0,         // a start still getting ready is dropped if this moves
+    ostQueue: -1,     // a Looped ostinato's section chosen while it plays
+    ostSection: -1,   // the ostinato section last lit
+    handedSection: null,  // …and the last one handed over
+    leadUntil: 0      // sound handed over this far ahead, round a change of section
   };
+
+  /* A change of section redraws the ostinato's pane as it is heard, and a
+     big score can hold the page up for longer than LOOKAHEAD — so the
+     opening of a new section is handed over this far ahead, before the
+     redraw, and cannot be made late by it. */
+  const SECTION_LEAD = 0.75;
 
   function isPlaying() { return play.on; }
 
-  function sidePlan(side) {
+  /* `opts` goes to the timeline: `{ section }` is one section of an
+     ostinato, for a Looped one that has been told to change. */
+  function sidePlan(side, opts) {
     const s = sides[side];
     if (!s.bridge || !state.songs[side]) return null;
     const info = safe(() => s.bridge.info());
-    const tl = safe(() => s.bridge.timeline());
+    const tl = safe(() => s.bridge.timeline(opts));
     if (!info || !tl || !tl.totalBeats) return null;
     s.info = info;
 
@@ -874,13 +955,38 @@
         gap: (ev.gapTicks || 0) / bt
       });
     });
+    /* Which section each beat is in, and which beat of it, for an
+       ostinato in sections; null otherwise, and the beat is lit as it is. */
+    const passes = Array.isArray(tl.passes) && info.sections ? tl.passes : null;
+    let secOf = null, localOf = null;
+    if (passes) {
+      secOf = new Array(n);
+      localOf = new Array(n);
+      passes.forEach(p => {
+        for (let b = 0; b < p.beats && p.beat + b < n; b++) {
+          secOf[p.beat + b] = p.section;
+          localOf[p.beat + b] = b;
+        }
+      });
+    }
     return {
       info: info,
       n: n,
       byBeat: byBeat,
       bpb: Math.max(1, info.beatsPerMeasure),
-      pickup: info.pickupBeats || 0
+      pickup: info.pickupBeats || 0,
+      // one time round the first section: what the intro goes round
+      first: passes ? passes[0].beats : n,
+      // more than one pass (Continuous, Arranged): not cut short by the poem
+      runsOn: !!(passes && passes.length > 1),
+      secOf: secOf,
+      localOf: localOf
     };
+  }
+
+  // A Looped ostinato in sections: the one kind whose section is chosen while it plays
+  function ostLooped(info) {
+    return !!(info && info.sections && info.sections.mode === 'loop');
   }
 
   function buildPlan() {
@@ -892,7 +998,7 @@
     /* one bar of the lead piece — two of a bar of two (EVMCountIn.beats) */
     const C = state.countIn ? EVMCountIn.beats(lead.bpb) : 0;
     const pk = poem ? poem.pickup : 0;
-    const L = (poem && ost) ? state.leadIn * ost.n : 0;
+    const L = (poem && ost) ? state.leadIn * ost.first : 0;
     let T0 = C + L;
     if (poem && L === 0) T0 = Math.max(T0, pk);
 
@@ -905,7 +1011,8 @@
       T0: T0,
       pk: pk,
       poemStart: poem ? T0 - pk : Infinity,
-      ostStart: ost ? (poem ? T0 - L : T0) : Infinity
+      ostStart: ost ? (poem ? T0 - L : T0) : Infinity,
+      ostFrom: -Infinity    // where a Looped ostinato last changed section
     };
   }
 
@@ -931,18 +1038,27 @@
       }
       if (ost && g >= plan.ostStart) {
         if (g < plan.T0) {
-          r.ob = mod(g - plan.T0, ost.n);
+          // the intro: the first section, round and round, ending on T0
+          r.ob = mod(g - Math.max(plan.ostStart, plan.ostFrom), ost.first);
         } else {
+          /* Each pass of the poem starts the ostinato again — unless it is
+             a whole order of sections, which would then never get past
+             the ones that fit in one pass; that goes on through, from T0. */
           const k = Math.floor((g - plan.poemStart) / poem.n);
-          r.ob = mod(g - (plan.T0 + k * poem.n), ost.n);
+          const base = ost.runsOn ? plan.T0 : plan.T0 + k * poem.n;
+          r.ob = mod(g - Math.max(base, plan.ostFrom), ost.n);
         }
       }
     } else if (ost) {
-      const rel = g - plan.ostStart;
+      const rel = g - Math.max(plan.ostStart, plan.ostFrom);
       const k = Math.floor(rel / ost.n);
       if (!state.loop && k >= 1) { r.end = true; return r; }
       r.pass = k;
       r.ob = rel - k * ost.n;
+    }
+    if (r.ob != null && ost.secOf) {
+      r.os = ost.secOf[r.ob];
+      r.ol = ost.localOf[r.ob];
     }
     return r;
   }
@@ -951,7 +1067,19 @@
      notes at the same instant, so sound goes out first. */
   function beatItems(g) {
     const plan = play.plan;
-    const r = resolveBeat(plan, g);
+    let r = resolveBeat(plan, g);
+    /* A Looped ostinato back at its top, with another section chosen:
+       that one takes over from here. Beats are asked for in order, once
+       each, so this happens exactly once, on the beat it should. */
+    if (r.ob === 0 && play.ostQueue >= 0 && plan.ost) {
+      const next = sidePlan('ost', { section: play.ostQueue });
+      play.ostQueue = -1;
+      if (next) {
+        plan.ost = next;
+        plan.ostFrom = g;
+        r = resolveBeat(plan, g);
+      }
+    }
     const items = [];
     if (r.end) {
       items.push({ frac: 0, kind: 'end' });
@@ -990,7 +1118,7 @@
 
   function pump() {
     if (!play.on || play.ending || play.priming) return;
-    const horizon = audio.ctx.currentTime + LOOKAHEAD;
+    let horizon = Math.max(audio.ctx.currentTime + LOOKAHEAD, play.leadUntil);
     for (let guard = 0; guard < 2000; guard++) {
       if (!play.items) { play.items = beatItems(play.beat); play.index = 0; }
       if (play.index >= play.items.length) {
@@ -1004,6 +1132,7 @@
       dispatch(play.beat, item, time);
       play.index++;
       if (play.ending) break;
+      horizon = Math.max(horizon, play.leadUntil);
     }
   }
 
@@ -1013,6 +1142,12 @@
     else if (item.kind === 'beat') {
       if (item.r.click) playClick(item.r.click === 2, time);
       const r = item.r;
+      /* the first beat of another ostinato section: hand its opening over
+         now, ahead of the redraw that lighting it will cause */
+      if (r.os != null && r.os !== play.handedSection) {
+        if (play.handedSection != null) play.leadUntil = time + SECTION_LEAD;
+        play.handedSection = r.os;
+      }
       later(heardAt(time), () => onBeat(g, r));
     } else if (item.kind === 'end') {
       play.ending = true;
@@ -1039,7 +1174,16 @@
 
   function onBeat(g, r) {
     if (sides.poem.bridge && state.songs.poem) safe(() => sides.poem.bridge.highlight(r.pb == null ? -1 : r.pb));
-    if (sides.ost.bridge && state.songs.ost) safe(() => sides.ost.bridge.highlight(r.ob == null ? -1 : r.ob));
+    if (sides.ost.bridge && state.songs.ost) {
+      /* in sections, the beat of its own section — which the pane brings
+         on screen first, if it is not showing */
+      if (r.os != null) safe(() => sides.ost.bridge.highlight(r.ol, r.os));
+      else safe(() => sides.ost.bridge.highlight(r.ob == null ? -1 : r.ob));
+    }
+    if (r.os != null && r.os !== play.ostSection) {
+      play.ostSection = r.os;
+      renderOstSections();
+    }
     updateReadout(g, r);
   }
 
@@ -1068,6 +1212,10 @@
     play.on = true;
     play.priming = true;
     play.ending = false;
+    play.ostQueue = -1;
+    play.ostSection = -1;
+    play.handedSection = null;
+    play.leadUntil = 0;
     setPlayGlyph(true);
 
     /* The card is up at once, so the room knows a count is coming while
@@ -1127,6 +1275,11 @@
       if (b && state.songs[side]) safe(() => b.stop());
     });
     ['readout-poem', 'readout-ost', 'where-poem', 'where-ost'].forEach(id => { $(id).textContent = ''; });
+    play.ostQueue = -1;
+    play.ostSection = -1;
+    // a Looped ostinato may have stopped on another section than it started on
+    if (sides.ost.bridge && state.songs.ost) sides.ost.info = safe(() => sides.ost.bridge.info(), sides.ost.info);
+    renderOstSections();
     setPlayGlyph(false);
     SIDES.forEach(side => { if (sides[side].stale) reopen(side); });
   }
@@ -1176,8 +1329,14 @@
       }
     }
     if (plan.ost && r.ob != null) {
-      const bar = Math.floor(r.ob / plan.ost.bpb) + 1;
-      o = 'Bar ' + bar + ' of ' + barsOf(plan.ost.info);
+      const sec = plan.ost.info.sections;
+      if (r.os != null && sec) {
+        const bar = Math.floor(r.ol / plan.ost.bpb) + 1;
+        o = 'Section ' + (r.os + 1) + ' · bar ' + bar + ' of ' + sec.bars[r.os];
+      } else {
+        const bar = Math.floor(r.ob / plan.ost.bpb) + 1;
+        o = 'Bar ' + bar + ' of ' + barsOf(plan.ost.info);
+      }
     }
     poemEl.textContent = p;
     ostEl.textContent = o;
@@ -2383,7 +2542,8 @@
 
   function songRow(song, current, onPick) {
     const bits = [];
-    if (song.measures) bits.push(song.measures + (song.measures === 1 ? ' bar' : ' bars'));
+    if (song.sections > 1) bits.push(song.sections + ' sections');
+    else if (song.measures) bits.push(song.measures + (song.measures === 1 ? ' bar' : ' bars'));
     bits.push(song.bpm + ' BPM');
     if (song.preview) bits.push(song.preview);
     return libRow({
@@ -3592,6 +3752,13 @@
   function handleKey(k) {
     if (isSpace(k)) {
       togglePlayback();
+      return;
+    }
+    // 1–4: a Looped ostinato's sections, as its buttons
+    if (/^[1-4]$/.test(k.key || '') && !k.metaKey && !k.ctrlKey && !k.altKey
+        && !openSheetEl() && ostLooped(state.songs.ost ? sides.ost.info : null)) {
+      if (k.preventDefault) k.preventDefault();
+      chooseOstSection(Number(k.key) - 1);
       return;
     }
     if (k.key === 'Escape') {

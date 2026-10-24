@@ -39,7 +39,7 @@ const Voices = (() => {
   /* ---------------- live ---------------- */
   function start(ctx) {
     const gate = ctx.createGain();
-    gate.connect(ctx.destination);
+    gate.connect(window.StudioBus ? StudioBus.out(ctx) : ctx.destination);
     const timed = EVMCountIn.timed(ctx);
     let xyloBus = null;
     const gains = new Map();      // track id -> GainNode (xylophone, ostinato)

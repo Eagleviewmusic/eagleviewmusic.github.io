@@ -59,7 +59,8 @@ const Audio = (() => {
 
     mixBus.connect(dryGain); dryGain.connect(hp);
     mixBus.connect(reverb); reverb.connect(reverbGain); reverbGain.connect(hp);
-    hp.connect(comp); comp.connect(master); master.connect(c.destination);
+    hp.connect(comp); comp.connect(master);
+    master.connect(window.StudioBus ? StudioBus.out(c) : c.destination);   // Recording Studio: through its bus (bus.js) — the ONE line this copy differs by
     return { mixBus, hp, comp, master, dryGain, reverb, reverbGain };
   }
 

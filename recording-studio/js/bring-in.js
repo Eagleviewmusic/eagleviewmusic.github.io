@@ -109,7 +109,8 @@
     put(key === 'ostinato' ? 'My ostinatos' : 'My songs', mine);
     put(key === 'ostinato' ? 'Starters' : 'Built in', starters);
     const meta = s => key === 'ostinato'
-      ? [s.meter ? s.meter.join('/') : '', s.bpm ? s.bpm + ' bpm' : '', s.measures ? s.measures + (s.measures === 1 ? ' bar' : ' bars') : '', s.preview || ''].filter(Boolean).join(' · ')
+      ? [s.meter ? s.meter.join('/') : '', s.bpm ? s.bpm + ' bpm' : '',
+         s.sections > 1 ? s.sections + ' sections' : s.measures ? s.measures + (s.measures === 1 ? ' bar' : ' bars') : '', s.preview || ''].filter(Boolean).join(' · ')
       : [s.meter || '', s.bpm ? s.bpm + ' bpm' : ''].filter(Boolean).join(' · ');
     body.innerHTML = `<button class="link-btn back-link" type="button">‹ Back</button>` + (groups.length
       ? groups.map(g => `<section class="panel-section"><h3>${esc(g.label)}</h3><div class="pick-list">${g.list.map(s =>
@@ -120,20 +121,42 @@
   }
 
   // -------- TURNING THE MUSIC INTO TRACKS --------
-  // An ostinato: one pass of hits, in its own beats, and how it is counted.
+  /* An ostinato: one pass of hits, in its own beats, and how it is counted.
+     One in sections offers each way through it as a `part` — its
+     arrangement, every section in turn, or one section alone — and starts
+     on the one it is set to play: a Looped ostinato goes round one section,
+     so that one, alone. */
   function readOstinato(bridge, id) {
     const info = bridge.openLibrarySong(id);
     if (!info) return null;
-    const tl = bridge.timeline();
     const snap = bridge.snapshot();
     const volumes = (snap.tracks || []).map(t => (typeof t.volume === 'number' && isFinite(t.volume) ? t.volume : 1));
     const muted = (info.voices || []).map(v => !!v.muted);
-    const hits = tl.notes
-      .filter(n => !muted[n.voice] && info.voices[n.voice])
-      .map(n => ({ i: info.voices[n.voice].instrument, b: n.tick / tl.beatTicks, g: volumes[n.voice] == null ? 1 : volumes[n.voice], r: n.gapTicks / tl.beatTicks }));
+    const read = opts => {
+      const tl = bridge.timeline(opts);
+      return {
+        beats: tl.totalBeats,
+        hits: tl.notes
+          .filter(n => !muted[n.voice] && info.voices[n.voice])
+          .map(n => ({ i: info.voices[n.voice].instrument, b: n.tick / tl.beatTicks, g: volumes[n.voice] == null ? 1 : volumes[n.voice], r: n.gapTicks / tl.beatTicks }))
+      };
+    };
+    const sec = info.sections;
+    const parts = [];
+    if (sec) {
+      const steps = order => order.map(([s, x]) => (s + 1) + (x > 1 ? ' ×' + x : '')).join(' › ');
+      if (sec.mode === 'arranged') parts.push(Object.assign({ key: 'arranged', label: 'Its arrangement: ' + steps(sec.order) }, read({ play: 'arranged' })));
+      parts.push(Object.assign({ key: 'continuous', label: 'Every section in turn: ' + steps(sec.bars.map((_, k) => [k, 1])) }, read({ play: 'continuous' })));
+      sec.bars.forEach((_, k) => parts.push(Object.assign({ key: 's' + k, label: 'Section ' + (k + 1) + ' alone' }, read({ section: k }))));
+    } else {
+      parts.push(Object.assign({ key: 'all', label: '' }, read()));
+    }
+    const start = !sec ? 'all' : sec.mode === 'loop' ? 's' + sec.current : sec.mode;
+    const part = parts.find(p => p.key === start) || parts[0];
     return {
       id, title: info.title, meter: info.meter.join('/'), bpm: info.bpm,
-      beats: tl.totalBeats, hits, instruments: (info.voices || []).filter((v, i) => !muted[i]).map(v => v.label)
+      beats: part.beats, hits: part.hits, parts, part: part.key,
+      instruments: (info.voices || []).filter((v, i) => !muted[i]).map(v => v.label)
     };
   }
   function readSong(bridge, id) {
@@ -155,7 +178,11 @@
     const sameTime = m.meter === P.meter;
     const known = !!Studio.METERS[m.meter];
     const bpb = Studio.barBeats();
-    const passBars = key === 'ostinato' ? m.beats / (Studio.METERS[m.meter] || bpb) : 0;
+    const barsOfPass = () => key === 'ostinato' ? m.beats / (Studio.METERS[m.meter] || bpb) : 0;
+    const describe = () => [m.meter, m.bpm + ' bpm', key === 'ostinato'
+      ? (barsOfPass() === 1 ? 'one bar' : barsOfPass() + ' bars') + ' · ' + m.instruments.join(', ') : ''].filter(Boolean).join(' · ');
+    const passBars = barsOfPass();
+    const choosePart = key === 'ostinato' && m.parts && m.parts.length > 1;
     const hasMelody = key === 'song' && m.melody && m.melody.length > 0;
     const hasChords = key === 'song' && m.chords && m.chords.length > 0;
     title.textContent = m.title || 'Untitled';
@@ -163,7 +190,9 @@
       <button class="link-btn back-link" type="button">‹ ${esc(app.name)}</button>
       <section class="panel-section">
         <h3>How it comes in</h3>
-        <p class="panel-note">${esc([m.meter, m.bpm + ' bpm', key === 'ostinato' ? (passBars === 1 ? 'one bar' : passBars + ' bars') + ' · ' + m.instruments.join(', ') : ''].filter(Boolean).join(' · '))}</p>
+        <p class="panel-note" id="bi-what">${esc(describe())}</p>
+        ${choosePart ? `<label class="opt opt-part"><span>Which part</span><select class="select" id="bi-part">${m.parts.map(p =>
+          `<option value="${esc(p.key)}"${p.key === m.part ? ' selected' : ''}>${esc(p.label)}</option>`).join('')}</select></label>` : ''}
         <div class="opt-grid">
           <label class="opt"><span>Starts at bar</span><input class="num-field" type="number" id="bi-bar" min="1" max="999" value="1"></label>
           ${key === 'ostinato' ? `<label class="opt"><span>Plays</span><span class="opt-inline"><input class="num-field" type="number" id="bi-times" min="1" max="64" value="${Math.max(1, Math.min(64, Math.round(8 / Math.max(1, passBars))))}"> times</span></label>` : ''}
@@ -190,6 +219,17 @@
     };
     timeBox.addEventListener('change', renderNote);
     renderNote();
+    /* An ostinato in sections: the part chosen is the pass that is repeated. */
+    if (choosePart) {
+      el('bi-part').addEventListener('change', () => {
+        const p = m.parts.find(x => x.key === el('bi-part').value);
+        if (!p) return;
+        m.part = p.key;
+        m.beats = p.beats;
+        m.hits = p.hits;
+        el('bi-what').textContent = describe();
+      });
+    }
     el('bi-go').addEventListener('click', () => {
       const useTime = timeBox.checked;
       const meter = useTime ? m.meter : P.meter;

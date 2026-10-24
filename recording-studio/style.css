@@ -315,6 +315,22 @@ kbd {
 .vp-timing { font-size: 13px; font-weight: 700; color: var(--text-2); }
 .vp-timing .link-btn { display: inline; }
 .vp-cal-msg:empty { display: none; }
+.vp-target { position: absolute; top: 0; bottom: 0; left: 70%; width: 20%; background: rgba(45, 184, 106, 0.22); }   /* −18 to −6 dBFS: aim here */
+.vp-advice { margin: -4px 0 0; font-size: 13px; font-weight: 700; line-height: 1.45; color: var(--danger); }
+.vp-advice:empty { display: none; }
+.vp-audit { margin: 0; padding: 8px 12px 8px 28px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); font-size: 13px; font-weight: 700; line-height: 1.45; color: var(--text); }
+.vp-audit li + li { margin-top: 4px; }
+.vp-check { border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; background: var(--surface); }
+.vp-check summary { cursor: pointer; padding: 9px 0; font-size: 13px; font-weight: 800; color: var(--text-2); list-style: none; display: flex; align-items: center; gap: 8px; }
+.vp-check summary::-webkit-details-marker { display: none; }
+.vp-check summary::before { content: ''; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform 0.15s; margin-left: 2px; }
+.vp-check[open] summary::before { transform: rotate(45deg); }
+.vp-check[open] { padding-bottom: 12px; }
+.vp-check > :not(summary) { margin-top: 8px; }
+.vp-dl { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 4px 10px; margin: 0; font-size: 13px; line-height: 1.4; }
+.vp-dl dt { font-weight: 800; color: var(--text-3); }
+.vp-dl dd { margin: 0; font-weight: 700; color: var(--text-2); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.vp-spec { display: block; width: 100%; height: 96px; border-radius: 8px; background: var(--bg-2); box-shadow: inset 0 0 0 1px var(--line); }
 @media (max-width: 640px) { .vp-grid { grid-template-columns: 1fr; } .vp-level { width: 120px; } }
 
 /* frames lending a song; laid out (never display:none) but out of sight */
@@ -448,6 +464,9 @@ kbd {
 .opt-grid { display: flex; flex-wrap: wrap; gap: 10px 20px; }
 .opt { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; color: var(--text-2); }
 .opt-inline { display: inline-flex; align-items: center; gap: 6px; }
+/* an ostinato in sections: which way through it comes in */
+.opt-part { margin: 0 0 12px; }
+.opt-part .select { flex: 1; min-width: 0; }
 .num-field { width: 70px; height: 34px; padding: 0 8px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--surface); font-weight: 800; text-align: center; }
 .opt-checks { display: flex; flex-direction: column; gap: 6px; }
 .check { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; }

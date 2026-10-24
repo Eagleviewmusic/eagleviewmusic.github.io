@@ -261,7 +261,12 @@
     timeSignatureNumerator: 4,
     timeSignatureDenominator: 4,
     measures: 1,
-    tracks: []
+    tracks: [],
+    /* SECTIONS: which one is on screen, how many bars each runs, and how
+       they follow one another when it plays */
+    section: 0,
+    sectionBars: [1],
+    play: defaultPlay()
   };
 
   /* The Sound popover. None of it is saved — as in Rhythm Poetry, it is
@@ -314,7 +319,9 @@
     }
   }
 
-  function conformAllTracks() { song.tracks.forEach(conformTrack); }
+  function conformAllTracks() {
+    song.tracks.forEach(track => { ensureParts(track); conformTrack(track); });
+  }
 
 
   /* ==================================================================
@@ -471,6 +478,153 @@
 
 
   /* ==================================================================
+     SECTIONS
+     ------------------------------------------------------------------
+     A piece can have up to four sections — an A and a B, a verse and a
+     chorus — each up to sixteen bars long. They share everything that
+     says what the piece is played on and how fast: the instruments, with
+     their mutes and volumes, the meter and the tempo. What a section has
+     of its own is its music: every line's beats, joins and words, and
+     how many bars it runs.
+
+     The section on screen lives where a piece has always kept its music
+     — song.measures, and each track's beats, links and words — and the
+     others wait in track.parts[k]. So the grid, the editing, the engraver
+     and the playing of one pass know nothing about sections at all.
+     stashSection() writes the one on screen back into its part before
+     anything reads across sections; loadSection() brings one forward.
+
+     How the sections follow one another when Play is pressed (View →
+     While it plays) belongs to the piece too, and is saved with it:
+       loop        the section on screen repeats until another is chosen
+       continuous  each section in turn, from the one on screen
+       arranged    a set order — 1 ×3, 2 ×1, 1 ×3 — from the top
+     ================================================================== */
+
+  const MAX_SECTIONS = 4;
+  const PLAY_MODES = ['loop', 'continuous', 'arranged'];
+  const ORDER_STEPS_MAX = 24;   // steps in an arrangement
+  const STEP_TIMES_MAX = 16;    // times one step may play before the next
+
+  /* Looped, because that is how the app has always played: a second
+     section added while the first is being built must not start the
+     screen jumping between them the next time Play is pressed. */
+  function defaultPlay() { return { mode: 'loop', order: [], end: 'repeat' }; }
+
+  function sectionCount() { return song.sectionBars.length; }
+
+  // with one section there is nothing to follow on to
+  function playMode() { return sectionCount() > 1 ? song.play.mode : 'loop'; }
+
+  function emptyPart() { return { beats: [], links: {} }; }
+
+  function copyPart(part) {
+    const out = {
+      beats: (part.beats || []).map(b => ({ slots: b.slots, cells: b.cells.slice() })),
+      links: Object.assign({}, part.links)
+    };
+    if (part.words && part.words.some(Boolean)) out.words = part.words.slice();
+    return out;
+  }
+
+  /* A track added since the piece was opened has no parts yet; it gets an
+     empty one for every section, filled out by conformTrack when shown. */
+  function ensureParts(track) {
+    if (!Array.isArray(track.parts)) track.parts = [];
+    const n = sectionCount();
+    while (track.parts.length < n) track.parts.push(emptyPart());
+    if (track.parts.length > n) track.parts.length = n;
+  }
+
+  function stashSection() {
+    const k = song.section;
+    song.sectionBars[k] = song.measures;
+    song.tracks.forEach(t => {
+      ensureParts(t);
+      const part = { beats: t.beats, links: t.links || {} };
+      if (t.words) part.words = t.words;
+      t.parts[k] = part;
+    });
+  }
+
+  /* Bring section k on screen. stashSection() first, unless the one on
+     screen is being thrown away. */
+  function loadSection(k) {
+    song.section = k;
+    song.measures = song.sectionBars[k];
+    song.tracks.forEach(t => {
+      ensureParts(t);
+      const part = t.parts[k] || emptyPart();
+      t.beats = part.beats;
+      t.links = part.links || {};
+      if (part.words && part.words.length) t.words = part.words; else delete t.words;
+    });
+  }
+
+  /* Run `fn` as though section k were on screen, and put the one that is
+     back afterwards — how playback reads a section it is about to play. */
+  function withSection(k, fn) {
+    if (k === song.section) { conformAllTracks(); return fn(); }
+    const was = song.section;
+    stashSection();
+    loadSection(k);
+    try {
+      conformAllTracks();
+      return fn();
+    } finally {
+      stashSection();
+      loadSection(was);
+    }
+  }
+
+  function sectionHasNotes(k) {
+    stashSection();
+    return song.tracks.some(t => t.parts[k] && t.parts[k].beats.some(b => b.cells.some(Boolean)));
+  }
+
+  /* The order an arrangement plays, as [section, times] steps. Steps for a
+     section that is gone are dropped, and an empty order is every section
+     once, in turn — so Arranged always has something to play. */
+  function arrangement() {
+    const n = sectionCount();
+    const order = song.play.order.filter(st => st[0] < n);
+    return order.length ? order : song.sectionBars.map((_, k) => [k, 1]);
+  }
+
+  /* Two steps side by side for the same section are one step played more
+     times — which is what lets the order be built by tapping. */
+  function mergeSteps(order) {
+    const out = [];
+    order.forEach(([s, x]) => {
+      const last = out[out.length - 1];
+      if (last && last[0] === s) last[1] = Math.min(STEP_TIMES_MAX, last[1] + x);
+      else out.push([s, x]);
+    });
+    return out;
+  }
+
+  /* From storage, a file or a link (normalizeSong): the bar counts and
+     the way it plays. Null for a piece of one section, which is saved and
+     keyed exactly as it was before there were sections. */
+  function normalizeSectionInfo(raw, measures) {
+    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.bars) || raw.bars.length < 2) return null;
+    const bars = raw.bars.slice(0, MAX_SECTIONS)
+      .map(b => Math.max(1, Math.min(MAX_MEASURES, Math.round(Number(b) || 1))));
+    bars[0] = measures;   // the first section's length is the piece's `measures`, as ever
+    const n = bars.length;
+    const order = (Array.isArray(raw.order) ? raw.order : []).slice(0, ORDER_STEPS_MAX)
+      .filter(st => Array.isArray(st) && Number.isInteger(st[0]) && st[0] >= 0 && st[0] < n)
+      .map(st => [st[0], Math.max(1, Math.min(STEP_TIMES_MAX, Math.round(Number(st[1]) || 1)))]);
+    return {
+      bars: bars,
+      play: PLAY_MODES.indexOf(raw.play) !== -1 ? raw.play : 'loop',
+      order: mergeSteps(order),
+      end: raw.end === 'stop' ? 'stop' : 'repeat'
+    };
+  }
+
+
+  /* ==================================================================
      THE LIBRARY
      ------------------------------------------------------------------
      Every ostinato the user has, kept in localStorage. The one on screen
@@ -511,26 +665,21 @@
 
     const measures = Math.max(1, Math.min(MAX_MEASURES, Math.round(Number(src.measures) || 1)));
     const bpm = Math.max(BPM_MIN, Math.min(BPM_MAX, Math.round(Number(src.bpm) || 92)));
+    const sections = normalizeSectionInfo(src.sections, measures);
 
     const tracks = (Array.isArray(src.tracks) ? src.tracks : []).slice(0, MAX_TRACKS).map(t => {
       const source = t && typeof t === 'object' ? t : {};
       const instrument = VI.INSTRUMENT_MAP[source.instrument] ? source.instrument : VI.INSTRUMENT_IDS[0];
-      const beats = (Array.isArray(source.beats) ? source.beats : []).map(b => {
-        const slots = Math.max(1, Math.min(12, Math.round(Number(b && b.slots) || 2)));
-        const cells = Array.isArray(b && b.cells) ? b.cells : [];
-        return makeBeat(slots, cells);
-      });
-      const links = {};
-      if (source.links && typeof source.links === 'object') {
-        Object.keys(source.links).forEach(k => { if (source.links[k]) links[k] = true; });
-      }
-      const out = { id: nextTrackId++, instrument: instrument, muted: !!source.muted,
-                    beats: beats, links: links };
-      // absent unless the line has some — a piece without them keys and saves as it always did
-      const words = normalizeWords(source.words);
-      if (words.length) out.words = words;
+      const out = Object.assign({ id: nextTrackId++, instrument: instrument, muted: !!source.muted },
+                                normalizePart(source));
       const volume = trackVolume(source);
       if (volume !== 1) out.volume = Math.round(volume * 100) / 100;
+      /* The line's music in sections 2, 3 and 4. Section 1 is the beats,
+         links and words above, where a piece has always kept them. */
+      if (sections) {
+        const more = Array.isArray(source.sections) ? source.sections : [];
+        out.sections = sections.bars.slice(1).map((_, i) => normalizePart(more[i]));
+      }
       return out;
     });
 
@@ -545,6 +694,7 @@
       measures: measures,
       tracks: tracks
     };
+    if (sections) out.sections = sections;
     // updatedAt, received, receivedAt, derivedFrom — see lib/evm-library.js
     EVM.carry(src, out);
     // the Layout Settings it was saved with (A PIECE'S OWN LAYOUT)
@@ -552,6 +702,26 @@
     // how the sender had it spoken — syllables and words (A PIECE'S OWN LAYOUT)
     const show = speechShowFrom(src.show);
     if (show) out.show = show;
+    return out;
+  }
+
+  /* One line's music in one section: its beats, its joins, and its words
+     — the words absent unless it has some, so a piece without them keys
+     and saves as it always did. */
+  function normalizePart(raw) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const beats = (Array.isArray(source.beats) ? source.beats : []).map(b => {
+      const slots = Math.max(1, Math.min(12, Math.round(Number(b && b.slots) || 2)));
+      const cells = Array.isArray(b && b.cells) ? b.cells : [];
+      return makeBeat(slots, cells);
+    });
+    const links = {};
+    if (source.links && typeof source.links === 'object') {
+      Object.keys(source.links).forEach(k => { if (source.links[k]) links[k] = true; });
+    }
+    const out = { beats: beats, links: links };
+    const words = normalizeWords(source.words);
+    if (words.length) out.words = words;
     return out;
   }
 
@@ -601,9 +771,10 @@
     const compound = n.timeSignatureDenominator === 8;
     const plain = compound ? 3 : 2;
     const allowed = compound ? [3, 6, 2, 4] : [2, 4, 3, 6];
-    const want = n.measures * (compound ? n.timeSignatureNumerator / 3 : n.timeSignatureNumerator);
-    n.tracks = n.tracks.map(t => {
-      const beats = t.beats.map((b, i) => (i < want && allowed.indexOf(b.slots) === -1)
+    const perBar = compound ? n.timeSignatureNumerator / 3 : n.timeSignatureNumerator;
+    const keyBeats = (list, bars) => {
+      const want = bars * perBar;
+      const beats = list.map((b, i) => (i < want && allowed.indexOf(b.slots) === -1)
         ? { slots: plain, cells: Array.from({ length: plain }, (_, k) => !!b.cells[k]) }
         : { slots: b.slots, cells: b.cells.slice() });
       while (beats.length) {
@@ -611,20 +782,31 @@
         if (last.slots !== plain || last.cells.some(Boolean)) break;
         beats.pop();
       }
+      return beats;
+    };
+    n.tracks = n.tracks.map(t => {
       // a track's id is a counter for this page load, not part of the piece
-      const key = { instrument: t.instrument, muted: t.muted, beats: beats, links: t.links };
+      const key = { instrument: t.instrument, muted: t.muted, beats: keyBeats(t.beats, n.measures), links: t.links };
       // what a line says, and how loud, are the piece — but only once there are any
       if (t.words) key.words = t.words;
       if (t.volume !== undefined) key.volume = t.volume;
+      // the same, for each section after the first (SECTIONS)
+      if (t.sections) {
+        key.sections = t.sections.map((p, i) => {
+          const part = { beats: keyBeats(p.beats, n.sections.bars[i + 1]), links: p.links };
+          if (p.words) part.words = p.words;
+          return part;
+        });
+      }
       return key;
     });
     return EVM.stableStringify(n);
   }
 
-  // Blank: not a single cell turned on, in any beat of any track.
+  // Blank: not a single cell turned on, in any beat of any track, in any section.
   function isBlankSong(n) {
-    return !(n.tracks || []).some(t =>
-      (t.beats || []).some(b => (b.cells || []).some(Boolean)));
+    const sounds = part => (part.beats || []).some(b => (b.cells || []).some(Boolean));
+    return !(n.tracks || []).some(t => sounds(t) || (t.sections || []).some(sounds));
   }
 
   /* Ids an import must never take. The sandbox is scratch work; a lesson
@@ -691,29 +873,38 @@
   }
 
   /* What gets written down: a deep copy, so later edits on screen cannot
-     reach back into a record already saved. */
+     reach back into a record already saved. The whole piece, whichever
+     section is on screen: section 1 where a piece has always kept its
+     music, the rest beside it (SECTIONS). */
   function snapshot() {
-    return {
+    stashSection();
+    const many = sectionCount() > 1;
+    const out = {
       id: song.id,
       title: song.title || 'Untitled ostinato',
       bpm: song.bpm,
       timeSignatureNumerator: song.timeSignatureNumerator,
       timeSignatureDenominator: song.timeSignatureDenominator,
-      measures: song.measures,
+      measures: song.sectionBars[0],
       tracks: song.tracks.map(t => {
-        const out = {
-          instrument: t.instrument,
-          muted: !!t.muted,
-          beats: t.beats.map(b => ({ slots: b.slots, cells: b.cells.slice() })),
-          links: Object.assign({}, t.links)
-        };
-        if (trackHasWords(t)) out.words = t.words.slice();
+        const out = Object.assign({ instrument: t.instrument, muted: !!t.muted }, copyPart(t.parts[0]));
         if (trackVolume(t) !== 1) out.volume = trackVolume(t);
+        if (many) out.sections = t.parts.slice(1).map(copyPart);
         return out;
       })
     };
+    if (many) {
+      out.sections = {
+        bars: song.sectionBars.slice(),
+        play: song.play.mode,
+        order: song.play.order.map(st => st.slice()),
+        end: song.play.end
+      };
+    }
+    return out;
   }
 
+  /* A normalized record on to the screen, at its first section. */
   function adoptSong(record) {
     song.id = record.id;
     song.title = record.title;
@@ -722,6 +913,17 @@
     song.timeSignatureDenominator = record.timeSignatureDenominator;
     song.measures = record.measures;
     song.tracks = record.tracks;
+    const sec = record.sections;
+    song.section = 0;
+    song.sectionBars = sec ? sec.bars.slice() : [record.measures];
+    song.play = sec ? { mode: sec.play, order: sec.order.map(st => st.slice()), end: sec.end } : defaultPlay();
+    song.tracks.forEach(t => {
+      const first = { beats: t.beats, links: t.links };
+      if (t.words) first.words = t.words;
+      t.parts = [first].concat(t.sections || []);
+      delete t.sections;
+    });
+    queuedSection = -1;
   }
 
   /* ------------------------------------------------------------------
@@ -2266,8 +2468,23 @@
   let countTimers = [];     // the count-in's own; an edit mid-count leaves them be
   let playToken = 0;        // a start still getting ready is dropped if this moves
   let started = false;      // the loop is laid down (false while getting ready)
-  let playAnchor = 0;       // audio time of tick 0 of the first pass
   let handedUntil = 0;      // the latest moment a sound has been handed over for
+
+  /* The music is played a pass at a time, one pass being one time through
+     one section: { section, start, ticks, step, rep } — `start` the audio
+     time of its first tick, `step` and `rep` where it stands in an
+     arrangement. The next pass is decided and laid down a moment before
+     this one ends (SECTIONS says how they follow one another). */
+  let pass = null;
+  let nextPass = null;
+  /* A section chosen while the music plays: it takes over when the pass
+     sounding now reaches its end, never in the middle of a bar. */
+  let queuedSection = -1;
+  /* A pass that brings another section on screen redraws the page as it
+     begins, and a big score can hold the page up for longer than
+     LOOKAHEAD. The opening of such a pass is handed over this far ahead,
+     before the redraw, so its first notes cannot be made late by it. */
+  const SWITCH_LEAD = 0.75;
 
   /* The seconds-per-tick the schedule now in flight was built with.
      Kept apart from tickMs() because an edit changes that the instant it is
@@ -2356,30 +2573,123 @@
     }
   }
 
+  /* One section's timeline and length, read whether or not it is the
+     one on screen. */
+  function passMusic(section) {
+    return withSection(section, () => ({ events: buildTimeline(), ticks: totalTicks() }));
+  }
+
   /* `notBefore` is only passed when picking the music up where it is:
      everything already handed over is skipped and the rest keeps its
      place. It is an absolute time, so it rides along to the next pass
      too — an edit made in the last moment of a pass may already have
      handed over the start of the next. */
-  function scheduleLoop(iteration, events, loopSec, notBefore) {
-    const base = playAnchor + iteration * loopSec;
+  function schedulePass(p, events, notBefore) {
     const now = audioNow();
+    const lead = p.section !== song.section ? SWITCH_LEAD : 0;
 
     events.forEach(ev => {
-      const due = base + ev.tick * liveTickSec;
-      if (ev.kind === 'beat' && due >= now) whenHeard(playTimers, due, () => highlightBeat(ev.beat));
+      const due = p.start + ev.tick * liveTickSec;
+      if (ev.kind === 'beat' && due >= now) whenHeard(playTimers, due, () => lightPass(p, ev.beat));
       if (notBefore != null && due <= notBefore) return;
-      handOver(playTimers, due, () => fireEvent(ev, due));
+      handOver(playTimers, due < p.start + lead ? due - lead : due, () => fireEvent(ev, due));
     });
 
-    // lay the next pass down well before it is due
-    handOver(playTimers, base + loopSec - 0.2,
-      () => { if (isPlaying) scheduleLoop(iteration + 1, events, loopSec, notBefore); });
+    // decide on the next pass, and lay it down, well before it is due
+    const end = p.start + p.ticks * liveTickSec;
+    handOver(playTimers, end - 0.2, () => { if (isPlaying) layNextPass(p, end, notBefore); });
+  }
+
+  function layNextPass(p, end, notBefore) {
+    const next = followingPass(p);
+    if (!next) {
+      // the end of the piece, with Stop chosen for it
+      whenHeard(playTimers, end, () => { if (isPlaying) stopPlayback(); });
+      return;
+    }
+    const music = passMusic(next.section);
+    nextPass = Object.assign(next, { start: end, ticks: music.ticks });
+    schedulePass(nextPass, music.events, notBefore);
+  }
+
+  /* A beat is heard. The first one heard of a new pass makes it the pass
+     sounding now, and brings its section on screen if it is not already. */
+  function lightPass(p, beat) {
+    if (!isPlaying) return;
+    if (p !== pass) {
+      pass = p;
+      if (nextPass === p) nextPass = null;
+      if (queuedSection === p.section) queuedSection = -1;
+    }
+    if (p.section !== song.section) {
+      clearHighlights();
+      showSection(p.section);
+    }
+    highlightBeat(beat);
+    updateSectionPicker();
+  }
+
+  /* Where a pass begins: the section on screen, or the top of the order. */
+  function firstPass() {
+    if (playMode() === 'arranged') return { section: arrangement()[0][0], step: 0, rep: 1 };
+    return { section: song.section, step: null, rep: 1 };
+  }
+
+  /* What plays after pass `p` — null when the piece is over. Read a
+     moment before `p` ends, so a section chosen, a mode changed or an
+     order edited while it plays is taken up at the next bar line that
+     ends a section. */
+  function followingPass(p) {
+    const n = sectionCount();
+    const mode = playMode();
+    const q = queuedSection >= 0 && queuedSection < n ? queuedSection : -1;
+
+    if (mode === 'loop') return { section: q >= 0 ? q : Math.min(p.section, n - 1), step: null, rep: 1 };
+
+    if (mode === 'continuous') {
+      if (q >= 0) return { section: q, step: null, rep: 1 };
+      if (p.section + 1 < n) return { section: p.section + 1, step: null, rep: 1 };
+      return song.play.end === 'stop' ? null : { section: 0, step: null, rep: 1 };
+    }
+
+    const order = arrangement();
+    let step = p.step, rep = p.rep;
+    /* A pass the order does not account for — Arranged chosen only now, or
+       the order edited under it — is picked up at that section's first
+       step; one not in the order at all starts the order from the top.
+       A section chosen by hand and played as an extra (below) is where it
+       is on purpose, so it is left be. */
+    if (!(step != null && step < order.length && (p.extra || order[step][0] === p.section))) {
+      step = order.findIndex(st => st[0] === p.section);
+      rep = 1;
+      if (step === -1) { step = 0; rep = 0; }
+    }
+    /* Chosen by hand: on to the next step that plays it. One the order
+       never plays is played once, and the order carries on from where it
+       was. */
+    if (q >= 0) {
+      for (let i = 1; i <= order.length; i++) {
+        const j = (step + i) % order.length;
+        if (order[j][0] === q) return { section: q, step: j, rep: 1 };
+      }
+      return { section: q, step: step, rep: rep, extra: true };
+    }
+    rep++;
+    if (rep > order[step][1]) { step++; rep = 1; }
+    if (step >= order.length) {
+      if (song.play.end === 'stop') return null;
+      step = 0;
+    }
+    return { section: order[step][0], step: step, rep: rep };
   }
 
   async function startPlayback() {
     unlockAudio();
     stopPlayback();
+    /* An arrangement starts from the top, whichever section is on screen,
+       and the room should see it before the count begins. */
+    const first = firstPass();
+    if (first.section !== song.section) showSection(first.section);
     if (!totalTicks() || !tickMs()) return;
     const token = playToken;
     isPlaying = true;
@@ -2402,14 +2712,17 @@
 
     /* Built now rather than before the wait, so an edit made while it
        was getting ready is in it. */
-    const events = buildTimeline();
+    const music = passMusic(song.section);
     liveTickSec = tickMs() / 1000;
     let t = audioNow() + START_GAP;
     if (count) t = scheduleCountIn(t, beatTicks() * liveTickSec, count);
-    playAnchor = t;
     handedUntil = 0;
     started = true;
-    scheduleLoop(0, events, totalTicks() * liveTickSec);
+    queuedSection = -1;
+    pass = Object.assign(first, { section: song.section, start: t, ticks: music.ticks });
+    nextPass = null;
+    schedulePass(pass, music.events);
+    updateSectionPicker();
   }
 
   function countInBeats() { return EVMCountIn.beats(beatsPerMeasure()); }
@@ -2443,36 +2756,48 @@
      The position is read in ticks rather than seconds, which is what
      lets a tempo change take effect from where the music is rather than
      dragging the beat sideways, and lets a piece that just got shorter wrap
-     into itself rather than run off the end. */
+     into itself rather than run off the end.
+
+     Only the pass sounding now is laid again; the one after it is decided
+     afresh a moment before it is due, as it always is. */
   function resyncPlayback() {
-    if (!isPlaying || !started) return;   // still getting ready: the start reads the song afresh
+    if (!isPlaying || !started || !pass) return;   // still getting ready: the start reads the song afresh
 
     const now = audioNow();
-    const newLoopTicks = totalTicks();
     const newTickSec = tickMs() / 1000;
-    if (!newLoopTicks || !newTickSec) { stopPlayback(); return; }
+    if (!totalTicks() || !newTickSec) { stopPlayback(); return; }
 
     playTimers.forEach(clearTimeout);
     playTimers = [];
 
+    // the next pass, if it has begun on the clock but not yet been heard
+    const cur = (nextPass && now >= nextPass.start) ? nextPass : pass;
+    cur.section = Math.min(cur.section, sectionCount() - 1);
+    pass = cur;
+    nextPass = null;
+    const music = passMusic(cur.section);
+    if (!music.ticks) { stopPlayback(); return; }
+
     /* Still counting in: bar 1 has not begun, so there is no place to
-       keep — the loop is laid again from where it was always going to
+       keep — the pass is laid again from where it was always going to
        start, and the count carries on. */
-    if (now < playAnchor) {
+    if (now < cur.start) {
       liveTickSec = newTickSec;
-      scheduleLoop(0, buildTimeline(), newLoopTicks * newTickSec, handedUntil);
+      cur.ticks = music.ticks;
+      schedulePass(cur, music.events, handedUntil);
       return;
     }
 
     /* where we are, measured against the tempo the running schedule used */
-    let tick = liveTickSec > 0 ? (now - playAnchor) / liveTickSec : 0;
+    let tick = liveTickSec > 0 ? (now - cur.start) / liveTickSec : 0;
     if (!isFinite(tick) || tick < 0) tick = 0;
-    tick = tick % newLoopTicks;          // the piece may have changed length
+    tick = tick % music.ticks;           // the section may have changed length
 
     liveTickSec = newTickSec;
-    playAnchor = now - tick * newTickSec; // tick 0 of the pass we are inside
+    cur.start = now - tick * newTickSec; // tick 0 of the pass we are inside
+    cur.ticks = music.ticks;
 
-    scheduleLoop(0, buildTimeline(), newLoopTicks * newTickSec, handedUntil);
+    schedulePass(cur, music.events, handedUntil);
   }
 
   function stopPlayback() {
@@ -2485,8 +2810,12 @@
     EVMCountIn.close();
     isPlaying = false;
     liveTickSec = 0;
+    pass = null;
+    nextPass = null;
+    queuedSection = -1;
     clearHighlights();
     setPlayGlyph('▶', false);
+    updateSectionPicker();
   }
 
   function togglePlayback() {
@@ -2751,6 +3080,16 @@
 
     const head = document.createElement('div');
     head.className = 'ruler-head';
+    /* Which section this is, in the corner over the instruments — empty
+       space until now, and the one place a room reading the board can
+       see it without anything else being added (SECTIONS). Once, over
+       the first line. */
+    if (sectionCount() > 1 && from === 0) {
+      const label = document.createElement('span');
+      label.className = 'ruler-section';
+      label.textContent = 'Section ' + (song.section + 1);
+      head.appendChild(label);
+    }
     row.appendChild(head);
 
     const body = document.createElement('div');
@@ -3397,13 +3736,38 @@
       row.title = 'Double-click a syllable to change it';
       row.addEventListener('dblclick', e => {
         if (document.body.classList.contains('present-mode')) return;
+        if (performance.now() - wordTapAt < 600) return;     // a double tap opened it already
         const cell = e.target.closest('[data-note]');
         if (!cell) return;
         e.preventDefault();
         startWordEdit(track, Number(cell.dataset.note));
       });
+      row.addEventListener('pointerup', e => onSpeechTap(e, track));
     }
     return row;
+  }
+
+  /* A double tap on a syllable, for a finger or a pen. An iPad sends no
+     dblclick for touches (Song Writer 2.0 found the same), so two taps on
+     the same note, close in time and place, open its word here — inside
+     the tap itself, so a tablet brings its keyboard up. The mouse keeps
+     the real dblclick, and a dblclick the browser sends as well is not
+     acted on twice. */
+  let lastWordTap = null;   // { track, note, t, x, y }
+  let wordTapAt = 0;        // when a double tap last opened a word
+  function onSpeechTap(e, track) {
+    if (e.pointerType === 'mouse' || document.body.classList.contains('present-mode')) return;
+    const cell = e.target.closest('[data-note]');
+    if (!cell) { lastWordTap = null; return; }
+    const note = Number(cell.dataset.note), now = performance.now(), t = lastWordTap;
+    if (t && t.track === track && t.note === note && now - t.t < 420 && Math.hypot(e.clientX - t.x, e.clientY - t.y) < 28) {
+      lastWordTap = null;
+      wordTapAt = now;
+      e.preventDefault();
+      startWordEdit(track, note);
+    } else {
+      lastWordTap = { track, note, t: now, x: e.clientX, y: e.clientY };
+    }
   }
 
   /* Words are written wherever the rhythm is: a lesson that has fixed the
@@ -4548,12 +4912,18 @@
      A remainder is possible when the beat itself does not divide — eight
      beats need three bars of 3/4, and the ninth comes up empty — but no
      beat is ever cut, and the round trip that matters, 4/4 to 6/8 and
-     back, is exact. */
+     back, is exact.
+
+     Every section is re-barred the same way, the ones off screen too:
+     the meter belongs to the whole piece (SECTIONS). */
   function changeMeter(apply) {
-    const held = totalBeats();
+    stashSection();
+    const held = song.sectionBars.map(bars => bars * beatsPerMeasure());
     apply();
-    const need = Math.ceil(held / beatsPerMeasure());
-    song.measures = Math.max(1, Math.min(maxMeasuresAllowed(), need));
+    const needs = held.map(beats => Math.ceil(beats / beatsPerMeasure()));
+    song.sectionBars = needs.map(need => Math.max(1, Math.min(maxMeasuresAllowed(), need)));
+    song.measures = song.sectionBars[song.section];
+    const need = Math.max.apply(null, needs);
 
     updateMeterDisplay();
     updateMeasureDisplay();
@@ -4562,7 +4932,7 @@
     render();
     syncSettings();
 
-    /* Eight bars is the ceiling, so a long piece in a meter that counts
+    /* Sixteen bars is the ceiling, so a long piece in a meter that counts
        fewer beats to the bar can run past the end. Nothing is lost — the
        surplus beats are waiting, not deleted — but say so. */
     if (need > maxMeasuresAllowed()) {
@@ -4578,7 +4948,7 @@
   const measuresMinus = document.getElementById('measures-minus');
   const measuresPlus  = document.getElementById('measures-plus');
   const measureStepper = document.getElementById('measure-stepper');
-  const MAX_MEASURES = 8;
+  const MAX_MEASURES = 16;   // in each section (SECTIONS)
 
   /* Disabled and absent mean different things here, and both are used.
      A greyed − at one bar is the length of the piece talking: there is
@@ -4614,6 +4984,188 @@
     render();
     syncSettings();
   }
+
+  /* ---- sections ----
+     The picker sits beside View: a numbered button for each section, and
+     a + for another. With only one there is nothing to pick between, so
+     it is the + alone, named. What a section is, and how they follow one
+     another, is in SECTIONS.
+
+     Adding or taking away a section is a change of length, so it asks
+     what the bar counter asks; looking at one is reading, and is always
+     allowed. */
+  const SECTION_MARK = '<svg class="section-mark" viewBox="0 0 24 24" aria-hidden="true">'
+    + '<rect x="2.5" y="5" width="8" height="14" rx="2"/><rect x="13.5" y="5" width="8" height="14" rx="2"/></svg>';
+
+  function canAddSections()    { return canAddMeasures() && sectionCount() < MAX_SECTIONS; }
+  function canRemoveSections() { return canRemoveMeasures() && sectionCount() > 1; }
+
+  function barsWord(n) { return n === 1 ? '1 bar' : n + ' bars'; }
+
+  /* Looked up each time rather than held: the music stopping calls this,
+     and must be able to before this part of the file has run. */
+  function updateSectionPicker() {
+    const picker = document.getElementById('section-picker');
+    const present = document.getElementById('present-sections');
+    if (!picker) return;
+    const n = sectionCount();
+    const playingNow = isPlaying && started;
+    const chips = song.sectionBars.map((bars, k) => {
+      const here = k === song.section;
+      const title = k === queuedSection
+        ? 'Section ' + (k + 1) + ' comes in next — tap again to change your mind'
+        : playingNow
+        ? (here ? 'Section ' + (k + 1) + ' is playing' : 'Play section ' + (k + 1) + ' next')
+        : 'Section ' + (k + 1) + ' (' + barsWord(bars) + ')'
+          + (here ? ' — tap again to add a section, or copy, clear or delete this one' : '');
+      return '<button class="section-chip' + (here ? ' active' : '') + (k === queuedSection ? ' queued' : '')
+        + '" data-section="' + k + '" aria-pressed="' + here + '" title="' + title + '">' + (k + 1) + '</button>';
+    }).join('');
+
+    picker.classList.toggle('single', n === 1);
+    if (n === 1) {
+      picker.hidden = !canAddSections();
+      picker.innerHTML = '<button class="section-add section-add-wide" title="Add a section — another part, with music of its own, on the same instruments">'
+        + SECTION_MARK + '<span class="section-add-plus">+</span><span class="tool-label">Section</span></button>';
+    } else {
+      picker.hidden = false;
+      picker.innerHTML = SECTION_MARK + chips + (canAddSections()
+        ? '<button class="section-add step-btn" title="Add a section" aria-label="Add a section">+</button>' : '');
+    }
+    if (present) {
+      present.hidden = n < 2;
+      present.innerHTML = n < 2 ? '' : chips;
+    }
+  }
+
+  /* A tap on a section's number. While the music plays it says which
+     section comes in next, at the end of the one playing — never in the
+     middle of it. */
+  function chooseSection(k, anchor) {
+    if (k < 0 || k >= sectionCount()) return;
+    if (isPlaying && started) { queueSection(k); return; }
+    if (k === song.section) {
+      if (anchor && !presentMode) toggleSectionMenu(anchor);
+      return;
+    }
+    closeSectionMenu();
+    showSection(k);
+  }
+
+  function queueSection(k) {
+    if (queuedSection === k) queuedSection = -1;                              // tapped again: never mind
+    else if (k === song.section && playMode() === 'loop') queuedSection = -1; // it is going round already
+    else queuedSection = k;
+    updateSectionPicker();
+  }
+
+  function showSection(k) {
+    if (k === song.section || k < 0 || k >= sectionCount()) return;
+    dismissWordEdit();
+    stashSection();
+    loadSection(k);
+    afterSectionChange();
+  }
+
+  function afterSectionChange() {
+    currentPage = 0;
+    if (stage.scrollLeft) stage.scrollTo({ left: 0 });
+    updateMeasureDisplay();
+    render();
+    syncSettings();
+  }
+
+  /* Another section: empty, as long as the one on screen, or a copy of
+     one — the way to a B that is the A with a change or two. */
+  function addSection(copyFrom) {
+    if (!canAddSections()) return;
+    closeSectionMenu();
+    if (isPlaying) stopPlayback();
+    dismissWordEdit();
+    stashSection();
+    const copy = copyFrom != null;
+    song.sectionBars.push(song.sectionBars[copy ? copyFrom : song.section]);
+    song.tracks.forEach(t => t.parts.push(copy ? copyPart(t.parts[copyFrom]) : emptyPart()));
+    const k = sectionCount() - 1;
+    loadSection(k);
+    afterSectionChange();
+    toast(copy ? 'Section ' + (k + 1) + ' starts as a copy of section ' + (copyFrom + 1)
+      : k === 1 ? 'Section 2 added — View, under While it plays, says how the sections follow one another'
+      : 'Section ' + (k + 1) + ' added');
+  }
+
+  function clearSection() {
+    if (!rhythmEditable()) return;
+    const k = song.section;
+    closeSectionMenu();
+    if (sectionHasNotes(k) && !confirm('Clear every note in section ' + (k + 1) + '?')) return;
+    dismissWordEdit();
+    song.tracks.forEach(t => { t.beats = []; t.links = {}; delete t.words; });
+    conformAllTracks();
+    if (isPlaying) resyncPlayback();
+    render();
+  }
+
+  function deleteSection() {
+    if (!canRemoveSections()) return;
+    const k = song.section;
+    closeSectionMenu();
+    if (sectionHasNotes(k) && !confirm('Delete section ' + (k + 1) + ' and all the music in it? This cannot be undone.')) return;
+    if (isPlaying) stopPlayback();
+    dismissWordEdit();
+    stashSection();
+    song.sectionBars.splice(k, 1);
+    song.tracks.forEach(t => t.parts.splice(k, 1));
+    // the order loses that section's steps, and the later sections move up one
+    song.play.order = mergeSteps(song.play.order.filter(st => st[0] !== k)
+      .map(st => [st[0] > k ? st[0] - 1 : st[0], st[1]]));
+    loadSection(Math.min(k, sectionCount() - 1));   // the one on screen is gone: nothing to stash
+    afterSectionChange();
+    toast('Section ' + (k + 1) + ' deleted');
+  }
+
+  function onSectionTap(e) {
+    if (e.target.closest('.section-add')) { e.stopPropagation(); addSection(null); return; }
+    const chip = e.target.closest('.section-chip');
+    if (!chip) return;
+    e.stopPropagation();
+    chooseSection(Number(chip.dataset.section), chip);
+  }
+  document.getElementById('section-picker').addEventListener('click', onSectionTap);
+  document.getElementById('present-sections').addEventListener('click', onSectionTap);
+
+  /* ---- one section's menu: a second tap on the section on screen ---- */
+  const sectionMenu = document.getElementById('section-menu');
+  const sectionNewBtn = document.getElementById('section-new-btn');
+  const sectionCopyBtn = document.getElementById('section-copy-btn');
+  const sectionClearBtn = document.getElementById('section-clear-btn');
+  const sectionDeleteBtn = document.getElementById('section-delete-btn');
+
+  function toggleSectionMenu(anchor) {
+    if (sectionMenu.classList.contains('open')) { closeSectionMenu(); return; }
+    showHide(sectionNewBtn, canAddSections());
+    showHide(sectionCopyBtn, canAddSections());
+    showHide(sectionClearBtn, rhythmEditable());
+    showHide(sectionDeleteBtn, canRemoveSections());
+    if (!canAddSections() && !rhythmEditable() && !canRemoveSections()) return;   // nothing to offer
+    closeSettings();
+    closeSound();
+    const k = song.section;
+    document.getElementById('section-menu-title').textContent = 'Section ' + (k + 1);
+    document.getElementById('section-new-label').textContent = 'New empty section ' + (sectionCount() + 1);
+    document.getElementById('section-copy-label').textContent = 'Copy into a new section ' + (sectionCount() + 1);
+    document.getElementById('section-delete-label').textContent = 'Delete section ' + (k + 1);
+    positionPopover(anchor, sectionMenu);
+  }
+
+  function closeSectionMenu() { sectionMenu.classList.remove('open'); }
+
+  sectionNewBtn.addEventListener('click', () => addSection(null));
+  sectionCopyBtn.addEventListener('click', () => addSection(song.section));
+  sectionClearBtn.addEventListener('click', clearSection);
+  sectionDeleteBtn.addEventListener('click', deleteSection);
+  sectionMenu.addEventListener('click', e => e.stopPropagation());
+  document.addEventListener('click', closeSectionMenu);
 
   /* ==================================================================
      SOUND — the popover
@@ -4733,6 +5285,7 @@
   function toggleSound() {
     if (soundPopover.classList.contains('open')) return closeSound();
     closeSettings();
+    closeSectionMenu();
     syncSound();
     positionPopover(soundBtn, soundPopover);
     soundBtn.classList.add('active');
@@ -5048,6 +5601,8 @@
     document.body.classList.toggle('show-syllables', !!view.showSyllables);
     document.body.classList.toggle('light-beats', !!view.lightBeats);
     document.body.classList.toggle('light-notes', !!view.lightNotes);
+    syncSectionPlay();
+    updateSectionPicker();
 
     const paged = isPaged(), systems = isSystems(), blocks = inBlocks();
     layoutPagesBtn.classList.toggle('active', paged);
@@ -5096,6 +5651,91 @@
     render();
   });
 
+  /* ---- While it plays: how the sections follow one another ----
+     Part of the piece rather than of the view (SECTIONS), so a change
+     here is saved with the piece and nothing is redrawn. Taken up at the
+     end of the section playing, if the music is going. */
+  const sectionPlay     = document.getElementById('section-play');
+  const sectionPlayNote = document.getElementById('section-play-note');
+  const arrangementBox  = document.getElementById('arrangement');
+  const arrSteps        = document.getElementById('arr-steps');
+  const arrAdd          = document.getElementById('arr-add');
+  const sectionEnd      = document.getElementById('section-end');
+
+  const SECTION_PLAY_NOTES = {
+    continuous: 'From the section on screen to the last, then {end}. Tap a number while it plays to go there next.',
+    loop: 'The section on screen goes round and round. Tap another number while it plays, and that one comes in when this one reaches its end.',
+    arranged: 'Always from the top of the order. Tap the numbers in the order they play — the same one again for another time round — and tap a step to take one away.'
+  };
+
+  function syncSectionPlay() {
+    const many = sectionCount() > 1;
+    sectionPlay.hidden = !many;
+    if (!many) return;
+    const mode = song.play.mode;
+    sectionPlay.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    sectionPlay.querySelectorAll('[data-end]').forEach(b => b.classList.toggle('active', b.dataset.end === song.play.end));
+    sectionEnd.hidden = mode === 'loop';
+    arrangementBox.hidden = mode !== 'arranged';
+    sectionPlayNote.textContent = SECTION_PLAY_NOTES[mode]
+      .replace('{end}', song.play.end === 'stop' ? 'it stops' : 'round again from section 1');
+    if (mode === 'arranged') renderArrangement();
+  }
+
+  /* The order, as a row of steps: "1 ×3 › 2 › 1 ×3". Built by tapping
+     the numbers underneath in the order they play — a number tapped
+     straight after itself adds a time round rather than a step, so 1 1 1
+     is "1 ×3" — and taken apart a time at a time by tapping a step. */
+  function renderArrangement() {
+    const n = sectionCount();
+    const order = song.play.order.filter(st => st[0] < n);
+    const editable = rhythmEditable();
+    const bars = arrangement().reduce((sum, [s, x]) => sum + song.sectionBars[s] * x, 0);
+    arrSteps.innerHTML = (order.length
+      ? order.map(([s, x], i) => '<button class="arr-step" data-step="' + i + '"'
+          + (editable ? ' title="Take one away"' : ' disabled') + '><b>' + (s + 1) + '</b>'
+          + (x > 1 ? '<span class="arr-times">×' + x + '</span>' : '') + '</button>')
+          .join('<span class="arr-then" aria-hidden="true">›</span>')
+      : '<span class="arr-empty">Each section once, in turn.</span>')
+      + '<span class="arr-total">' + barsWord(bars) + ' in all</span>';
+    arrAdd.innerHTML = !editable ? '' : '<span class="arr-add-label">Add</span>'
+      + song.sectionBars.map((_, k) => '<button class="arr-add-btn" data-add="' + k
+          + '" title="Section ' + (k + 1) + ' next in the order">' + (k + 1) + '</button>').join('')
+      + (order.length ? '<button class="arr-clear">Clear</button>' : '');
+  }
+
+  function setSectionPlay(changes) {
+    // Arranged with nothing set yet starts from every section once, written out to change
+    if (changes.mode === 'arranged' && !song.play.order.length) changes.order = arrangement().map(st => st.slice());
+    Object.assign(song.play, changes);
+    syncSectionPlay();
+    scheduleAutosave();
+  }
+
+  sectionPlay.addEventListener('click', e => {
+    const modeBtn = e.target.closest('[data-mode]');
+    if (modeBtn) { setSectionPlay({ mode: modeBtn.dataset.mode }); return; }
+    const endBtn = e.target.closest('[data-end]');
+    if (endBtn) { setSectionPlay({ end: endBtn.dataset.end }); return; }
+    if (!rhythmEditable()) return;
+    const add = e.target.closest('[data-add]');
+    if (add) {
+      const order = mergeSteps(song.play.order.concat([[Number(add.dataset.add), 1]]));
+      if (order.length > ORDER_STEPS_MAX) { toast(ORDER_STEPS_MAX + ' steps is the most an order can have'); return; }
+      setSectionPlay({ order: order });
+      return;
+    }
+    const step = e.target.closest('[data-step]');
+    if (step) {
+      const order = song.play.order.map(st => st.slice());
+      const i = Number(step.dataset.step);
+      if (order[i] && --order[i][1] < 1) order.splice(i, 1);
+      setSectionPlay({ order: mergeSteps(order) });
+      return;
+    }
+    if (e.target.closest('.arr-clear')) setSectionPlay({ order: [] });
+  });
+
   /* Anchored above the button that opened it, and nudged back on screen
      if that would hang it off an edge. */
   function positionPopover(button, popover) {
@@ -5113,6 +5753,7 @@
   function toggleSettings() {
     if (settingsPopover.classList.contains('open')) return closeSettings();
     closeSound();
+    closeSectionMenu();
     syncSettings();
     positionPopover(settingsBtn, settingsPopover);
     settingsBtn.classList.add('active');
@@ -5923,6 +6564,7 @@
     document.body.classList.toggle('present-mode', presentMode);
     closeSettings();
     closeSound();
+    closeSectionMenu();
     closeInstrumentSheet();
 
     /* The stage has only just changed size; measuring in the same frame
@@ -5967,6 +6609,13 @@
   document.addEventListener('keydown', e => {
     if (e.target.matches('input, textarea')) return;
     if (e.code === 'Space') { e.preventDefault(); togglePlayback(); }
+    /* 1–4 pick a section, as tapping its number does — with the music
+       going, the one that comes in next. Not with a sheet open over it. */
+    if (/^[1-4]$/.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey && sectionCount() > 1
+        && !document.querySelector('.sheet-backdrop.open')) {
+      e.preventDefault();
+      chooseSection(Number(e.key) - 1);
+    }
     if (e.key === 'Escape') {
       /* Close the topmost thing that is open; only stop the music if
          nothing was. */
@@ -5975,10 +6624,12 @@
         .filter(el => el && el.classList.contains('open'));
       const hadPopover = settingsPopover.classList.contains('open')
                       || soundPopover.classList.contains('open')
+                      || sectionMenu.classList.contains('open')
                       || instrumentSheet.classList.contains('open');
       closeInstrumentSheet();
       closeSettings();
       closeSound();
+      closeSectionMenu();
       if (sheets.length) closeSheet(sheets[0]);
       else if (hadPopover) { /* the popover was the thing that was open */ }
       else if (presentMode) setPresentMode(false);
@@ -6022,7 +6673,9 @@
   wireSheet(librarySheet, 'library-close');
 
   function describeSong(record) {
-    const bars = record.measures === 1 ? '1 bar' : record.measures + ' bars';
+    const sections = record.sections && Array.isArray(record.sections.bars) ? record.sections.bars : null;
+    const total = sections ? sections.reduce((sum, b) => sum + (Number(b) || 1), 0) : record.measures;
+    const bars = (sections ? sections.length + ' sections · ' : '') + (total === 1 ? '1 bar' : total + ' bars');
     const n = record.tracks.length;
     const kit = n === 1 ? '1 instrument' : n + ' instruments';
     return bars + ' · ' + kit + ' · ' + record.bpm + ' BPM';
@@ -8383,6 +9036,8 @@
         measures: rec.measures,
         instruments: (rec.tracks || []).map(t => t.instrument),
         isCustom: !starter,
+        // how many sections, when there is more than one (SECTIONS)
+        sections: rec.sections && Array.isArray(rec.sections.bars) ? rec.sections.bars.length : 0,
         createdAt: rec.createdAt || 0,
         updatedAt: rec.updatedAt || rec.createdAt || 0,
         // shared with this browser, and the Teacher Library book it came in
@@ -8491,6 +9146,18 @@
           pickupBeats: 0,
           totalBeats: totalBeats(),
           measures: song.measures,
+          /* null for a piece of one section. Otherwise how many, how long,
+             how they follow one another (`order` is what Arranged plays,
+             written out), and which is on screen. totalBeats and measures
+             above are that one's; timeline() has the whole piece. */
+          sections: sectionCount() > 1 ? {
+            count: sectionCount(),
+            bars: song.sectionBars.slice(),
+            mode: song.play.mode,
+            order: arrangement().map(st => st.slice()),
+            end: song.play.end,
+            current: song.section
+          } : null,
           voices: song.tracks.map((t, i) => ({
             id: i,
             label: instrumentMeta(t.instrument).label,
@@ -8501,18 +9168,55 @@
         };
       },
 
-      /* Every hit in one pass, in ticks from the first beat, muted tracks
-         included — the Music Stand owns the mutes. `gapTicks` is how long until
-         that track's next hit, which the kit needs to shape fast repeats. */
-      timeline() {
-        const notes = [];
-        song.tracks.forEach((track, ti) => {
-          trackOnsets(track).forEach(o => {
-            notes.push({ tick: o.tick, voice: ti, gapTicks: o.gapTicks });
+      /* Every hit in one time through the piece, in ticks from the first
+         beat, muted tracks included — the Music Stand owns the mutes.
+         `gapTicks` is how long until that track's next hit, which the kit
+         needs to shape fast repeats.
+
+         Once through is the piece as it is set to play (SECTIONS):
+         Continuous is every section in turn from the first, Arranged is
+         the order, and Looped is the section on screen — the host goes
+         round it, and asks for another with `{ section }` when one is
+         chosen. `{ play: 'continuous' | 'arranged' | 'loop' }` asks for
+         one of the others. `passes` says which section each stretch is,
+         by beat, so the host can light it with highlight(beat, section).
+         A piece of one section is one pass, as it always was. */
+      timeline(opts) {
+        opts = opts || {};
+        const n = sectionCount();
+        const mode = PLAY_MODES.indexOf(opts.play) !== -1 ? opts.play : playMode();
+        const steps = (Number.isInteger(opts.section) && opts.section >= 0 && opts.section < n)
+          ? [[opts.section, 1]]
+          : (n < 2 || mode === 'loop') ? [[song.section, 1]]
+          : mode === 'arranged' ? arrangement()
+          : song.sectionBars.map((_, k) => [k, 1]);
+        const bt = beatTicks();
+        const notes = [], passes = [];
+        let beat = 0;
+        steps.forEach(([section, times]) => {
+          const one = withSection(section, () => {
+            const list = [];
+            song.tracks.forEach((track, ti) => {
+              trackOnsets(track).forEach(o => list.push({ tick: o.tick, voice: ti, gapTicks: o.gapTicks }));
+            });
+            return { list: list, beats: totalBeats() };
           });
+          for (let x = 0; x < times; x++) {
+            passes.push({ section: section, beat: beat, beats: one.beats });
+            one.list.forEach(o => notes.push({ tick: o.tick + beat * bt, voice: o.voice, gapTicks: o.gapTicks }));
+            beat += one.beats;
+          }
         });
         notes.sort((a, b) => a.tick - b.tick);
-        return { beatTicks: beatTicks(), totalBeats: totalBeats(), notes: notes };
+        return { beatTicks: bt, totalBeats: beat, notes: notes, passes: passes };
+      },
+
+      /* Show section k, as a tap on its number would. Not an edit. */
+      setSection(k) {
+        k = Number(k);
+        if (!Number.isInteger(k) || k < 0 || k >= sectionCount()) return null;
+        showSection(k);
+        return bridge.info();
       },
 
       attachAudio(ctx, out) {
@@ -8580,8 +9284,15 @@
         return bridge.info();
       },
 
-      highlight(beat) {
+      /* `section`, when given, is the section the beat is in — brought on
+         screen first if another is showing (a pass of timeline() says
+         which). Without it, the beat is in the section on screen. */
+      highlight(beat, section) {
         if (beat == null || beat < 0) { clearHighlights(); return; }
+        if (Number.isInteger(section) && section !== song.section && section >= 0 && section < sectionCount()) {
+          clearHighlights();
+          showSection(section);
+        }
         highlightBeat(beat);
       },
 

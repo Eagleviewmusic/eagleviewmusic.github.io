@@ -10,6 +10,11 @@
   <link rel="stylesheet" href="lib/evm-shelf.css">
   <link rel="stylesheet" href="lib/evm-count-in.css">
   <link rel="stylesheet" href="style.css">
+  <script>
+    // inside a frame (the hub, a Google Site, an LMS): no back-to-hub link (style.css hides .home-link under html.in-iframe)
+    try { if (window.self !== window.top) document.documentElement.classList.add('in-iframe'); }
+    catch (e) { document.documentElement.classList.add('in-iframe'); }
+  </script>
   <!-- EVM visit counter: one anonymous count each time an app is opened. What is sent, and what never is: /what-we-count.html -->
   <script>
     (function () {
@@ -167,6 +172,8 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <span class="pane-meta" id="ost-meta"></span>
+      <!-- a Looped ostinato's sections, to choose which goes round -->
+      <span class="pane-sections" id="ost-sections" role="group" aria-label="Ostinato sections" hidden></span>
       <button class="edited-chip" id="ost-edited" data-side="ost" hidden>Edited here</button>
       <span class="meter-note" id="meter-note" hidden></span>
       <span class="pane-spacer"></span>
@@ -249,6 +256,10 @@
       <span class="readout-part poem" id="readout-poem"></span>
       <span class="readout-part ost" id="readout-ost"></span>
     </div>
+
+    <!-- The same section buttons as the ostinato's heading, for present
+         mode, where the headings are hidden. -->
+    <div class="transport-sections" id="transport-sections" role="group" aria-label="Ostinato sections" hidden></div>
 
     <button class="present-exit" id="present-exit" title="Leave present mode (Esc)">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9L4 4m0 0v5m0-5h5"/><path d="M15 9l5-5m0 0v5m0-5h-5"/><path d="M9 15l-5 5m0 0v-5m0 5h5"/><path d="M15 15l5 5m0 0v-5m0 5h-5"/></svg>
@@ -357,7 +368,7 @@
         <button class="seg-btn" data-leadin="2">2×</button>
         <button class="seg-btn" data-leadin="4">4×</button>
       </div>
-      <p class="pop-note">A poem with a pickup comes in on the intro’s last beat.</p>
+      <p class="pop-note">A poem with a pickup comes in on the intro’s last beat. An ostinato in sections plays its first section as the intro.</p>
       <label class="vol"><span>Volume</span><input type="range" min="0" max="100" id="vol-ost"></label>
     </div>
   </div>

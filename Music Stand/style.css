@@ -534,6 +534,38 @@ body.editing .editing-flag { display: inline-block; }
   font-variant-numeric: tabular-nums;
 }
 .pane-where:empty { display: none; }
+
+/* A Looped ostinato's sections, as Ostinato Builder draws them: the one
+   going round filled, one chosen to come in next ringed and breathing. */
+.pane-sections,
+.transport-sections { display: inline-flex; align-items: center; gap: 3px; flex: none; }
+.pane-sections[hidden],
+.transport-sections[hidden] { display: none; }
+.sec-chip {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--ost);
+  background: var(--ost-soft);
+  border: none;
+  cursor: pointer;
+  transition: background .13s, color .13s, box-shadow .13s;
+}
+.sec-chip:hover { box-shadow: inset 0 0 0 2px var(--ost); }
+.sec-chip.active { background: var(--ost); color: #fff; }
+.sec-chip.queued { box-shadow: inset 0 0 0 2.5px var(--ost); animation: sec-next 1.1s ease-in-out infinite; }
+@keyframes sec-next { 50% { background: #fff; } }
+@media (prefers-reduced-motion: reduce) { .sec-chip.queued { animation: none; } }
+/* on the transport only while presenting, where the headings are hidden */
+.transport-sections { display: none !important; }
+body.present .transport-sections:not([hidden]) { display: inline-flex !important; }
+body.present .transport-sections .sec-chip { width: 40px; height: 40px; font-size: 17px; }
 /* while it plays, where it is matters more than the meters' note */
 .pane-head:has(.pane-where:not(:empty)) .meter-note { display: none; }
 

@@ -336,7 +336,7 @@
     g.gain.exponentialRampToValueAtTime(peak, t + 0.002);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
     o.connect(g);
-    g.connect(ctx.destination);
+    g.connect(window.StudioBus ? StudioBus.out(ctx) : ctx.destination);
     o.start(t);
     o.stop(t + 0.09);
     o.onended = () => { try { o.disconnect(); g.disconnect(); } catch (e) {} };
@@ -406,8 +406,12 @@
       clicks: [], take: [], held: new Map(),
       timer: 0, raf: 0, drawn: 0
     };
+    if (recording && R.inst === 'voice') {
+      run.capture = StudioVoice.startCapture();
+      run.vdelay = StudioVoice.delaySec();
+      if (count) run.capture.countSpan = { from: anchor - count * spb, to: anchor - 0.03 };   // the speakers alone: the bleed is measured there
+    }
     applyLevels();
-    if (recording && R.inst === 'voice') { run.capture = StudioVoice.startCapture(); run.vdelay = StudioVoice.delaySec(); }
     if (count) {
       const times = [];
       for (let k = count; k > 0; k--) times.push(EVMCountIn.heardAt(ctx, anchor - k * spb));
@@ -589,9 +593,23 @@
       const res = await StudioVoice.endCapture(c, stopT);
       if (!res || !res.data.length || !tr) return;
       if (res.peak < 0.002) { toast('The microphone was silent, so nothing was kept. Check the meter in the Voice panel moves when you sing.'); return; }
-      const vd = r.vdelay;
+      // Where the take sits: by its own bleed when the speakers were heard in it
+      // (the round trip measured on this very take, so the backing in it lands
+      // on the beat with the real tracks), else by the lined-up figure.
+      const found = res.ref ? StudioVoice.measureDelay(res) : null;
+      const vd = found ? found.sec : r.vdelay;
+      const bleedDb = StudioVoice.bleedOf(res, vd);
       const tFrom = r.anchor + vd;                  // where beat `from` is in the take
-      const pick = StudioVoice.pickupOnset(res, tFrom);
+      // The speakers' sound, taken back out: the studio knows what it sent (res.ref)
+      // and, once the microphone is lined up, how the room returns it.
+      let data = res.data, removedDb = null, removalFail = null, notLinedUp = false;
+      if (res.ref && StudioVoice.removalReady()) {
+        let out = null;
+        try { out = await StudioVoice.removeBacking(res, found ? found.sec : null); } catch (e) { console.error(e); }
+        if (out && (out.erle == null || (out.erle >= 6 && out.median > -1))) { data = out.clean; removedDb = out.erle == null ? null : Math.round(out.erle); }
+        else if (out) removalFail = Math.round(out.erle);
+      } else if (res.ref && !StudioVoice.echoFilter() && StudioVoice.removalWanted()) notLinedUp = true;
+      const pick = StudioVoice.pickupOnset(Object.assign({}, res, { data }), tFrom);
       const startT = Math.max(res.t0, pick != null ? pick : tFrom);
       const endT = Math.min(stopT, res.t0 + res.data.length / res.rate);
       if (endT - startT < 0.05) return;            // stopped in the count-in
@@ -599,7 +617,8 @@
       const hi = r.from + (endT - vd - r.anchor) / r.spb;
       const id = newId('c');
       const a = Math.round((startT - res.t0) * res.rate), b = Math.round((endT - res.t0) * res.rate);
-      await StudioVoice.saveClip(id, res.rate, res.data.slice(a, b));
+      const take = StudioVoice.boosted(data.slice(a, b), res.boost);   // the Voice panel's boost, capped under full scale
+      await StudioVoice.saveClip(id, res.rate, take.data, { gain: take.gain, clipped: take.clipped, mic: res.mic, removed: removedDb });
       pushUndo('the take on track ' + (r.armed + 1));
       cutRegions(tr, lo, hi);
       tr.regions.push({ c: id, b: lo, o: 0, d: (b - a) / res.rate });
@@ -607,7 +626,21 @@
       tr.kind = 'voice';
       save();
       renderAll();
-      if (pick != null) setTimeout(() => toast('Kept the pick-up you sang in the count-in.'), 400);
+      const bleedHot = Number.isFinite(bleedDb) && bleedDb > -6;
+      const word = take.clipped ? 'That take was too loud for the microphone in places (it clipped). Move back a little for the next one.'
+        : bleedHot ? `The speakers were loud at the microphone during the count-in (${Math.round(bleedDb)} dB): turn them down, or use headphones.`
+          : removalFail != null ? `The backing could not be taken out of that take cleanly (${removalFail} dB), so it is kept as recorded. Line up the microphone again in the Voice panel.`
+            : notLinedUp && !sessionGet('line-up-hint') ? (sessionSet('line-up-hint'), 'Line up the microphone (in the Voice panel) and the studio will take the backing back out of your voice takes.')
+              : pick != null ? 'Kept the pick-up you sang in the count-in.'
+                : removedDb != null ? `Backing taken out of the take: ${removedDb} dB.` : '';
+      if (word) setTimeout(() => toast(word), 400);
+      const notes = [];
+      if (found) notes.push(`lined up by its own sound (${found.ms} ms)`);
+      if (Number.isFinite(bleedDb)) notes.push(`speakers at the microphone ${Math.round(bleedDb)} dB${bleedHot ? ' (loud)' : ''}`);
+      if (removedDb != null) notes.push(`backing taken out ${removedDb} dB`);
+      else if (removalFail != null) notes.push(`backing left in (${removalFail} dB)`);
+      else if (notLinedUp) notes.push('backing left in — line up the microphone first');
+      StudioVoice.say(notes.length ? 'Last take: ' + notes.join(' · ') + '.' : '');
     } catch (e) {
       console.error(e);
       toast('The take could not be kept here (the browser’s storage may be full). Download the project file to keep your work.');

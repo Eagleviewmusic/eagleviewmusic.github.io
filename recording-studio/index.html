@@ -287,9 +287,11 @@
   </defs>
 </svg>
 
-<!-- The engines. audio.js is a byte-identical copy of Digital Accordion/audio.js (authoritative there);
+<!-- The engines. audio.js is a copy of Digital Accordion/audio.js (authoritative there) differing by ONE line: its master
+     goes through StudioBus (js/bus.js), so the studio can tap exactly what it sends to the speakers;
      lib/evm-count-in.* copies of EVM Library/'s (check-copies.sh); lib/instruments/js/virtual-instruments.js
      a copy of Virtual Instrument Assets/js/ (authoritative there); vendor/lame.min.js is lamejs (LAME-NOTICE.txt). -->
+<script src="js/bus.js"></script>
 <script src="audio.js"></script>
 <script src="lib/evm-count-in.js"></script>
 <script src="lib/instruments/js/virtual-instruments.js"></script>
@@ -297,6 +299,7 @@
 <script src="js/xylo.js"></script>
 <script src="js/voices.js"></script>
 <script src="js/studio.js"></script>
+<script src="js/backing-removal.js"></script>
 <script src="js/voice.js"></script>
 <script src="js/link.js"></script>
 <script src="js/bring-in.js"></script>

@@ -33,3 +33,35 @@ does nothing. Contract: `Recording Studio/README.md`, "The instrument link".
 In the source, `App.tsx`: `joinStudio` near the top (after `IN_IFRAME`), and
 the one `studio?.hit(...)` line right after `xylophoneAudio.playNote` in
 `triggerCustomNote`. Not yet in the published copy in `Eagle View Music/`.
+
+## The Scales window (2026-10-24)
+
+Settings (the gear, now at the far right of the header) → **Scales** opens one
+window: a key (12 chips, spelled the way the Virtual Keyboard spells them), the
+Virtual Keyboard's scales by family (its Minor and Natural Minor are the same
+notes, so Minor is listed once), the user's own scales, and **+ Build a scale**.
+Opening the window changes nothing; a tap on a key or a scale is applied at
+once: the first bar becomes the key's letter, bars take the scale's ♯/♭, bars
+whose letter is not in the scale are switched off (the bolts turn them back on).
+A note with no letter of its own on a 7-letter xylophone (Blues' ♭5 beside
+its 5, an octatonic's eighth note) is left out and the window says so.
+
+The window re-detects the scale on the instrument when it opens; a hand-set
+or linked layout shows as "Your own scale" with nothing in the lists lit, and
+a key tap then transposes it rather than replacing it. **Build a scale** starts
+from whatever is on the keys (each note keeps the letter it sits on: D♯ on the
+D bar stays ♯2) and applies nothing until a note is tapped; Cancel, Escape, ×
+or the backdrop mid-build put the keys back exactly. An own scale that is
+selected shows an **Edit** button in the brown result box; Save changes keeps
+its id. Own scales are degrees only (`localStorage` key
+`rainbow_xylophone_my_scales`), so they work in any key.
+
+In the source: `utils/scales.ts` (scale list, spelling, the fit onto seven
+letters, detection, `instrumentToDegrees`), `components/ScalesModal.tsx` (the
+window), `utils/scaleStorage.ts` (`loadMyScales` / `saveMyScales`), and in
+`App.tsx` `openScales` / `applyScale` / `restoreInstrument` plus the settings
+sub-menu (now `right-0 w-max`, wrapping on a phone). The older "Custom Scale
+Library" in the Save window was REMOVED the same day (it confused what the
+link saved); its storage key `rainbow_xylophone_custom_scales` is unused.
+The tutorial's step 8 now describes Scales + Save. Not yet in
+`Eagle View Music/` (tiers 2 and 3).
