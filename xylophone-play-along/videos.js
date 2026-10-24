@@ -8,6 +8,7 @@ window.XB_VIDEOS = [
   { slug: 'eg', title: 'Xylophone Basics: Notes E & G', youtube: 'QZrYoYaalRE', notes: ['E', 'G'] },
   { slug: 'ega', title: 'Xylophone Basics: E G & A', youtube: 'VMBd5EeTRqA', notes: ['E', 'G', 'A'] },
   { slug: 'cde', title: 'Xylophone Basics: C D E', youtube: 'prJ4evzeoW8', notes: ['C', 'D', 'E'] },
-  { slug: 'cdeg', title: 'Xylophone Basics: CDEG', youtube: 'BN0YtHwfIis', notes: ['C', 'D', 'E', 'G'] },
+  { slug: 'cdeg', title: 'Xylophone Basics: CDEG', youtube: '9iRV4cWrX90', notes: ['C', 'D', 'E', 'G'] },
   { slug: 'dega', title: 'Xylophone Basics: DEGA', youtube: 'Tupr8brKOGY', notes: ['D', 'E', 'G', 'A'] },
+  { slug: 'defga', title: 'Xylophone Basics: DEFGA', youtube: 'NR4xwqnugPI', notes: ['D', 'E', 'F', 'G', 'A'] },
 ];

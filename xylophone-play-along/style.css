@@ -71,6 +71,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid #fbbf24; outline-
 @media (max-width: 639px) {
   html:not(.in-iframe) .app-title { display: none; }
 }
+/* too many tabs for one row beside the name: the name on two lines, the tabs a little closer */
+@media (min-width: 641px) {
+  .topbar.stack .app-title { font-size: clamp(17px, 1.7vw, 24px); line-height: 1.05; height: 46px; display: flex; flex-direction: column; justify-content: center; }
+  .topbar.stack .app-title span { display: block; }
+  .topbar.stack .tabs { gap: 6px; }
+  .topbar.stack .tab { padding: 0 6px; }
+}
 
 .tabs { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; padding: 2px; }
 

@@ -288,7 +288,15 @@
     el.style.height = Math.round(r.h) + 'px';
   }
 
+  /* the name goes onto two lines when the tabs would not fit beside it on one row */
+  function fitTitle() {
+    const bar = document.querySelector('.topbar'), tabs = $('tabs').children;
+    bar.classList.remove('stack');
+    if (tabs.length && tabs[tabs.length - 1].offsetTop > tabs[0].offsetTop) bar.classList.add('stack');
+  }
+
   function layout() {
+    fitTitle();
     const W = stage.clientWidth, H = stage.clientHeight;
     if (!W || !H) return;
     const tall = H > W;
