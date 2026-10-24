@@ -43,8 +43,16 @@ notes, so Minor is listed once), the user's own scales, and **+ Build a scale**.
 Opening the window changes nothing; a tap on a key or a scale is applied at
 once: the first bar becomes the key's letter, bars take the scale's ♯/♭, bars
 whose letter is not in the scale are switched off (the bolts turn them back on).
-A note with no letter of its own on a 7-letter xylophone (Blues' ♭5 beside
-its 5, an octatonic's eighth note) is left out and the window says so.
+A scale the seven letters cannot hold (Blues' ♭5 beside its 5, C D♭ D E♭, an
+octatonic) is laid out **note by note** instead (2026-10-24, the user's ask):
+the bars take the scale's notes in order and go round again up the octaves
+(C E♭ F G♭ G B♭ C E♭ …), each bar keeping its letter's colour with the sharp
+or flat lit. Such a layout is a `BarNote[]` (`constants.ts`: `makeLayoutNotes`,
+`barNoteId` 'Db4' / 'C#5', `parseBarId`) in App's `layout` state; `null` means
+the lettered bars. Links carry it as `seq=C4,Db4,D4,…` (the accidentals ride in
+`acc` as usual). The root-letter picker returns to lettered bars. The fitter
+uses only each scale's own spelling (never E♭ → D♯ to squeeze a scale in), so
+a collision always means the note-by-note layout.
 
 The window re-detects the scale on the instrument when it opens; a hand-set
 or linked layout shows as "Your own scale" with nothing in the lists lit, and
