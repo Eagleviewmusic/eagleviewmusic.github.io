@@ -262,7 +262,8 @@
       const placed = Studio.bringIn(tracks, {
         label: 'bringing in ' + (m.title || 'a song'),
         tempo: useTime ? m.bpm : null,
-        meter: useTime && !sameTime ? m.meter : null
+        meter: useTime && !sameTime ? m.meter : null,
+        key: key !== 'ostinato' && m.key ? { name: m.key, scale: m.scale } : null   // the instruments play in the song's key
       });
       if (!placed) { note.textContent = `There is no room: ${tracks.length === 1 ? 'a track is' : tracks.length + ' tracks are'} needed and the project has ${Studio.MAX_TRACKS}. Clear or remove one first.`; return; }
       Studio.closeSheet('bring-sheet');

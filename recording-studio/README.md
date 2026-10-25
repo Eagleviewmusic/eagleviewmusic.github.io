@@ -52,6 +52,11 @@ the live site): move a project between them with a project file.
 | V9 | **Backing removal** (2026-10-24, from the user's *Removing Speaker Playback* notes): a singer needs the backing out loud, so the studio takes its own sound back out afterwards. Every sound goes out through one bus (`StudioBus`) and a second worklet tap keeps the reference beside the take. "Line up the microphone" plays a 1.5 s sweep (60 Hz–20 kHz) and learns the room's 0.5 s response (its peak is the voice delay). A take's echo is predicted by convolution, fitted to the take (±15 ms lag + gain, over its first 20 s) and subtracted; the figure is ERLE in ¼ s blocks where the echo has energy, 90th percentile ("Backing taken out: 35 dB"), kept with the clip; under 6 dB, or a median below −1 dB, the take is kept as recorded. The singer need not be silent anywhere — the voice is unrelated to the echo, so the fit ignores it and the check finds its figure in the pauses. Not applied with the browser's echo cancellation on. | The one approach that leaves the singer's own sound untouched: a fixed filter cannot learn the performer. The browser's canceller, made for calls, swallows the voice while the speakers are loud at the microphone — it stays as a labelled last resort. |
 | V9a | Tried and taken out the same day, after the user tried them (2026-10-24): a **beat light** (a circle a beat, lit as heard) with a **"count in, then quiet"** take — "the lights are poorly designed for keeping the beat", and a take with nothing sounding blurs the beat; and an automatic half-level **duck** of the backing after a loud bleed. | A singer needs to hear the backing; the studio's job is to take it out afterwards, not to take it away. |
 | V11 | **A take lines itself up by its own sound** (2026-10-24, the user's ask after hearing a doubled rhythm: the bleed in a take sat 63 ms behind the real tracks). With the speakers heard in a take, the round trip is measured on that take — the onsets of what the microphone heard against the onsets of what was sent (1 ms envelopes, so the voice hardly counts), then the raw signals within ±2 ms — and the take is placed by it, the backing in it landing on the beat with the tracks. That figure becomes the voice delay ("from your last take") for takes that do not hear the speakers; the removal looks for its lag around it. A checkbox chooses whether the speakers' sound is then taken out or kept, lined up. | Calibration figures drift and can be wrong; the take itself carries the truth. |
+| D10 | **One key for the project** (2026-10-24, the user's ask): a key + scale menu beside the tempo and time signature (the Virtual Keyboard's scales, Minor listed once). Every instrument plays in it — C minor on the keyboard is C minor on the accordion and the xylophone (its Scales window's fitting). It is saved with the project, given to each instrument as it joins and whenever it changes, and a Song Writer song brought in sets it to the song's key. | One place to say what key the band is in. |
+| D11 | **The instrument's own controls sit in the studio's tab row** (2026-10-24): the app's header rows (key, view, octaves, sound, Library, gear) are hidden in the frame, and the studio shows the controls it needs beside the tabs (not Library, nor the xylophone's ? tutorial — the user's call), its settings gear at the end — each one clicking or setting the app's real control and reading back what it shows (`js/inst-controls.js`). The line of words that was there ("Track 5 is empty…") is gone. | The user asked for fewer rows of words: the instrument gets two rows' height back. |
+| D13 | **Move and trim takes on the timeline** (2026-10-24, the user's ask): drag a take to move it (by whole beats; hold Option/Alt for finer), drag either end to trim it (an end snaps to a beat line within 6 px; Option/Alt for free). Trimming only narrows the take's window onto its recording (`o`, `d`) — nothing is cut from the clip, so the same end dragged back out opens it up again, as far as the recording goes; the whole recording shows faintly behind a take while it is dragged. A take moved or widened over another on its track covers it by the tape rules (`cutRegions`; the covered take keeps its recording too). A click that doesn't move still sets where Play starts. Undo / Redo cover it. | |
+| D14 | **Note tracks are kept as blocks** (2026-10-24, the user's ask: the same move and trim for keyboard, accordion, xylophone and brought-in tracks). `tr.clips = [{ b, o, d, len, items }]` in beats: each take (or bring-in) is a block holding everything played (`items`, beats from the block's own 0) and a window onto it. `tr.notes` / `tr.hits` are worked out from the windows (`blockView`) — what plays, draws and goes into a song file — and are still saved as plain notes beside the blocks, so an older copy of the studio opens the file as it sounds. A file without blocks opens as one block per track, from the beat its first note starts on to the beat after its last ends. A new take covers what it overlaps (`cutBlocks`) instead of deleting it; Tidy rounds every note a block holds but never pushes a heard note out of its window; Move a bar and Duplicate carry the blocks. A note held past a block's end stops there. Undo labels say "the part". | The same idea as a voice take's window, so trimming loses nothing. |
+| D12 | **Drag a track's name up or down** to reorder the tracks (2026-10-24, the user's ask); a press that doesn't move still arms the track. Undo / Redo cover it. A track's colour goes with its place. | |
 
 ## Files
 
@@ -59,7 +64,9 @@ the live site): move a project between them with a project file.
 |---|---|
 | `index.html`, `style.css` | The page: top bar, transport, tracks, the instrument area, sheets. |
 | `js/studio.js` | The project, tracks, transport, recording, drawing. |
-| `js/link.js` | The instrument link (`window.EVMStudio`, below): frames, timing, keys. |
+| `js/link.js` | The instrument link (`window.EVMStudio`, below): frames, timing, keys, the project's key handed on. |
+| `js/inst-controls.js` | The showing instrument's own controls in the tab row, standing in for the app's hidden header (D11). |
+| `theory.js` | Copy of `Digital Accordion/theory.js` (authoritative there; the Virtual Keyboard has one too): the scale list and key spellings. |
 | `js/voices.js` | Playing tracks back on the one clock, and rendering them for a file. |
 | `js/xylo.js` | The Rainbow Xylophone's vibraphone and marimba, on any audio context. |
 | `js/bring-in.js` | Bringing in Ostinato Builder and Song Writer songs. |
@@ -92,7 +99,7 @@ const studio = joinStudio('virtual-keyboard');
 studio.on(id, freqs, sound, level)   // a held note or chord starts now
 studio.off(id)                       // and ends now (id: unique while held)
 studio.hit(freqs, sound, level)      // a struck note that rings on its own
-studio.offer({ setSound, releaseAll })   // optional: what the studio may ask
+studio.offer({ setSound, setKey, releaseAll })   // optional: what the studio may ask
 ```
 
 - `freqs` — the frequencies sounding (one for a note, several for a chord).
@@ -105,7 +112,11 @@ studio.offer({ setSound, releaseAll })   // optional: what the studio may ask
   (capture listeners it adds to the frame's window) and takes the moment of the
   key or touch that caused the call, as the Virtual Keyboard recorder does.
 - `offer(api)`: `setSound(id)` puts a track's sound back on the instrument when
-  that track is picked again; `releaseAll()` lets go of every held note.
+  that track is picked again; `setKey(pc, scaleId)` plays in the project's key
+  (pitch class 0 = C, a `Theory` scale id; given shortly after `offer` and on
+  every change); `releaseAll()` lets go of every held note. The keyboard and
+  accordion offer `setKey` in `script.js`; the xylophone in `App.tsx` (as Minor
+  for Natural Minor).
 
 Who joins:
 

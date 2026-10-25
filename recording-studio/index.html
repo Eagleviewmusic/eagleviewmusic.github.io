@@ -103,6 +103,10 @@
       <option value="9/8">9/8 (in 3)</option>
       <option value="12/8">12/8 (in 4)</option>
     </select>
+    <div class="tp-key" role="group" aria-label="Key">
+      <select class="select tp-key-select" id="key-select" aria-label="Key" title="The key every instrument plays in"></select>
+      <select class="select tp-scale-select" id="scale-select" aria-label="Scale" title="The scale every instrument plays in"></select>
+    </div>
     <button class="quick-btn" id="countin" type="button" aria-pressed="true" title="A bar of clicks before recording starts">Count-in</button>
     <select class="select tp-click" id="click" aria-label="Metronome">
       <option value="record">Click when recording</option>
@@ -111,6 +115,9 @@
     </select>
     <button class="tp-btn tp-undo" id="undo" type="button" aria-label="Undo" title="Undo">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+    </button>
+    <button class="tp-btn tp-undo" id="redo" type="button" aria-label="Redo" title="Redo" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
     </button>
   </div>
 </div>
@@ -135,7 +142,8 @@
   <section class="inst-pane" id="inst-pane" aria-label="Instrument">
     <div class="inst-bar">
       <div class="inst-tabs" role="tablist" aria-label="Instrument" id="inst-tabs"></div>
-      <div class="inst-status" id="inst-status"></div>
+      <!-- the showing instrument's own sound and layout controls (inst-controls.js) -->
+      <div class="inst-ctls" id="inst-ctls"></div>
       <button class="tb-btn icon-only inst-fold" id="inst-fold" type="button" aria-expanded="true" aria-label="Hide the instrument" title="Hide the instrument">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
@@ -293,6 +301,7 @@
      a copy of Virtual Instrument Assets/js/ (authoritative there); vendor/lame.min.js is lamejs (LAME-NOTICE.txt). -->
 <script src="js/bus.js"></script>
 <script src="audio.js"></script>
+<script src="theory.js"></script><!-- a copy of Digital Accordion/theory.js: keep them the same -->
 <script src="lib/evm-count-in.js"></script>
 <script src="lib/instruments/js/virtual-instruments.js"></script>
 <script src="vendor/lame.min.js"></script>
@@ -302,6 +311,7 @@
 <script src="js/backing-removal.js"></script>
 <script src="js/voice.js"></script>
 <script src="js/link.js"></script>
+<script src="js/inst-controls.js"></script>
 <script src="js/bring-in.js"></script>
 </body>
 </html>

@@ -59,7 +59,7 @@
   const playBtn = el('play'), recordBtn = el('record'), homeBtn = el('home');
   const posEl = el('pos');
   const tempoInput = el('tempo'), meterSelect = el('meter'), countInBtn = el('countin'), clickSelect = el('click');
-  const undoBtn = el('undo');
+  const undoBtn = el('undo'), redoBtn = el('redo');
 
   let P = null;               // the project
   let projects = {};          // id -> project (this device)
@@ -68,7 +68,7 @@
   let view = { start: 0, end: 32 };
   let rows = [];              // { row, ctl, lane, canvas, ... } per track
   let ruler = null;
-  let undo = [];
+  let undo = [], redo = [];   // redo: what Undo took back, until something new is done
   let prefs = { volume: 1, inst: 'keyboard', split: null, folded: false };
   let audioWoken = false;
   let armedId = null;         // the armed track's id, so arming survives tracks moving
@@ -100,18 +100,85 @@
 
   // -------- THE PROJECT --------
   function blankTrack() {
-    return { id: newId('t'), kind: null, name: '', volume: 1, muted: false, solo: false, sound: null, notes: [], hits: [], regions: [], from: null };
+    return { id: newId('t'), kind: null, name: '', volume: 1, muted: false, solo: false, sound: null, notes: [], hits: [], regions: [], clips: [], from: null };
   }
   function blankProject() {
     return {
       id: newId('p'), name: '', createdAt: Date.now(), updatedAt: Date.now(),
       tempo: 90, meter: '4/4', countIn: true, click: 'record', room: 0.35,
+      key: 0, scale: 'major',   // what every instrument plays in: a pitch class (0 = C), a Theory scale id
       tracks: Array.from({ length: START_TRACKS }, blankTrack)
     };
   }
-  const hasContent = tr => tr.notes.length > 0 || tr.hits.length > 0 || tr.regions.length > 0;
+  const hasContent = tr => tr.notes.length > 0 || tr.hits.length > 0 || tr.regions.length > 0 || tr.clips.length > 0;
   const recordable = tr => !tr.kind || !!(KINDS[tr.kind] && KINDS[tr.kind].play);
   const engineOf = tr => (tr.kind && KINDS[tr.kind] ? KINDS[tr.kind].engine : 'notes');
+
+  function cleanNotes(list) {
+    return list
+      .filter(n => n && Number.isFinite(n.m) && Number.isFinite(n.b) && Number.isFinite(n.d) && n.m >= 12 && n.m <= 120 && n.d > 0)
+      .map(n => {
+        const o = { m: n.m, b: n.b, d: n.d };
+        if (typeof n.s === 'string') o.s = n.s;
+        o.v = Number.isFinite(n.v) && n.v >= 0 && n.v <= 2 ? n.v : 1;
+        return o;
+      })
+      .sort(byBeat);
+  }
+  function cleanHits(list) {
+    const VI = window.VirtualInstruments;
+    return list
+      .filter(h => h && VI.INSTRUMENT_MAP[h.i] && Number.isFinite(h.b))
+      .map(h => ({ i: h.i, b: h.b, g: Number.isFinite(h.g) ? clamp(h.g, 0, 2) : 1, r: Number.isFinite(h.r) && h.r > 0 ? h.r : 0 }))
+      .sort(byBeat);
+  }
+
+  // -------- BLOCKS (note and ostinato tracks) --------
+  // A keyboard, accordion, xylophone or brought-in track is kept as blocks,
+  // as a voice track keeps takes: each block holds what was played (items,
+  // in beats from the block's own beginning) and a window onto it — where
+  // it sits (b), how far in the window opens (o), how long it is (d), how
+  // long what was played is (len). Trimming narrows the window: nothing
+  // played is lost. tr.notes / tr.hits are what the windows let through, in
+  // the song's beats — what plays, draws and goes into a song file.
+  function makeBlock(items, lo, hi) {
+    return { b: lo, o: 0, d: hi - lo, len: hi - lo, items: items.map(n => ({ ...n, b: n.b - lo })) };
+  }
+  // A block round some notes (or hits): from the beat they start on to the
+  // beat after they end. A note played a moment early still counts as on the beat.
+  function blockAround(items, hits) {
+    const lo = Math.floor(Math.min(...items.map(n => n.b)) + EARLY);
+    const hi = Math.ceil(Math.max(...items.map(n => n.b + (hits ? (n.r || 0.25) : n.d))) - 1e-6);
+    return makeBlock(items, lo, Math.max(hi, lo + 1));
+  }
+  function blockView(tr) {
+    const hits = engineOf(tr) === 'hits', out = [];
+    tr.clips.forEach(c => {
+      const end = c.o + c.d;
+      c.items.forEach(n => {
+        if (n.b < c.o - EARLY || n.b >= end - 1e-6) return;
+        const x = { ...n, b: c.b + n.b - c.o };
+        if (!hits && n.b + n.d > end) x.d = Math.max(MIN_HOLD, end - n.b);   // a note held past the end stops there
+        out.push(x);
+      });
+    });
+    out.sort(byBeat);
+    tr.notes = hits ? [] : out;
+    tr.hits = hits ? out : [];
+  }
+  // What a block covers on its track goes, by the tape rules — and only
+  // from view: the blocks underneath keep everything they hold.
+  function cutBlocks(tr, lo, hi) {
+    const out = [];
+    const copy = c => c.items.map(n => ({ ...n }));
+    tr.clips.forEach(c => {
+      const e = c.b + c.d;
+      if (e <= lo || c.b >= hi) { out.push(c); return; }
+      if (c.b < lo) out.push({ ...c, d: lo - c.b, items: copy(c) });
+      if (e > hi) { const cut = hi - c.b; out.push({ ...c, b: hi, o: c.o + cut, d: c.d - cut, items: copy(c) }); }
+    });
+    tr.clips = out;
+  }
 
   // Anything missing or unknown falls back to the default, so every file opens.
   function normalizeTrack(src) {
@@ -125,29 +192,28 @@
     t.muted = src.muted === true;
     t.solo = src.solo === true;
     if (typeof src.sound === 'string' && (Audio.PRESETS[src.sound] || src.sound === 'vibraphone' || src.sound === 'marimba')) t.sound = src.sound;
-    if (Array.isArray(src.notes)) {
-      t.notes = src.notes
-        .filter(n => n && Number.isFinite(n.m) && Number.isFinite(n.b) && Number.isFinite(n.d) && n.m >= 12 && n.m <= 120 && n.d > 0)
-        .map(n => {
-          const o = { m: n.m, b: n.b, d: n.d };
-          if (typeof n.s === 'string') o.s = n.s;
-          o.v = Number.isFinite(n.v) && n.v >= 0 && n.v <= 2 ? n.v : 1;
-          return o;
-        })
-        .sort(byBeat);
-    }
-    if (Array.isArray(src.hits)) {
-      const VI = window.VirtualInstruments;
-      t.hits = src.hits
-        .filter(h => h && VI.INSTRUMENT_MAP[h.i] && Number.isFinite(h.b))
-        .map(h => ({ i: h.i, b: h.b, g: Number.isFinite(h.g) ? clamp(h.g, 0, 2) : 1, r: Number.isFinite(h.r) && h.r > 0 ? h.r : 0 }))
-        .sort(byBeat);
-    }
+    if (Array.isArray(src.notes)) t.notes = cleanNotes(src.notes);
+    if (Array.isArray(src.hits)) t.hits = cleanHits(src.hits);
     if (Array.isArray(src.regions)) {
       t.regions = src.regions
         .filter(r => r && typeof r.c === 'string' && /^[\w-]{1,40}$/.test(r.c) && Number.isFinite(r.b) && Number.isFinite(r.o) && Number.isFinite(r.d) && r.o >= 0 && r.d > 0)
         .map(r => ({ c: r.c, b: r.b, o: r.o, d: r.d }))
         .sort(byBeat);
+    }
+    // A note or ostinato track's blocks: as saved, or one block round what
+    // an older file kept as plain notes. What plays is worked out from them.
+    if (engineOf(t) !== 'audio') {
+      const hits = engineOf(t) === 'hits';
+      if (Array.isArray(src.clips) && src.clips.length) {
+        t.clips = src.clips
+          .filter(c => c && [c.b, c.o, c.d, c.len].every(Number.isFinite) && c.d > 0 && c.o >= 0 && Array.isArray(c.items))
+          .map(c => ({ b: c.b, o: c.o, d: c.d, len: Math.max(c.len, c.o + c.d), items: hits ? cleanHits(c.items) : cleanNotes(c.items) }))
+          .sort(byBeat);
+      } else {
+        const items = hits ? t.hits : t.notes;
+        if (items.length) t.clips = [blockAround(items, hits)];
+      }
+      blockView(t);
     }
     if (src.from && typeof src.from === 'object') {
       t.from = { app: String(src.from.app || ''), title: String(src.from.title || '').slice(0, 80), id: src.from.id ? String(src.from.id) : '' };
@@ -166,6 +232,8 @@
     const tempo = Math.round(Number(src.tempo));
     if (tempo >= TEMPO_MIN && tempo <= TEMPO_MAX) p.tempo = tempo;
     if (METERS[src.meter]) p.meter = src.meter;
+    if (Number.isInteger(src.key) && src.key >= 0 && src.key < 12) p.key = src.key;
+    if (Theory.SCALE_BY_ID[src.scale]) p.scale = src.scale === 'minor' ? 'natural-minor' : src.scale;
     if (typeof src.countIn === 'boolean') p.countIn = src.countIn;
     if (CLICKS.includes(src.click)) p.click = src.click;
     const room = Number(src.room);
@@ -184,8 +252,12 @@
     return {
       ...p,
       tracks: p.tracks.map(tr => {
-        const o = { ...tr, notes: tr.notes.map(n => { const c = { m: n.m, b: r(n.b), d: r(n.d) }; if (n.s) c.s = n.s; if (n.v !== 1) c.v = r(n.v); return c; }) };
-        o.hits = tr.hits.map(h => { const c = { i: h.i, b: r(h.b) }; if (h.g !== 1) c.g = r(h.g); if (h.r) c.r = r(h.r); return c; });
+        const cn = n => { const c = { m: n.m, b: r(n.b), d: r(n.d) }; if (n.s) c.s = n.s; if (n.v !== 1) c.v = r(n.v); return c; };
+        const ch = h => { const c = { i: h.i, b: r(h.b) }; if (h.g !== 1) c.g = r(h.g); if (h.r) c.r = r(h.r); return c; };
+        // what plays (as plain notes, which older copies of the studio read) and the blocks it comes from
+        const o = { ...tr, notes: tr.notes.map(cn) };
+        o.hits = tr.hits.map(ch);
+        o.clips = tr.clips.map(c => ({ b: r(c.b), o: r(c.o), d: r(c.d), len: r(c.len), items: c.items.map(engineOf(tr) === 'hits' ? ch : cn) }));
         o.regions = tr.regions.map(g => ({ c: g.c, b: r(g.b), o: Math.round(g.o * 1e5) / 1e5, d: Math.round(g.d * 1e5) / 1e5 }));
         return o;
       })
@@ -226,15 +298,26 @@
   function pushUndo(label) {
     undo.push({ label, json: JSON.stringify(P) });
     if (undo.length > UNDO_MAX) undo.shift();
+    redo = [];   // something new: what was undone can't come back on top of it
     renderTransport();
   }
   function doUndo() {
     if (busy()) return;
     const u = undo.pop();
     if (!u) return;
+    redo.push({ label: u.label, json: JSON.stringify(P) });
     P = normalizeProject(JSON.parse(u.json));
     afterProjectChange();
     toast('Undone: ' + u.label);
+  }
+  function doRedo() {
+    if (busy()) return;
+    const r = redo.pop();
+    if (!r) return;
+    undo.push({ label: r.label, json: JSON.stringify(P) });
+    P = normalizeProject(JSON.parse(r.json));
+    afterProjectChange();
+    toast('Redone: ' + r.label);
   }
   function afterProjectChange(keepPos) {
     // the armed track stays armed wherever it has moved to (a duplicate, a removal, an undo)
@@ -244,6 +327,7 @@
     if (!keepPos) R.pos = songStart();
     applyLevels();
     if (audioWoken) Audio.setReverb(P.room);
+    if (window.StudioLink) StudioLink.setKey(P.key, P.scale);
     buildTracks();
     renderAll();
     save();
@@ -565,10 +649,13 @@
     const tr = P.tracks[r.armed];
     if (!tr) return;
     pushUndo('the take on track ' + (r.armed + 1));
-    const lo = Math.min(r.from, ...r.take.map(n => n.b));
+    const lo = Math.floor(Math.min(r.from, ...r.take.map(n => n.b)) + EARLY);   // on the beat: a note a moment early still counts
     const hi = Math.max(stop, ...r.take.map(n => n.b + n.d));
     tr.kind = r.inst;
-    tr.notes = tr.notes.filter(n => n.b < lo || n.b >= hi).concat(r.take).sort(byBeat);
+    cutBlocks(tr, lo, hi);
+    tr.clips.push(makeBlock(r.take, lo, hi));
+    tr.clips.sort(byBeat);
+    blockView(tr);
     save();
     if (!storedDelay() && !sessionGet('tip')) {
       sessionSet('tip');
@@ -747,20 +834,25 @@
     return 'Empty';
   }
 
-  function makeLane(wrapCls) {
+  // A click moves the start to the nearest bar line.
+  function placeStart(clientX, wrap) {
+    const rect = wrap.getBoundingClientRect();
+    const bpb = barBeats();
+    const beat = view.start + (clientX - rect.left) / pxPerBeat(rect.width);
+    R.pos = clamp(Math.round(beat / bpb) * bpb, songStart(), view.end - bpb);
+    renderPos();
+  }
+  // grab(e): a lane's own use of a press (a voice take dragged); true = taken
+  function makeLane(wrapCls, grab) {
     const wrap = document.createElement('div');
     wrap.className = 'lane ' + wrapCls;
     const canvas = document.createElement('canvas');
     canvas.setAttribute('aria-hidden', 'true');
     wrap.append(canvas);
-    // a click moves the start to the nearest bar line
     wrap.addEventListener('pointerdown', (e) => {
       if (busy() || e.button > 0) return;
-      const rect = wrap.getBoundingClientRect();
-      const bpb = barBeats();
-      const beat = view.start + (e.clientX - rect.left) / pxPerBeat(rect.width);
-      R.pos = clamp(Math.round(beat / bpb) * bpb, songStart(), view.end - bpb);
-      renderPos();
+      if (grab && grab(e)) return;
+      placeStart(e.clientX, wrap);
     });
     return { wrap, canvas };
   }
@@ -792,7 +884,8 @@
       const name = document.createElement('button');
       name.type = 'button';
       name.className = 'tname';
-      name.addEventListener('click', () => armTrack(i));
+      name.addEventListener('pointerdown', (e) => dragTrack(e, i));
+      name.addEventListener('click', () => { if (performance.now() - dragEnded > 300) armTrack(i); });
 
       const mute = document.createElement('button');
       mute.type = 'button';
@@ -822,7 +915,8 @@
       more.addEventListener('click', (e) => { e.stopPropagation(); openTrackMenu(i, more); });
 
       ctl.append(arm, name, mute, solo, vol, more);
-      const lane = makeLane('track-lane');
+      const lane = makeLane('track-lane', (e) => grabTake(e, i));
+      lane.wrap.addEventListener('pointermove', (e) => { if (!e.buttons) hoverTake(e, i); });
       row.append(ctl, lane.wrap);
       tracksEl.appendChild(row);
       return { row, ctl, arm, name, mute, solo, vol, more, wrap: lane.wrap, canvas: lane.canvas };
@@ -849,6 +943,56 @@
     head.className = 'playhead';
     head.id = 'playhead';
     tracksEl.appendChild(head);
+  }
+
+  // Drag a track by its name, up or down, to put it somewhere else in the
+  // list. The rows in between make room as it goes; a press that doesn't
+  // move is still a click (it arms the track).
+  let dragEnded = 0;
+  function dragTrack(e, i) {
+    if (busy() || e.button > 0 || P.tracks.length < 2) return;
+    const btn = e.currentTarget, id = e.pointerId, startY = e.clientY;
+    const mids = rows.map(r => { const b = r.row.getBoundingClientRect(); return b.top + b.height / 2; });
+    const step = mids.length > 1 ? mids[1] - mids[0] : 0;
+    let on = false, to = i;
+    const move = (ev) => {
+      if (ev.pointerId !== id) return;
+      const dy = ev.clientY - startY;
+      if (!on) {
+        if (Math.abs(dy) < 6) return;
+        on = true;
+        try { btn.setPointerCapture(id); } catch (err) {}
+        document.body.classList.add('dragging-track');
+        rows[i].row.classList.add('lifted');
+      }
+      ev.preventDefault();
+      const y = clamp(mids[i] + dy, mids[0], mids[mids.length - 1]);
+      rows[i].row.style.transform = `translateY(${y - mids[i]}px)`;
+      to = mids.filter((m, k) => k !== i && m < y).length;   // the rows it has passed
+      rows.forEach((r, k) => {
+        if (k === i) return;
+        const shift = i < to && k > i && k <= to ? -step : i > to && k >= to && k < i ? step : 0;
+        r.row.style.transform = shift ? `translateY(${shift}px)` : '';
+      });
+    };
+    const up = (ev) => {
+      if (ev.pointerId !== id) return;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      if (!on) return;
+      dragEnded = performance.now();
+      document.body.classList.remove('dragging-track');
+      rows.forEach(r => { r.row.style.transform = ''; r.row.classList.remove('lifted'); });
+      if (to === i || ev.type === 'pointercancel') return;
+      pushUndo(`moving track ${i + 1} to place ${to + 1}`);
+      const [tr] = P.tracks.splice(i, 1);
+      P.tracks.splice(to, 0, tr);
+      afterProjectChange(true);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   }
 
   function armTrack(i) {
@@ -891,7 +1035,7 @@
     const label = empty && armed && rec ? `For ${PLAYED[R.inst]}` : trackName(tr);
     c.name.innerHTML = `<span class="ticon">${ICON[kind || 'empty']}</span><span class="tlabel">${esc(label)}</span>`;
     c.name.classList.toggle('is-empty', empty);
-    c.name.title = tr.from ? `${trackName(tr)} — brought in from ${FROM_NAME[tr.from.app] || 'another app'}` : trackName(tr);
+    c.name.title = (tr.from ? `${trackName(tr)} — brought in from ${FROM_NAME[tr.from.app] || 'another app'}` : trackName(tr)) + ' · drag up or down to move it';
     c.name.disabled = busy() && !armed;
     c.mute.setAttribute('aria-pressed', String(tr.muted));
     c.mute.title = tr.muted ? 'Muted: not heard, and left out of song files' : 'Mute';
@@ -918,6 +1062,9 @@
       l.canvas.height = Math.round(h * dpr);
       l.w = w; l.h = h; l.dpr = dpr;
     });
+    // where the lanes begin inside #tracks, which holds the playhead (the
+    // ruler row is sticky, so its offsetLeft leaves out the tracks' padding)
+    if (ruler) ruler.x = ruler.wrap.getBoundingClientRect().left - tracksEl.getBoundingClientRect().left - tracksEl.clientLeft;
   }
 
   let cssCache = null;
@@ -981,19 +1128,23 @@
     if (engineOf(tr) === 'audio') { drawTakes(i, l, g, ppb, base); return; }
     if (engineOf(tr) === 'hits') {
       // an ostinato: a row for each instrument, in the order they first play
+      // (every hit the blocks hold, so trimming never reorders the rows)
       const order = [];
-      tr.hits.forEach(h => { if (!order.includes(h.i)) order.push(h.i); });
+      tr.clips.forEach(c => c.items.forEach(h => { if (!order.includes(h.i)) order.push(h.i); }));
       const rowsN = Math.max(1, order.length);
       const rh = (l.h - 6) / rowsN;
       const col = TRACK_COLORS[i % TRACK_COLORS.length];
+      drawBlocks(i, l, g, ppb, base);
       g.fillStyle = col;
-      tr.hits.forEach(h => {
+      const hit = (h, alpha) => {
         const x = (h.b - view.start) * ppb;
         if (x < -4 || x > l.w + 4) return;
         const r = order.indexOf(h.i);
-        g.globalAlpha = base * (0.55 + 0.45 * Math.min(1, h.g));
+        g.globalAlpha = alpha * (0.55 + 0.45 * Math.min(1, h.g));
         g.fillRect(x, 3 + r * rh + rh * 0.15, Math.max(2, Math.min(ppb * 0.22, 6)), Math.max(2, rh * 0.7));
-      });
+      };
+      hiddenOf(i).forEach(h => hit(h, 0.25 * base));
+      tr.hits.forEach(h => hit(h, base));
       g.globalAlpha = 1;
       if (rowsN > 1 && l.h / rowsN >= 9 && ppb * barBeats() > 40) {
         g.font = '700 9px Nunito, system-ui, sans-serif';
@@ -1011,7 +1162,8 @@
       const now = heardBeat(run);
       fresh = run.take.concat([...run.held.values()].flatMap(h => h.ms.map(m => ({ m, b: h.b, d: Math.max(MIN_HOLD, now - h.b) }))));
     }
-    const all = tr.notes.concat(fresh);
+    // the pitch range: every note the blocks hold, so trimming never rescales the lane
+    const all = tr.clips.flatMap(c => c.items).concat(tr.notes, fresh);
     if (!all.length) {
       g.fillStyle = cssVar('--text-3');
       g.font = '700 12px Nunito, system-ui, sans-serif';
@@ -1041,10 +1193,145 @@
       }
       g.fillRect(x, y(n.m), w, nh);
     };
+    drawBlocks(i, l, g, ppb, base);
+    hiddenOf(i).forEach(n => paint(n, 0.25 * base));   // what a block being dragged hides: an end can open it up again
     // while a take goes on, what it will replace is shown faint
     tr.notes.forEach(n => paint(n, taking && n.b >= run.from - run.count ? 0.25 : base));
     fresh.forEach(n => paint(n, 1));
     g.globalAlpha = 1;
+  }
+
+  // A note track's blocks: a faint box each, with its two ends marked (what a
+  // press there trims).
+  function drawBlocks(i, l, g, ppb, base) {
+    const tr = P.tracks[i];
+    g.fillStyle = TRACK_COLORS[i % TRACK_COLORS.length];
+    tr.clips.forEach(c => {
+      const x0 = (c.b - view.start) * ppb, x1 = x0 + c.d * ppb;
+      if (x1 < 0 || x0 > l.w) return;
+      g.globalAlpha = 0.1 * base;
+      g.fillRect(x0, 3, x1 - x0, l.h - 6);
+      g.globalAlpha = 0.8 * base;
+      g.fillRect(Math.round(x0), 3, 2, l.h - 6);
+      g.fillRect(Math.round(x1) - 2, 3, 2, l.h - 6);
+    });
+    g.globalAlpha = 1;
+  }
+  // What the window of the block being dragged leaves out, in the song's beats.
+  function hiddenOf(i) {
+    const tr = P.tracks[i];
+    if (!takeEdit || takeEdit.i !== i || engineOf(tr) === 'audio') return [];
+    const c = takeEdit.g, end = c.o + c.d;
+    return c.items.filter(n => n.b < c.o - EARLY || n.b >= end - 1e-6).map(n => ({ ...n, b: c.b + n.b - c.o }));
+  }
+
+  // -------- MOVING AND TRIMMING TAKES AND BLOCKS --------
+  // Drag a voice take or a note track's block left or right to move it (by
+  // whole beats; Option/Alt for finer), or drag one of its ends to trim it.
+  // Trimming only narrows the window ({ o, d }): the sound or notes cut off
+  // are kept, and the same end dragged back out opens them up again. One
+  // moved or widened over another covers it, by the tape rules (the one
+  // covered keeps everything it holds too).
+  const TAKE_MIN = 0.05;   // seconds: the shortest a voice take can be trimmed to
+  const BLOCK_MIN = 0.25;  // beats: the shortest a block can be
+  let takeEdit = null;     // { i, g } while a take or block is being dragged
+  function takeAt(e, i) {
+    const tr = P.tracks[i], l = rows[i];
+    if (!tr || !l) return null;
+    const audio = engineOf(tr) === 'audio';
+    const list = audio ? tr.regions : tr.clips;
+    const u = audio ? 60 / P.tempo : 1;   // a window's units in a beat: seconds for a take, beats for a block
+    const rect = l.wrap.getBoundingClientRect();
+    const ppb = pxPerBeat(rect.width), x = e.clientX - rect.left;
+    for (let k = list.length - 1; k >= 0; k--) {
+      const g = list[k];
+      const x0 = (g.b - view.start) * ppb, x1 = x0 + g.d / u * ppb;
+      const edge = Math.min(8, (x1 - x0) / 3);
+      if (x < x0 - 4 || x > x1 + 4) continue;
+      return { g, rect, ppb, u, audio, how: x <= x0 + edge ? 'start' : x >= x1 - edge ? 'end' : 'move' };
+    }
+    return null;
+  }
+  function hoverTake(e, i) {
+    const hit = busy() ? null : takeAt(e, i);
+    rows[i].wrap.style.cursor = !hit ? '' : hit.how === 'move' ? 'grab' : 'ew-resize';
+  }
+  function grabTake(e, i) {
+    const hit = takeAt(e, i);
+    if (!hit) return false;
+    const tr = P.tracks[i], g = hit.g, u = hit.u, bpb = barBeats();
+    const wrap = rows[i].wrap, id = e.pointerId, startX = e.clientX;
+    const was = { b: g.b, o: g.o, d: g.d };
+    const c = hit.audio ? StudioVoice.clip(g.c) : null;
+    // how far the window can open: the whole recording (one not loaded yet can't
+    // be opened up), or everything the block holds
+    const full = hit.audio ? (c ? c.data.length / c.rate : g.o + g.d) : g.len;
+    const least = hit.audio ? TAKE_MIN : BLOCK_MIN;
+    const looked = () => { if (!hit.audio) blockView(tr); drawLane(i); };
+    const snapPx = 6;
+    // an edge lands on a beat line when it comes within a few pixels of one
+    const magnet = (beat, free) => {
+      if (free) return beat;
+      const n = Math.round(beat);
+      return Math.abs(n - beat) * hit.ppb < snapPx ? n : beat;
+    };
+    let on = false;
+    const move = (ev) => {
+      if (ev.pointerId !== id) return;
+      const dx = ev.clientX - startX;
+      if (!on) {
+        if (Math.abs(dx) < 4) return;
+        on = true;
+        try { wrap.setPointerCapture(id); } catch (err) {}
+        takeEdit = { i, g };
+        document.body.classList.add(hit.how === 'move' ? 'dragging-take' : 'trimming-take');
+      }
+      ev.preventDefault();
+      const beats = dx / hit.ppb;
+      if (hit.how === 'move') {
+        g.b = Math.max(-bpb, was.b + (ev.altKey ? beats : Math.round(beats)));
+      } else if (hit.how === 'start') {
+        let b = magnet(was.b + beats, ev.altKey);
+        b = clamp(b, Math.max(-bpb, was.b - was.o / u), was.b + (was.d - least) / u);
+        const ds = (b - was.b) * u;
+        g.b = b; g.o = was.o + ds; g.d = was.d - ds;
+      } else {
+        const end = magnet(was.b + was.d / u + beats, ev.altKey);
+        g.d = clamp((end - was.b) * u, least, full - was.o);
+      }
+      looked();
+    };
+    const up = (ev) => {
+      if (ev.pointerId !== id) return;
+      wrap.removeEventListener('pointermove', move);
+      wrap.removeEventListener('pointerup', up);
+      wrap.removeEventListener('pointercancel', up);
+      takeEdit = null;
+      document.body.classList.remove('dragging-take', 'trimming-take');
+      if (!on) { placeStart(ev.clientX, wrap); return; }   // a click on a take: Play starts at that bar, as anywhere
+      const now = { b: g.b, o: g.o, d: g.d };
+      Object.assign(g, was);
+      if (ev.type === 'pointercancel' || (now.b === was.b && now.o === was.o && now.d === was.d)) { looked(); return; }
+      pushUndo(`${hit.how === 'move' ? 'moving' : 'trimming'} ${hit.audio ? 'the take' : 'the part'} on track ${i + 1}`);
+      Object.assign(g, now);
+      if (hit.audio) {
+        tr.regions = tr.regions.filter(r => r !== g);
+        cutRegions(tr, g.b, regionEnd(g));
+        tr.regions.push(g);
+        tr.regions.sort(byBeat);
+      } else {
+        tr.clips = tr.clips.filter(k => k !== g);
+        cutBlocks(tr, g.b, g.b + g.d);
+        tr.clips.push(g);
+        tr.clips.sort(byBeat);
+        blockView(tr);
+      }
+      afterProjectChange(true);
+    };
+    wrap.addEventListener('pointermove', move);
+    wrap.addEventListener('pointerup', up);
+    wrap.addEventListener('pointercancel', up);
+    return true;
   }
 
   // A voice track: each take's waveform, in the track's colour.
@@ -1073,11 +1360,29 @@
       }
     };
     const need = [];
+    const edited = takeEdit && takeEdit.i === i ? takeEdit.g : null;
+    if (edited) {   // the whole recording, faint, behind the take being trimmed or moved: what an edge can open up again
+      const c = StudioVoice.clip(edited.c);
+      if (c) wave(edited.b - edited.o / spb, 0, c.data.length / c.rate, c.peaks, 0.3 * base);
+    }
     tr.regions.forEach(r => {
+      if (r === edited) return;
       const c = StudioVoice.clip(r.c);
       if (!c && !StudioVoice.isMissing(r.c)) need.push(r.c);
       wave(r.b, r.o, r.d, c ? c.peaks : null, taking && regionEnd(r) > run.from ? 0.25 * base : base);
     });
+    if (edited) { const c = StudioVoice.clip(edited.c); wave(edited.b, edited.o, edited.d, c ? c.peaks : null, base); }
+    // each take's two ends: what a press there trims
+    if (!taking) {
+      g.fillStyle = col;
+      g.globalAlpha = 0.8 * base;
+      tr.regions.forEach(r => {
+        const x0 = (r.b - view.start) * ppb, x1 = x0 + r.d / spb * ppb;
+        if (x1 < 0 || x0 > l.w) return;
+        g.fillRect(Math.round(x0), 3, 2, l.h - 6);
+        g.fillRect(Math.round(x1) - 2, 3, 2, l.h - 6);
+      });
+    }
     if (need.length) StudioVoice.load(need).then(() => drawLane(i));
     if (taking && run.capture.t0 != null) {   // the take as it comes in
       const c = run.capture;
@@ -1104,7 +1409,7 @@
     const l = ruler;
     if (!head || !l || !l.w) return;
     const x = (beat - view.start) * pxPerBeat(l.w);
-    head.style.transform = `translateX(${l.wrap.offsetLeft + x}px)`;
+    head.style.transform = `translateX(${l.x + x}px)`;
     head.style.visibility = x < 0 || x > l.w ? 'hidden' : '';
   }
 
@@ -1187,9 +1492,9 @@
   document.addEventListener('pointerdown', (e) => { if (!menu.hidden && !menu.contains(e.target) && !e.target.closest('.more')) closeMenu(); });
 
   function shiftTrack(tr, beats) {
-    tr.notes.forEach(n => { n.b += beats; });
-    tr.hits.forEach(h => { h.b += beats; });
+    tr.clips.forEach(c => { c.b += beats; });
     tr.regions.forEach(g => { g.b += beats; });
+    if (engineOf(tr) !== 'audio') blockView(tr);
   }
   function trackAction(i, act, grid) {
     const tr = P.tracks[i];
@@ -1203,12 +1508,21 @@
     } else if (act === 'tidy') {
       const gs = Number(grid);
       pushUndo(`tidying track ${i + 1}`);
-      tr.notes.forEach(n => {
-        const b = Math.round(n.b / gs) * gs;
-        const end = n.d >= gs * 0.75 ? Math.max(b + gs, Math.round((n.b + n.d) / gs) * gs) : b + n.d;
-        n.b = b; n.d = Math.max(MIN_HOLD, end - b);
+      // every note a block holds, hidden or not, put on the grid as the song counts
+      if (engineOf(tr) === 'notes' || engineOf(tr) === 'strikes') tr.clips.forEach(c => {
+        const at = c.b - c.o;   // the song's beat for the block's own 0
+        const lo = c.b - EARLY, hi = c.b + c.d - 1e-6;   // the window, as the song counts
+        c.items.forEach(n => {
+          const nb = at + n.b;
+          let b = Math.round(nb / gs) * gs;
+          // a note heard now stays heard: never put out of its block's window
+          if (nb >= lo && nb < hi) { if (b >= hi) b -= gs; else if (b < lo) b += gs; }
+          const end = n.d >= gs * 0.75 ? Math.max(b + gs, Math.round((nb + n.d) / gs) * gs) : b + n.d;
+          n.b = b - at; n.d = Math.max(MIN_HOLD, end - b);
+        });
+        c.items.sort(byBeat);
       });
-      tr.notes.sort(byBeat);
+      blockView(tr);
       toast(`Track ${i + 1}: every note moved to the nearest ${({ 1: 'beat', 0.5: 'eighth', 0.25: 'sixteenth' })[gs] || 'triplet'}.`);
     } else if (act === 'dup') {
       if (P.tracks.length >= MAX_TRACKS) return;
@@ -1253,12 +1567,16 @@
     [tempoInput, meterSelect, countInBtn, el('tempo-down'), el('tempo-up'), el('bring-btn')].forEach(c => { c.disabled = busy(); });
     undoBtn.disabled = busy() || !undo.length;
     undoBtn.title = undo.length ? 'Undo ' + undo[undo.length - 1].label : 'Nothing to undo';
+    redoBtn.hidden = !redo.length;   // shows once Undo has taken something back
+    redoBtn.disabled = busy();
+    redoBtn.title = redo.length ? 'Redo ' + redo[redo.length - 1].label : '';
   }
   function renderSettings() {
     tempoInput.value = P.tempo;
     meterSelect.value = P.meter;
     countInBtn.setAttribute('aria-pressed', String(P.countIn));
     clickSelect.value = P.click;
+    renderKey();
   }
   function renderAll() {
     if (!P) return;
@@ -1280,6 +1598,7 @@
   recordBtn.addEventListener('click', toggleRecord);
   homeBtn.addEventListener('click', () => { if (!busy()) { R.pos = songStart(); renderPos(); } });
   undoBtn.addEventListener('click', doUndo);
+  redoBtn.addEventListener('click', doRedo);
 
   function setTempo(v) {
     v = Math.round(Number(v));
@@ -1297,6 +1616,44 @@
   tempoInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tempoInput.blur(); });
   el('tempo-down').addEventListener('click', () => setTempo(P.tempo - 1));
   el('tempo-up').addEventListener('click', () => setTempo(P.tempo + 1));
+  // The key: one for the whole project, played by every instrument (link.js
+  // hands it to each as it joins and whenever it changes). The scale menu is
+  // the Virtual Keyboard's: Theory's scales, Minor listed once (as Natural Minor).
+  const keySelect = el('key-select'), scaleSelect = el('scale-select');
+  const prettyNote = n => n[0] + n.slice(1).replace(/#/g, '♯').replace(/b/g, '♭');
+  (function fillScales() {
+    const fams = [];
+    Theory.SCALES.forEach(sc => {
+      if (sc.id === 'minor') return;
+      let f = fams.find(x => x.name === sc.family);
+      if (!f) fams.push(f = { name: sc.family, items: [] });
+      f.items.push(sc);
+    });
+    scaleSelect.innerHTML = fams.map(f => `<optgroup label="${esc(f.name)}">${f.items.map(sc => `<option value="${sc.id}">${esc(sc.name)}</option>`).join('')}</optgroup>`).join('');
+  })();
+  function renderKey() {
+    // the keys spelled as this scale spells its tonic (C♯ minor, D♭ major)
+    keySelect.innerHTML = Array.from({ length: 12 }, (_, pc) => `<option value="${pc}">${prettyNote(Theory.tonicName(pc, P.scale))}</option>`).join('');
+    keySelect.value = String(P.key);
+    scaleSelect.value = P.scale;
+  }
+  function setProjectKey(pc, scale) {
+    P.key = pc;
+    P.scale = scale;
+    renderKey();
+    save();
+    if (window.StudioLink) StudioLink.setKey(P.key, P.scale);
+  }
+  keySelect.addEventListener('change', () => { setProjectKey(Number(keySelect.value), P.scale); keySelect.blur(); });
+  scaleSelect.addEventListener('change', () => { setProjectKey(P.key, scaleSelect.value); scaleSelect.blur(); });
+  // A key by name ('F#', 'Bb', 'E♭') → its pitch class, or -1.
+  function keyPc(name) {
+    const n = String(name || '').trim().replace(/♯/g, '#').replace(/♭/g, 'b');
+    const k = n ? n[0].toUpperCase() + n.slice(1) : '';
+    const i = Theory.TONIC_FLAT.indexOf(k);
+    return i >= 0 ? i : Theory.TONIC_SHARP.indexOf(k);
+  }
+
   meterSelect.addEventListener('change', () => { P.meter = meterSelect.value; meterSelect.blur(); R.pos = songStart(); renderAll(); save(); });
   countInBtn.addEventListener('click', () => { P.countIn = !P.countIn; renderSettings(); save(); });
   clickSelect.addEventListener('change', () => { P.click = clickSelect.value; clickSelect.blur(); save(); });
@@ -1321,18 +1678,10 @@
       b.disabled = R.state === 'recording' || (R.state === 'priming' && R.priming === 'recording');
     });
   }
+  // Beside the tabs: the showing instrument's own sound and layout controls
+  // (inst-controls.js), in the place a line of words used to take.
   function renderInstBar() {
-    const s = el('inst-status');
-    const tr = P.tracks[R.armed];
-    const label = PLAYED[R.inst];
-    let text;
-    if (R.state === 'recording') text = `<span class="rec-dot-inline"></span> Recording ${label} onto track ${R.armed + 1}`;
-    else if (R.state === 'priming' && R.priming === 'recording') text = 'Get ready…';
-    else if (!tr || !recordable(tr)) text = 'Pick a track to record onto (its round button).';
-    else if (!hasContent(tr)) text = `Track ${R.armed + 1} is empty: press <span class="rec-dot-inline"></span> to record ${label} onto it.`;
-    else if (tr.kind === R.inst) text = `Track ${R.armed + 1} · ${esc(trackName(tr))}: <span class="rec-dot-inline"></span> records over it from where you start.`;
-    else text = `Track ${R.armed + 1} is ${PLAYED[tr.kind] || 'another instrument'}'s.`;
-    s.innerHTML = text;
+    if (window.InstControls) InstControls.render(R.inst);
   }
 
   // Sharing the screen: drag the bar between the tracks and the instrument.
@@ -1429,7 +1778,7 @@
       const gone = clipIds(normalizeProject(projects[id]).tracks);
       delete projects[id];
       saveJSON(PROJECTS_KEY, projects);
-      if (id === P.id) { P = blankProject(); undo = []; afterProjectChange(); }
+      if (id === P.id) { P = blankProject(); undo = []; redo = []; afterProjectChange(); }
       forgetUnused(gone);
       renderProjectList();
       renderProjectChip();
@@ -1439,7 +1788,7 @@
   function usedClips() {
     const used = new Set(clipIds(P.tracks));
     Object.values(projects).forEach(p => clipIds(normalizeProject(p).tracks).forEach(c => used.add(c)));
-    undo.forEach(u => { try { clipIds(normalizeProject(JSON.parse(u.json)).tracks).forEach(c => used.add(c)); } catch (e) {} });
+    undo.concat(redo).forEach(u => { try { clipIds(normalizeProject(JSON.parse(u.json)).tracks).forEach(c => used.add(c)); } catch (e) {} });
     return used;
   }
   function forgetUnused(candidates) {
@@ -1450,7 +1799,7 @@
     if (busy()) stopRun();
     saveNow();
     P = normalizeProject(projects[id]);
-    undo = [];
+    undo = []; redo = [];
     saveJSON(CURRENT_KEY, P.id);
     afterProjectChange();
     el('project-name').value = P.name;
@@ -1474,7 +1823,7 @@
   el('project-new').addEventListener('click', () => {
     saveNow();
     P = blankProject();
-    undo = [];
+    undo = []; redo = [];
     R.armed = 0;
     afterProjectChange();
     el('project-name').value = '';
@@ -1488,7 +1837,7 @@
     copy.name = ((P.name || 'Untitled project') + ' (copy)').slice(0, 60);
     copy.createdAt = Date.now();
     P = copy;
-    undo = [];
+    undo = []; redo = [];
     saveNow();
     el('project-name').value = P.name;
     renderProjectList();
@@ -1541,7 +1890,7 @@
       if (data.clips) { el('project-status').textContent = 'Unpacking the voice takes…'; await StudioVoice.importClips(data.clips); }
       P = normalizeProject(data);
       if (projects[P.id]) P.id = newId('p');   // opened as a project of its own, never over one kept here
-      undo = [];
+      undo = []; redo = [];
       afterProjectChange();
       saveNow();
       el('project-name').value = P.name;
@@ -1875,6 +2224,7 @@
     get project() { return P; },
     get state() { return R; },
     barBeats, hasContent, recordable, blankTrack, normalizeTrack,
+    get key() { return { pc: P.key, scale: P.scale }; },
     icon: k => ICON[k] || '',
     // Put brought-in tracks on the first empty tracks (adding tracks as needed).
     // Returns how many went in, or 0 when there was no room.
@@ -1886,6 +2236,10 @@
       pushUndo(opts && opts.label ? opts.label : 'bringing in a song');
       if (opts && opts.tempo) P.tempo = clamp(Math.round(opts.tempo), TEMPO_MIN, TEMPO_MAX);
       if (opts && opts.meter && METERS[opts.meter]) P.meter = opts.meter;
+      if (opts && opts.key && keyPc(opts.key.name) >= 0) {   // a song brings its key: the instruments play in it
+        P.key = keyPc(opts.key.name);
+        if (Theory.SCALE_BY_ID[opts.key.scale]) P.scale = opts.key.scale === 'minor' ? 'natural-minor' : opts.key.scale;
+      }
       const placed = [];
       tracks.forEach(t => {
         const nt = normalizeTrack(t);

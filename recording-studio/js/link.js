@@ -94,7 +94,11 @@
         on(id, freqs, sound, level) { if (Array.isArray(freqs) && freqs.length) Studio.noteOn(kind, key(id), freqs, sound, level); },
         off(id) { Studio.noteOff(kind, key(id)); },
         hit(freqs, sound, level) { if (Array.isArray(freqs) && freqs.length) Studio.noteHit(kind, freqs, sound, level); },
-        offer(api) { src.api = api && typeof api === 'object' ? api : null; }
+        offer(api) {
+          src.api = api && typeof api === 'object' ? api : null;
+          src.keyGiven = null;
+          setTimeout(() => giveKey(src), 0);   // once the app has finished starting
+        }
       };
     }
   };
@@ -110,7 +114,8 @@
     f.src = src.url;
     f.addEventListener('load', () => {
       f.classList.add('loaded');
-      if (shown === kind) focusFrame(kind);
+      giveKey(src);
+      if (shown === kind) { focusFrame(kind); if (window.InstControls) InstControls.render(kind); }
     });
     stage.appendChild(f);
     src.iframe = f;
@@ -142,6 +147,7 @@
     empty.hidden = true;
     document.getElementById('voice-panel').hidden = !voice;
     if (typeof StudioVoice !== 'undefined') StudioVoice.shown(voice);   // (a global const, not window.StudioVoice)
+    if (window.InstControls) InstControls.render(kind);
     if (voice) { stage.classList.remove('loading'); return; }
     const f = frameFor(kind);
     f.classList.add('active');
@@ -173,6 +179,18 @@
     target.dispatchEvent(ev);
   }
 
+  // -------- THE KEY --------
+  // Every instrument plays in the project's key: given as it joins, and again
+  // whenever the key changes (an instrument already in it is left alone).
+  function giveKey(src) {
+    const key = Studio.key;
+    if (!src || !src.api || !src.api.setKey || !key) return;
+    const k = key.pc + ' ' + key.scale;
+    if (src.keyGiven === k) return;
+    try { src.api.setKey(key.pc, key.scale); src.keyGiven = k; } catch (e) {}
+  }
+  function setKey() { Object.values(SOURCES).forEach(giveKey); }
+
   function setSound(kind, id) {
     const src = SOURCES[kind];
     try { if (src && src.api && src.api.setSound) src.api.setSound(id); } catch (e) {}
@@ -186,5 +204,5 @@
     setTimeout(() => { if (!Studio.sheetOpen() && document.getElementById('track-menu').hidden) focusFrame(shown); }, 0);
   });
 
-  window.StudioLink = { show, inputStamp, forward, setSound, sources: SOURCES };
+  window.StudioLink = { show, inputStamp, forward, setSound, setKey, focus: () => focusFrame(shown), sources: SOURCES };
 })();

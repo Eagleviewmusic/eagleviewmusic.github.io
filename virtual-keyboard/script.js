@@ -1565,9 +1565,15 @@ function layoutFromUrl() {
 // -------- START --------
 try { if (window.self !== window.top) root.classList.add('in-iframe'); } catch (e) { root.classList.add('in-iframe'); }
 // What the studio may ask: put a track's sound back on the keyboard when that
-// track is picked again, and let go of every key.
+// track is picked again, play in the project's key (pitch class 0 = C, a
+// Theory scale id), and let go of every key.
 if (STUDIO) STUDIO.offer({
   setSound(id) { if (Audio.PRESETS[id] && id !== currentSound) { currentSound = id; renderChrome(); } },
+  setKey(pc, scaleId) {
+    if (scaleId === 'minor') scaleId = 'natural-minor';   // the same notes; this menu lists it once
+    if (Theory.SCALE_BY_ID[scaleId]) scaleSelector.value = scaleId;
+    setKey(PHYSICAL_NAMES[((pc % 12) + 12) % 12]);       // (the function above: redraws in the new scale too)
+  },
   releaseAll() { [...active.keys()].forEach(stopNote); }
 });
 fillSoundSelect();

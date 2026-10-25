@@ -2672,7 +2672,18 @@ function layoutFromUrl() {
 
 function start() {
   try { if (window.self !== window.top) document.documentElement.classList.add('in-iframe'); } catch (e) { document.documentElement.classList.add('in-iframe'); }
-  if (studio) studio.offer({ releaseAll: stopAllBlocks });   // what the studio may ask
+  // what the studio may ask: let go of everything, and play in the project's
+  // key (pitch class 0 = C, a Theory scale id) — a board in that key already
+  // (minor or natural minor alike) is left as it is
+  if (studio) studio.offer({
+    releaseAll: stopAllBlocks,
+    setKey(pc, scaleId) {
+      if (!layout) return;
+      const same = (a, b) => a === b || (isBuiltIn(a) && isBuiltIn(b) && T.SCALE_BY_ID[a].degrees.join() === T.SCALE_BY_ID[b].degrees.join());
+      if (isBuiltIn(scaleId) && !same(layout.scale, scaleId)) setScale(scaleId);
+      if (Number.isInteger(pc) && layout.key !== ((pc % 12) + 12) % 12) setKey(pc);
+    }
+  });
   document.documentElement.dataset.style = 'accordion';   // the only look
   wireTopbar(); wireSettings();
   let L = layoutFromUrl();
