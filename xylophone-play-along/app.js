@@ -33,7 +33,7 @@
   const pct = i => (100 - i * 4) / 100;
 
   const VIDEOS = window.XB_VIDEOS;
-  const DEFAULTS = { side: 'left', sound: 'vibraphone', high: false, xyloVol: 70, videoVol: 100, unused: false, names: true, keys: false };
+  const DEFAULTS = { side: 'left', sound: 'vibraphone', high: false, xyloVol: 70, videoVol: 100, unused: false, names: true, keys: false, tabs: true };
   const store = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
@@ -109,6 +109,22 @@
       nav.appendChild(tab);
     });
   }
+
+  /* the button beside the tabs folds the whole row away, and brings it back */
+  function showTabs(open) {
+    const fold = $('fold'), label = open ? 'Hide the videos' : 'Show the videos';
+    $('tabs').hidden = !open;
+    fold.setAttribute('aria-expanded', open);
+    fold.setAttribute('aria-label', label);
+    fold.title = label;
+    fitTitle();   // the stage's new height re-lays the instrument (ResizeObserver)
+  }
+  $('fold').addEventListener('click', () => {
+    S.tabs = !S.tabs;
+    store.set('xbpa.settings', S);
+    showTabs(S.tabs);
+    focusStage();
+  });
 
   function choose(v) {
     if (!v || v === video) return;
@@ -535,6 +551,7 @@
 
   history.replaceState(null, '', '#' + video.slug);
   drawTabs();
+  showTabs(S.tabs);
   drawXylophone();
   drawPiano();
   refreshInstrument();

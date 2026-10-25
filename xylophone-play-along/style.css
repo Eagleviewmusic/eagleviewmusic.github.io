@@ -76,12 +76,28 @@ button:focus-visible, input:focus-visible { outline: 3px solid #fbbf24; outline-
   .topbar.stack .app-title { font-size: clamp(17px, 1.7vw, 24px); line-height: 1.05; height: 46px; display: flex; flex-direction: column; justify-content: center; }
   .topbar.stack .app-title span { display: block; }
   .topbar.stack .tabs { gap: 6px; }
-  .topbar.stack .tab { padding: 0 6px; }
+  .topbar.stack .tab { padding: 0 5px; gap: 3px; }
 }
 
 .tabs { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; padding: 2px; }
+.tabs[hidden] { display: none; }
 
-.tab, .gear, .home-btn {
+/* folds the tabs away: the arrow points back (‹) while they show, out (›) when they are hidden */
+.fold {
+  flex: 0 0 auto;
+  height: 42px;
+  margin-top: 2px;
+  padding: 0 6px 0 9px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  color: #3e2723;
+}
+.fold .film { width: 22px; height: 22px; }
+.fold .arrow { width: 16px; height: 16px; transform: rotate(180deg); transition: transform 0.25s; }
+.fold[aria-expanded="false"] .arrow { transform: none; }
+
+.tab, .gear, .home-btn, .fold {
   background: rgba(255, 255, 255, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 10px;
@@ -91,8 +107,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid #fbbf24; outline-
   cursor: pointer;
   transition: background 0.2s, transform 0.1s;
 }
-.tab:hover, .gear:hover, .home-btn:hover { background: rgba(255, 255, 255, 0.38); }
-.tab:active, .gear:active, .home-btn:active { transform: scale(0.95); }
+.tab:hover, .gear:hover, .home-btn:hover, .fold:hover { background: rgba(255, 255, 255, 0.38); }
+.tab:active, .gear:active, .home-btn:active, .fold:active { transform: scale(0.95); }
 .topbar .home-btn { border-radius: 999px; }
 
 .tab {
