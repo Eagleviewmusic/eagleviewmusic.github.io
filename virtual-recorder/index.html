@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recorder Note Player</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 10px 0 0 0;
+      font-family: sans-serif;
+      background: white;
+      width: 100vw;
+      min-height: 100vh;
+    }
+    body {
+      min-height: 100vh;
+      min-width: 100vw;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .app-center-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+      min-width: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .scaling-outer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform-origin: center center;
+    }
+    .scaling-wrapper {
+      display: flex;
+      align-items: flex-start;
+      gap: 22px;
+    }
+
+    /* The recorder picture, with the tips and the "other fingering" button under it */
+    .recorder-col {
+      width: 180px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #recorder {
+      width: 160px;
+      height: 530px;
+      display: block;
+    }
+    .tip-area {
+      width: 180px;
+      height: 62px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      text-align: center;
+      font-size: 11.5px;
+      line-height: 1.3;
+      color: #374151;
+    }
+    .tip-area .hint { color: #9ca3af; }
+    .alt-btn {
+      font: 700 11.5px/1 sans-serif;
+      padding: 6px 11px;
+      border-radius: 9999px;
+      border: 1.5px solid #e69e22;
+      background: #fff7e6;
+      color: #8a5a00;
+      cursor: pointer;
+    }
+    .alt-btn:hover { background: #ffecc2; }
+
+    /* The notes, laid out like a piano standing on its end: low C at the bottom,
+       the sharps and flats in their own column between the letters they sit between */
+    .note-pad {
+      position: relative;
+      width: 154px;
+      height: 592px;
+    }
+    .note-btn {
+      position: absolute;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 7px 0 9px;
+      border: 1px solid rgba(0, 0, 0, 0.28);
+      border-radius: 7px;
+      box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+      font-family: inherit;
+      font-weight: bold;
+      cursor: pointer;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      transition: transform 0.08s ease, filter 0.08s ease;
+    }
+    .note-btn.natural {
+      left: 0;
+      width: 82px;
+      height: 33px;
+      font-size: 19px;
+    }
+    .note-btn.sharp {
+      left: 90px;
+      width: 64px;
+      height: 28px;
+      padding-left: 7px;
+    }
+    .note-btn .names {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      line-height: 1;
+    }
+    .note-btn.sharp .names b { font-size: 14px; }
+    .note-btn.sharp .names small { font-size: 10px; opacity: 0.8; margin-top: 1px; }
+    .note-btn .acc { margin-left: -0.12em; }
+    .note-btn .key {
+      font: 11px monospace;
+      opacity: 0.6;
+      text-transform: uppercase;
+    }
+    .note-btn.selected {
+      outline: 3px solid #1f2937;
+      outline-offset: 1px;
+      z-index: 1;
+    }
+    .note-btn.active {
+      transform: scale(1.08);
+      filter: brightness(1.12);
+      z-index: 2;
+    }
+    .note-btn:focus { outline: none; }
+    .note-btn:focus-visible { outline: 3px solid #2563eb; outline-offset: 1px; }
+    .note-btn.selected:focus-visible { outline-color: #1f2937; }
+    @media (hover: none) and (pointer: coarse) {
+      .note-btn .key { display: none; }
+    }
+
+    /* G major: ten big buttons in one column, low C at the bottom */
+    .note-pad.gmajor {
+      width: 124px;
+      height: 574px;
+    }
+    .note-btn.scale-note {
+      left: 0;
+      width: 124px;
+      height: 52px;
+      font-size: 24px;
+      padding: 0 10px 0 14px;
+    }
+
+    /* ----- settings ----- */
+    /* the header's padding used to push it 20px wider than the window, hiding anything at its right edge */
+    #app-header { box-sizing: border-box; }
+    .gear-btn {
+      position: absolute;
+      top: 50%;
+      right: 10px;
+      transform: translateY(-50%);
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(30, 41, 59, 0.88);
+      color: #f1f5f9;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .gear-btn:hover, .gear-btn[aria-expanded="true"] { background: #334155; color: #74B9FF; }
+    .gear-btn svg { width: 19px; height: 19px; }
+
+    .settings-panel {
+      position: fixed;
+      top: 44px;
+      right: 0;
+      bottom: 0;
+      width: min(360px, 100vw);
+      z-index: 9998;
+      box-sizing: border-box;
+      padding: 12px 16px 28px;
+      overflow-y: auto;
+      background: #ffffff;
+      border-left: 1px solid #e5e7eb;
+      box-shadow: -6px 0 24px rgba(0, 0, 0, 0.15);
+      font: 14px/1.4 system-ui, -apple-system, sans-serif;
+      color: #1f2937;
+      visibility: hidden;
+      transform: translateX(105%);
+      transition: transform 0.2s ease, visibility 0s 0.2s;
+    }
+    .settings-panel.open {
+      visibility: visible;
+      transform: none;
+      transition: transform 0.2s ease;
+    }
+    .sp-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sp-head h2 {
+      margin: 0;
+      font: normal 24px 'Lobster', cursive;
+      color: #e69e22;
+    }
+    .sp-close {
+      border: 0;
+      background: none;
+      padding: 2px 6px;
+      font-size: 28px;
+      line-height: 1;
+      color: #6b7280;
+      cursor: pointer;
+    }
+    .sp-section { margin-top: 16px; }
+    .sp-section h3 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #6b7280;
+    }
+    .sp-group {
+      margin: 18px 0 4px;
+      padding-top: 10px;
+      border-top: 1px solid #f3f4f6;
+      font-weight: 800;
+      font-size: 13px;
+      color: #8a5a00;
+    }
+    .view-choice {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .view-choice button {
+      padding: 10px;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      background: #ffffff;
+      font: inherit;
+      text-align: left;
+      color: inherit;
+      cursor: pointer;
+    }
+    .view-choice button b { display: block; font-size: 15px; }
+    .view-choice button small { display: block; margin-top: 2px; font-size: 12px; color: #6b7280; }
+    .view-choice button[aria-checked="true"] { border-color: #e69e22; background: #fff7e6; }
+    .sp-row { margin: 12px 0; }
+    .sp-row.off { opacity: 0.45; }
+    .sp-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 13.5px;
+    }
+    .sp-value {
+      font-weight: 600;
+      color: #8a5a00;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .sp-row input[type="range"] {
+      width: 100%;
+      margin: 6px 0 1px;
+      accent-color: #e69e22;
+    }
+    .sp-ends {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #9ca3af;
+    }
+    .sp-hint {
+      margin-top: 3px;
+      font-size: 11.5px;
+      color: #6b7280;
+    }
+    .seg {
+      display: flex;
+      margin-top: 6px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 9px;
+      overflow: hidden;
+    }
+    .seg button {
+      flex: 1;
+      padding: 7px 4px;
+      border: 0;
+      border-left: 1px solid #e5e7eb;
+      background: #ffffff;
+      font: 600 13px system-ui, -apple-system, sans-serif;
+      color: #374151;
+      cursor: pointer;
+    }
+    .seg button:first-child { border-left: 0; }
+    .seg button[aria-checked="true"] { background: #e69e22; color: #ffffff; }
+    .sp-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .sp-btn {
+      padding: 7px 13px;
+      border-radius: 9999px;
+      border: 1.5px solid #e69e22;
+      background: #fff7e6;
+      font: 700 13px system-ui, -apple-system, sans-serif;
+      color: #8a5a00;
+      cursor: pointer;
+    }
+    .sp-btn:hover { background: #ffecc2; }
+    .sp-btn.primary { background: #e69e22; color: #ffffff; }
+    .sp-btn.primary:hover { background: #d48b12; }
+  </style>
+
+<!-- Eagle View Music: the way back to the hub. Hidden when the app is embedded in a frame (a Google Site, an LMS). -->
+<style>
+  .back-home-btn{position:fixed;top:12px;left:12px;z-index:10000;display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:9999px;background:rgba(30,41,59,.88);color:#f1f5f9;border:1px solid rgba(255,255,255,.22);font:600 13px/1 Montserrat,system-ui,-apple-system,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25);backdrop-filter:blur(6px);transition:background .2s,color .2s}
+  .back-home-btn:hover{background:#334155;color:#74B9FF}
+  .back-home-btn.in-bar{position:absolute;top:50%;left:10px;transform:translateY(-50%);box-shadow:none}
+  @media (max-width:640px){.back-home-btn .back-label{display:none}}
+  .in-iframe .back-home-btn{display:none!important}
+</style>
+<script>try{if(window.self!==window.top)document.documentElement.classList.add('in-iframe')}catch(e){document.documentElement.classList.add('in-iframe')}</script>
+  <!-- EVM visit counter: one anonymous count each time an app is opened. What is sent, and what never is: /what-we-count.html -->
+  <script>
+    (function () {
+      var off = false;
+      try { off = localStorage.getItem('skipgc') === 't'; } catch (e) {}
+      if (location.hash === '#toggle-goatcounter') {   // the teacher's own browsers opt out here (and back in)
+        try { off ? localStorage.removeItem('skipgc') : localStorage.setItem('skipgc', 't'); } catch (e) {}
+        alert(off ? 'Visits from this browser will be counted again.' : 'Visits from this browser will no longer be counted.');
+        return;
+      }
+      if (off || navigator.webdriver) return;
+      if (navigator.globalPrivacyControl || navigator.doNotTrack === '1' || window.doNotTrack === '1') return;   // the visitor asked not to be counted
+      if (!/(^|\.)eagleviewmusic\.com$/.test(location.hostname)) return;   // testing, or a copy on another site
+      try { if (window.top !== window && parent.location.host) return; } catch (e) {}   // framed by another of our apps (the Music Stand), which counts itself
+      try {
+        var p = decodeURIComponent(location.pathname).replace(/index\.html$/, '');
+        var r = document.referrer.split(/[?#]/)[0];   // where the visit came from, never the rest of a link
+        var u = 'https://eagleviewmusic.goatcounter.com/count?p=' + encodeURIComponent(p) +
+          (r ? '&r=' + encodeURIComponent(r) : '') + '&s=' + screen.width + '&rnd=' + Math.random().toString(36).slice(2, 7);
+        if (!(navigator.sendBeacon && navigator.sendBeacon(u))) new Image().src = u;
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+<!-- ===== App Header Start ===== -->
+<!-- Google Font -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lobster&display=swap" rel="stylesheet">
+
+<!-- Header -->
+<div id="app-header" style="position: fixed; top: 0; left: 0; right: 0; width: 100%; z-index: 9999; background-color: #e69e22; padding: 5px 10px; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+    <a href="../index.html" class="back-home-btn in-bar" title="Back to Eagle View Music" aria-label="Back to Eagle View Music"><span class="back-arrow">←</span><span class="back-label">Eagle View Music</span></a>
+    <a href="../index.html" rel="noopener noreferrer" style="text-decoration: none; color: white;">
+        <h1 style="font-family: 'Lobster', cursive; margin: 0; font-size: clamp(16px, 5vw, 24px); white-space: nowrap; font-weight: normal;">
+            <!-- !!! IMPORTANT: Change this to the name of your app !!! -->
+          Virtual Recorder
+        </h1>
+    </a>
+    <button type="button" class="gear-btn" id="settingsBtn" title="Settings" aria-label="Settings" aria-expanded="false" aria-controls="settingsPanel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+</div>
+<!-- ===== App Header End ===== -->
+  <div class="app-center-container">
+    <div class="scaling-outer" id="scaling-outer">
+      <div class="scaling-wrapper" id="scaling-wrapper">
+        <div class="recorder-col">
+          <svg id="recorder" viewBox="0 0 145 480" role="img" aria-label="Recorder"></svg>
+          <div class="tip-area" id="tipArea" aria-live="polite"></div>
+        </div>
+        <div class="note-pad" id="notePad"></div>
+      </div>
+    </div>
+  </div>
+  <aside class="settings-panel" id="settingsPanel" role="dialog" aria-label="Settings">
+    <div class="sp-head">
+      <h2>Settings</h2>
+      <button type="button" class="sp-close" id="settingsClose" aria-label="Close settings">×</button>
+    </div>
+    <div class="sp-section">
+      <h3>Notes to show</h3>
+      <div class="view-choice" role="radiogroup" aria-label="Notes to show">
+        <button type="button" role="radio" data-view="gmajor"><b>G major</b><small>Low C to high E, keys 1 to 0</small></button>
+        <button type="button" role="radio" data-view="chromatic"><b>Every note</b><small>Low C to high D, with every sharp and flat</small></button>
+      </div>
+    </div>
+    <div class="sp-section">
+      <h3>Sound</h3>
+      <div class="sp-actions">
+        <button type="button" class="sp-btn primary" id="tuneBtn">▶ Try it: Hot Cross Buns</button>
+        <button type="button" class="sp-btn" id="resetSoundBtn">Reset sound</button>
+      </div>
+      <div id="soundControls"></div>
+    </div>
+  </aside>
+  <script src="recorder-synth.js"></script>
+  <script>
+    // Fingerings from Yamaha's soprano recorder (Baroque) fingering chart, low C to high D.
+    // Each one reads like a chart, top to bottom: thumb, holes 1–5, then the double holes 6 and 7.
+    //   ● covered   ○ open   ◐ thumb pinched, or only the big hole of a double hole covered
+    // A second fingering is one of Yamaha's alternate fingerings.
+    const CHART = [
+      ['C4',  'z', '●●●●●●●●'],
+      ['C#4', 's', '●●●●●●●◐'],
+      ['D4',  'x', '●●●●●●●○'],
+      ['D#4', 'd', '●●●●●●◐○'],
+      ['E4',  'c', '●●●●●●○○'],
+      ['F4',  'v', '●●●●●○●●'],
+      ['F#4', 'g', '●●●●○●●○'],
+      ['G4',  'b', '●●●●○○○○'],
+      ['G#4', 'h', '●●●○●●◐○'],
+      ['A4',  'n', '●●●○○○○○'],
+      ['A#4', 'j', '●●○●●○○○'],
+      ['B4',  'm', '●●○○○○○○', '●○●●○○○○'],
+      ['C5',  'q', '●○●○○○○○'],
+      ['C#5', '2', '○●●○○○○○', '●○○○○○○○'],
+      ['D5',  'w', '○○●○○○○○'],
+      ['D#5', '3', '○○●●●●●○'],
+      ['E5',  'e', '◐●●●●●○○'],
+      ['F5',  'r', '◐●●●●○●○'],
+      ['F#5', '5', '◐●●●○●○○'],
+      ['G5',  't', '◐●●●○○○○'],
+      ['G#5', '6', '◐●●○●○○○'],
+      ['A5',  'y', '◐●●○○○○○'],
+      ['A#5', '7', '◐●●○●●●○'],
+      ['B5',  'u', '◐●●○●●○○', '◐●○○○●●●'],
+      ['C6',  'i', '◐●○○●●○○'],
+      ['C#6', '9', '◐●○●●●○●'],
+      ['D6',  'o', '◐●○●●○●○'],
+    ];
+
+    // The keys under each other row also play the second octave, like the Virtual Keyboard
+    const EXTRA_KEYS = { ',': 'C5', 'l': 'C#5', '.': 'D5', ';': 'D#5', '/': 'E5' };
+
+    const LETTER_COLORS = {
+      C: '#FF3B30', D: '#FF8A00', E: '#FFF200', F: '#34C759',
+      G: '#30C0C6', A: '#007AFF', B: '#AF52DE'
+    };
+    const LETTERS = 'CDEFGAB';
+    // Sharps and flats: the name most songs use first, then the other name
+    const ACCIDENTAL_NAMES = {
+      C: ['C♯', 'D♭'], D: ['E♭', 'D♯'], F: ['F♯', 'G♭'], G: ['G♯', 'A♭'], A: ['B♭', 'A♯']
+    };
+
+    const notes = CHART.map(([pitch, key, ...fingerings]) => {
+      const letter = pitch[0];
+      const sharp = pitch[1] === '#';
+      const upper = LETTERS[(LETTERS.indexOf(letter) + 1) % 7];
+      return {
+        pitch, key, fingerings, sharp,
+        name: sharp ? ACCIDENTAL_NAMES[letter][0] : letter,
+        otherName: sharp ? ACCIDENTAL_NAMES[letter][1] : '',
+        // A sharp's colour runs from the letter below it to the letter above it
+        color: LETTER_COLORS[letter],
+        upperColor: sharp ? LETTER_COLORS[upper] : LETTER_COLORS[letter],
+      };
+    });
+    const notesByPitch = Object.fromEntries(notes.map(n => [n.pitch, n]));
+
+    // The G major view: the ten notes of the first recorder songs, on the number keys
+    const G_MAJOR = ['C4', 'D4', 'E4', 'F#4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5'];
+    const G_MAJOR_KEYS = '1234567890';
+
+    // ----- saved settings (this browser only) -----
+    const STORE_KEY = 'virtual-recorder-settings';
+    function loadSettings() {
+      try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; }
+    }
+    function saveSettings() {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify({ version: 2, view, sound: soundSettings })); } catch (e) { /* private window */ }
+    }
+    const saved = loadSettings();
+    let view = saved.view === 'gmajor' ? 'gmajor' : 'chromatic';
+    let keyMap = {};   // computer key -> note, for the view on screen
+
+    // Which fingering each note shows, when it has more than one (kept while the page is open)
+    const chosenFingering = {};
+    let shownNote = null;
+
+    // ----- colours -----
+    function hexToRgb(hex) {
+      const n = parseInt(hex.slice(1), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    function rgbToHex(rgb) {
+      return '#' + rgb.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+    }
+    function mix(a, b, t) {
+      const ra = hexToRgb(a), rb = hexToRgb(b);
+      return rgbToHex(ra.map((v, i) => v + (rb[i] - v) * t));
+    }
+    function darken(hex, amount) {
+      return rgbToHex(hexToRgb(hex).map(v => v * (1 - amount)));
+    }
+    function luminance(hex) {
+      const [r, g, b] = hexToRgb(hex).map(v => {
+        v /= 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+    function textColorOn(hex) {
+      return luminance(hex) > 0.3 ? '#1f2937' : '#ffffff';
+    }
+
+    // ----- the note buttons -----
+    const notePad = document.getElementById('notePad');
+
+    // Pulls ♯ / ♭ in against the letter (their fallback font leaves a gap)
+    function accidentalHtml(name) {
+      return `${name[0]}<span class="acc">${name[1]}</span>`;
+    }
+    const ROW = 37;                      // one letter's height, gap included
+    const SCALE_ROW = 58;                // one G major button's height, gap included
+
+    function addNoteButton(note, key, kind, top) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'note-btn ' + kind;
+      btn.dataset.pitch = note.pitch;
+      btn.style.top = top + 'px';
+      const both = note.sharp && kind === 'sharp';
+      btn.setAttribute('aria-label', note.sharp
+        ? `${note.name}${both ? ' / ' + note.otherName : ''} (${note.pitch.replace('#', '♯')})`
+        : note.pitch);
+      btn.title = `Press ${key.toUpperCase()} to play ${both ? note.name + ' / ' + note.otherName : note.name}`;
+      if (note.sharp) {
+        btn.style.background = `linear-gradient(to top, ${note.color}, ${note.upperColor})`;
+        btn.style.color = textColorOn(mix(note.color, note.upperColor, 0.5));
+      } else {
+        btn.style.background = note.color;
+        btn.style.color = textColorOn(note.color);
+      }
+      const names = both
+        ? `<b>${accidentalHtml(note.name)}</b><small>${accidentalHtml(note.otherName)}</small>`
+        : note.sharp ? `<span>${accidentalHtml(note.name)}</span>` : note.name;
+      btn.innerHTML = `<span class="names">${names}</span><span class="key">${key}</span>`;
+
+      btn.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        press(note);
+      });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(type =>
+        btn.addEventListener(type, () => release(note)));
+      // Enter or Space on a focused button plays a short note
+      btn.addEventListener('click', e => {
+        if (e.detail !== 0) return;
+        press(note);
+        setTimeout(() => release(note), 400);
+      });
+      btn.addEventListener('contextmenu', e => e.preventDefault());
+      notePad.appendChild(btn);
+      keyMap[key] = note;
+    }
+
+    function buildNotePad() {
+      notePad.innerHTML = '';
+      notePad.className = 'note-pad ' + view;
+      keyMap = {};
+      if (view === 'gmajor') {
+        G_MAJOR.forEach((pitch, i) =>
+          addNoteButton(notesByPitch[pitch], G_MAJOR_KEYS[i], 'scale-note', (G_MAJOR.length - 1 - i) * SCALE_ROW));
+      } else {
+        const naturalCount = notes.filter(n => !n.sharp).length;
+        let naturalIndex = -1;
+        notes.forEach(note => {
+          if (note.sharp) {
+            // Sits on the line between the letter below and the letter above
+            const lineY = (naturalCount - 1 - naturalIndex) * ROW - 2;
+            addNoteButton(note, note.key, 'sharp', lineY - 14);
+          } else {
+            naturalIndex++;
+            addNoteButton(note, note.key, 'natural', (naturalCount - 1 - naturalIndex) * ROW);
+          }
+        });
+        Object.entries(EXTRA_KEYS).forEach(([key, pitch]) => keyMap[key] = notesByPitch[pitch]);
+      }
+    }
+
+    // ----- drawing the recorder -----
+    const OUTLINE = '#4d4d4d';
+    const BODY = '#fbb03b';
+    const RING = '#7ac943';
+
+    // Where each finger goes: the centre of its pad, which side it reaches in from, its size and tilt.
+    // The left hand's fingers come in from the left, the right hand's from the right.
+    const FINGERS = {
+      1: { x: 68, y: 214, side: -1, size: 1, tilt: -5 },
+      2: { x: 68, y: 247, side: -1, size: 1 },
+      3: { x: 68, y: 280, side: -1, size: 1 },
+      4: { x: 68, y: 313, side: 1, size: 1 },
+      5: { x: 68, y: 342, side: 1, size: 0.95 },
+      6: { x: 67, y: 368, side: 1, size: 0.92 },
+      7: { x: 68, y: 399, side: 1, size: 0.88, tilt: -14 },
+    };
+    // A finger reaching in from the left, its pad centred on (0, 0)
+    const FINGER_PATH = 'M2,-16 C11,-16 16,-8 16,1 C16,10 10,16 1,16 C-6,16 -10,12 -13,8 ' +
+      'C-19,6 -27,6 -33,6.5 C-38,7 -39.5,3.5 -39.5,1 C-39.5,-2.5 -37,-5 -33,-5 ' +
+      'C-24,-5 -17,-8 -12,-13 C-9,-15.5 -4,-16 2,-16 Z';
+    // The small hole of each double hole: what stays open when only the big hole is covered
+    const SMALL_HOLES = {
+      6: '<circle cx="72.5" cy="369" r="2.7" />',
+      7: '<ellipse cx="73" cy="399.5" rx="2.2" ry="3" />',
+    };
+    // The same holes drawn a little larger on top of a finger, so the open one is easy to spot
+    const OPEN_SMALL_HOLES = {
+      6: '<circle cx="73" cy="369" r="3.4" />',
+      7: '<ellipse cx="73.5" cy="399.5" rx="2.9" ry="3.7" />',
+    };
+    const FINGER_TOP = 196, FINGER_BOTTOM = 418;
+
+    function parseFingering(code) {
+      const chars = [...code];
+      return {
+        thumb: { '●': 'closed', '◐': 'pinch', '○': 'open' }[chars[0]],
+        holes: chars.slice(1).map(c => ({ '●': 2, '◐': 1, '○': 0 })[c]),   // 2 covered, 1 big hole only, 0 open
+      };
+    }
+
+    // ♯ and ♭ come from a fallback font with a wide gap, so they are pulled in close to the letter
+    function nameMarkup(name) {
+      if (name.length < 2) return name;
+      return `${name[0]}<tspan dx="${name[1] === '♭' ? -3 : -1}" font-size="0.85em">${name[1]}</tspan>`;
+    }
+
+    function fingerTransform(f) {
+      const s = f.size;
+      return `translate(${f.x} ${f.y}) rotate(${f.tilt || 0}) scale(${-f.side * s} ${s})`;
+    }
+
+    function colorAt(note, y) {
+      const t = Math.min(1, Math.max(0, (FINGER_BOTTOM - y) / (FINGER_BOTTOM - FINGER_TOP)));
+      return mix(note.color, note.upperColor, t);
+    }
+
+    function recorderBody() {
+      return `
+        <g stroke="${OUTLINE}" stroke-width="2" stroke-linejoin="round">
+          <path fill="${BODY}" d="M50,163 C50,120 48,80 47,40 C46.5,22 46.5,12 50,8 C56,3.5 86,3.5 90,7 C93.5,12 93.5,22 92,40 C90.5,80 87.5,120 87.5,163 Z" />
+          <rect fill="${RING}" x="45.5" y="59.5" width="46.5" height="9" rx="3.5" />
+          <path fill="#999999" d="M62,74 C62,72.5 63,72 64.5,72 L76.5,72 C78,72 79,72.5 79,74 L78,93 C78,95.5 76.5,97 74,97 L66.5,97 C64,97 62.5,95.5 62.5,93 Z" />
+          <path fill="${BODY}" d="M53,196 L83,196 L82,382 L54,382 Z" />
+          <path fill="${BODY}" d="M54,386 L82,386 L82,416 L54,416 Z" />
+          <path fill="${BODY}" d="M57.5,421 C58.5,433 60.5,439 58.5,447 C56,457 46.5,461 47,469 C47.5,476.5 56,477.5 68,477.5 C80,477.5 89,476.5 89.5,469 C90,461 80.5,457 78,447 C76,439 78,433 79,421 Z" />
+          <rect fill="${RING}" x="47" y="160" width="42.5" height="7.5" rx="3" />
+          <rect fill="${BODY}" x="46" y="167" width="45" height="19" rx="8" />
+          <rect fill="${RING}" x="50" y="185" width="36.5" height="12" rx="6" />
+          <rect fill="${RING}" x="52" y="379" width="32" height="8.5" rx="3" />
+          <rect fill="${RING}" x="51" y="412.5" width="34.5" height="10" rx="4" />
+        </g>
+        <g fill="#ffffff" stroke="${OUTLINE}" stroke-width="1.6">
+          <circle cx="68.5" cy="214" r="5.6" />
+          <circle cx="68.5" cy="247" r="5.8" />
+          <circle cx="68.5" cy="280" r="5.8" />
+          <circle cx="68" cy="313" r="5.8" />
+          <circle cx="68" cy="343" r="5.8" />
+          <circle cx="63.5" cy="368" r="3.6" />
+          ${SMALL_HOLES[6]}
+          <ellipse cx="65" cy="399" rx="3" ry="4" />
+          ${SMALL_HOLES[7]}
+        </g>
+        <g font-family="Arial, Helvetica, sans-serif" font-weight="bold" text-anchor="middle">
+          <text x="23" y="170" font-size="15" fill="#9900cc">Left</text>
+          <text x="23" y="182.5" font-size="12.5" fill="#999999">Hand</text>
+          <text x="121" y="170" font-size="15" fill="#009900">Right</text>
+          <text x="121" y="182.5" font-size="12.5" fill="#999999">Hand</text>
+        </g>`;
+    }
+
+    function thumbHole(state) {
+      const x = 23, y = 204, r = 6.5;
+      const label = { closed: ['Thumb', '#000000'], open: ['Open', '#22974e'], pinch: ['Pinch', '#c2410c'] }[state];
+      let hole;
+      if (state === 'open') {
+        hole = `<circle cx="${x}" cy="${y}" r="${r}" fill="#ffffff" stroke="${OUTLINE}" stroke-width="1.6" />`;
+      } else {
+        hole = `<circle cx="${x}" cy="${y}" r="${r}" fill="#000000" stroke="${OUTLINE}" stroke-width="1" />`;
+        // Pinched: the thumb leaves a little gap at the top of the hole
+        if (state === 'pinch') {
+          hole += `<clipPath id="thumbClip"><circle cx="${x}" cy="${y}" r="${r - 0.6}" /></clipPath>
+            <rect x="${x - r}" y="${y - r}" width="${2 * r}" height="${r * 0.62}" fill="#ffffff" clip-path="url(#thumbClip)" />
+            <circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${OUTLINE}" stroke-width="1.2" />`;
+        }
+      }
+      return `${hole}<text x="${x}" y="${y - 10}" font-family="Arial, Helvetica, sans-serif" font-weight="bold"
+        font-size="10.5" text-anchor="middle" fill="${label[1]}">${label[0]}</text>`;
+    }
+
+    function drawRecorder(note, code) {
+      const svg = document.getElementById('recorder');
+      const fingering = parseFingering(code || '○○○○○○○○');
+      const down = [1, 2, 3, 4, 5, 6, 7].filter(h => fingering.holes[h - 1] > 0);
+      let out = recorderBody() + thumbHole(fingering.thumb);
+
+      if (note && down.length) {
+        // Outlines first, then the colour on top, so touching fingers read as one hand
+        const fill = note.sharp ? 'url(#sharpFill)' : note.color;
+        const edge = darken(mix(note.color, note.upperColor, 0.5), 0.62);
+        if (note.sharp) {
+          out += `<defs><linearGradient id="sharpFill" gradientUnits="userSpaceOnUse" x1="0" y1="${FINGER_BOTTOM}" x2="0" y2="${FINGER_TOP}">
+            <stop offset="0" stop-color="${note.color}" /><stop offset="1" stop-color="${note.upperColor}" /></linearGradient></defs>`;
+        }
+        const fingerPaths = down.map(h => `<path d="${FINGER_PATH}" transform="${fingerTransform(FINGERS[h])}" />`).join('');
+        out += `<g fill="${edge}" stroke="${edge}" stroke-width="3.4" stroke-linejoin="round">${fingerPaths}</g>`;
+        if (note.sharp) {
+          // One blend down the whole hand: the fingers cut it out of a rectangle
+          out += `<clipPath id="fingerClip">${fingerPaths}</clipPath>
+            <rect x="0" y="${FINGER_TOP - 10}" width="145" height="${FINGER_BOTTOM - FINGER_TOP + 20}" fill="${fill}" clip-path="url(#fingerClip)" />`;
+        } else {
+          out += `<g fill="${fill}">${fingerPaths}</g>`;
+        }
+
+        // Half holes: the small hole stays open
+        [6, 7].filter(h => fingering.holes[h - 1] === 1).forEach(h => {
+          const y = FINGERS[h].y;
+          out += `<g fill="#ffffff" stroke="${OUTLINE}" stroke-width="1.5">${OPEN_SMALL_HOLES[h]}</g>
+            <g font-family="Arial, Helvetica, sans-serif" font-weight="bold">
+              <rect x="31" y="${y - 8}" width="17" height="15" rx="4" fill="#ffffff" stroke="${OUTLINE}" stroke-width="1.2" />
+              <text x="39.5" y="${y + 3.5}" font-size="11" text-anchor="middle" fill="#1f2937">½</text>
+            </g>`;
+        });
+
+        // The note's name goes on the lowest finger that covers its whole hole
+        // (never on a half hole, where it would hide the little open hole)
+        const full = down.filter(h => fingering.holes[h - 1] === 2);
+        const low = FINGERS[(full.length ? full : down).pop()];
+        const pad = note.sharp ? colorAt(note, low.y) : note.color;
+        out += `<text x="${low.x}" y="${low.y + 6.5}" font-family="Arial, Helvetica, sans-serif" font-weight="bold"
+          font-size="${note.sharp ? 16 : 19}" text-anchor="middle" fill="${textColorOn(pad)}">${nameMarkup(note.name)}</text>`;
+      } else if (note) {
+        // No fingers down at all: name the note beside the recorder instead
+        out += `<rect x="96" y="203" width="40" height="23" rx="6" fill="${note.color}" stroke="${darken(note.color, 0.62)}" stroke-width="1.5" />
+          <text x="116" y="220" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="15"
+          text-anchor="middle" fill="${textColorOn(note.color)}">${nameMarkup(note.name)}</text>`;
+      }
+      svg.innerHTML = out;
+      svg.setAttribute('aria-label', note ? `Fingering for ${note.name}` : 'Recorder');
+    }
+
+    // ----- what's shown under the recorder -----
+    const tipArea = document.getElementById('tipArea');
+
+    function showTips(note) {
+      if (!note) {
+        tipArea.innerHTML = '<span class="hint">Press a note to see how to play it.</span>';
+        return;
+      }
+      const which = chosenFingering[note.pitch] || 0;
+      const fingering = parseFingering(note.fingerings[which]);
+      const tips = [];
+      if (fingering.thumb === 'pinch') tips.push('<b>Pinch</b> the thumb hole: leave a tiny gap at the top.');
+      if (fingering.holes.some(h => h === 1)) tips.push('<b>½</b> Cover only the big hole of the pair.');
+      let html = tips.map(t => `<div>${t}</div>`).join('');
+      if (note.fingerings.length > 1) {
+        html += `<button type="button" class="alt-btn" id="altBtn">⇄ Other fingering (${which + 1} of ${note.fingerings.length})</button>`;
+      }
+      tipArea.innerHTML = html;
+    }
+
+    tipArea.addEventListener('click', e => {
+      if (!e.target.closest('#altBtn') || !shownNote) return;
+      const count = shownNote.fingerings.length;
+      chosenFingering[shownNote.pitch] = ((chosenFingering[shownNote.pitch] || 0) + 1) % count;
+      showNote(shownNote);
+    });
+
+    function showNote(note) {
+      shownNote = note;
+      drawRecorder(note, note ? note.fingerings[chosenFingering[note.pitch] || 0] : null);
+      showTips(note);
+      document.querySelectorAll('.note-btn.selected').forEach(b => b.classList.remove('selected'));
+      if (note) buttonFor(note.pitch)?.classList.add('selected');
+    }
+
+    function buttonFor(pitch) {
+      return notePad.querySelector(`.note-btn[data-pitch='${pitch}']`);
+    }
+
+    // ----- sound -----
+    // recorder-synth.js's waveguide engine: a physical model of a recorder's air jet and pipe.
+    // It plays a soprano, so it sounds an octave above the written note, like the real one.
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+    const SOUND_DEFAULTS = Object.assign({}, window.RecorderSynth ? RecorderSynth.DEFAULTS : {}, {
+      engine: 'waveguide',
+      size: 'soprano',
+      writtenPitch: true,
+      mono: true,          // one note at a time; going from one note to the next slurs
+      vibrato: 0.35,       // the synth's own default is 0.15
+      vibratoDelay: 0.25,  // seconds before the vibrato starts (default 0.35)
+      glide: 0.04,         // slur time: the smoothest for the Waveguide (default 0.025)
+    });
+
+    // What the settings panel offers. Each slider and choice is one of recorder-synth.js's settings.
+    const pct = v => Math.round(v * 100) + '%';
+    const ms = v => Math.round(v * 1000) + ' ms';
+    const SOUND_CHOICES = [
+      { key: 'engine', label: 'Sound model', options: [
+        ['waveguide', 'Waveguide', 'A physical model of the air and the pipe. The most natural.'],
+        ['spectral', 'Spectral', "Built from a real recorder's overtones."],
+        ['fm', 'FM', 'A bright, simple electronic sound.'],
+      ] },
+      { key: 'timbre', label: 'Recorder', options: [
+        ['wood', 'Wooden', 'Warm and round, like a wooden baroque recorder.'],
+        ['plastic', 'Plastic', 'Brighter, like a school recorder.'],
+      ] },
+      { key: 'size', label: 'Size', options: [
+        ['soprano', 'Soprano', 'Sounds an octave above the written note, like a school recorder.'],
+        ['tenor', 'Tenor', 'The big one: sounds the note as written. Same fingerings.'],
+      ] },
+      { key: 'mono', label: 'One note at a time', options: [
+        [true, 'On', 'Like a real recorder. Going from one held key to the next slurs.'],
+        [false, 'Off', 'Hold several keys to play several notes at once.'],
+      ] },
+    ];
+    const SOUND_SLIDERS = [
+      { group: 'Breath and tone' },
+      { key: 'volume', label: 'Volume', min: 0, max: 1.5, step: 0.05, show: pct },
+      { key: 'breath', label: 'Breath', min: 0.1, max: 1, step: 0.01, show: pct, ends: ['Gentle', 'Strong'],
+        hint: 'Like a real recorder: gentle is softer and a little flat, strong is louder, brighter and a little sharp.' },
+      { key: 'attack', label: 'Tonguing', min: 0.005, max: 0.12, step: 0.005, show: ms, ends: ['"Tu" (crisp)', '"Du" (soft)'] },
+      { key: 'chiff', label: 'Chiff', min: 0, max: 1, step: 0.01, show: pct,
+        hint: 'The little puff of air at the start of each note.' },
+      { key: 'noise', label: 'Breath noise', min: 0, max: 1, step: 0.01, show: pct,
+        hint: 'Air you can hear along with the tone.' },
+      { group: 'Vibrato' },
+      { key: 'vibrato', label: 'Vibrato', min: 0, max: 1, step: 0.01, show: pct, ends: ['None', 'Lots'] },
+      { key: 'vibratoRate', label: 'Vibrato speed', min: 2, max: 9, step: 0.1, show: v => v.toFixed(1) + ' per second' },
+      { key: 'vibratoDelay', label: 'Vibrato starts after', min: 0, max: 1, step: 0.05, show: v => v.toFixed(2) + ' s' },
+      { group: 'Room and feel' },
+      { key: 'reverb', label: 'Room', min: 0, max: 1, step: 0.01, show: pct, ends: ['Dry', 'Big room'] },
+      { key: 'drift', label: 'Wobble', min: 0, max: 1, step: 0.01, show: pct,
+        hint: 'Slow, tiny changes in pitch, like a real player.' },
+      { key: 'release', label: 'Note ending', min: 0.02, max: 0.5, step: 0.01, show: ms, ends: ['Short', 'Long'] },
+      { key: 'glide', label: 'Slur speed', min: 0.005, max: 0.2, step: 0.005, show: ms, onlyIf: s => s.mono,
+        hint: 'How quickly one note slides into the next. Needs "One note at a time".' },
+      { key: 'pitchFollow', label: 'Pitch follows breath', min: 0, max: 1, step: 0.01, show: pct,
+        onlyIf: s => s.engine !== 'waveguide', hint: 'Stronger breath bends the pitch up. The Waveguide does this by itself.' },
+    ];
+
+    // Saved values are only used when they are still one of the choices or inside a slider's range
+    const soundSettings = Object.assign({}, SOUND_DEFAULTS);
+    const savedSound = Object.assign({}, saved.sound);
+    // Settings saved before version 2 hold the old 25 ms slur time even if nobody moved it
+    if (!saved.version && savedSound.glide === 0.025) delete savedSound.glide;
+    SOUND_CHOICES.forEach(c => {
+      if (c.options.some(o => o[0] === savedSound[c.key])) soundSettings[c.key] = savedSound[c.key];
+    });
+    SOUND_SLIDERS.forEach(s => {
+      const v = savedSound[s.key];
+      if (s.key && typeof v === 'number' && v >= s.min && v <= s.max) soundSettings[s.key] = v;
+    });
+
+    let synth = null;
+    const synthReady = window.RecorderSynth
+      ? RecorderSynth.create(audioCtx, soundSettings).then(s => { s.connect(audioCtx.destination); synth = s; })
+      : new Promise(() => console.warn('[Virtual Recorder] recorder-synth.js is missing, so there is no sound'));
+    const heldNotes = new Map();   // pitch -> the note number the synth was given for it
+
+    // 'C#4' -> 61
+    function pitchToMidi(pitch) {
+      const semitones = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+      const [, letter, sharp, octave] = pitch.match(/^([A-G])(#?)(\d)$/);
+      return (Number(octave) + 1) * 12 + semitones[letter] + (sharp ? 1 : 0);
+    }
+
+    // How sharp each sound plays at the synth's default breath, in cents, measured at written
+    // C4 F4 A4 C5 E5 G5 B5 D6 with vibrato and wobble off. Each note is sent that much lower.
+    const TUNING_AT = [60, 65, 69, 72, 76, 79, 83, 86];
+    const TUNING = {
+      'waveguide/soprano/wood':    [3, 3, 4, 4, 5, 6, 8, 11],
+      'waveguide/soprano/plastic': [3, 2, 2, 2, 3, 3, 4, 6],
+      'waveguide/tenor/wood':      [5, 4, 3, 3, 3, 3, 4, 4],
+      'waveguide/tenor/plastic':   [5, 4, 3, 3, 2, 2, 2, 1],
+    };
+    const OTHER_MODELS_SHARP = 2;   // Spectral and FM: 2 cents everywhere
+
+    function synthNote(pitch) {
+      const midi = pitchToMidi(pitch);
+      const row = TUNING[`${soundSettings.engine}/${soundSettings.size}/${soundSettings.timbre}`];
+      let sharp = OTHER_MODELS_SHARP;
+      if (row) {
+        const i = Math.max(0, TUNING_AT.findIndex((m, k) => midi <= TUNING_AT[k + 1]));
+        const t = (midi - TUNING_AT[i]) / (TUNING_AT[i + 1] - TUNING_AT[i]);
+        sharp = row[i] + (row[i + 1] - row[i]) * t;
+      }
+      return midi - sharp / 100;
+    }
+
+    // The synth may still be loading on the very first press; its noteOn and noteOff stay in order.
+    // The note number is kept so the same one is let go even if a setting changes in between.
+    function startNote(pitch) {
+      if (heldNotes.has(pitch)) return;
+      const n = synthNote(pitch);
+      heldNotes.set(pitch, n);
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      synthReady.then(() => synth.noteOn(n));
+    }
+
+    function stopNote(pitch) {
+      if (!heldNotes.has(pitch)) return;
+      const n = heldNotes.get(pitch);
+      heldNotes.delete(pitch);
+      synthReady.then(() => synth.noteOff(n));
+    }
+
+    function press(note) {
+      startNote(note.pitch);
+      showNote(note);
+      buttonFor(note.pitch)?.classList.add('active');
+    }
+
+    function release(note) {
+      stopNote(note.pitch);
+      buttonFor(note.pitch)?.classList.remove('active');
+    }
+
+    // ----- keys -----
+    window.addEventListener('keydown', e => {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'Escape') return closeSettings();
+      const note = keyMap[e.key.toLowerCase()];
+      if (note) press(note);
+    });
+
+    window.addEventListener('keyup', e => {
+      const note = keyMap[e.key.toLowerCase()];
+      if (note) release(note);
+    });
+
+    function releaseAll() {
+      notes.forEach(release);
+    }
+
+    // Let go of every note if the page loses focus mid-note
+    window.addEventListener('blur', releaseAll);
+
+    // Clicking anywhere else puts the recorder back to all holes open (and closes the settings)
+    document.body.addEventListener('pointerdown', e => {
+      if (e.target.closest('.settings-panel, #app-header')) return;
+      if (!e.target.closest('.note-btn')) closeSettings();
+      if (!e.target.closest('.note-btn, .alt-btn')) showNote(null);
+    });
+
+    // ----- the settings panel -----
+    const settingsPanel = document.getElementById('settingsPanel');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const soundControls = document.getElementById('soundControls');
+
+    function openSettings() {
+      settingsPanel.classList.add('open');
+      settingsBtn.setAttribute('aria-expanded', 'true');
+    }
+    function closeSettings() {
+      settingsPanel.classList.remove('open');
+      settingsBtn.setAttribute('aria-expanded', 'false');
+    }
+    settingsBtn.addEventListener('click', () =>
+      settingsPanel.classList.contains('open') ? closeSettings() : openSettings());
+    document.getElementById('settingsClose').addEventListener('click', closeSettings);
+
+    function setView(v) {
+      if (v === view) return;
+      releaseAll();
+      view = v;
+      saveSettings();
+      buildNotePad();
+      showNote(shownNote && buttonFor(shownNote.pitch) ? shownNote : null);
+      refreshViewChoice();
+      updateScale();
+    }
+    function refreshViewChoice() {
+      settingsPanel.querySelectorAll('[data-view]').forEach(b =>
+        b.setAttribute('aria-checked', String(b.dataset.view === view)));
+    }
+    settingsPanel.querySelectorAll('[data-view]').forEach(b =>
+      b.addEventListener('click', () => setView(b.dataset.view)));
+
+    function setSound(key, value) {
+      soundSettings[key] = value;
+      saveSettings();
+      if (synth) synth.set(key, value);   // takes effect on the next note (volume and room right away)
+      refreshSoundControls();
+    }
+
+    function buildSoundControls() {
+      let html = '';
+      SOUND_CHOICES.forEach(c => {
+        html += `<div class="sp-row" data-row="${c.key}"><div class="sp-label">${c.label}</div>
+          <div class="seg" role="radiogroup" aria-label="${c.label}">` +
+          c.options.map(([value, label], i) =>
+            `<button type="button" role="radio" data-choice="${c.key}" data-index="${i}">${label}</button>`).join('') +
+          `</div><div class="sp-hint" data-hint="${c.key}"></div></div>`;
+      });
+      SOUND_SLIDERS.forEach(s => {
+        if (s.group) { html += `<div class="sp-group">${s.group}</div>`; return; }
+        html += `<div class="sp-row" data-row="${s.key}">
+          <label class="sp-label" for="sl-${s.key}">${s.label}<span class="sp-value" data-value="${s.key}"></span></label>
+          <input type="range" id="sl-${s.key}" data-slider="${s.key}" min="${s.min}" max="${s.max}" step="${s.step}">` +
+          (s.ends ? `<div class="sp-ends"><span>${s.ends[0]}</span><span>${s.ends[1]}</span></div>` : '') +
+          (s.hint ? `<div class="sp-hint">${s.hint}</div>` : '') + '</div>';
+      });
+      soundControls.innerHTML = html;
+
+      soundControls.querySelectorAll('[data-choice]').forEach(b => b.addEventListener('click', () => {
+        const c = SOUND_CHOICES.find(c => c.key === b.dataset.choice);
+        setSound(c.key, c.options[b.dataset.index][0]);
+      }));
+      soundControls.querySelectorAll('[data-slider]').forEach(input => input.addEventListener('input', () =>
+        setSound(input.dataset.slider, Number(input.value))));
+    }
+
+    function refreshSoundControls() {
+      SOUND_CHOICES.forEach(c => {
+        const current = c.options.find(o => o[0] === soundSettings[c.key]);
+        soundControls.querySelectorAll(`[data-choice="${c.key}"]`).forEach(b =>
+          b.setAttribute('aria-checked', String(c.options[b.dataset.index] === current)));
+        soundControls.querySelector(`[data-hint="${c.key}"]`).textContent = current ? current[2] : '';
+      });
+      SOUND_SLIDERS.forEach(s => {
+        if (s.group) return;
+        const v = soundSettings[s.key];
+        soundControls.querySelector(`[data-slider="${s.key}"]`).value = v;
+        soundControls.querySelector(`[data-value="${s.key}"]`).textContent = s.show(v);
+        soundControls.querySelector(`[data-row="${s.key}"]`).classList.toggle('off', !!s.onlyIf && !s.onlyIf(soundSettings));
+      });
+    }
+
+    document.getElementById('resetSoundBtn').addEventListener('click', () => {
+      Object.assign(soundSettings, SOUND_DEFAULTS);
+      saveSettings();
+      if (synth) Object.keys(SOUND_DEFAULTS).forEach(k => synth.set(k, SOUND_DEFAULTS[k]));
+      refreshSoundControls();
+    });
+
+    // A short tune to hear the settings: Hot Cross Buns, in beats
+    const TEST_TUNE = [
+      ['B4', 1], ['A4', 1], ['G4', 2], ['B4', 1], ['A4', 1], ['G4', 2],
+      ['G4', 0.5], ['G4', 0.5], ['G4', 0.5], ['G4', 0.5], ['A4', 0.5], ['A4', 0.5], ['A4', 0.5], ['A4', 0.5],
+      ['B4', 1], ['A4', 1], ['G4', 2],
+    ];
+    const BEAT = 0.42;   // seconds
+    const tuneBtn = document.getElementById('tuneBtn');
+    const tuneLabel = tuneBtn.textContent;
+    let tuneTimers = [];
+
+    function stopTune() {
+      tuneTimers.forEach(clearTimeout);
+      tuneTimers = [];
+      releaseAll();
+      tuneBtn.textContent = tuneLabel;
+    }
+    function playTune() {
+      stopTune();
+      tuneBtn.textContent = '■ Stop';
+      let at = 0;
+      TEST_TUNE.forEach(([pitch, beats]) => {
+        const note = notesByPitch[pitch];
+        const start = at * BEAT * 1000, end = (at + beats * 0.85) * BEAT * 1000;   // a little gap to re-tongue
+        tuneTimers.push(setTimeout(() => press(note), start), setTimeout(() => release(note), end));
+        at += beats;
+      });
+      tuneTimers.push(setTimeout(stopTune, at * BEAT * 1000 + 100));
+    }
+    tuneBtn.addEventListener('click', () => tuneTimers.length ? stopTune() : playTune());
+
+    buildSoundControls();
+    refreshSoundControls();
+    refreshViewChoice();
+    buildNotePad();
+    showNote(null);
+
+    // Responsive scaling: shrink the whole app proportionally if needed (height only)
+    function updateScale() {
+      const outer = document.getElementById('scaling-outer');
+      const wrapper = document.getElementById('scaling-wrapper');
+      const header = document.getElementById('app-header');
+
+      // Adjust container padding to account for header
+      const container = document.querySelector('.app-center-container');
+      const headerHeight = header ? header.offsetHeight : 0;
+      if (container) {
+        container.style.paddingTop = headerHeight + 'px';
+      }
+      document.getElementById('settingsPanel').style.top = headerHeight + 'px';
+
+      // DESIGN SIZE: Measure wrapper or fallback
+      const designHeight = wrapper.offsetHeight || 592;
+      const designWidth = wrapper.offsetWidth || 360;
+
+      const availableHeight = window.innerHeight - headerHeight - 20;
+      const availableWidth = window.innerWidth - 20;
+
+      const scaleHeight = availableHeight / designHeight;
+      const scaleWidth = availableWidth / designWidth;
+
+      // Fit within frame, but allow scaling up
+      const scale = Math.min(scaleHeight, scaleWidth);
+
+      // Prevent negative or zero scale
+      const finalScale = Math.max(0.1, scale);
+
+      outer.style.transform = `scale(${finalScale})`;
+    }
+    window.addEventListener('resize', updateScale);
+    window.addEventListener('load', updateScale);
+    updateScale();
+  </script>
+</body>
+</html>
