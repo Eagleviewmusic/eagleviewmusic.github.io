@@ -177,10 +177,29 @@ kbd {
 .tracks { position: relative; display: flex; flex-direction: column; padding: 0 12px 10px; min-width: 620px; }
 .row { display: grid; grid-template-columns: var(--head-w) minmax(0, 1fr); gap: 8px; align-items: stretch; }
 .ruler-row {
-  position: sticky; top: 0; z-index: 3; padding: 6px 0 4px; height: 32px;
+  position: sticky; top: 0; z-index: 3; padding: 8px 0 2px; height: 32px;
   background: var(--bg);
 }
-.ctl-corner { display: flex; align-items: center; padding-left: 4px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+.ctl-corner { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+/* zoom: − / + and what a drag snaps to (studio.js renderZoom), and the thumb above the ruler that slides the window along */
+.zoom { display: inline-flex; align-items: center; gap: 3px; letter-spacing: 0; text-transform: none; }
+.zoom-btn {
+  width: 24px; height: 22px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface);
+  color: var(--text-2); font: 800 15px/1 var(--font-ui); padding: 0;
+}
+.zoom-btn:hover:not(:disabled) { color: var(--text); border-color: var(--line-strong); }
+.zoom-btn:disabled { opacity: 0.4; }
+/* Split (studio.js setCutMode): lit while the next press on a take or part cuts it in two */
+.cut-btn { margin-right: 5px; display: inline-flex; align-items: center; justify-content: center; }
+.cut-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.cut-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #1b1d24; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+.cutting .track-lane { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cg fill='none' stroke='%23000' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='7' cy='19' r='3.5'/%3E%3Ccircle cx='19' cy='19' r='3.5'/%3E%3Cpath d='M9.5 16.5 20 3M16.5 16.5 6 3'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='7' cy='19' r='3.5'/%3E%3Ccircle cx='19' cy='19' r='3.5'/%3E%3Cpath d='M9.5 16.5 20 3M16.5 16.5 6 3'/%3E%3C/g%3E%3C/svg%3E") 13 3, crosshair !important; }
+.zoom-snap { min-width: 62px; text-align: center; font-size: 10px; font-weight: 800; color: var(--text-3); white-space: nowrap; }
+.hscroll { position: absolute; left: 0; right: 0; top: -7px; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--line) 70%, transparent); pointer-events: none; }
+.hscroll[hidden] { display: none; }
+.hscroll-thumb { position: absolute; top: -2px; height: 8px; border-radius: 4px; background: var(--text-3); opacity: 0.6; pointer-events: auto; cursor: grab; touch-action: none; }
+.hscroll-thumb:hover, .hscroll-thumb.held { opacity: 0.95; }
+.hscroll-thumb.held { cursor: grabbing; }
 .lane { position: relative; min-width: 0; cursor: pointer; }
 .lane canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .ruler { height: 22px; }
@@ -191,7 +210,7 @@ kbd {
 .track.lifted .track-lane { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 0 0 1px var(--line-strong); }
 .dragging-track, .dragging-track * { cursor: grabbing !important; user-select: none; }
 /* a voice take moved or trimmed on its lane (studio.js grabTake) */
-.track-lane { touch-action: pan-y; }
+.lane { touch-action: pan-y; }   /* two fingers on a lane pinch the zoom; one finger still scrolls the tracks */
 .dragging-take, .dragging-take * { cursor: grabbing !important; user-select: none; }
 .trimming-take, .trimming-take * { cursor: ew-resize !important; user-select: none; }
 .track-lane { border-radius: 8px; background: var(--lane); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }

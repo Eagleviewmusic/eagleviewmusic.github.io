@@ -19,7 +19,7 @@
   const APPS = {
     ostinato: {
       name: 'Ostinato Builder', url: '../Ostinato%20Builder%202.0/index.html?embed=music-stand', bridge: 'MusicStandBridge',
-      blurb: 'An ostinato’s rhythms, on its own percussion — repeated as many times as you like.'
+      blurb: 'An ostinato’s rhythms, on its own percussion — a loop: drag its end out for as many bars as you like.'
     },
     song: {
       name: 'Song Writer', url: '../Song%20Writer%202.5/index.html?embed=studio', bridge: 'SongWriterStudio',
@@ -243,7 +243,9 @@
         const hits = [];
         for (let k = 0; k < times; k++) m.hits.forEach(h => hits.push({ i: h.i, b: offset + k * m.beats + h.b, g: h.g, r: h.r }));
         if (!hits.length) { note.textContent = 'This ostinato has no sounds to bring in.'; return; }
-        tracks.push({ kind: 'ostinato', hits, from });
+        // a loop block: one pass, going round for `times` passes — drag its end out for more
+        const items = m.hits.map(h => ({ i: h.i, b: h.b, g: h.g, r: h.r }));
+        tracks.push({ kind: 'ostinato', hits, from, clips: [{ b: offset, o: 0, d: times * m.beats, len: m.beats, loop: m.beats, items }] });
       } else {
         const bt = m.beatTicks;
         const beat = t => offset + (t - (m.pickupTicks || 0)) / bt;

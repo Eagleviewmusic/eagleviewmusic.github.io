@@ -65,7 +65,16 @@
   let projects = {};          // id -> project (this device)
   const R = { armed: 0, inst: 'keyboard', state: 'idle', pos: 0 }; // state: idle | priming | playing | recording
   let run = null, runToken = 0;
-  let view = { start: 0, end: 32 };
+  let view = { start: 0, end: 32 };   // the beats across the lanes
+  let fit = { start: 0, end: 32 };    // the whole song's range (zoomed out, the lanes show all of it)
+  let win = 0;                        // zoom: beats across the lanes, or 0 for the whole song
+  let viewAt = 0;                     // zoomed in: the beat at the lanes' left edge
+  let zoomUI = null;                  // the − / + buttons, the snap label and the scroll thumb
+  let pinch = null;                   // two fingers on the lanes, zooming
+  let cutMode = false;                // the Split button is lit: the next press on a take or part cuts it in two
+  let cutHover = null;                // { i, beat } where the scissors would cut, drawn on that lane
+  let sel = null;                     // { tid, b } the take or part last pressed: outlined on its lane, Delete removes it
+  let drawQueued = false;
   let rows = [];              // { row, ctl, lane, canvas, ... } per track
   let ruler = null;
   let undo = [], redo = [];   // redo: what Undo took back, until something new is done
@@ -144,6 +153,30 @@
   function makeBlock(items, lo, hi) {
     return { b: lo, o: 0, d: hi - lo, len: hi - lo, items: items.map(n => ({ ...n, b: n.b - lo })) };
   }
+  // A LOOP block (an ostinato): `items` is one pass, `loop` beats long, and the
+  // window shows it going round for as long as the window is — drag its end
+  // out and it keeps going. `o` is the phase: where in the pass the window starts.
+  const mod = (x, m) => ((x % m) + m) % m;
+  // The pass length hidden in a block of repeated hits: the shortest whole-beat
+  // shift that lands every hit on another of its instrument (whole passes
+  // only); the whole block when there is none.
+  function findLoop(items) {
+    const key = (i, b) => i + '@' + Math.round(b * 96);
+    const set = new Set(items.map(h => key(h.i, h.b)));
+    const first = Math.min(...items.map(h => h.b)), last = Math.max(...items.map(h => h.b));
+    const whole = Math.max(1, Math.ceil(last + 1e-6));   // one pass: up to the beat after the last hit
+    for (let L = 1; L * 2 <= whole; L++) {
+      const ok = items.every(h => (h.b + L > last + 1e-6 || set.has(key(h.i, h.b + L))) && (h.b - L < first - 1e-6 || set.has(key(h.i, h.b - L))));
+      if (ok) return L;
+    }
+    return whole;
+  }
+  // Make an older ostinato block (its hits written out, repeat after repeat) a loop block.
+  function loopify(c) {
+    if (c.loop || !c.items.length) return c;
+    const loop = findLoop(c.items);
+    return { b: c.b, o: mod(c.o, loop), d: c.d, len: loop, loop, items: c.items.filter(h => h.b < loop - 1e-6) };
+  }
   // A block round some notes (or hits): from the beat they start on to the
   // beat after they end. A note played a moment early still counts as on the beat.
   function blockAround(items, hits) {
@@ -155,6 +188,15 @@
     const hits = engineOf(tr) === 'hits', out = [];
     tr.clips.forEach(c => {
       const end = c.o + c.d;
+      if (c.loop) {   // the pass goes round for the whole window
+        const L = c.loop;
+        for (let k = Math.floor((c.o - EARLY) / L); k * L < end; k++) c.items.forEach(n => {
+          const t = k * L + n.b;
+          if (t < c.o - EARLY || t >= end - 1e-6) return;
+          out.push({ ...n, b: c.b + t - c.o });
+        });
+        return;
+      }
       c.items.forEach(n => {
         if (n.b < c.o - EARLY || n.b >= end - 1e-6) return;
         const x = { ...n, b: c.b + n.b - c.o };
@@ -207,12 +249,18 @@
       if (Array.isArray(src.clips) && src.clips.length) {
         t.clips = src.clips
           .filter(c => c && [c.b, c.o, c.d, c.len].every(Number.isFinite) && c.d > 0 && c.o >= 0 && Array.isArray(c.items))
-          .map(c => ({ b: c.b, o: c.o, d: c.d, len: Math.max(c.len, c.o + c.d), items: hits ? cleanHits(c.items) : cleanNotes(c.items) }))
+          .map(c => {
+            const items = hits ? cleanHits(c.items) : cleanNotes(c.items);
+            const loop = hits && Number.isFinite(c.loop) && c.loop > 0 ? c.loop : 0;
+            if (loop) return { b: c.b, o: mod(c.o, loop), d: c.d, len: loop, loop, items: items.filter(h => h.b < loop - 1e-6) };
+            return { b: c.b, o: c.o, d: c.d, len: Math.max(c.len, c.o + c.d), items };
+          })
           .sort(byBeat);
       } else {
         const items = hits ? t.hits : t.notes;
         if (items.length) t.clips = [blockAround(items, hits)];
       }
+      if (hits && src.from && src.from.app === 'ostinato-builder') t.clips = t.clips.map(loopify);
       blockView(t);
     }
     if (src.from && typeof src.from === 'object') {
@@ -257,7 +305,7 @@
         // what plays (as plain notes, which older copies of the studio read) and the blocks it comes from
         const o = { ...tr, notes: tr.notes.map(cn) };
         o.hits = tr.hits.map(ch);
-        o.clips = tr.clips.map(c => ({ b: r(c.b), o: r(c.o), d: r(c.d), len: r(c.len), items: c.items.map(engineOf(tr) === 'hits' ? ch : cn) }));
+        o.clips = tr.clips.map(c => ({ b: r(c.b), o: r(c.o), d: r(c.d), len: r(c.len), ...(c.loop ? { loop: r(c.loop) } : {}), items: c.items.map(engineOf(tr) === 'hits' ? ch : cn) }));
         o.regions = tr.regions.map(g => ({ c: g.c, b: r(g.b), o: Math.round(g.o * 1e5) / 1e5, d: Math.round(g.d * 1e5) / 1e5 }));
         return o;
       })
@@ -568,7 +616,7 @@
     if (!run) return;
     const beat = heardBeat(run);
     if (!run.recording && beat > run.end + 0.05) { finishPlayback(); return; }
-    if (beat > view.end - barBeats() / 2) { view.end += 4 * barBeats(); drawAll(); }
+    if (beat > view.end - barBeats() / 2 || (win && beat >= run.from && beat < view.start)) extendView(beat);
     setHead(beat);
     posEl.textContent = beat < run.from && run.count ? 'Count-in' : posText(beat);
     if (run.recording && now - run.drawn > 80) { run.drawn = now; drawLane(run.armed); }
@@ -806,13 +854,77 @@
     const inBar = Math.floor(beat - bar * bpb + 1e-6) + 1;
     return bar < 0 ? `Pick-up · ${inBar}` : `Bar ${bar + 1} · ${inBar}`;
   }
-  // What the lanes show: the whole song, at least eight bars, and a bar to spare.
+  // What the lanes can show: the whole song, at least eight bars, and a bar to spare.
   function fitView() {
     const bpb = barBeats();
     const start = songStart();
-    view = { start, end: Math.max(Math.ceil(songEnd() / bpb) * bpb + bpb, start + 8 * bpb, R.pos + bpb) };
+    fit = { start, end: Math.max(Math.ceil(songEnd() / bpb) * bpb + bpb, start + 8 * bpb, R.pos + bpb) };
+    applyView();
   }
   const pxPerBeat = w => w / (view.end - view.start);
+
+  // -------- ZOOM --------
+  // Zoomed out (win = 0) the lanes show the whole song. Zoomed in they show
+  // `win` beats from `viewAt` — never less than a bar, never past the song's
+  // range — and a scroll thumb above the ruler slides the window along.
+  const ZOOM_STEP = 2;
+  function applyView() {
+    const range = fit.end - fit.start;
+    let w = range;
+    if (win) {
+      w = clamp(win, barBeats(), range);
+      if (w >= range - 1e-9) win = 0; else win = w;
+    }
+    viewAt = win ? clamp(viewAt, fit.start, fit.end - w) : fit.start;
+    view = { start: viewAt, end: viewAt + w };
+    if (ruler && ruler.w) renderZoom(pxPerBeat(ruler.w));   // the buttons answer at once, before the lanes redraw
+  }
+  // Zoom by a factor (> 1 zooms in), keeping the beat `around` where it is on screen.
+  function zoomBy(factor, around) {
+    const range = fit.end - fit.start, w0 = view.end - view.start;
+    const w = clamp(w0 / factor, barBeats(), range);
+    if (around == null) around = view.start + w0 / 2;
+    viewAt = around - (around - view.start) / w0 * w;
+    win = w >= range - 1e-9 ? 0 : w;
+    applyView();
+    queueDraw();
+  }
+  function panTo(at) {
+    if (!win) return;
+    viewAt = at;
+    applyView();
+    queueDraw();
+  }
+  // The song's beat under a point on screen (the lanes line up with the ruler).
+  function beatAtX(clientX) {
+    const rect = ruler.wrap.getBoundingClientRect();
+    return view.start + (clientX - rect.left) / pxPerBeat(ruler.w);
+  }
+  // Played or recorded past the lanes' right edge (or started before the left
+  // one): zoomed out the song's range grows; zoomed in the window moves along.
+  function extendView(beat) {
+    const bpb = barBeats();
+    if (!win) fit.end += 4 * bpb;
+    else { fit.end = Math.max(fit.end, beat + win); viewAt = beat - bpb / 2; }
+    applyView();
+    drawAll();
+  }
+  function queueDraw() {
+    if (drawQueued) return;
+    drawQueued = true;
+    requestAnimationFrame(() => { drawQueued = false; drawAll(); });
+  }
+
+  // The grid a dragged take or part moves by: the finest division the zoom
+  // shows at 16 px or more, down to a 32nd note (an eighth of a beat; a
+  // twelfth where the beat is a dotted quarter).
+  const SNAP_PX = 16;
+  function snapGrid(ppb) {
+    const divs = P.meter.endsWith('/8') ? [1, 1 / 3, 1 / 6, 1 / 12] : [1, 1 / 2, 1 / 4, 1 / 8];
+    let k = 0;
+    divs.forEach((d, j) => { if (d * ppb >= SNAP_PX) k = j; });
+    return { size: divs[k], name: ['beat', '8th', '16th', '32nd'][k] };
+  }
 
   const ICON = {
     keyboard: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 5v14M12 5v14M16 5v14"/><path class="fill" d="M6.6 5h2.8v8H6.6zM14.6 5h2.8v8h-2.8z"/></svg>',
@@ -823,6 +935,7 @@
     chords: '<svg viewBox="0 0 24 24"><circle class="fill" cx="8" cy="18" r="2.4"/><circle class="fill" cx="8" cy="12.5" r="2.4"/><circle class="fill" cx="8" cy="7" r="2.4"/><path d="M10.4 18V3.5"/><path d="M14.5 8h6M14.5 12.5h6M14.5 17h6"/></svg>',
     voice: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>',
     empty: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" stroke-dasharray="2.5 2.5"/></svg>',
+    split: '<svg viewBox="0 0 24 24"><path d="M12 4v16"/><path d="M8.5 12H2.5M5.5 9l-3 3 3 3"/><path d="M15.5 12h6M18.5 9l3 3-3 3"/></svg>',
     more: '<svg viewBox="0 0 24 24"><circle class="fill" cx="5.5" cy="12" r="1.6"/><circle class="fill" cx="12" cy="12" r="1.6"/><circle class="fill" cx="18.5" cy="12" r="1.6"/></svg>'
   };
   const FROM_NAME = { 'ostinato-builder': 'Ostinato Builder', 'song-writer': 'Song Writer' };
@@ -849,11 +962,20 @@
     const canvas = document.createElement('canvas');
     canvas.setAttribute('aria-hidden', 'true');
     wrap.append(canvas);
+    let tap = null;   // a finger down: a tap places the start on the lift, two fingers zoom instead
     wrap.addEventListener('pointerdown', (e) => {
-      if (busy() || e.button > 0) return;
+      if (busy() || e.button > 0 || pinch) return;
       if (grab && grab(e)) return;
+      if (e.pointerType === 'touch') { tap = { id: e.pointerId, x: e.clientX }; return; }
+      select(null);
       placeStart(e.clientX, wrap);
     });
+    wrap.addEventListener('pointerup', (e) => {
+      if (!tap || tap.id !== e.pointerId) return;
+      const t = tap; tap = null;
+      if (!pinch && !busy() && Math.abs(e.clientX - t.x) < 8) { select(null); placeStart(e.clientX, wrap); }
+    });
+    wrap.addEventListener('pointercancel', () => { tap = null; });
     return { wrap, canvas };
   }
 
@@ -863,8 +985,28 @@
     rulerRow.className = 'row ruler-row';
     const corner = document.createElement('div');
     corner.className = 'ctl ctl-corner';
-    corner.innerHTML = '<span>Tracks</span>';
+    corner.innerHTML = `<span>Tracks</span><div class="zoom" role="group" aria-label="Timeline tools">
+      <button type="button" class="zoom-btn cut-btn" aria-pressed="false" aria-label="Split a take or part in two" title="Split: press this, then press a take or part where it should be cut in two (Option/Alt: off the grid)">${ICON.split}</button>
+      <button type="button" class="zoom-btn zoom-out" aria-label="Zoom out" title="Zoom out — more bars across (pinch the lanes, too)">−</button>
+      <span class="zoom-snap" title="How far a dragged take or part moves at this zoom. Zoom in for finer, down to a 32nd note."></span>
+      <button type="button" class="zoom-btn zoom-in" aria-label="Zoom in" title="Zoom in — fewer bars across, finer moves (pinch the lanes, too)">+</button></div>`;
     ruler = makeLane('ruler');
+    const bar = document.createElement('div');
+    bar.className = 'hscroll';
+    bar.hidden = true;
+    const thumb = document.createElement('div');
+    thumb.className = 'hscroll-thumb';
+    thumb.setAttribute('role', 'scrollbar');
+    thumb.setAttribute('aria-label', 'Which bars the lanes show');
+    thumb.title = 'Drag to move along the song';
+    thumb.addEventListener('pointerdown', (e) => grabThumb(e, thumb));
+    bar.appendChild(thumb);
+    ruler.wrap.appendChild(bar);
+    zoomUI = { out: corner.querySelector('.zoom-out'), in: corner.querySelector('.zoom-in'), snap: corner.querySelector('.zoom-snap'), cut: corner.querySelector('.cut-btn'), bar, thumb };
+    zoomUI.cut.addEventListener('click', () => setCutMode(!cutMode));
+    renderCut();
+    zoomUI.out.addEventListener('click', () => zoomBy(1 / ZOOM_STEP));
+    zoomUI.in.addEventListener('click', () => zoomBy(ZOOM_STEP));
     rulerRow.append(corner, ruler.wrap);
     tracksEl.appendChild(rulerRow);
 
@@ -917,6 +1059,7 @@
       ctl.append(arm, name, mute, solo, vol, more);
       const lane = makeLane('track-lane', (e) => grabTake(e, i));
       lane.wrap.addEventListener('pointermove', (e) => { if (!e.buttons) hoverTake(e, i); });
+      lane.wrap.addEventListener('pointerleave', () => { if (cutHover && cutHover.i === i) { cutHover = null; drawLane(i); } });
       row.append(ctl, lane.wrap);
       tracksEl.appendChild(row);
       return { row, ctl, arm, name, mute, solo, vol, more, wrap: lane.wrap, canvas: lane.canvas };
@@ -1092,7 +1235,9 @@
         g.fillStyle = cssVar('--text-3');
         g.fillText(String(bar), x + 4, l.h / 2 - 1);
       }
+      if (ppb >= 24) for (let k = 1; k < bpb; k++) g.fillRect(Math.round(x + k * ppb), l.h - 4, 1, 4);   // zoomed in: a tick a beat
     }
+    renderZoom(ppb);
     if (R.pos >= view.start) { // where Play starts
       const x = (R.pos - view.start) * ppb;
       g.fillStyle = cssVar('--accent');
@@ -1108,6 +1253,13 @@
       g.globalAlpha = bar ? 1 : 0.45;
       g.fillRect(Math.round((b - view.start) * ppb), 0, 1, l.h);
     }
+    const grid = snapGrid(ppb).size;   // zoomed in: the lines a drag snaps to, faint
+    if (grid < 1) {
+      g.globalAlpha = 0.18;
+      for (let b = Math.ceil(view.start); b < view.end; b++) {
+        for (let k = grid; k < 1 - 1e-6; k += grid) g.fillRect(Math.round((b + k - view.start) * ppb), 0, 1, l.h);
+      }
+    }
     g.globalAlpha = 1;
     if (view.start < 0) { // the pick-up bar, shaded
       g.fillStyle = cssVar('--line');
@@ -1116,6 +1268,11 @@
   }
 
   function drawLane(i) {
+    drawLaneBody(i);
+    drawSel(i);
+    drawCut(i);
+  }
+  function drawLaneBody(i) {
     const l = rows[i], tr = P.tracks[i];
     if (!l || !l.w || !tr) return;
     const g = l.canvas.getContext('2d');
@@ -1214,13 +1371,20 @@
       g.globalAlpha = 0.8 * base;
       g.fillRect(Math.round(x0), 3, 2, l.h - 6);
       g.fillRect(Math.round(x1) - 2, 3, 2, l.h - 6);
+      if (c.loop) {   // a loop: a notch where each pass begins
+        g.globalAlpha = 0.35 * base;
+        for (let t = c.loop - mod(c.o, c.loop); t < c.d - 1e-6; t += c.loop) {
+          const x = Math.round(x0 + t * ppb);
+          g.fillRect(x, 3, 1, 5); g.fillRect(x, l.h - 8, 1, 5);
+        }
+      }
     });
     g.globalAlpha = 1;
   }
   // What the window of the block being dragged leaves out, in the song's beats.
   function hiddenOf(i) {
     const tr = P.tracks[i];
-    if (!takeEdit || takeEdit.i !== i || engineOf(tr) === 'audio') return [];
+    if (!takeEdit || takeEdit.i !== i || engineOf(tr) === 'audio' || takeEdit.g.loop) return [];
     const c = takeEdit.g, end = c.o + c.d;
     return c.items.filter(n => n.b < c.o - EARLY || n.b >= end - 1e-6).map(n => ({ ...n, b: c.b + n.b - c.o }));
   }
@@ -1253,10 +1417,138 @@
     return null;
   }
   function hoverTake(e, i) {
+    if (cutMode) { rows[i].wrap.style.cursor = ''; hoverCut(e, i); return; }
     const hit = busy() ? null : takeAt(e, i);
     rows[i].wrap.style.cursor = !hit ? '' : hit.how === 'move' ? 'grab' : 'ew-resize';
   }
+
+  // -------- THE SELECTED TAKE OR PART --------
+  // A press on a take or part (one that doesn't drag) selects it: a yellow
+  // outline shows which one, and Delete or Backspace removes it (Undo brings
+  // it back). A press on empty lane lets it go. It is remembered by track and
+  // start beat, so it survives the tracks being rebuilt or undone.
+  function selected() {
+    if (!sel) return null;
+    const i = P.tracks.findIndex(t => t.id === sel.tid);
+    const tr = P.tracks[i];
+    if (!tr) return null;
+    const audio = engineOf(tr) === 'audio';
+    const g = (audio ? tr.regions : tr.clips).find(x => Math.abs(x.b - sel.b) < 1e-9);
+    return g ? { i, tr, g, audio } : null;
+  }
+  function select(hit) {   // hit: { tr, g } or null
+    const was = selected();
+    sel = hit ? { tid: hit.tr.id, b: hit.g.b } : null;
+    const now = selected();
+    if (was && (!now || was.i !== now.i)) drawLane(was.i);
+    if (now) drawLane(now.i);
+  }
+  function drawSel(i) {
+    const s = selected();
+    if (!s || s.i !== i) return;
+    const l = rows[i];
+    if (!l || !l.w) return;
+    const g = l.canvas.getContext('2d'), ppb = pxPerBeat(l.w);
+    const u = s.audio ? 60 / P.tempo : 1;
+    const x0 = (s.g.b - view.start) * ppb, x1 = x0 + s.g.d / u * ppb;
+    if (x1 < 0 || x0 > l.w) return;
+    g.setTransform(l.dpr, 0, 0, l.dpr, 0, 0);
+    g.fillStyle = g.strokeStyle = cssVar('--accent');
+    g.globalAlpha = 0.12;
+    g.fillRect(x0, 0, x1 - x0, l.h);
+    g.globalAlpha = 1;
+    g.lineWidth = 2;
+    g.strokeRect(Math.round(x0) + 1, 1, Math.max(2, Math.round(x1 - x0) - 2), l.h - 2);
+  }
+  function deleteSelected() {
+    const s = selected();
+    if (!s || busy()) return;
+    pushUndo(`deleting ${s.audio ? 'the take' : 'the part'} on track ${s.i + 1}`);
+    if (s.audio) s.tr.regions = s.tr.regions.filter(x => x !== s.g);
+    else { s.tr.clips = s.tr.clips.filter(x => x !== s.g); blockView(s.tr); }
+    sel = null;
+    afterProjectChange(true);
+    toast(`Deleted ${s.audio ? 'the take' : 'the part'} on track ${s.i + 1} — Undo brings it back.`);
+  }
+
+  // -------- SPLITTING --------
+  // The Split button lights up; over the lanes the pointer is a pair of
+  // scissors and a line on the take or part under it shows where the cut
+  // would fall (on the drag grid; Option/Alt anywhere). A press cuts it in two
+  // and the button goes out again — only a cut, or the button, turns it off.
+  function setCutMode(on) {
+    cutMode = !!on;
+    if (!cutMode && cutHover) { const i = cutHover.i; cutHover = null; drawLane(i); }
+    renderCut();
+  }
+  function renderCut() {
+    document.body.classList.toggle('cutting', cutMode);
+    if (zoomUI) zoomUI.cut.setAttribute('aria-pressed', String(cutMode));
+  }
+  // Where the scissors would cut on track i: { g, beat, audio, u } or null
+  // when there is no take or part under them (or too little on one side).
+  function cutAt(e, i) {
+    const tr = P.tracks[i], l = rows[i];
+    if (!tr || !l || busy()) return null;
+    const audio = engineOf(tr) === 'audio';
+    const list = audio ? tr.regions : tr.clips;
+    const u = audio ? 60 / P.tempo : 1, least = (audio ? TAKE_MIN : BLOCK_MIN) / u;   // in beats
+    const rect = l.wrap.getBoundingClientRect(), ppb = pxPerBeat(rect.width);
+    let beat = view.start + (e.clientX - rect.left) / ppb;
+    if (!e.altKey) { const grid = snapGrid(ppb).size; beat = Math.round(beat / grid) * grid; }
+    for (let k = list.length - 1; k >= 0; k--) {
+      const g = list[k];
+      if (beat - g.b >= least - 1e-9 && g.b + g.d / u - beat >= least - 1e-9) return { g, beat, audio, u };
+    }
+    return null;
+  }
+  function hoverCut(e, i) {
+    const hit = cutAt(e, i), was = cutHover;
+    cutHover = hit ? { i, beat: hit.beat } : null;
+    if (was && (!cutHover || was.i !== i)) drawLane(was.i);
+    if (cutHover && (!was || was.i !== i || was.beat !== cutHover.beat)) drawLane(i);
+  }
+  function drawCut(i) {
+    if (!cutHover || cutHover.i !== i) return;
+    const l = rows[i];
+    if (!l || !l.w) return;
+    const g = l.canvas.getContext('2d');
+    g.setTransform(l.dpr, 0, 0, l.dpr, 0, 0);
+    const x = Math.round((cutHover.beat - view.start) * pxPerBeat(l.w));
+    g.fillStyle = cssVar('--accent');
+    g.fillRect(x - 1, 0, 2, l.h);
+    g.beginPath(); g.moveTo(x - 5, 0); g.lineTo(x + 5, 0); g.lineTo(x, 6); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(x - 5, l.h); g.lineTo(x + 5, l.h); g.lineTo(x, l.h - 6); g.closePath(); g.fill();
+  }
+  // A press on a lane with the scissors: cut the take or part under them in
+  // two. Both halves keep the whole recording (a take) or their own notes (a
+  // part: the notes before the cut go left, the rest right), so an end
+  // dragged back out opens a take up again. True = the press was taken.
+  function cutHere(e, i) {
+    const hit = cutAt(e, i);
+    if (!hit) { if (!busy()) toast('Press on a take or a part to split it there.'); return true; }
+    const tr = P.tracks[i], g = hit.g, cut = (hit.beat - g.b) * hit.u;   // into the window, in its units
+    pushUndo(`splitting ${hit.audio ? 'the take' : 'the part'} on track ${i + 1}`);
+    const left = { ...g, d: cut }, right = { ...g, b: hit.beat, o: g.loop ? mod(g.o + cut, g.loop) : g.o + cut, d: g.d - cut };
+    if (!hit.audio && g.loop) { left.items = g.items.map(n => ({ ...n })); right.items = g.items.map(n => ({ ...n })); }
+    else if (!hit.audio) {
+      const at = g.o + cut;
+      left.items = g.items.filter(n => n.b < at).map(n => ({ ...n }));
+      right.items = g.items.filter(n => n.b >= at).map(n => ({ ...n }));
+    }
+    const list = hit.audio ? tr.regions : tr.clips;
+    list.splice(list.indexOf(g), 1, left, right);
+    list.sort(byBeat);
+    if (!hit.audio) blockView(tr);
+    sel = { tid: tr.id, b: left.b };
+    cutHover = null;
+    setCutMode(false);
+    afterProjectChange(true);
+    return true;
+  }
+
   function grabTake(e, i) {
+    if (cutMode) return cutHere(e, i);
     const hit = takeAt(e, i);
     if (!hit) return false;
     const tr = P.tracks[i], g = hit.g, u = hit.u, bpb = barBeats();
@@ -1265,19 +1557,20 @@
     const c = hit.audio ? StudioVoice.clip(g.c) : null;
     // how far the window can open: the whole recording (one not loaded yet can't
     // be opened up), or everything the block holds
-    const full = hit.audio ? (c ? c.data.length / c.rate : g.o + g.d) : g.len;
+    const full = hit.audio ? (c ? c.data.length / c.rate : g.o + g.d) : g.loop ? Infinity : g.len;
     const least = hit.audio ? TAKE_MIN : BLOCK_MIN;
     const looked = () => { if (!hit.audio) blockView(tr); drawLane(i); };
-    const snapPx = 6;
-    // an edge lands on a beat line when it comes within a few pixels of one
+    const snapPx = 6, grid = snapGrid(hit.ppb).size;
+    // an edge lands on a grid line when it comes within a few pixels of one
     const magnet = (beat, free) => {
       if (free) return beat;
-      const n = Math.round(beat);
+      const n = Math.round(beat / grid) * grid;
       return Math.abs(n - beat) * hit.ppb < snapPx ? n : beat;
     };
     let on = false;
     const move = (ev) => {
       if (ev.pointerId !== id) return;
+      if (pinch) { up(Object.assign(new Event('pointercancel'), { pointerId: id })); return; }   // a second finger: zooming, not dragging
       const dx = ev.clientX - startX;
       if (!on) {
         if (Math.abs(dx) < 4) return;
@@ -1289,12 +1582,12 @@
       ev.preventDefault();
       const beats = dx / hit.ppb;
       if (hit.how === 'move') {
-        g.b = Math.max(-bpb, was.b + (ev.altKey ? beats : Math.round(beats)));
+        g.b = Math.max(-bpb, was.b + (ev.altKey ? beats : Math.round(beats / grid) * grid));
       } else if (hit.how === 'start') {
         let b = magnet(was.b + beats, ev.altKey);
-        b = clamp(b, Math.max(-bpb, was.b - was.o / u), was.b + (was.d - least) / u);
+        b = clamp(b, g.loop ? -bpb : Math.max(-bpb, was.b - was.o / u), was.b + (was.d - least) / u);
         const ds = (b - was.b) * u;
-        g.b = b; g.o = was.o + ds; g.d = was.d - ds;
+        g.b = b; g.o = g.loop ? mod(was.o + ds, g.loop) : was.o + ds; g.d = was.d - ds;
       } else {
         const end = magnet(was.b + was.d / u + beats, ev.altKey);
         g.d = clamp((end - was.b) * u, least, full - was.o);
@@ -1308,7 +1601,7 @@
       wrap.removeEventListener('pointercancel', up);
       takeEdit = null;
       document.body.classList.remove('dragging-take', 'trimming-take');
-      if (!on) { placeStart(ev.clientX, wrap); return; }   // a click on a take: Play starts at that bar, as anywhere
+      if (!on) { if (ev.type !== 'pointercancel') { placeStart(ev.clientX, wrap); select({ tr, g }); } return; }   // a click on a take: Play starts at that bar, and it is the one selected
       const now = { b: g.b, o: g.o, d: g.d };
       Object.assign(g, was);
       if (ev.type === 'pointercancel' || (now.b === was.b && now.o === was.o && now.d === was.d)) { looked(); return; }
@@ -1326,6 +1619,7 @@
         tr.clips.sort(byBeat);
         blockView(tr);
       }
+      sel = { tid: tr.id, b: g.b };
       afterProjectChange(true);
     };
     wrap.addEventListener('pointermove', move);
@@ -1396,6 +1690,93 @@
       g.fillText('Empty — press ● to record here', 10, l.h / 2);
     }
   }
+
+  // The − / + buttons, the snap label and the scroll thumb, for the view now.
+  function renderZoom(ppb) {
+    if (!zoomUI || !ruler || !ruler.w) return;
+    const range = fit.end - fit.start, w = view.end - view.start;
+    zoomUI.out.disabled = !win;
+    zoomUI.in.disabled = w <= barBeats() + 1e-9;
+    zoomUI.snap.textContent = 'snap ' + snapGrid(ppb).name;
+    zoomUI.bar.hidden = !win;
+    if (win) {
+      const tw = Math.max(24, w / range * ruler.w);
+      zoomUI.thumb.style.width = tw + 'px';
+      zoomUI.thumb.style.left = (view.start - fit.start) / (range - w) * (ruler.w - tw) + 'px';
+      zoomUI.thumb.setAttribute('aria-valuenow', String(Math.round((view.start - fit.start) / (range - w) * 100)));
+    }
+  }
+  // Drag the thumb to slide the window along the song.
+  function grabThumb(e, thumb) {
+    if (e.button > 0 || !win) return;
+    e.stopPropagation(); e.preventDefault();
+    const id = e.pointerId, x0 = e.clientX, at0 = viewAt;
+    const range = fit.end - fit.start, w = view.end - view.start;
+    const tw = thumb.offsetWidth, room = Math.max(1, ruler.w - tw);
+    thumb.classList.add('held');
+    try { thumb.setPointerCapture(id); } catch (err) {}
+    const move = (ev) => { if (ev.pointerId === id) panTo(at0 + (ev.clientX - x0) / room * (range - w)); };
+    const up = (ev) => {
+      if (ev.pointerId !== id) return;
+      thumb.classList.remove('held');
+      thumb.removeEventListener('pointermove', move);
+      thumb.removeEventListener('pointerup', up);
+      thumb.removeEventListener('pointercancel', up);
+    };
+    thumb.addEventListener('pointermove', move);
+    thumb.addEventListener('pointerup', up);
+    thumb.addEventListener('pointercancel', up);
+  }
+  // Over the lanes: a trackpad pinch (Ctrl + wheel) zooms around the pointer,
+  // two fingers sideways slide the window; Safari sends its pinch as gesture
+  // events; on a touch screen two fingers on the lanes pinch.
+  const overLane = e => ruler && ruler.w && e.target && e.target.closest && e.target.closest('.lane');
+  tracksEl.addEventListener('wheel', (e) => {
+    if (!overLane(e)) return;
+    if (e.ctrlKey) {
+      if ('GestureEvent' in window) return;   // Safari: the gesture events below
+      e.preventDefault();
+      zoomBy(Math.exp(-e.deltaY * 0.01), beatAtX(e.clientX));
+    } else if (win && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      e.preventDefault();
+      panTo(viewAt + e.deltaX / pxPerBeat(ruler.w));
+    }
+  }, { passive: false });
+  let gestureScale = 1;
+  tracksEl.addEventListener('gesturestart', (e) => { if (overLane(e)) { e.preventDefault(); gestureScale = 1; } });
+  tracksEl.addEventListener('gesturechange', (e) => {
+    if (!overLane(e)) return;
+    e.preventDefault();
+    zoomBy(e.scale / gestureScale, beatAtX(e.clientX));
+    gestureScale = e.scale;
+  });
+  const fingers = new Map();   // touch pointers on the lanes: id -> x
+  tracksEl.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch' || !overLane(e)) return;
+    fingers.set(e.pointerId, e.clientX);
+    if (fingers.size === 2) {
+      const [a, b] = [...fingers.values()];
+      pinch = { d0: Math.max(8, Math.abs(a - b)), w0: view.end - view.start, at: beatAtX((a + b) / 2) };
+      e.stopPropagation();   // the lane under the second finger doesn't take it as a press
+    }
+  }, true);
+  tracksEl.addEventListener('pointermove', (e) => {
+    if (!fingers.has(e.pointerId)) return;
+    fingers.set(e.pointerId, e.clientX);
+    if (!pinch || fingers.size < 2) return;
+    e.preventDefault();
+    const [a, b] = [...fingers.values()];
+    const range = fit.end - fit.start;
+    const w = clamp(pinch.w0 * pinch.d0 / Math.max(8, Math.abs(a - b)), barBeats(), range);
+    const rect = ruler.wrap.getBoundingClientRect();
+    viewAt = pinch.at - ((a + b) / 2 - rect.left) / ruler.w * w;   // the beat between the fingers stays there
+    win = w >= range - 1e-9 ? 0 : w;
+    applyView();
+    queueDraw();
+  });
+  const liftFinger = (e) => { fingers.delete(e.pointerId); if (fingers.size < 2) pinch = null; };
+  tracksEl.addEventListener('pointerup', liftFinger);
+  tracksEl.addEventListener('pointercancel', liftFinger);
 
   function drawAll() {
     cssCache = null;
@@ -2189,6 +2570,11 @@
       if (!e.repeat) togglePlay();
       return;
     }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selected()) {
+      e.preventDefault();
+      if (!e.repeat) deleteSelected();
+      return;
+    }
     if (window.StudioLink) StudioLink.forward(e);
   });
   // a focused button would click on Space as well
@@ -2222,6 +2608,7 @@
     calibrating: () => !!cal, calTap,
     sheetOpen, toast, openSheet, closeSheet,
     get project() { return P; },
+    get view() { return view; },   // the beats across the lanes (tests)
     get state() { return R; },
     barBeats, hasContent, recordable, blankTrack, normalizeTrack,
     get key() { return { pc: P.key, scale: P.scale }; },
