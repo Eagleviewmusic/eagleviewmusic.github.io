@@ -1,0 +1,170 @@
+/* ==========================================================================
+   evm-shelf.css — the Teacher Library shelf (evm-shelf.js)
+   AUTHORITATIVE COPY: Claude Apps/EVM Library/evm-shelf.css
+   Uses each app's own tokens where it has them (--accent, --ink, --paper,
+   --surface, --font…), so the shelf looks like part of whichever app it is in.
+   ========================================================================== */
+
+.evm-shelf {
+  position: fixed; inset: 0; z-index: 1000;
+  display: none;
+  align-items: center; justify-content: center;
+  padding: 16px;
+  font-family: var(--font, 'Nunito', system-ui, sans-serif);
+  color: var(--ink, #1D2B45);
+}
+.evm-shelf.show { display: flex; }
+.evm-shelf-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(29, 43, 69, .38);
+}
+.evm-shelf-panel {
+  position: relative;
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 680px;
+  max-height: calc(100vh - 32px);
+  background: var(--surface, #fff);
+  border-radius: 22px;
+  box-shadow: 0 12px 28px rgba(29,43,69,.16), 0 32px 64px rgba(29,43,69,.18);
+  overflow: hidden;
+}
+.evm-shelf-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 14px 10px 20px;
+  border-bottom: 1px solid var(--hairline, #E4DACA);
+}
+.evm-shelf-title {
+  flex: 1; margin: 0;
+  font-family: var(--font-round, var(--font, inherit));
+  font-size: 20px; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.evm-shelf-back, .evm-shelf-close {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; flex: none;
+  border: 0; border-radius: 999px;
+  background: var(--paper-2, #F6EFE3);
+  color: var(--ink-2, #55637C);
+  cursor: pointer;
+}
+.evm-shelf-back { margin-left: -6px; }
+.evm-shelf-back[hidden] { display: none; }
+.evm-shelf-back svg, .evm-shelf-close svg {
+  width: 18px; height: 18px; fill: none; stroke: currentColor;
+  stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
+}
+.evm-shelf-body { padding: 16px 20px 20px; overflow-y: auto; }
+
+.evm-shelf-intro, .evm-shelf-fine { margin: 0 0 14px; font-size: 14px; color: var(--ink-2, #55637C); }
+.evm-shelf-fine { margin: 12px 0 0; font-size: 13px; }
+.evm-shelf-empty { margin: 24px 0; text-align: center; font-weight: 700; color: var(--ink-3, #8A96AB); }
+.evm-shelf-note {
+  margin: 0 0 14px; padding: 10px 14px;
+  border-radius: 14px;
+  background: #FBF0DC; color: #9A5B0F;
+  font-size: 13px; font-weight: 700;
+}
+
+/* ---------- the shelf: books standing on a ledge ---------- */
+.evm-shelf-shelf {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 18px 12px;
+  padding: 12px 12px 10px;
+  /* a wooden ledge under every row: rows are 164px books + 18px gaps,
+     so the pattern repeats every 182px, starting below the 12px padding */
+  background:
+    repeating-linear-gradient(to bottom,
+      transparent 0, transparent 164px,
+      #C9A77A 164px, #B08A5A 170px,
+      transparent 170px, transparent 182px) 0 12px / 100% 182px repeat-y;
+  border-radius: 10px;
+}
+.evm-shelf-book {
+  position: relative;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 6px;
+  height: 164px;
+  padding: 14px 12px 12px 18px;
+  border: 0;
+  border-radius: 4px 12px 12px 4px;
+  background: hsl(var(--book-hue, 210), 45%, 42%);
+  box-shadow: inset 6px 0 0 rgba(0,0,0,.18), 0 2px 6px rgba(29,43,69,.18);
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+}
+.evm-shelf-book:hover { transform: translateY(-4px); box-shadow: inset 6px 0 0 rgba(0,0,0,.18), 0 8px 16px rgba(29,43,69,.24); }
+.evm-shelf-book-name {
+  font-family: var(--font-round, var(--font, inherit));
+  font-size: 16px; font-weight: 700; line-height: 1.2;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+}
+.evm-shelf-book-count { font-size: 11px; font-weight: 800; opacity: .88; }
+/* A book that is out: pulled forward and flagged, so the gap on the shelf
+   and the flag both say where it went. */
+.evm-shelf-book.is-out {
+  background: var(--surface, #fff);
+  color: var(--ink, #1D2B45);
+  box-shadow: inset 6px 0 0 hsl(var(--book-hue, 210), 45%, 42%), 0 0 0 2px hsl(var(--book-hue, 210), 45%, 42%);
+}
+.evm-shelf-book-flag {
+  position: absolute; top: -8px; right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent, #2F6B4F); color: #fff;
+  font-size: 10px; font-weight: 800; white-space: nowrap;
+}
+
+/* ---------- one book, opened ---------- */
+.evm-shelf-cover {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 14px 16px 14px 22px;
+  margin-bottom: 12px;
+  border-radius: 6px 14px 14px 6px;
+  background: hsl(var(--book-hue, 210), 45%, 42%);
+  box-shadow: inset 7px 0 0 rgba(0,0,0,.18);
+  color: #fff;
+}
+.evm-shelf-cover-count { font-weight: 800; }
+.evm-shelf-cover-also { font-size: 12px; opacity: .9; }
+.evm-shelf-list { list-style: none; margin: 0; padding: 0; }
+.evm-shelf-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--hairline, #E4DACA);
+}
+.evm-shelf-item-title { flex: 1; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evm-shelf-item-kind { font-size: 12px; font-weight: 800; color: var(--ink-3, #8A96AB); text-transform: capitalize; }
+.evm-shelf-link {
+  border: 0; background: none; padding: 4px 6px;
+  font: inherit; font-size: 13px; font-weight: 800;
+  color: var(--accent, #2F6B4F); cursor: pointer;
+}
+.evm-shelf-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+.evm-shelf-btn {
+  min-height: 42px; padding: 0 20px;
+  border-radius: 999px;
+  border: 1.5px solid var(--hairline-2, #D6C9B4);
+  background: var(--surface, #fff);
+  color: var(--ink, #1D2B45);
+  font: inherit; font-weight: 800; font-size: 14px;
+  cursor: pointer;
+}
+.evm-shelf-btn.primary { border-color: var(--accent, #2F6B4F); background: var(--accent, #2F6B4F); color: #fff; }
+.evm-shelf-btn:disabled { opacity: .5; cursor: default; }
+
+@media (max-width: 480px) {
+  .evm-shelf { padding: 0; align-items: flex-end; }
+  .evm-shelf-panel { max-height: 92vh; border-radius: 22px 22px 0 0; }
+  .evm-shelf-shelf { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+}
+
+/* ---------- in an app's own library list ---------- */
+.evm-book-head-btn {
+  margin-left: auto;
+  border: 0; background: none; padding: 2px 4px;
+  font: inherit; font-size: 12px; font-weight: 800;
+  color: var(--accent, #2F6B4F); cursor: pointer;
+  text-transform: none; letter-spacing: 0;
+}
