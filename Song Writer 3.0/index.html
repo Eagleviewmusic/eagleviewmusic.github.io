@@ -753,16 +753,14 @@
   </div>
 </div>
 
-<!-- ============ SHEET: CHORDS — one chord, the chord charts, the time line (js/components/progression-window.js) ============
-     Before the chord editor, so More chords… opens on top of it. -->
+<!-- ============ SHEET: CHORDS — the chord chart, the time line (js/components/progression-window.js; the chart: chord-chart.js + song-wave.js; Focus: chord-focus.js; the Time Line: chord-timeline.js) ============ -->
 <div class="sheet-backdrop" id="prog-sheet">
   <div class="sheet prog-sheet" role="dialog" aria-label="Chords">
     <div class="pw-head">
       <h2>Chords</h2>
       <span class="pw-song" id="pw-song"></span>
-      <div class="seg pw-tabs" id="pw-tabs" role="tablist" aria-label="One chord, the chord charts, or the time line">
-        <button type="button" class="seg-btn" data-tab="focus" role="tab">Individual Focus</button>
-        <button type="button" class="seg-btn active" data-tab="build" role="tab">Chord Charts</button>
+      <div class="seg pw-tabs" id="pw-tabs" role="tablist" aria-label="The chord chart, or the time line">
+        <button type="button" class="seg-btn active" data-tab="chart" role="tab">Chord Chart</button>
         <button type="button" class="seg-btn" data-tab="song" role="tab">Time Line</button>
       </div>
       <span class="pw-undo">
@@ -777,20 +775,6 @@
     </div>
     <div class="pw-body" id="pw-body"></div>
     <div class="pw-foot" id="pw-foot"></div>
-  </div>
-</div>
-
-<!-- ============ SHEET: A PROGRESSION'S CHORD — More chords… and a double-click on a card (progression-window.js) ============
-     After the Chords window, so it opens on top of it. -->
-<div class="sheet-backdrop" id="pchord-sheet">
-  <div class="sheet pchord-sheet" role="dialog" aria-label="Chord">
-    <div class="pw-head">
-      <h2 id="pchord-title">Chord</h2>
-      <span class="pw-gap"></span>
-      <button class="sheet-close" data-close="pchord-sheet" title="Close (Esc)" aria-label="Close">&times;</button>
-    </div>
-    <div class="pchord-body" id="pchord-body"></div>
-    <div class="pw-foot" id="pchord-foot"></div>
   </div>
 </div>
 
@@ -975,7 +959,7 @@
       <li><span class="help-key edit">↵</span><div><b>Lines</b>, in the Edit box: <b>New line</b> starts a line at this word, and <b>Join up</b> (on the first word of a line) joins the line to the one above. <span class="help-key">⌫</span> removes the selected syllable — press it twice, so one stray press never loses work.</div></li>
       <li><span class="help-key edit">♪</span><div><b>Pick-ups</b> (Layout settings → 1-beat pick-up, saved with the song): every line starts with a one-beat pick-up. Unlocked, point at the bar line after a pick-up and press its <b>×</b>: the bar line goes and the pick-up joins the first bar. Or select a line’s pick-up and <b>Join up</b> moves just that beat to the end of the line above — press it again to join the whole line. <b>Delete</b> on a pick-up takes it away and puts a rest in the bar above. A new line starts with its pick-up again.</div></li>
       <li><span class="help-key edit">A</span><div><b>Section names</b> sit in the top corner of each line; type into them in Edit. ▲ ▼ move the line, ⧉ copies it below, × deletes it. <b>Add a line</b>, at the end of the song, starts a new one.</div></li>
-      <li><span class="help-key">I</span><div><b>The Chords window</b> (Chords tab): <b>Chord Progression</b>, under the panel, opens it on <b>Chord Charts</b>; a <b>double-click</b> on a chord opens it on <b>Individual Focus</b>. <b>Individual Focus</b> is one chord of the song — which chord, how long, its rhythm. <b>Chord Charts</b> makes a progression, top to bottom: choose a rhythm every bar plays (<b>Build your own</b> dot by dot, or tap a <b>Pre-built</b> one) and play chords from the board to explore (hold one to hear it in that rhythm) — the changes under it (sus2, ♭7, 6/4 …) stay on until you tap them again. When you’re ready, tap <b>Add a chord</b>: each chord you play then goes in, until you tap anywhere else. <b>Double-click</b> a chord to change it or give it a custom rhythm. Then name it, <b>Hear it</b>, and <b>Place it in the song</b>. <b>Time Line</b> lays the song’s chords out in groups, one for each progression: drag a group by its top strip to move all of it, drag a chord to move it (dropped between two chords it slides in and the others make room), tap one and <b>Copy</b>, <b>Paste</b> (at the orange point) or <b>Delete</b> (⌘C ⌘V Delete too). The chords play on past the melody, to help write the next part.</div></li>
+      <li><span class="help-key">I</span><div><b>The Chords window</b> (Chords tab): <b>Chord Chart</b>, under the panel, opens it. Along the top are the song’s chords — press one to hear it, drag it to move it, drag it away to take it off. Under them the song plays as a <b>sound wave</b> (▶, round and round): tap the wave to jump, drag across it to loop just those bars, and switch the <b>Melody</b> or the <b>Chords</b> off. While it plays, press any chord on the board (or its key) to hear it with the song; drag a chord up onto the chart, or tap <b>+</b> and every chord you play goes on. <b>Time Line</b> lays the song out in bars, its words over its chords: drag a chord on from the tray, drag a chord to move it (⌥ for a copy), stretch it by its grips, and Copy, Repeat or Delete it. Drag a <b>section</b> by its tab to move it a bar at a time (its chords go with it; past the middle of the next one they swap), or Copy, Repeat or Delete it; empty bars before or between sections are an <b>Intro</b> or <b>Interlude</b> — put chords in them, and they become a row of chords in the music. Your changes wait there until <b>Apply</b> — leave without applying and it asks (<b>Apply all</b>, or <b>Chords only</b> to leave the melody as it was); <b>Not now</b> keeps them for later (a dot on the tab). A <b>double-click</b> on a chord opens it on its own.</div></li>
       <li><span class="help-key">I</span><div><b>The chord track</b> draws the chords over the words, and the bars after the melody as a chord chart. Tap a chord to hear it; in Edit, select it and press a chord key to change it, <span class="help-key">⌫</span> to silence it, <span class="help-key">←</span> <span class="help-key">→</span> to walk the chords. <b>Double-click</b> a chord for <b>Just here</b>: change that one bar — one chord or two, any rhythm — and the progression stays as it is. Play starts from a selected chord.</div></li>
       <li><span class="help-key edit">✎</span><div><b>Change a chord</b>: unlocked, the pencil on any chord opens its editor — root, quality, a 7th or an inversion stuck to it, its name — and <b>Back to the scale’s chord</b> undoes it. The pencil at the end of the Z X C V B row chooses what each button does (sus2 … maj7, or the inversions 6, 6/4, 6/5, 4/3, 4/2). Re-chorded places are saved with the song. Under the panel, the corner shows the chord in hand and its notes; the keyboard’s Octaves and Focus sit below them.</div></li>
       <li><span class="help-key">⛶</span><div><b>Present</b> hides every control and fills the screen. Play and the step arrows stay. Press <span class="help-key">Esc</span> to come back.</div></li>
@@ -1102,6 +1086,10 @@
 <script src="js/components/syllable-review.js"></script>
 <script src="js/components/rhythm-box.js"></script>
 <script src="js/components/progression-window.js"></script>
+<script src="js/components/song-wave.js"></script>
+<script src="js/components/chord-chart.js"></script>
+<script src="js/components/chord-focus.js"></script>
+<script src="js/components/chord-timeline.js"></script>
 <script src="js/components/chord-track.js"></script>
 <script src="js/components/edit-box.js"></script>
 <script src="js/components/note-tools.js"></script>

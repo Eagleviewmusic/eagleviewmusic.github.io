@@ -24,6 +24,7 @@
      SW.history.undo() / redo()        true when something changed
      SW.history.canUndo() / canRedo()
      SW.history.reset()                this song becomes the first step
+     SW.history.hold(fn)               fn redraws the song as part of an edit (no fresh history)
    Event: 'history:changed' { canUndo, canRedo }
    ========================================================================== */
 (function () {
@@ -37,6 +38,7 @@
   let future = [];        // steps undone
   let current = null;     // { json, sel, reason, at }
   let restoring = false;
+  let holding = false;    // hold(fn): a song drawn again as part of one edit (the Time Line's Apply all)
 
   function selIndex() {
     const a = SW.score.getActiveNote();
@@ -108,11 +110,18 @@
   }
 
   SW.bus.on('score:changed', d => { if (!d || d.reason !== 'history') record(d && d.reason); });
-  SW.bus.on('score:loaded', () => { if (!restoring) reset(); });
+  SW.bus.on('score:loaded', () => { if (!restoring && !holding) reset(); });
+  /* fn draws the song again (SW.score.render) as part of an edit: the history goes on, and the
+     score:changed that follows is its one step; listeners take the redraw as Undo's (isRestoring) */
+  function hold(fn) {
+    const was = holding;
+    holding = true;
+    try { fn(); } finally { holding = was; }
+  }
 
   SW.history = {
-    undo, redo, reset,
-    isRestoring: () => restoring,
+    undo, redo, reset, hold,
+    isRestoring: () => restoring || holding,
     canUndo: () => past.length > 0,
     canRedo: () => future.length > 0
   };

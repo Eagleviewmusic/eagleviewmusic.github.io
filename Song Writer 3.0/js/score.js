@@ -537,6 +537,7 @@
     const newLabel = newLine.querySelector('.line-label');
     if (newLabel && labelInput) { newLabel.value = labelInput.value; sizeLabel(newLabel); }
     if (lineElement.dataset.pickup) newLine.dataset.pickup = lineElement.dataset.pickup;
+    if (lineElement.dataset.bars) markInstrumental(newLine, lineElement.dataset.bars);
     lineElement.querySelectorAll(':scope > .syllable').forEach(syllable => {
       const clone = syllable.cloneNode(true);
       clone.classList.remove('highlighted', 'editing', 'sounding');
@@ -586,6 +587,8 @@
     if (lines.length <= 1) {
       // the only line empties instead (2.0)
       lineElement.querySelectorAll(':scope > .syllable, :scope > .row-break').forEach(s => s.remove());
+      delete lineElement.dataset.bars;
+      lineElement.classList.remove('instrumental');
       const newSyllable = createNewSyllable();
       lineElement.appendChild(newSyllable);
       const labelInput = lineElement.querySelector('.line-label');
@@ -650,6 +653,7 @@
     if (!S.editing || !can('structure') || !line) return false;
     const prev = line.previousElementSibling;
     if (!prev || !prev.classList.contains('notation-line')) return false;
+    if (prev.dataset.bars || line.dataset.bars) return false;          // an instrumental line takes no words
     const active = getActiveNote();
     line.querySelectorAll(':scope > .syllable').forEach(s => prev.appendChild(s));
     line.remove();
@@ -828,6 +832,14 @@
   }
 
   /* ================= ELEMENTS ================= */
+  /* INSTRUMENTAL LINES (3.0, 2026-10-29 — `lines[].bars`): bars with no
+     melody, an intro or an interlude, made on the Chords window's Time
+     Line. The line holds no syllables — only its head — and the chord
+     track draws its bars as a row of chords (chord-track.js). */
+  function markInstrumental(line, bars) {
+    line.dataset.bars = String(bars);
+    line.classList.add('instrumental');
+  }
   function createNewLineElement(isSectionBreak) {
     const line = document.createElement('div');
     line.className = 'notation-line';
@@ -1344,7 +1356,7 @@
       targetLine = targetSyllable.closest('.notation-line');
     } else {
       const lines = notationContainer.querySelectorAll('.notation-line');
-      if (lines.length > 0) {
+      if (lines.length > 0 && !lines[lines.length - 1].dataset.bars) {     // never into an instrumental line
         targetLine = lines[lines.length - 1];
         const own = targetLine.querySelectorAll('.syllable');
         targetSyllable = own.length ? own[own.length - 1] : null;
@@ -2504,12 +2516,15 @@
     const board = SW.chords ? SW.chords.boardModel() : {};
     if (Object.keys(board).length) out.board = board;                        // re-chorded places on the panel
     if (SW.track) Object.assign(out, SW.track.model());                       // progressions + the chord track (js/track.js), when there are any
-    out.lines = Array.from(notationContainer.querySelectorAll('.notation-line')).map(readLine);
+    out.lines = Array.from(notationContainer.querySelectorAll('.notation-line')).map(readLine)
+      .map(l => (l.bars ? { label: l.label, bars: l.bars } : l));             // an instrumental line is written as bars alone
     return out;
   }
   /* One line of the model (also SW.score.readLine, for the flow engine). */
   function readLine(line) {
     const label = line.querySelector('.line-label');
+    const bars = SW.timing.barsOf(line);
+    if (bars) return { label: label ? label.value.trim() : '', bars, syllables: [] };   // an instrumental line (INSTRUMENTAL LINES)
     const syllables = [];
     line.querySelectorAll('.syllable').forEach(syl => {
       // a whole word on the Pitch page is read as the syllables it holds (WORDS IN SYLLABLES)
@@ -2565,7 +2580,7 @@
      from `lineModel.syllables` (normalized first, as render does). The
      caller puts the selection back. Not an edit by itself — no changed(). */
   function replaceLine(line, lineModel) {
-    if (!line || !lineModel) return;
+    if (!line || !lineModel || SW.timing.barsOf(line)) return;
     finishTextEdit();
     const norm = normalizeScore({ v: 2, key: S.key, scale: S.scale, meter: S.meter, lines: [lineModel] }).lines[0];
     line.querySelectorAll(':scope > .syllable, :scope > .row-break').forEach(el => el.remove());
@@ -2600,6 +2615,7 @@
       label.value = l.label || '';
       sizeLabel(label);
       if (l.pickup) line.dataset.pickup = l.pickup;
+      if (l.bars) markInstrumental(line, l.bars);
       l.syllables.forEach(s => line.appendChild(createNewSyllable(s.text, s.cols, s.chord, s.hy)));
       notationContainer.appendChild(line);
     });
@@ -2643,6 +2659,13 @@
     (Array.isArray(raw.lines) ? raw.lines : []).forEach(l => {
       if (!l || typeof l !== 'object') return;
       const line = { label: typeof l.label === 'string' ? l.label.slice(0, 15) : '', syllables: [] };
+      // an instrumental line (3.0, 2026-10-29): bars and no melody — read only while it has no syllables
+      const bars = Number(l.bars);
+      if (bars >= 1 && bars === Math.floor(bars) && !(Array.isArray(l.syllables) && l.syllables.length)) {
+        line.bars = Math.min(64, bars);
+        out.lines.push(line);
+        return;
+      }
       if (pickupOk(l.pickup)) line.pickup = l.pickup;
       else if (legacyPickup && l.pickup !== false) line.pickup = SW.values.DEFAULT;
       (Array.isArray(l.syllables) ? l.syllables : []).forEach(s => {
@@ -2724,6 +2747,7 @@
     let body = '';
     score.lines.forEach(line => {
       body += `[${line.label || 'New Line'}]\n`;
+      if (line.bars) { body += `[Bars ${line.bars}]\n`; return; }          // an instrumental line
       if (line.pickup) body += `[Pickup ${line.pickup}]\n`;
       body += line.syllables.map(s => {
         const cols = s.cols.map(c => c.notes.map(noteToken).join('+') + (c.v ? ':' + c.v : '') + (c.tie ? '_' : '')).join(',');
@@ -2796,6 +2820,8 @@
       // a line's pick-up: [Pickup e] under its name (a song-wide [Pickup 1] is read off the head above)
       const pk = lineText.match(/^\[Pickup ([^\]]+)\]$/i);
       if (pk) { if (current && SW.values.isValid(pk[1].trim())) current.pickup = pk[1].trim(); return; }
+      const bk = lineText.match(/^\[Bars (\d+)\]$/i);                    // an instrumental line
+      if (bk) { if (current && !current.syllables.length) current.bars = parseInt(bk[1], 10); return; }
       if (lineText.startsWith('[Key of') || /^\[(Time|Tempo|Scale) /i.test(lineText)) return;
       const label = lineText.match(/^\[(.*)\]$/);
       if (label) {
@@ -2876,7 +2902,7 @@
      the one word it meant (Set to the notes stores it that way). */
   const NB_HYPHEN = '‑';
   function scoreToWords(model) {
-    return normalizeScore(model || readScore()).lines.map(l => {
+    return normalizeScore(model || readScore()).lines.filter(l => !l.bars).map(l => {
       return wordsOfLine(l.syllables).map(w => w.map(sy => {
         const t = legacyBare(sy.text);
         if (t === '-') return w.length > 1 ? '' : '-';
@@ -2972,8 +2998,9 @@
   function wordsToScore(text, model) {
     const score = normalizeScore(model || readScore());
     const rows = wordParagraphs(text);
+    const sung = score.lines.filter(l => !l.bars);                       // the paragraphs are the lines with words
     const lines = rows.map((row, i) => {
-      const old = score.lines[i] || { label: '', syllables: [] };
+      const old = sung[i] || { label: '', syllables: [] };
       const parsed = parseWordsLine(row);
       const neu = parsed.words;
       const oldWords = wordsOfLine(old.syllables).map(w => w.slice());
@@ -3000,8 +3027,13 @@
       });
       return { label: old.label, pickup: old.pickup, syllables };
     });
+    // instrumental lines keep their places among them (the ones after the last paragraph stay at the end)
+    const out = [];
+    let k = 0;
+    score.lines.forEach(l => { if (l.bars) out.push(l); else if (k < lines.length) out.push(lines[k++]); });
+    while (k < lines.length) out.push(lines[k++]);
     // the song keeps its key, scale, panel and time (2.0 dropped meter and tempo here)
-    return normalizeScore(Object.assign({}, score, { lines }));
+    return normalizeScore(Object.assign({}, score, { lines: out }));
   }
 
   /* Your words (the Write button). Two views: the words alone, fitted

@@ -93,7 +93,10 @@
     // no head row: the RHYTHM title, its hint and Dots | Easy went (user, 2026-10-26)
     let html = '';
     if (!sg.lines.length) html += '<div class="rp-empty">Add a line to the song to shape its rhythm</div>';
+    const g = SW.track ? SW.track.grid(sg) : null;
+    const chordEvs = g && SW.settings.shows('lane') ? SW.track.events(g).filter(e => e.id) : [];
     sg.lines.forEach((le, li) => {
+      if (le.bars) { html += restHtml(le, li, g, chordEvs); return; }
       const d = lineData(le.line);
       const label = d.model.label;
       const bg = le.line.style.backgroundColor;
@@ -134,6 +137,30 @@
     mark();
     if (typing) openBox();
     hyphens();
+  }
+
+  /* AN INSTRUMENTAL LINE (score.js INSTRUMENTAL LINES): no rhythm to shape — its bars, numbered,
+     with the chords that sound in them */
+  function restHtml(le, li, g, evs) {
+    const label = le.line.querySelector('.line-label');
+    const bg = le.line.style.backgroundColor;
+    let html = '<div class="rp-line rp-rest" data-line="' + li + '"' + (bg ? ' style="--line-bg:' + bg + '"' : '') + '>' +
+      (label && label.value.trim() ? '<div class="rp-label">' + esc(label.value.trim()) + '</div>' : '') + '<div class="rp-rest-bars">';
+    const L1 = le.at + le.padded;
+    for (let k = 0; k < le.bars && g; k++) {
+      const b = g.barAt(le.at) + k;
+      const a = Math.max(0, g.T(b)), z = g.T(b + 1), lim = k === le.bars - 1 ? Math.min(z, L1) : z;
+      const pct = t => ((t - a) / (z - a) * 100).toFixed(2);
+      html += '<div class="rp-rest-bar"><span class="rp-measure-number">' + b + '</span>' +
+        evs.filter(e => e.end > a && e.at < lim).map(e => {
+          const st = Math.max(e.at, a), en = Math.min(e.end, lim);
+          const d = SW.chords.isKnown(e.id) ? SW.chords.describeVoiced(e.id, e.voice) : null;
+          const name = d && d.known ? SW.chords.nameOf(d) : e.id;
+          const c = d && d.known ? d.color : '#B9AEC4';
+          return '<i style="left:' + pct(st) + '%;width:calc(' + pct(en) + '% - ' + pct(st) + '% - 4px);--c:' + c + ';--ck:' + SW.chordStrip.inkOn(c) + '">' + (e.at >= a ? SW.chords.labelHTML(name) : '') + '</i>';
+        }).join('') + '</div>';
+    }
+    return html + '</div></div>';
   }
 
   /* The hyphens between a word's syllables (score.js WORDS IN SYLLABLES):

@@ -20,6 +20,9 @@
    song's meter (SW.state.meter). A line's last bar is padded with silence
    to the bar in playback.
 
+   INSTRUMENTAL LINES — `lines[].bars` (3.0, 2026-10-29): a line of bars
+   with no melody (restLine below).
+
    PICK-UP — a line's own (2026-10-01): `data-pickup` on the line holds a
    value id ('e', 'q.', …; `lines[].pickup` in the model), made with
    Pick-up in the Edit box (score.js PICK-UPS) or, for the first line,
@@ -57,6 +60,7 @@
                                         shift, barStart(bar), endsOnBar, opensNext }
      SW.timing.song()                 every line, with absolute starts
      SW.timing.linePickup(lineEl)     this line's pick-up in ticks (0: none)
+     SW.timing.barsOf(lineEl)         an instrumental line's bars (0: a line of melody)
      SW.timing.tickMs()               milliseconds per tick at the tempo
    ========================================================================== */
 (function () {
@@ -69,7 +73,7 @@
   const meter = () => SW.meters.byId(S.meter);
   function linePickup(line, mt) {
     const id = line && line.dataset.pickup;
-    if (!id || !SW.values.isValid(id)) return 0;
+    if (!id || !SW.values.isValid(id) || barsOf(line)) return 0;
     const t = SW.values.byId(id).ticks;
     return t < mt.barTicks ? t : 0;
   }
@@ -111,6 +115,8 @@
      groups (ev.beam = group index, or null). */
   function lineEvents(line) {
     const mt = meter();
+    const bars = barsOf(line);
+    if (bars) return restLine(line, mt, bars);
     const P = linePickup(line, mt);
     const shift = P ? mt.barTicks - P : 0;            // bar 0 is the pick-up's one beat
     const stacks = Array.from(line.querySelectorAll('.harmony-stack'));
@@ -177,6 +183,30 @@
       endsOnBar: (t + shift) % mt.barTicks === 0,     // the line's notes end on a bar line
       opensNext: i >= 0 && i < lines.length - 1 && Pn > 0,   // the next line's pick-up finishes this line's last bar
       notatedCount: events.filter(e => e.notated).length
+    };
+  }
+
+  /* AN INSTRUMENTAL LINE (3.0, 2026-10-29 — `lines[].bars`, data-bars on
+     the line): bars with no melody, an intro or an interlude, drawn as a
+     row of its chords. It has no notes and no pick-up; the next line's
+     pick-up sounds in its last bar (there is nothing there to collide
+     with), so the song's downbeats stay on one grid. */
+  function barsOf(line) {
+    const n = line && line.dataset ? Number(line.dataset.bars) : 0;
+    return n > 0 && n === Math.floor(n) ? Math.min(n, 64) : 0;
+  }
+  function restLine(line, mt, bars) {
+    const lines = allLines();
+    const i = lines.indexOf(line);
+    const next = i < 0 ? line : (lines[i + 1] || lines[0]);
+    const Pn = next === line ? 0 : linePickup(next, mt);
+    const padded = bars * mt.barTicks - Pn;
+    return {
+      meter: mt, events: [], total: padded, padded, pickup: 0, shift: 0, bars,
+      barStart: b => b * mt.barTicks,
+      endsOnBar: Pn === 0,
+      opensNext: i >= 0 && i < lines.length - 1 && Pn > 0,
+      notatedCount: 0
     };
   }
 
@@ -318,7 +348,7 @@
   }
 
   SW.timing = {
-    column, lineEvents, song, tickMs, LETTERS,
+    column, lineEvents, song, tickMs, LETTERS, barsOf,
     linePickup: line => linePickup(line, meter()),
     spell, spellSpan, barPieces, fillPieces, placeOf
   };

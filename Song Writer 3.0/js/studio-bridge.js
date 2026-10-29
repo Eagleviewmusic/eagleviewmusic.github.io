@@ -79,7 +79,7 @@
     const chords = [];
     events.forEach(ce => {
       if (ce.end <= from || ce.at >= total) return;
-      const list = ce.id && SW.chords.isKnown(ce.id) ? SW.chords.midis(ce.id) : [];
+      const list = ce.id && SW.chords.isKnown(ce.id) ? SW.chords.midis(ce.id, { voice: ce.voice }) : [];   // its own notes, when it has them
       if (!list.length) return;
       const name = chordName(ce.id);
       ce.strikes.forEach(st => {

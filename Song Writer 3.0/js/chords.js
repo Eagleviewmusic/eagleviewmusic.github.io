@@ -17,7 +17,8 @@
          F (wide)  G        rank 1 (the tonic chord) and rank 5
 
    In major: F=I  D=V  S=IV  A=vi  G=ii  R=iii  E=V/V  Q=V/vi  W=IV/IV,
-   1–5 = ♭VI iv vii°7/V V/iii V/ii. Any place can be re-chorded (root,
+   1–5 = ♭VI iv ii/IV iii/V V/ii (3 and 4 were vii°7/V and V/iii until
+   2026-10-28). Any place can be re-chorded (root,
    quality, permanent functions, label) — the song remembers it
    (`score.board`), so a song that says "D is V7" opens that way.
 
@@ -46,8 +47,10 @@
      entry(place) · setBoard(place, spec|null)    read / re-chord / reset a place
      parse(id|spec) · toId(spec) · isKnown(id)
      describe(id|spec, { held }) → names, colour, tones, bass, place, key…
-     midis(id|spec, { held })                      the notes, voiced
-     play(id|spec, source) · playPlace(place, source) · announce(id, midis, source)
+     midis(id|spec, { held, voice })               the notes, voiced (a voice: the chord's own notes)
+     cleanVoice(v) · voiceMidis(v) · voiceOf(id) · refitVoice(v, fromId, toId)   voices (2026-10-28, below midis)
+     voiceNotes(v) · spellMidi(midi, dir, tones?) · pairOf(d, acc) · nameVoice(v) · describeVoiced(id, voice)
+     play(id|spec, source, { voice }) · playPlace(place, source) · announce(id, midis, source)
      bend() · bendDelta(deg)                       the chord in hand bends the scale (the keyboard's)
      holdPlace(place, holder, source) · releaseHold(holder) · isHeld(place)   a chord held down (rings, re-strikes)
      offered() · placeShown(place) · setChordSet(id) · setIndex() · CHORD_SETS
@@ -439,6 +442,7 @@
      voicing — or 1.0's for its nine, when Sound → Chord voicing says so. */
   function midis(x, opts) {
     const o = opts || {};
+    if (o.voice) { const v = cleanVoice(o.voice); if (v) return voiceMidis(v); }   // the chord's own notes (a VOICE, below) win
     let spec = parse(x);
     if (!spec) return [];
     if (o.held) spec = withHeld(spec);
@@ -462,6 +466,163 @@
       if (list.length) return list;
     }
     return T.chordMidis(keyIndex(), spec.root, spec.q, 0, eff.tones);
+  }
+
+  /* ---------------- a chord's own notes (2026-10-28) ----------------
+     A VOICE is a chord's notes as the song keeps them (the Chord Chart's
+     Focus makes them): [[step, semi], …] — semi the semitones above the
+     key's tonic (Theory's tonicMidi, the note the engine voices from),
+     step the letters above the tonic's letter (0 its own, 7 an octave
+     up), which keeps the spelling (G♯ stays G♯). It moves with the key,
+     and it wins over the engine's voicing wherever the chord sounds.
+       cleanVoice(v) → v | null    2–8 notes, low to high, no pitch twice
+       voiceMidis(v) · voiceOf(id) (the engine's voicing as a voice)
+       refitVoice(v, fromId, toId) the voice kept in shape when a new scale changes its chord */
+  const NAT = [0, 2, 4, 5, 7, 9, 11];
+  const LETTERS = 'CDEFGAB';
+  const natSemis = step => 12 * Math.floor(step / 7) + NAT[((step % 7) + 7) % 7];
+  // the step nearest a pitch, among the ones with letter offset d (any, when d is null)
+  function stepFor(semi, d) {
+    let best = null;
+    for (let s = Math.floor(semi * 7 / 12) - 8; s <= Math.floor(semi * 7 / 12) + 8; s++) {
+      if (d !== null && ((s % 7) + 7) % 7 !== d) continue;
+      if (best === null || Math.abs(natSemis(s) - semi) < Math.abs(natSemis(best) - semi)) best = s;
+    }
+    return best;
+  }
+  function cleanVoice(v) {
+    if (!Array.isArray(v)) return null;
+    const seen = new Set(), out = [];
+    v.forEach(n => {
+      if (!Array.isArray(n) || n.length !== 2) return;
+      const se = Number(n[1]);
+      let st = Number(n[0]);
+      if (!Number.isInteger(se) || se < -36 || se > 36 || seen.has(se)) return;
+      if (!Number.isInteger(st) || Math.abs(natSemis(st) - se) > 2) st = stepFor(se, null);
+      seen.add(se);
+      out.push([st, se]);
+    });
+    if (out.length < 2 || out.length > 8) return null;
+    return out.sort((a, b) => a[1] - b[1]);
+  }
+  const voiceMidis = v => v.map(n => T.tonicMidi(keyIndex()) + n[1]);
+  const letterStep = (letter, semi) => stepFor(semi, ((LETTERS.indexOf(letter) - LETTERS.indexOf(tonicName()[0])) % 7 + 7) % 7);
+  function voiceOf(x, opts) {
+    const spec = parse(x);
+    if (!spec) return null;
+    const named = spellTones(spec, effective(spec).tones || T.qualityTones(spec.q));
+    const t0 = T.tonicMidi(keyIndex());
+    return cleanVoice(midis(spec, opts).map(m => {
+      const semi = m - t0, tone = named.find(t => t.pc === ((semi % 12) + 12) % 12);
+      return [tone ? letterStep(tone.letter, semi) : stepFor(semi, null), semi];
+    }));
+  }
+  /* ---- a voice's notes, spelled (2026-10-28, Focus) ----
+     voiceNotes(v) → [{ step, semi, midi, d, letter, acc, name }] low to high:
+     `d` the note's place on a staff (letters from C0: C4 = 28, as staff.js
+     counts), `acc` −2 … +2 from the natural letter. spellMidi(midi, dir,
+     tones?) → [step, semi] — the letter a new pitch takes: a tone of the
+     chord's (`tones`, describe().tones) its letter; else the scale's; else
+     the natural; else ♯ going up, ♭ going down. pairOf(d, acc) the other
+     way round. */
+  const NATPC = [0, 2, 4, 5, 7, 9, 11];
+  const ACC = { '-2': '𝄫', '-1': '♭', 0: '', 1: '♯', 2: '𝄪' };
+  const natMidi = d => 12 * (Math.floor(d / 7) + 1) + NATPC[((d % 7) + 7) % 7];
+  function tonicD() {
+    const t0 = T.tonicMidi(keyIndex()), L = LETTERS.indexOf(tonicName()[0]);
+    for (let d = L; d < 70; d += 7) { const a = t0 - natMidi(d); if (a >= -2 && a <= 2) return d; }
+    return 28 + L;
+  }
+  const pairOf = (d, acc) => [d - tonicD(), natMidi(d) + acc - T.tonicMidi(keyIndex())];
+  function voiceNotes(v) {
+    const t0 = T.tonicMidi(keyIndex()), d0 = tonicD();
+    return (v || []).map(([step, semi]) => {
+      const d = d0 + step, midi = t0 + semi, acc = midi - natMidi(d), letter = LETTERS[((d % 7) + 7) % 7];
+      return { step, semi, midi, d, letter, acc, name: letter + (ACC[acc] || '') };
+    });
+  }
+  function spellMidi(midi, dir, tones) {
+    const t0 = T.tonicMidi(keyIndex()), pc = ((midi - t0) % 12 + 12) % 12, abs = ((midi % 12) + 12) % 12;
+    let letter = null;
+    const tone = (tones || []).find(t => t.pc === pc);
+    if (tone) letter = tone.letter;
+    if (!letter) {
+      const deg = scale().degrees.find(x => T.degreeSemis(x) === pc);
+      if (deg) letter = LETTERS[(LETTERS.indexOf(tonicName()[0]) + T.parseDegree(deg).num - 1) % 7];
+    }
+    if (!letter && NATPC.indexOf(abs) !== -1) letter = LETTERS[NATPC.indexOf(abs)];
+    if (!letter) letter = LETTERS[NATPC.indexOf(dir < 0 ? (abs + 1) % 12 : (abs + 11) % 12)];
+    const L = LETTERS.indexOf(letter);
+    let acc = ((abs - NATPC[L]) % 12 + 12) % 12;
+    if (acc > 6) acc -= 12;
+    const d = (Math.round((midi - acc - NATPC[L]) / 12) - 1) * 7 + L;
+    return pairOf(d, acc);
+  }
+  /* ---- a chord named by its notes (D10: the name follows them) ----
+     nameVoice(v) → { id, spec } — the chord those notes make, its root
+     the bass when it can be (C E G → I; E to F → Isus4; E in the bass →
+     I⁶, as the inversion functions name it) — or { unnamed: true, notes }
+     when no chord quality has them (C F B). describeVoiced(id, voice) is
+     describe(id) — the colour, the place, the key stay the chord it
+     started as — with its names from its notes. */
+  const TRIAD_Q = ['maj', 'min', 'dim', 'aug'];
+  const SEVENTH_Q = ['dom7', 'maj7', 'min7', 'm7b5', 'dim7', 'mmaj7', 'aug7', 'dom7b5'];
+  function nameVoice(v) {
+    const ns = voiceNotes(cleanVoice(v) || []);
+    if (!ns.length) return { unnamed: true, notes: '' };
+    const t0 = T.tonicMidi(keyIndex());
+    const pcs = Array.from(new Set(ns.map(n => ((n.midi - t0) % 12 + 12) % 12)));
+    const bassPc = ((ns[0].midi - t0) % 12 + 12) % 12;
+    const roots = [bassPc].concat(pcs.filter(p => p !== bassPc));
+    // a quality's notes as a set — with its perfect 5th left out (F A is still IV, F A E♭ still IV7)
+    const qset = (id, no5) => {
+      let iv = Array.from(new Set(T.QUALITIES[id].iv.map(x => x % 12)));
+      if (no5) { if (iv.indexOf(7) === -1) return null; iv = iv.filter(x => x !== 7); if (iv.length < 2) return null; }
+      return iv.sort((a, b) => a - b).join();
+    };
+    const tries = [];
+    [false, true].forEach(no5 => roots.forEach(r => tries.push([r, no5])));      // every whole chord first, then a 5th left out
+    for (const [r, no5] of tries) {
+      const set = pcs.map(p => ((p - r) % 12 + 12) % 12).sort((a, b) => a - b).join();
+      const q = Object.keys(T.QUALITIES).find(id => qset(id, no5) === set);
+      if (!q) continue;
+      const root = T.semisToDegree(r, scale().degrees);
+      const i = ((bassPc - r) % 12 + 12) % 12;
+      let inv = null;
+      if (i && TRIAD_Q.indexOf(q) !== -1) inv = i === 3 || i === 4 ? 'inv6' : i >= 6 && i <= 8 ? 'inv64' : null;
+      else if (i && SEVENTH_Q.indexOf(q) !== -1) inv = i === 3 || i === 4 ? 'inv65' : i >= 6 && i <= 8 ? 'inv43' : i >= 9 ? 'inv42' : null;
+      const spec = { root, q, mods: inv ? [inv] : [] };
+      return { id: toId(spec), spec, slash: i && !inv ? ns[0].name : null };
+    }
+    return { unnamed: true, notes: Array.from(new Set(ns.map(n => n.name))).join(' ') };
+  }
+  function describeVoiced(id, voice) {
+    const d = describe(id);
+    if (!voice || !d.known) return d;
+    const n = nameVoice(voice);
+    if (n.unnamed) return Object.assign({}, d, { roman: n.notes, letter: n.notes, voiced: true, unnamed: true });
+    const v = describe(n.id);
+    return Object.assign({}, d, { roman: v.roman, letter: v.letter + (n.slash ? '/' + n.slash : ''), voiced: true, voiceId: n.id });
+  }
+
+  /* A new scale gives a chord picked from the panel another chord (IV → iv):
+     each note of the voice that was one of its tones moves to the same
+     tone of the new chord (the third of IV to the third of iv); a note
+     that was not (an added one) stays. */
+  function refitVoice(v, fromId, toId) {
+    const a = parse(fromId), b = parse(toId);
+    if (!v || !a || !b) return v;
+    const ta = spellTones(a, effective(a).tones || T.qualityTones(a.q));
+    const tb = spellTones(b, effective(b).tones || T.qualityTones(b.q));
+    return cleanVoice(v.map(([st, se]) => {
+      const i = ta.findIndex(t => t.pc === ((se % 12) + 12) % 12);
+      if (i < 0 || !tb[i]) return [st, se];
+      let ds = ((tb[i].pc - ta[i].pc) % 12 + 12) % 12;
+      if (ds > 6) ds -= 12;
+      let dl = ((LETTERS.indexOf(tb[i].letter) - LETTERS.indexOf(ta[i].letter)) % 7 + 7) % 7;
+      if (dl > 3) dl -= 7;
+      return [st + dl, se + ds];
+    })) || v;
   }
 
   /* ---------------- playing ---------------- */
@@ -514,9 +675,9 @@
 
   /* Sound a chord (the id as given — the held buttons are not applied
      here; playPlace does that) and tell the listeners. */
-  function play(x, source) {
+  function play(x, source, opts) {
     const id = toId(x);
-    const list = id ? midis(id) : [];
+    const list = id ? midis(id, opts) : [];          // opts.voice: the chord's own notes
     if (!list.length) { console.warn('Chord ' + x + ' could not be voiced'); return []; }
     SW.audio.playChordFrequencies(list.map(M.midiToFreq));
     announce(id, list, source);
@@ -628,6 +789,7 @@
     board, entry, presetAt, presetLabel, setBoard, boardModel,
     parse, toId, isKnown, sameChord,
     describe, midis, spellTones, play, playPlace, announce, clearSounding, bend, bendDelta,
+    cleanVoice, voiceMidis, voiceOf, refitVoice, voiceNotes, spellMidi, pairOf, nameVoice, describeVoiced,
     holdPlace, releaseHold, isHeld, releaseAllHolds,
     offered, placeShown, placeAllowed, setIndex, setChordSet, describeSet,
     heldMods, setMod, clearMods, isModKey, slotFunc, setSlot, resetSlots, modSlots, withHeld,

@@ -9,7 +9,7 @@
    every chord that opens the chord editor. js/chords.js is the engine.
 
          [ Chords        (C) (♪)     Extreme ]   C/I: names as letters or numerals; ♪: the notes in every chord
-         [ 1 ][ 2 ][ 3 ][ 4 ][ 5 ]              ♭VI iv vii°7/V V/iii V/ii
+         [ 1 ][ 2 ][ 3 ][ 4 ][ 5 ]              ♭VI iv ii/IV iii/V V/ii
          [ Q ][ W ][ E ][ R ]                   V/vi IV/IV V/V iii
          [ A ][ S ][ D ]                        vi IV V
          [ F  F  F ][ G ]                       I  ii
@@ -149,21 +149,23 @@
     renderCorner();
   }
 
-  /* The Chord Progression button: the window for building progressions
-     and putting them in the song (progression-window.js). */
+  /* The Chord Chart button: the Chords window (progression-window.js), on
+     the song's chart (2026-10-28 — it was Chord Progression); its badge,
+     the chords on the chart. */
+  const chartCount = () => (SW.chordChart ? SW.chordChart.count() : 0);
   function progButtonHtml() {
     const edit = SW.settings.can('chords');
     if (!edit && !SW.settings.can('chordsListen')) return '';
-    const n = SW.track ? SW.track.progressions().length : 0;
-    return '<button type="button" class="prog-btn" title="' + (edit ? 'Chord Progression — build progressions of chords and rhythms, and put them in the song' : 'Chord Progression — the song’s progressions, to look at and hear') + '">' +
+    const n = chartCount();
+    return '<button type="button" class="prog-btn" title="' + (edit ? 'Chord Chart — choose the song’s chords, hear them with the song, place them' : 'Chord Chart — the song’s chords, to look at and hear') + '">' +
       '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="7" width="5" height="12" rx="1.5"/><rect x="9.5" y="4" width="5" height="15" rx="1.5"/><rect x="16.5" y="9" width="5" height="10" rx="1.5"/></svg>' +
-      '<span class="pb-label">Chord Progression</span>' +
+      '<span class="pb-label">Chord Chart</span>' +
       '<span class="pb-count"' + (n ? '' : ' hidden') + '>' + n + '</span></button>';
   }
   function updateProgButton() {
     const c = el.querySelector('.prog-btn .pb-count');
     if (!c) return;
-    const n = SW.track ? SW.track.progressions().length : 0;
+    const n = chartCount();
     c.textContent = n;
     c.hidden = !n;
   }

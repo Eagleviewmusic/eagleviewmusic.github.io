@@ -26,6 +26,10 @@
    • AFTER THE MELODY — the bars of chords past the last line, below it,
      four a row (eight on a wide stage), as a chord chart; + Add a line
      at its top (Edit); it folds to its title
+   • AN INSTRUMENTAL LINE (score.js INSTRUMENTAL LINES, 2026-10-29: an
+     intro or an interlude, bars with no melody) — its bars drawn the
+     same way, as a row of the chart inside the line: always there (its
+     bars, numbered), its chords when the track shows
 
    A BEAT AT A TIME (the user's overhaul, 2026-10-27). In Edit the band
    shows its beats (faint marks), and empty time a dashed +:
@@ -80,8 +84,8 @@
     while (e && e !== ancestor) { x += e.offsetLeft; y += e.offsetTop; e = e.offsetParent; }
     return { x, y };
   }
-  function look(id) {
-    const d = id ? C.describe(id) : null;
+  function look(id, voice) {
+    const d = id ? C.describeVoiced(id, voice) : null;            // a chord with its own notes: named by them (D10)
     if (!d || !d.known) return { name: id ? String(id) : '', color: '#9487A2', known: false };
     return { name: C.nameOf(d), color: d.color, known: true };
   }
@@ -98,6 +102,7 @@
   function stretchName(r) {
     if (!r) return '';
     if (r.prog) { const p = T.prog(r.prog); return p ? p.name : ''; }
+    if (T.isChartShape()) return '';                          // loose chords from the chart: no name to wear (progressions retired)
     return T.isVirtual() ? 'From the lane' : 'Just here';
   }
 
@@ -139,7 +144,7 @@
     const el = document.elementFromPoint(cx, cy);
     if (!el || !el.closest) return null;
     const cb = el.closest('.ct-bar');
-    if (cb && tail && tail.contains(cb)) {
+    if (cb && ((tail && tail.contains(cb)) || cb.closest('.ct-rest'))) {
       const lane = cb.querySelector('.ct-lane');
       const r = lane.getBoundingClientRect();
       const g = T.grid(), b = Number(cb.dataset.bar);
@@ -178,6 +183,8 @@
     if (!on) {
       score.querySelectorAll('.notation-line > .ctrack').forEach(l => l.remove());
       if (tail) { tail.hidden = true; tail.innerHTML = ''; }
+      const g0 = T.grid();
+      g0.song.lines.forEach(le => { if (le.bars) drawRestLine(le, { g: g0, evs: [], firstOf: new Set(), lastOf: new Map(), list: [], edit: false }); });
       return;
     }
     const list = T.shown(g);
@@ -186,7 +193,7 @@
     const lastOf = new Map();                                    // the last chord of each stretch: an end stroke
     list.forEach((r, i) => { const es = evs.filter(x => x.stretch === i && x.id); if (es.length) lastOf.set(es[es.length - 1], true); });
     const ctx = { g, evs: evs.filter(e => e.id), list, firstOf, lastOf, bs: blockScale(), edit: canEdit() && !S.present };
-    g.song.lines.forEach(le => drawLine(le, ctx));
+    g.song.lines.forEach(le => (le.bars ? drawRestLine(le, ctx) : drawLine(le, ctx)));
     drawTail(ctx);
     paintSel();
   }
@@ -332,7 +339,7 @@
 
   /* one chord bar (the track over a line, or a bar of the chart) */
   function barHtml(e, ctx, o) {
-    const l = look(e.id);
+    const l = look(e.id, e.voice);
     const cls = ['cbar'];
     if (!e.id) cls.push('nochord');
     if (!l.known && e.id) cls.push('unknown');
@@ -362,6 +369,56 @@
     '</button>';
   }
 
+  /* one bar of the chart: its number, its chords (and in Edit its empty time) — the tail's and an instrumental line's */
+  function chartBarHtml(b, ctx, o) {
+    const g = ctx.g;
+    const a = Math.max(0, g.T(b)), z = g.T(b + 1);
+    const lim = o.until !== undefined ? Math.min(z, o.until) : z;   // an instrumental line's last bar: the next line's pick-up is not its
+    const evs = ctx.evs.filter(e => e.end > a && e.at < lim);
+    const tagE = evs.find(e => ctx.firstOf.has(e) && e.at >= a);
+    const pct = t => (t - a) / (z - a) * 100;
+    let html = '<div class="ct-bar' + (o.rowEnd ? ' row-end' : '') + (playingBar === b ? ' playing' : '') + '" data-bar="' + b + '">' +
+      '<span class="ct-num">' + b + '</span>' +
+      (tagE && ctx.list[tagE.stretch] ? '<span class="ct-tag">' + esc(stretchName(ctx.list[tagE.stretch])) + ' ▸</span>' : '') +
+      '<div class="ct-lane">';
+    evs.forEach(e => {
+      const st = Math.max(e.at, a), en = Math.min(e.end, lim);
+      html += barHtml(e, ctx, {
+        pct: true, left: pct(st), width: Math.max(4, pct(en) - pct(st) - 1.2), held: e.at < a,
+        end: en === e.end && ctx.lastOf.has(e),
+        grips: ctx.edit ? { l: e.at >= a, r: en === e.end } : null,
+        // dots in % of the chord's own bar, inside a small margin
+        dots: e.strikes.filter(k => k.at >= st && k.at < en).map(k => [
+          6 + (k.at - st) / (en - st) * 88,
+          6 + (Math.min(k.at + k.len, en) - st) / (en - st) * 88 - 4
+        ])
+      });
+    });
+    if (ctx.edit) gapsIn(a, lim, ctx.evs).forEach(([s0, z0]) => {
+      html += '<button type="button" class="cbar-add in-chart" data-a="' + s0 + '" data-z="' + z0 + '" style="left:' + pct(s0).toFixed(2) + '%;width:' + Math.max(3, pct(z0) - pct(s0) - 1.2).toFixed(2) + '%" title="No chord here — tap a beat, then a chord">' + (z0 - s0 >= g.B / 2 ? '+' : '') + '</button>';
+    });
+    return html + '</div></div>';
+  }
+  /* AN INSTRUMENTAL LINE: its bars, a row of the chart in the line */
+  function drawRestLine(le, ctx) {
+    const line = le.line;
+    line.querySelectorAll(':scope > .ctrack').forEach(l => l.remove());
+    let layer = line.querySelector(':scope > .ct-rest');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'ct-rest';
+      line.appendChild(layer);
+    }
+    const g = ctx.g;
+    const b0 = g.barAt(le.at), n = le.bars;
+    const L1 = le.at + le.padded;
+    const per = Math.min(n, perRow());                             // its bars as wide as the chart's after the melody
+    let html = '<div class="ct-chart" style="--per:' + per + ';width:' + (per / perRow() * 100).toFixed(2) + '%">';
+    for (let k = 0; k < n; k++) html += chartBarHtml(b0 + k, ctx, { rowEnd: (k + 1) % perRow() === 0 || k === n - 1, until: k === n - 1 ? L1 : undefined });
+    layer.innerHTML = html + '</div>';
+  }
+  const perRow = () => (stage && stage.clientWidth >= 1100 ? 8 : 4);
+
   /* ================= AFTER THE MELODY ================= */
   function drawTail(ctx) {
     if (!tail) return;
@@ -370,7 +427,7 @@
     const first = Math.max(g.lastBar + 1, g.p0 ? 0 : 1);
     if (!trackLast || trackLast < first) { tail.hidden = true; tail.innerHTML = ''; return; }
     tail.hidden = false;
-    const perRow = stage && stage.clientWidth >= 1100 ? 8 : 4;
+    const per = perRow();
     const title = 'After the melody · ' + (first === trackLast ? 'bar ' + first : 'bars ' + first + '–' + trackLast);
     let html = '<div class="ct-head">' +
       '<button type="button" class="ct-fold" aria-expanded="' + !folded + '" title="' + (folded ? 'Show the chords after the melody' : 'Fold them away') + '">' + (folded ? '▸' : '▾') + '</button>' +
@@ -378,35 +435,8 @@
       (ctx.edit && SW.settings.can('structure') ? '<button type="button" class="ct-add" title="A new line of melody — it starts at bar ' + first + ', over these chords">+ Add a line — it starts at bar ' + first + '</button>' : '') +
     '</div>';
     if (!folded) {
-      html += '<div class="ct-chart" style="--per:' + perRow + '">';
-      for (let b = first; b <= trackLast; b++) {
-        const a = Math.max(0, g.T(b)), z = g.T(b + 1);
-        const evs = ctx.evs.filter(e => e.end > a && e.at < z);
-        const tagE = evs.find(e => ctx.firstOf.has(e) && e.at >= a);
-        const rowEnd = (b - first + 1) % perRow === 0 || b === trackLast;
-        const pct = t => (t - a) / (z - a) * 100;
-        html += '<div class="ct-bar' + (rowEnd ? ' row-end' : '') + (playingBar === b ? ' playing' : '') + '" data-bar="' + b + '">' +
-          '<span class="ct-num">' + b + '</span>' +
-          (tagE ? '<span class="ct-tag">' + esc(stretchName(ctx.list[tagE.stretch])) + ' ▸</span>' : '') +
-          '<div class="ct-lane">';
-        evs.forEach(e => {
-          const st = Math.max(e.at, a), en = Math.min(e.end, z);
-          html += barHtml(e, ctx, {
-            pct: true, left: pct(st), width: Math.max(4, pct(en) - pct(st) - 1.2), held: e.at < a,
-            end: en === e.end && ctx.lastOf.has(e),
-            grips: ctx.edit ? { l: e.at >= a, r: en === e.end } : null,
-            // dots in % of the chord's own bar, inside a small margin
-            dots: e.strikes.filter(k => k.at >= st && k.at < en).map(k => [
-              6 + (k.at - st) / (en - st) * 88,
-              6 + (Math.min(k.at + k.len, en) - st) / (en - st) * 88 - 4
-            ])
-          });
-        });
-        if (ctx.edit) gapsIn(a, z, ctx.evs).forEach(([s0, z0]) => {
-          html += '<button type="button" class="cbar-add in-chart" data-a="' + s0 + '" data-z="' + z0 + '" style="left:' + pct(s0).toFixed(2) + '%;width:' + Math.max(3, pct(z0) - pct(s0) - 1.2).toFixed(2) + '%" title="No chord here — tap a beat, then a chord">' + (z0 - s0 >= g.B / 2 ? '+' : '') + '</button>';
-        });
-        html += '</div></div>';
-      }
+      html += '<div class="ct-chart" style="--per:' + per + '">';
+      for (let b = first; b <= trackLast; b++) html += chartBarHtml(b, ctx, { rowEnd: (b - first + 1) % per === 0 || b === trackLast });
       html += '</div>';
     }
     tail.innerHTML = html;
@@ -430,9 +460,10 @@
       layer.insertAdjacentHTML('beforeend', '<span class="ct-cursor" aria-hidden="true" style="left:' + (xAt(r, t) - G.pad - 1.5).toFixed(1) + 'px;top:' + (r.y - 4) + 'px;height:' + (r.h + 8) + 'px"></span>');
       put = true;
     });
-    if (!put && tail) {
+    if (!put) {
       const g = T.grid();
-      const bar = tail.querySelector('.ct-bar[data-bar="' + g.barAt(t) + '"] .ct-lane');
+      const sel = '.ct-bar[data-bar="' + g.barAt(t) + '"] .ct-lane';
+      const bar = score.querySelector('.ct-rest ' + sel) || (tail && tail.querySelector(sel));
       if (bar) {
         const a = Math.max(0, g.T(g.barAt(t))), z = g.T(g.barAt(t) + 1);
         bar.insertAdjacentHTML('beforeend', '<span class="ct-cursor" aria-hidden="true" style="left:calc(' + ((t - a) / (z - a) * 100).toFixed(2) + '% - 1.5px);top:-4px;bottom:-4px"></span>');
@@ -463,7 +494,7 @@
     return T.events().find(e => e.id && e.at <= tick && tick < e.end) || null;
   }
   function hear(e) {
-    if (e && e.id && C.isKnown(e.id)) C.play(e.id, 'track');
+    if (e && e.id && C.isKnown(e.id)) C.play(e.id, 'track', { voice: e.voice });
   }
   function playAtTick(tick) { hear(eventAt(tick)); }
   /* Edit: the cursor on the beat at a tick (the chord there heard) */
@@ -743,9 +774,8 @@
   });
   SW.bus.on('track:bar', d => {
     playingBar = d.bar;
-    if (!tail) return;
-    tail.querySelectorAll('.ct-bar.playing').forEach(b => b.classList.remove('playing'));
-    const bar = tail.querySelector('.ct-bar[data-bar="' + d.bar + '"]');
+    document.querySelectorAll('.ct-bar.playing').forEach(b => b.classList.remove('playing'));
+    const bar = document.querySelector('#score .ct-rest .ct-bar[data-bar="' + d.bar + '"], #chord-tail .ct-bar[data-bar="' + d.bar + '"]');
     if (bar) {
       bar.classList.add('playing');
       if (view().followScroll !== false && bar.scrollIntoView) bar.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -756,7 +786,7 @@
     sounding = null;
     playingBar = null;
     document.querySelectorAll('.cbar.sounding').forEach(b => b.classList.remove('sounding'));
-    if (tail) tail.querySelectorAll('.ct-bar.playing').forEach(b => b.classList.remove('playing'));
+    document.querySelectorAll('.ct-bar.playing').forEach(b => b.classList.remove('playing'));
   });
 
   /* stepping onto a word where a chord starts plays it (Perform, as the lane did) */

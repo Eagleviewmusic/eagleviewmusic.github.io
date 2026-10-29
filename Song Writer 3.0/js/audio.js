@@ -215,6 +215,25 @@
     return handle(id);
   }
 
+  /* ---- one side of the song into a buffer (2026-10-28) ----
+     The Chord Chart's sound wave (components/song-wave.js): the melody
+     or the chords alone, through the same voices, levels and room the
+     speakers use, faster than real time. notes: [{ freqs, at, hold,
+     level }] in seconds (level as tone() takes it: the player's
+     loudness — the chords' is CHORD_LEVEL). A low rate is plenty for a
+     picture. → Promise<AudioBuffer> */
+  function renderSide(side, notes, seconds, rate) {
+    const m = mix();
+    const melody = side === 'melody';
+    return E.render({
+      seconds, rate: rate || 22050, room: m.room,
+      parts: [{
+        level: BASE_LEVEL * (melody ? m.melodyVolume : m.chordVolume),
+        notes: notes.map(n => ({ freqs: n.freqs, preset: melody ? m.melody : m.chords, at: n.at, hold: n.hold, level: melody ? (n.level || PLAYER_PEAK) / PLAYER_PEAK : CHORD_LEVEL }))
+      }]
+    });
+  }
+
   /* ---- the keyboard dock: a key held down rings until it is let go ---- */
   function noteOn(midi) {
     audioCtx();
@@ -278,7 +297,7 @@
     now: () => audioCtx().currentTime,
     calculateFrequency, getFrequencyForNote, getModifiedFrequency,
     playNote, playChordFrequencies, holdChord, transposeNote, generateChordForKey,
-    playNoteElement, playHarmony, tone, click, noteOn, noteOff,
+    playNoteElement, playHarmony, tone, click, noteOn, noteOff, renderSide,
     playMidi(midi) { playNote(M.midiToFreq(midi)); },
     applyMix, previewMelody, previewChords, soundGroups, CHORD_PLAY_HOLD,
     mix, PLAYER_PEAK, CHORD_LEVEL,      // read by js/studio-bridge.js (the Recording Studio)

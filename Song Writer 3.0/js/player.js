@@ -61,7 +61,17 @@
    API
      SW.player.toggle()   play / stop
      SW.player.play()     start (from the selection)
-     SW.player.playFrom(tick)   start at a tick of the song (the chord track's window)
+     SW.player.playFrom(tick, opts?)   start at a tick of the song (the Chords window). opts (2026-10-28,
+                                the Chord Chart's sound wave): loop — [a, z] round those ticks, true round
+                                the whole song from its top, false once; once: true — the [a, z] span one
+                                time through; melody / chords / beat — true or false over Sound's own;
+                                countIn: false — straight in; preview: { k, at, voice } — the chords from
+                                card k (and the one at tick `at`) sound with that voice (Focus, unsaved);
+                                events: the chords to play instead of the song's (an expand() list, or a
+                                function of the grid giving one — the Time Line's draft, 2026-10-29);
+                                song: the song to play instead of SW.timing.song() (an object of its shape,
+                                or a function giving one — the draft's sections in their new order)
+     SW.player.replan()         playing: the same run planned again from where the music is (no count-in)
      SW.player.position()       where the music is now (ticks), or null
      SW.player.stop()
      SW.player.playing    boolean
@@ -155,11 +165,13 @@
      every later pass repeats. Ticks are absolute, from the song's top.
      The song lasts as long as the longer of the melody and the chord
      track. `fromTick`: where to start (else the selection, else the top). */
-  function makePlan(fromTick) {
-    const song = SW.timing.song();
+  function makePlan(fromTick, opts) {
+    const o = opts || {};
+    const song = (typeof o.song === 'function' ? o.song() : o.song) || SW.timing.song();   // the Time Line's draft: its sections in its order
     const all = flatten(song);
     const g = SW.track ? SW.track.grid(song) : null;
-    const chords = g && chordsHeard() ? SW.track.events(g) : [];
+    const own = typeof o.events === 'function' ? o.events(g) : o.events;     // the Time Line's draft: its chords, not the song's
+    const chords = g && (o.chords !== undefined ? o.chords : chordsHeard()) ? (own || SW.track.events(g)) : [];
     const total = Math.max(song.total, chords.end || 0);
     if (!all.length && !chords.length) return null;
     let startTick = 0;
@@ -171,7 +183,18 @@
       const chordAt = SW.ctrack ? SW.ctrack.selectedTick() : null;      // a chord selected in the chord track
       startTick = from >= 0 ? all[from].at : chordAt !== null ? Math.min(chordAt, total - 1) : 0;
     }
-    const base = { song, all, chords, g, total };
+    const base = { song, all, chords, g, total, preview: o.preview || null,
+      melody: o.melody !== undefined ? !!o.melody : !!S.sound.melody, beat: o.beat !== undefined ? !!o.beat : !!S.sound.beat };
+    // the Chord Chart's wave: round a span, round the whole song from its top, or once
+    if (Array.isArray(o.loop)) {
+      const span = [Math.max(0, o.loop[0]), Math.min(total, o.loop[1])];
+      if (span[1] > span[0]) {
+        const at = startTick >= span[0] && startTick < span[1] ? startTick : span[0];
+        return Object.assign(base, { first: [at, span[1]], loop: o.once ? null : span, mode: 'span' });
+      }
+    }
+    if (o.loop === true) return Object.assign(base, { first: [startTick, total], loop: [0, total], mode: 'song' });
+    if (o.loop === false) return Object.assign(base, { first: [startTick, total], loop: null, mode: 'stop' });
     const mode = S.sound.atEnd;
     if (mode === 'line') {
       const le = song.lines.find(l => startTick >= l.at && startTick < l.at + l.padded);
@@ -194,7 +217,7 @@
      not struck again. */
   function schedulePass(plan, fromTick, toTick, anchor, tickSec, resumed) {
     const secs = t => (t - fromTick) * tickSec;
-    const melody = S.sound.melody;
+    const melody = plan.melody;
     const mt = plan.song.meter;
     const newCues = [];
     const sounds = [];          // this pass's sounds, laid on the clock by pump()
@@ -225,7 +248,8 @@
     // (unless it is a re-timing: then it is still ringing)
     plan.chords.forEach(ce => {
       if (ce.end <= fromTick || ce.at >= toTick) return;
-      const list = ce.id && SW.chords.isKnown(ce.id) ? SW.chords.midis(ce.id) : [];   // a chord in the song always plays (Layout settings govern building, not hearing)
+      const pv = plan.preview && ((plan.preview.k && ce.k === plan.preview.k) || (plan.preview.at !== undefined && ce.at <= plan.preview.at && plan.preview.at < ce.end)) ? plan.preview.voice : null;
+      const list = ce.id && SW.chords.isKnown(ce.id) ? SW.chords.midis(ce.id, { voice: pv || ce.voice }) : [];   // a chord in the song always plays (Layout settings govern building, not hearing); its own notes, when it has them
       newCues.push({ t: anchor + secs(Math.max(ce.at, fromTick)), chord: list.length ? { id: ce.id, list } : null, track: ce });
       if (!list.length) return;
       const freqs = list.map(M.midiToFreq);
@@ -245,17 +269,20 @@
       // the melody's end, when the chords go on: the light leaves the last word
       const mEnd = plan.song.total;
       if (mEnd > fromTick && mEnd < toTick) newCues.push({ t: anchor + secs(mEnd), melodyEnd: true });
-      // each bar past the melody (the chart lights them)
+      // each bar past the melody, and each of an instrumental line's (the chart lights them)
       const g = plan.g;
-      for (let b = Math.max(g.lastBar + 1, g.barAt(fromTick)); g.T(b) < toTick; b++) {
-        if (g.T(b) >= fromTick || b === g.barAt(fromTick)) newCues.push({ t: anchor + secs(Math.max(g.T(b), fromTick)), bar: b });
-      }
+      const barCue = b => { if (g.T(b) >= fromTick || b === g.barAt(fromTick)) newCues.push({ t: anchor + secs(Math.max(g.T(b), fromTick)), bar: b }); };
+      for (let b = Math.max(g.lastBar + 1, g.barAt(fromTick)); g.T(b) < toTick; b++) barCue(b);
+      plan.song.lines.forEach(le => {
+        if (!le.bars) return;
+        for (let b = g.barAt(le.at), k = 0; k < le.bars; b++, k++) if (g.T(b + 1) > fromTick && g.T(b) < toTick) barCue(b);
+      });
       newCues.sort((x, y) => x.t - y.t);
     }
 
     // the steady beat: every beat in the span, the bar's first stronger
     // (a beat later with a pick-up: timing.js PICK-UP)
-    if (S.sound.beat) {
+    if (plan.beat) {
       const bt = mt.beatTicks;
       const shift = plan.song.shift || 0;
       for (let t = Math.ceil((fromTick + shift) / bt) * bt - shift; t < toTick; t += bt) {
@@ -320,19 +347,19 @@
   }
 
   /* ---------------- play ---------------- */
-  async function play(fromTick) {
+  async function play(fromTick, opts) {
     stop();
-    const plan = makePlan(fromTick);
+    const plan = makePlan(fromTick, opts);
     if (!plan) { SW.ui.toast('Nothing to play yet'); return; }
     const hasChords = plan.chords.some(c => c.strikes.length && c.id && SW.chords.isKnown(c.id));
-    if (!S.sound.melody && !hasChords && !S.sound.beat) {
+    if (!plan.melody && !hasChords && !plan.beat) {
       SW.ui.toast('The melody is off in Sound, and there are no chords to hear');
       return;
     }
     const token = playToken;
     setPlaying(true);
     const mt = plan.song.meter;
-    let count = S.sound.countIn && window.EVMCountIn ? EVMCountIn.beats(mt.beats) : 0;
+    let count = S.sound.countIn && window.EVMCountIn && !(opts && opts.countIn === false) ? EVMCountIn.beats(mt.beats) : 0;
     // into a pick-up, the count's last bar stops where the pick-up comes in:
     // the clicks at or after it are left out, and the music starts there
     const start = plan.first[0];
@@ -353,7 +380,7 @@
     let t = ac.currentTime + START_GAP;
     if (count) t = scheduleCountIn(t, mt.beatTicks * tickSec, count, mt.beats,
       into ? t + (count - Math.ceil(into / mt.beatTicks) + into / mt.beatTicks) * mt.beatTicks * tickSec : 0);
-    run = { plan, tickSec, anchor: t, passFrom: plan.first[0], passTo: plan.first[1], passEnd: 0 };
+    run = { plan, tickSec, anchor: t, passFrom: plan.first[0], passTo: plan.first[1], passEnd: 0, opts: opts || null };
     cues = [];
     cueIndex = 0;
     const end = schedulePass(plan, plan.first[0], plan.first[1], t, tickSec);
@@ -422,6 +449,14 @@
 
   function toggle() { if (S.playing) stop(); else play(); }
 
+  /* The same run, planned again from where the music is — a chord's notes
+     changed on the Chord Chart while it plays (straight on: no count-in) */
+  function replan() {
+    if (!S.playing || !run) return;
+    const at = position();
+    play(at === null ? run.passFrom : Math.floor(at), Object.assign({}, run.opts || {}, { countIn: false }));
+  }
+
   /* Where the music is now, in ticks from the song's top (null when not
      playing; the starting point while counting in) — the chord map's
      playhead (progression-window.js). */
@@ -434,9 +469,13 @@
 
   // any redraw or edit of the song ends a run (the schedule no longer
   // matches); a change of tempo re-times it instead
-  SW.bus.on('score:changed', d => { if (d && d.reason === 'tempo') retime(); else stop(); });
+  SW.bus.on('score:changed', d => {
+    if (d && d.reason === 'tempo') retime();
+    else if (d && d.reason === 'chart') replan();          // the Chord Chart: the music goes on, with the chart as it is now
+    else stop();
+  });
   ['score:loaded', 'key:changed'].forEach(evt => SW.bus.on(evt, stop));
   SW.bus.on('meter:changed', d => { if (!d || d.what !== 'tempo') stop(); });
 
-  SW.player = { play: () => play(), playFrom: tick => play(tick), stop, toggle, position, get playing() { return S.playing; } };
+  SW.player = { play: () => play(), playFrom: (tick, opts) => play(tick, opts), stop, toggle, position, replan, get playing() { return S.playing; } };
 })();

@@ -2391,121 +2391,350 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .pw-hbtn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .pw-hbtn:hover:not(:disabled) { background: var(--paper-2); color: var(--ink); }
 .pw-hbtn:disabled { opacity: .35; }
-.pw-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 236px minmax(0, 1fr); }
+.pw-body { flex: 1; min-height: 0; }                     /* each page sets its own layout (.chart .tline .focus.fx) */
 .pw-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; padding: 12px 18px; border-top: 1px solid var(--hairline); background: var(--surface); }
 .pw-gap { flex: 1; }
-.pw-ghost { border-color: transparent; background: transparent; color: var(--ink-2); }
-.pw-confirm { font-weight: 800; color: var(--danger); margin-right: auto; }
-.pw-short { display: none; }
-.pw-kicker { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin: 0 0 8px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
-.pw-kicker .fold-note, .pw-kicker .pw-sub { font-size: 12.5px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--ink-3); }
-.pw-kicker .pw-sub { color: var(--ink-2); }
 
-/* the list */
-.pw-list { overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 9px; background: var(--paper-2); border-right: 1px solid var(--hairline); }
-.pw-pcard { padding: 9px 11px; border-radius: var(--r-md); background: var(--surface); border: 1.5px solid var(--hairline); cursor: pointer; transition: border-color .13s, box-shadow .13s; }
-.pw-pcard:hover { border-color: var(--hairline-2); }
-.pw-pcard.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.pw-pcard.draft { border-style: dashed; cursor: default; }
-.pw-pcard-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-.pw-pname { flex: 1; min-width: 0; font-family: var(--font-round); font-size: 17px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pw-pplay { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
-.pw-pplay svg { width: 13px; height: 13px; }
-.pw-pplay:hover { background: var(--accent); color: #fff; }
-.pw-pplay.on { background: var(--accent); color: #fff; box-shadow: 0 0 0 3px var(--accent-soft); }   /* playing: a second tap stops it */
-.pw-chips { display: flex; flex-wrap: wrap; gap: 4px; }
-.pw-chip { padding: 1px 7px; border-radius: 6px; background: var(--c); color: var(--cink); font-family: var(--font-block); font-size: 12px; font-weight: 600; }
-.pw-none { font-size: 12px; color: var(--ink-3); font-style: italic; }
-.pw-where { margin-top: 6px; font-size: 11.5px; font-weight: 700; color: var(--ink-3); line-height: 1.35; }
-.pw-new { padding: 10px; border-radius: var(--r-md); border: 1.5px dashed var(--hairline-2); background: transparent; color: var(--accent); font-weight: 800; font-size: 14px; }
-.pw-new:hover { border-color: var(--accent); background: var(--surface); }
-.pw-starters-btn { align-self: flex-start; padding: 4px 2px; font-size: 13px; font-weight: 800; color: var(--ink-2); }
-.pw-starters { display: flex; flex-direction: column; gap: 5px; }
-.pw-starter { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 7px 10px; border-radius: 10px; background: var(--surface); border: 1px solid var(--hairline); text-align: left; }
-.pw-starter b { font-size: 13px; color: var(--ink); }
-.pw-starter span { font-size: 11.5px; font-weight: 700; color: var(--ink-3); }
-.pw-starter:hover { border-color: var(--accent); }
-.pw-list > .fold-note, .pw-list > .note-i { margin-top: 4px; font-size: 12px; }
-
-/* the main column */
-.pw-main { overflow-y: auto; padding: 16px 20px 24px; display: flex; flex-direction: column; gap: 20px; background: var(--paper); container: pwmain / inline-size; }
-.pw-top { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; }
-.pw-name.text-field { width: 230px; height: 42px; font-family: var(--font-round); font-size: 20px; font-weight: 700; }
-.pw-hear { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px 0 12px; border-radius: 999px; background: var(--accent); color: #fff; font-weight: 900; font-size: 14px; }
-.pw-hear svg { width: 15px; height: 15px; }
-.pw-hear .sq { width: 11px; height: 11px; border-radius: 2px; background: #fff; }
-.pw-hear.on { background: var(--accent-deep); }
-.pw-hear:disabled { opacity: .45; }
-.pw-beat, .pw-twobars { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--ink-2); cursor: pointer; text-transform: none; letter-spacing: 0; }
-.pw-beat input, .pw-twobars input { width: 16px; height: 16px; accent-color: var(--accent); }
-.pw-each { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: var(--ink-2); }
-.pw-each small { min-width: 40px; font-size: 11.5px; color: var(--ink-3); }
-.pw-stepper { display: inline-flex; align-items: center; border: 1.5px solid var(--hairline-2); border-radius: 10px; overflow: hidden; background: var(--surface); }
-.pw-stepper button { width: 30px; height: 32px; background: var(--paper-2); font-size: 16px; font-weight: 900; color: var(--ink-2); }
-.pw-stepper button:disabled { opacity: .35; }
-.pw-stepper b { padding: 0 10px; font-size: 14px; color: var(--ink); white-space: nowrap; }
-
-/* the chords */
-.pw-cards { display: flex; flex-wrap: wrap; gap: 10px; }
-.pw-card {
-  position: relative; width: 124px; padding-bottom: 7px; border-radius: 14px; overflow: hidden;
-  background: var(--surface); border: 1.5px solid var(--hairline); cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: none;
-  transition: border-color .13s, box-shadow .13s, transform .1s;
+/* ============================================================
+   THE CHORD CHART — the Chords window's hub (chord-chart.js, song-wave.js; 2026-10-28,
+   ../Song Writer Chords Redesign/ §3.1). Information by design, not small print:
+   colour = the chord's root, the dots = its notes, the badge = how often the song
+   uses it; the wave's upper half the melody, its lower half the chords.
+   ============================================================ */
+.sheet.prog-sheet { position: relative; }           /* the hub's question sits over the whole window */
+.pw-body.chart { display: block; overflow-y: auto; background: var(--surface); }
+.pw-foot:empty { display: none; }
+.cc-hub { display: flex; flex-direction: column; min-height: 100%; }
+.cc-shelf {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 18px 14px; flex: none;   /* wrapped, never scrolled: a swipe on a card is a drag (touch, the smartboard) */
+  min-height: 148px; padding: 20px 22px 20px;
+  background: linear-gradient(var(--paper), var(--surface)); border-bottom: 1px solid var(--hairline);
+  transition: background .15s;
 }
-.pw-card:hover { border-color: var(--hairline-2); }
-.pw-card.on { border-color: var(--edit); box-shadow: 0 0 0 3px var(--edit-soft); }
-.pw-card.sounding { box-shadow: 0 0 0 3px rgba(156,22,142,.35); }
-.pw-card.on.sounding { box-shadow: 0 0 0 3px var(--edit-soft), 0 0 0 6px rgba(156,22,142,.3); }
-.pw-card.dragging { opacity: .55; transform: scale(.96); }
-.pw-card.drop { border-color: var(--accent); border-style: dashed; }
-.pw-card-top {
-  padding: 9px 4px 6px; text-align: center; background: var(--c);
-  background-image: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 60%);
-  color: var(--cink); font-family: var(--font-block); font-weight: 600; font-size: 25px; line-height: 1; white-space: nowrap; overflow: hidden;
-  text-shadow: 0 1px 2px rgba(0,0,0,.2);
+.cc-shelf.drop { background: var(--accent-soft); }
+.cc-card {
+  --c: #888; --cink: #fff;
+  position: relative; flex: none; width: 100px; height: 108px; padding: 6px 6px 6px 20px;
+  border-radius: 22px; background: var(--c);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.2), rgba(255,255,255,0) 55%);
+  color: var(--cink); font-family: var(--font-block);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  box-shadow: inset 0 -5px 0 rgba(0,0,0,.14), 0 2px 6px rgba(43,29,56,.14);
+  cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none;
+  transition: transform .12s, opacity .12s;
 }
-.pw-card.out .pw-card-top { background-image: repeating-linear-gradient(45deg, rgba(0,0,0,.12) 0 6px, transparent 6px 12px); }
-.pw-card.unknown .pw-card-top { font-size: 15px; }
-.pw-card-x { position: absolute; top: 5px; left: 5px; width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,.92); color: var(--ink); font-size: 15px; font-weight: 900; line-height: 1; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
-.pw-card-x:hover { background: var(--danger); color: #fff; }
-.pw-card-tones { display: flex; justify-content: center; flex-wrap: wrap; gap: 3px; padding: 6px 4px 2px; }
-.pw-card-tones i { font-style: normal; padding: 0 4px; border-radius: 4px; background: var(--c); font-family: var(--font-block); font-size: 10.5px; font-weight: 600; }
-.pw-card-len { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 22px; font-size: 12px; font-weight: 800; color: var(--ink-3); }
-.pw-card-len.own { color: var(--ink); }
-.pw-card-len button { width: 22px; height: 20px; border-radius: 6px; background: var(--paper-2); color: var(--ink-2); font-size: 14px; font-weight: 900; line-height: 1; }
-.pw-card-len button:hover:not(:disabled) { background: var(--edit-soft); color: var(--edit); }
-.pw-card-len button:disabled { opacity: .3; }
-.pw-mini { display: block; width: 96px; height: 12px; margin: 3px auto 0; }
-.pw-own-tag { display: block; width: max-content; margin: 4px auto 0; padding: 1px 6px; border-radius: 5px; background: var(--c); color: var(--cink); font-size: 9px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
-.pw-card.plus { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 118px; padding: 0; border-style: dashed; border-color: var(--hairline-2); background: transparent; color: var(--accent); }
-.pw-card.plus .pw-plus { font-size: 30px; font-weight: 900; line-height: 1; }
-.pw-card.plus small { font-size: 11px; font-weight: 800; color: var(--ink-3); }
-.pw-card.plus.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.cc-card.out-of-scale { background-image: repeating-linear-gradient(45deg, rgba(0,0,0,.12) 0 7px, transparent 7px 14px); }
+.cc-name { font-size: 32px; font-weight: 600; line-height: 1; white-space: nowrap; }
+.cc-other { font-family: var(--font); font-size: 14px; font-weight: 900; line-height: 1; opacity: .92; white-space: nowrap; }
+.cc-dots { position: absolute; left: 10px; top: 14px; bottom: 16px; width: 8px; border-radius: 4px; background: rgba(255,255,255,.3); }
+.cc-dots i { position: absolute; left: 0; width: 8px; height: 8px; margin-bottom: -4px; border-radius: 50%; background: var(--cink); }
+.cc-uses {
+  position: absolute; top: -9px; right: -9px; min-width: 28px; height: 28px; padding: 0 7px; border-radius: 14px;
+  background: var(--surface); color: var(--ink); font: 900 14px/28px var(--font); text-align: center; box-shadow: var(--shadow-1);
+}
+.cc-card.sel { outline: 4px solid var(--gold); outline-offset: 3px; }
+.cc-card.flash { animation: cc-flash .6s ease; }
+@keyframes cc-flash { 35% { transform: scale(1.1); } }
+.cc-card.cc-lifted { opacity: .28; }
+.cc-plus { background: transparent; background-image: none; border: 3px dashed var(--hairline-2); color: var(--ink-3); box-shadow: none; cursor: pointer; padding: 0; }
+.cc-plus svg { width: 36px; height: 36px; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; }
+.cc-plus:hover { border-color: var(--accent); color: var(--accent); }
+.cc-plus.listening { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); animation: cc-listen 1.2s ease-in-out infinite; }
+@keyframes cc-listen { 50% { transform: scale(1.06); } }
+.cc-starter { opacity: .32; cursor: pointer; padding: 6px; }
+.cc-starter:hover { opacity: .62; }
+.cc-gap { flex: none; width: 6px; align-self: stretch; margin: 8px -4px; border-radius: 3px; background: var(--accent); }
+.cc-ghost { position: fixed; z-index: 2000; margin: 0; pointer-events: none; transform: translate(-50%, -50%) rotate(-3deg); opacity: .92; box-shadow: var(--shadow-3); transition: opacity .12s, transform .12s; }
+.cc-ghost.cc-leaving { opacity: .4; transform: translate(-50%, -50%) rotate(-6deg) scale(.82); }
+.cc-none { margin: auto; color: var(--ink-3); font-weight: 800; }
 
-/* pick a chord (left) and the rhythm (right), side by side — one above
-   the other when the column is narrow (a tablet held upright, a phone) */
-.pw-duo { display: grid; grid-template-columns: minmax(250px, 320px) minmax(0, 1fr); gap: 22px; align-items: start; }
-@container pwmain (max-width: 600px) {
-  .pw-duo { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+/* the wave */
+.cc-mid { padding: 16px 22px 4px; }
+.cc-wave { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 16px; }
+.cc-transport { display: flex; flex-direction: column; align-items: center; gap: 9px; padding-top: 30px; }
+.cc-play { width: 62px; height: 62px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; box-shadow: 0 4px 12px rgba(156,22,142,.35); transition: filter .13s, transform .06s; }
+.cc-play:hover { filter: brightness(1.1); }
+.cc-play:active { transform: scale(.96); }
+.cc-play svg { width: 26px; height: 26px; fill: currentColor; }
+.cc-loop { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--paper-2); color: var(--ink-3); }
+.cc-loop.on { background: var(--accent-soft); color: var(--accent); }
+.cc-loop svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.cc-layer { width: 100%; height: 30px; border-radius: 999px; display: flex; align-items: center; justify-content: center; gap: 6px; background: var(--paper-2); font-size: 12.5px; font-weight: 900; color: var(--ink-3); }
+.cc-layer i { width: 11px; height: 11px; border-radius: 50%; box-shadow: inset 0 0 0 2px #9C168E; }
+.cc-layer.on { color: var(--ink); }
+.cc-layer.on i { background: #9C168E; }
+.cc-layer.chords i { box-shadow: inset 0 0 0 2px #A98BF0; }
+.cc-layer.chords.on i { background: #A98BF0; }
+.cc-wmain { min-width: 0; user-select: none; -webkit-user-select: none; }
+.cc-wtabs { position: relative; height: 30px; }
+.cc-wtab {
+  position: absolute; bottom: 0; min-width: 0; height: 28px; padding: 0 12px;
+  border: 2px solid var(--td); border-bottom: 0; border-radius: 11px 11px 0 0;
+  background: var(--tb); color: var(--td); font-family: var(--font-round); font-size: 16px; font-weight: 700; line-height: 24px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cc-wbody { position: relative; height: 132px; border-radius: 0 14px 14px 14px; overflow: hidden; background: var(--paper); cursor: pointer; touch-action: none; }
+.cc-wbody canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.cc-region { position: absolute; top: 0; bottom: 0; background: rgba(156,22,142,.10); border-left: 3px solid var(--accent); border-right: 3px solid var(--accent); pointer-events: none; }
+.cc-phead { position: absolute; top: 0; bottom: 0; left: 0; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--ink); pointer-events: none; }
+.cc-phead::before { content: ''; position: absolute; top: -1px; left: -4.5px; border: 6px solid transparent; border-top: 8px solid var(--ink); }
+.cc-lane { position: relative; height: 28px; margin-top: 7px; }
+.cc-lchord {
+  position: absolute; top: 0; height: 26px; border-radius: 7px; border-left: 2px solid var(--surface);
+  background: var(--c); color: var(--cink); font-family: var(--font-block); font-size: 14px; font-weight: 600; line-height: 26px;
+  text-align: center; white-space: nowrap; overflow: hidden; box-shadow: inset 0 -3px 0 rgba(0,0,0,.12);
 }
 
-/* pick a chord: its title with More chords… beside it, the panel's blocks (smaller), the note under them */
-.pw-pick { min-width: 0; }
-.pw-pick-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; min-height: 32px; margin-bottom: 8px; }
-.pw-pick-head .pw-kicker { margin: 0; }
-.pw-small-btn { height: 32px; padding: 0 12px; border-radius: 10px; font-size: 13px; }
+/* the board: the panel's blocks, bigger */
+.cc-play-area { display: flex; justify-content: center; padding: 10px 22px 22px; }
+.cc-board { width: min(680px, 100%); }
+.cc-hub .pw-board .strip-tower { height: 200px; }
+.cc-hub .pw-board .crow { max-height: 50px; }
+.cc-under { display: flex; align-items: stretch; gap: 8px; }
+.cc-under .strip-mods { flex: 1; min-width: 0; }
+.cc-more { flex: none; padding: 0 14px; border-radius: 10px; border: 1.5px solid var(--hairline-2); background: var(--surface); font-size: 13px; font-weight: 800; color: var(--ink-2); }
+.cc-more:hover { background: var(--paper-2); color: var(--ink); }
+.cblock.cc-on::after { content: ''; position: absolute; left: 7px; top: 7px; width: 9px; height: 9px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(43,29,56,.3); }
+.cc-hub.ro .cc-card { cursor: default; }
+
+/* the question (D5; Focus and the Time Line will ask too) */
+.cc-ask { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px; background: rgba(43,29,56,.28); border-radius: inherit; }
+.cc-ask-card { width: min(520px, 100%); padding: 24px 24px 14px; border-radius: 24px; background: var(--surface); box-shadow: var(--shadow-3); }
+.cc-ask-card h3 { margin: 0 0 18px; font-family: var(--font-round); font-size: 24px; font-weight: 700; line-height: 1.2; color: var(--ink); }
+.cc-ask-card h3 .figs, .cc-ask-card h3 .fig { color: inherit; }
+.cc-ask-btns { display: flex; flex-wrap: wrap; gap: 10px; }
+.cc-ask-btns .btn { flex: 1 1 auto; justify-content: center; }
+.cc-keep { display: block; margin: 12px auto 0; padding: 6px 12px; font-weight: 900; color: var(--ink-3); }
+.cc-keep:hover { color: var(--ink); }
+
+@media (max-width: 640px) {
+  .cc-shelf { min-height: 128px; padding: 16px 14px 18px; gap: 12px; }
+  .cc-card { width: 84px; height: 92px; border-radius: 19px; }
+  .cc-name { font-size: 27px; }
+  .cc-mid { padding: 12px 14px 4px; }
+  .cc-wave { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .cc-transport { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; padding-top: 0; }
+  .cc-play { width: 52px; height: 52px; }
+  .cc-layer { width: auto; padding: 0 12px; }
+  .cc-play-area { padding: 8px 14px 18px; }
+  .cc-hub .pw-board .strip-tower { height: 172px; }
+}
+
+/* the selected card's tune button: Focus on its notes */
+.cc-tune {
+  position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-2); cursor: pointer;
+}
+.cc-tune svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.cc-tune:hover { background: var(--paper-2); }
+
+/* ============================================================
+   FOCUS — one chord's own notes (chord-focus.js; 2026-10-28, ../Song Writer
+   Chords Redesign/ §3.2). The grand staff and the keyboard say it all: the
+   orange note is the one that moves, the faint ones are where it may go.
+   ============================================================ */
+.pw-body.focus.fx { display: flex; flex-direction: column; gap: 0; padding: 0; overflow-y: auto; background: var(--surface); }
+.fx-head { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; padding: 14px 22px; border-bottom: 1px solid var(--hairline); flex: none; }
+.fx-back { display: inline-flex; align-items: center; gap: 2px; height: 40px; padding: 0 16px 0 9px; border-radius: 999px; background: var(--paper-2); color: var(--ink-2); font-weight: 900; font-size: 14px; white-space: nowrap; }
+.fx-back svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
+.fx-back:hover { background: var(--hairline); color: var(--ink); }
+.fx-chip { width: 46px; height: 46px; flex: none; border-radius: 14px; background: var(--c); box-shadow: inset 0 -4px 0 rgba(0,0,0,.14); }
+.fx-name { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+.fx-big { font-family: var(--font-block); font-size: 42px; font-weight: 600; line-height: 1; color: var(--ink); white-space: nowrap; }
+.fx-big.notes { font-family: var(--font); font-size: 26px; font-weight: 900; letter-spacing: .04em; color: var(--ink-2); }
+.fx-small { font-family: var(--font-block); font-size: 21px; font-weight: 600; color: var(--ink-3); white-space: nowrap; }
+.fx-lock { margin-left: auto; }
+.fx-lock .seg-btn { display: inline-flex; align-items: center; gap: 7px; }
+.fx-lock svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; }
+.fx-lock .seg-btn.active svg rect { fill: currentColor; fill-opacity: .15; }
+.fx-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 10px 22px 30px; min-height: 0; }
+.fx-staff { width: min(560px, 100%); height: auto; flex: none; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+.pw-body svg.fx-staff { stroke: none; }   /* the app's svg[viewbox] { stroke } would outline every shape (it outranks a bare class) */
+.fx-staff.nudge { animation: fx-nudge .28s; }
+@keyframes fx-nudge { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+.fx-hit { fill: transparent; cursor: pointer; }
+.fx-note, .fx-ghost { cursor: pointer; }
+.fx-ghost:hover path { fill-opacity: .5; }
+.fx-btn { cursor: pointer; }
+.fx-btn circle { fill: #fff; stroke: var(--edit); stroke-width: 2.4; }
+.fx-btn path { fill: none; stroke: var(--edit); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.fx-btn:hover circle { fill: var(--edit-soft); }
+.fx-btn.fx-x circle { stroke: var(--hairline-2); }
+.fx-btn.fx-x path { stroke: var(--ink-3); stroke-width: 2.4; }
+.fx-keys { position: relative; display: flex; width: min(820px, 100%); height: 92px; flex: none; margin-bottom: 14px; user-select: none; -webkit-user-select: none; }
+.fx-wk { position: relative; flex: 1 1 0; min-width: 0; height: 100%; border: 1.5px solid var(--hairline-2); border-right-width: 0; border-radius: 0 0 8px 8px; background: #fff; }
+.fx-wk:last-of-type { border-right-width: 1.5px; }
+.fx-bk { position: absolute; top: 0; height: 60%; z-index: 2; border-radius: 0 0 6px 6px; background: #2E2338; }
+.fx-wk.lit, .fx-bk.lit { background: var(--kc); }
+.fx-kname { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 11px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.fx-bk .fx-kname { font-size: 9px; bottom: 5px; }
+.fx-kdot { position: absolute; left: 50%; bottom: 9px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--hairline-2); }
+.fx-bk .fx-kdot { background: #7C6B8C; bottom: 7px; }
+.fx-c { position: absolute; left: 0; right: 0; bottom: -19px; font-size: 10.5px; font-weight: 900; color: var(--ink-3); text-align: center; }
+.fx-hear { width: 48px; height: 48px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; box-shadow: 0 3px 10px rgba(156,22,142,.3); touch-action: none; }
+.fx-hear svg, .fx-insong svg { width: 20px; height: 20px; fill: currentColor; }
+.fx-insong { display: inline-flex; align-items: center; gap: 6px; }
+.fx-insong svg { width: 15px; height: 15px; }
+.fx-insong.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.fx-accs { display: inline-flex; gap: 5px; margin-left: 6px; }
+.fx-acc { width: 44px; height: 40px; border-radius: 11px; background: var(--paper-2); font-size: 22px; font-weight: 900; color: var(--ink-2); }
+.fx-acc.on { background: var(--edit); color: #fff; }
+.fx-none { margin: auto; color: var(--ink-3); font-weight: 800; }
+@media (max-width: 640px) {
+  .fx-head { padding: 10px 14px; gap: 10px; }
+  .fx-big { font-size: 34px; }
+  .fx-lock .seg-btn span { display: none; }
+  .fx-main { padding: 8px 12px 26px; }
+  .fx-keys { height: 76px; }
+  .fx-kname { font-size: 9px; }
+  .fx-bk .fx-kname { font-size: 7px; letter-spacing: -.02em; }
+}
+
+/* ============================================================
+   THE TIME LINE — where the chords go (chord-timeline.js; 2026-10-29, ../Song
+   Writer Chords Redesign/ §3.3). Bold, and no small print: big bar numbers,
+   sections in their label's colour with their words and the melody's shape,
+   chords as wide as they last in their root's colour, the orange point, a
+   dot on the tab while a draft waits.
+   ============================================================ */
+.pw-body.tline { display: flex; flex-direction: column; overflow-y: auto; background: var(--surface); }
+.pw-tabs .seg-btn.pw-dot::after { content: ''; display: inline-block; width: 9px; height: 9px; margin: -2px 0 0 7px; border-radius: 50%; background: var(--edit); vertical-align: middle; }
+.tl-view { display: flex; flex-direction: column; min-height: 100%; }
+.tl-headbar { display: flex; align-items: center; gap: 12px; padding: 16px 22px 2px; flex: none; }
+.tl-headbar .cc-play { width: 54px; height: 54px; }
+.tl-headbar .cc-play svg { width: 23px; height: 23px; }
+.tl-headbar .btn { height: 46px; padding: 0 18px; font-size: 16px; font-weight: 800; }
+.tl-headbar .btn svg { width: 19px; height: 19px; margin-right: 7px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.tl-headbar .btn[disabled] { opacity: .4; }
+.tl-scroll { flex: none; overflow-x: auto; overflow-y: hidden; padding: 12px 22px 6px; overscroll-behavior-x: contain; }
+.tl { position: relative; padding-bottom: 50px; user-select: none; -webkit-user-select: none; touch-action: pan-x; }   /* room under the row for the selection's tools */
+.tl-ruler { position: relative; height: 40px; cursor: pointer; touch-action: none; }
+.tl-bn {
+  position: absolute; top: 0; height: 40px; padding-left: 8px; display: flex; align-items: center;
+  border-left: 2px solid var(--hairline-2); font-family: var(--font-round); font-size: 21px; font-weight: 800; color: var(--ink-2);
+}
+.tl-bn:hover { color: var(--ink); background: var(--paper); }
+.tl-band { position: absolute; top: 2px; height: 36px; border-radius: 10px; background: var(--edit-soft); box-shadow: inset 0 0 0 2px var(--edit); pointer-events: none; }
+.tl-secrow { position: relative; height: 124px; margin-top: 36px; }
+.tl-sec { position: absolute; top: 0; height: 100%; border-radius: 16px; background: var(--sb); border: 3px solid var(--sbd); cursor: grab; }
+.tl-sec.sel { box-shadow: 0 0 0 4px var(--gold); z-index: 3; }
+.tl-sec.dragging { z-index: 5; box-shadow: var(--shadow-3); cursor: grabbing; opacity: .94; }
+.tl-shead { position: absolute; left: -3px; top: -38px; display: flex; align-items: flex-end; gap: 7px; z-index: 6; }
+.tl-slab {
+  position: relative; margin-top: 6px; height: 31px; min-width: 46px; padding: 0 14px; border-radius: 12px 12px 0 0;
+  background: var(--sbd); color: #fff; font-family: var(--font-round); font-size: 19px; font-weight: 800; display: grid; place-items: center; white-space: nowrap;
+  touch-action: none;                                      /* a finger drags a section by its tab; its body scrolls the page */
+}
+.tl-slab.blank svg { width: 20px; height: 20px; fill: currentColor; opacity: .85; }
+.tl-c.carried { z-index: 4; transition: none; }
+.tl-shead .tl-acts { position: static; transform: none; gap: 6px; }
+.tl-shead .tl-acts button { width: 36px; height: 36px; }
+.tl-gap .tl-acts { top: -20px; left: 10px; transform: none; }
+.tl-sacts button { box-shadow: var(--shadow-2), 0 0 0 1px var(--hairline); }
+.tl-sacts button[disabled] { opacity: .35; }
+.tl-ins { position: absolute; top: -8px; bottom: -8px; width: 8px; margin-left: -4px; border-radius: 4px; background: var(--accent); box-shadow: 0 0 0 3px rgba(156,22,142,.18); pointer-events: none; z-index: 6; }
+.tl-contour { position: absolute; left: 0; right: 0; top: 16px; height: 50px; pointer-events: none; }
+.tl-contour i { position: absolute; width: 13px; height: 13px; margin: -6px 0 0 5px; border-radius: 50%; background: var(--nc); box-shadow: inset 0 -2px 0 rgba(0,0,0,.16); }
+.tl-words { position: absolute; left: 0; right: 0; bottom: 12px; height: 26px; pointer-events: none; }
+.tl-words span { position: absolute; top: 0; padding-left: 6px; overflow: hidden; font-size: 17px; font-weight: 900; line-height: 26px; white-space: nowrap; color: var(--ink); }
+.tl-gap {
+  position: absolute; top: 0; height: 100%; border-radius: 16px; border: 3px dashed var(--hairline-2); display: grid; place-items: center;
+  font-family: var(--font-round); font-size: 20px; font-weight: 800; color: var(--ink-3);
+  background: repeating-linear-gradient(135deg, var(--paper) 0 10px, transparent 10px 20px);
+}
+.tl-gap.has { border-color: var(--ink-3); color: var(--ink-2); }
+.tl-gap[data-gap] { cursor: pointer; }
+.tl-gap.sel { border-color: var(--gold); border-style: solid; box-shadow: 0 0 0 3px var(--gold); z-index: 3; }
+.tl-chrow {
+  position: relative; height: 84px; margin-top: 14px; border-radius: 14px; background-color: var(--paper);
+  background-image: linear-gradient(90deg, var(--hairline-2) 2px, transparent 2px), linear-gradient(90deg, var(--hairline) 1px, transparent 1px);
+  transition: background-color .15s;
+}
+.tl-chrow.drop { background-color: var(--accent-soft); }
+.tl-c {
+  --c: #999; --ck: #fff;
+  position: absolute; top: 0; height: 84px; border-radius: 14px; background: var(--c); color: var(--ck);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.2), rgba(255,255,255,0) 55%);
+  display: flex; align-items: center; justify-content: center; padding: 0 4px;
+  font-family: var(--font-block); font-size: 28px; font-weight: 600; white-space: nowrap;
+  box-shadow: inset 0 -5px 0 rgba(0,0,0,.14); cursor: grab; touch-action: none;
+}
+.tl-c > span { overflow: hidden; }
+.tl-c.out { background-image: repeating-linear-gradient(45deg, rgba(0,0,0,.12) 0 7px, transparent 7px 14px); }
+.tl-c.sel { box-shadow: inset 0 -5px 0 rgba(0,0,0,.14), 0 0 0 4px var(--gold); z-index: 3; }
+.tl-c.sounding { box-shadow: inset 0 -5px 0 rgba(0,0,0,.14), 0 0 0 4px rgba(156,22,142,.45); }
+.tl-c.sel.sounding { box-shadow: inset 0 -5px 0 rgba(0,0,0,.14), 0 0 0 4px var(--gold); }
+.tl-c.lifted { opacity: .25; }
+.tl-c.tl-moving { z-index: 6; opacity: .9; pointer-events: none; box-shadow: var(--shadow-3); }
+.tl-c.tl-moving.copying::after { content: '+'; position: absolute; top: -12px; right: -12px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; font: 900 18px/1 var(--font); }
+.tl-stretch { position: absolute; top: 50%; width: 18px; height: 46px; margin-top: -23px; border-radius: 9px; background: var(--surface); box-shadow: var(--shadow-2); cursor: ew-resize; z-index: 4; touch-action: none; }
+.tl-stretch::after { content: ''; position: absolute; left: 6px; top: 13px; bottom: 13px; width: 6px; border-left: 2px solid var(--ink-3); border-right: 2px solid var(--ink-3); }
+.tl-stretch.l { left: -10px; }
+.tl-stretch.r { right: -10px; }
+.tl-acts { position: absolute; top: calc(100% + 8px); display: flex; gap: 7px; z-index: 6; transform: translateX(-100%); }
+.tl-acts button { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1), 0 0 0 1px var(--hairline); }
+.tl-acts button:hover { background: var(--paper-2); }
+.tl-acts svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.tl-mark { position: absolute; top: 0; height: 84px; border-radius: 14px; border: 3px dashed var(--accent); background: rgba(156,22,142,.08); pointer-events: none; z-index: 5; }
+.tl-pt { position: absolute; top: 0; bottom: 50px; width: 3px; margin-left: -1.5px; background: var(--edit); pointer-events: none; z-index: 7; }
+.tl-pt::before { content: ''; position: absolute; top: 0; left: -7.5px; border: 9px solid transparent; border-top: 12px solid var(--edit); }
+.tl-ph { position: absolute; top: 0; bottom: 50px; left: 0; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--ink); pointer-events: none; z-index: 8; }
+.tl-tray {
+  flex: none; margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  padding: 16px 22px 20px; border-top: 1px solid var(--hairline); background: linear-gradient(var(--surface), var(--paper));
+}
+.cc-card.tl-card { width: 88px; height: 88px; padding: 6px; border-radius: 20px; }
+.cc-card.tl-card .cc-name { font-size: 28px; }
+.tl-sep { flex: none; width: 2px; align-self: stretch; margin: 6px 2px; border-radius: 1px; background: var(--hairline-2); }
+.tl-clip {
+  position: relative; flex: none; width: 116px; height: 84px; padding: 12px 10px 10px; border-radius: 18px;
+  display: flex; align-items: center; background: var(--surface); border: 3px solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
+  cursor: grab; touch-action: none;
+}
+.tl-strip { display: flex; gap: 3px; width: 100%; height: 46px; }
+.tl-strip i { min-width: 5px; border-radius: 6px; background: var(--c); }
+.tl-pin { position: absolute; top: -13px; left: 50%; margin-left: -13px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: #fff; }
+.tl-pin svg { width: 15px; height: 15px; fill: currentColor; stroke: none; }
+.tl-view.ro .tl-c, .tl-view.ro .tl-sec { cursor: default; }
+/* a copied section on the clipboard card: its tab and its chords */
+.tl-clip.sec { width: 132px; flex-direction: column; align-items: stretch; gap: 6px; padding: 10px; background: var(--sb); border-color: var(--sbd); box-shadow: 4px 4px 0 var(--sbd); }
+.tl-clip.sec .tl-strip { height: 30px; }
+.tl-clab { align-self: flex-start; height: 26px; min-width: 34px; padding: 0 10px; border-radius: 9px; display: grid; place-items: center; background: var(--sbd); color: #fff; font-family: var(--font-round); font-size: 16px; font-weight: 800; }
+.tl-clab svg { width: 16px; height: 16px; fill: currentColor; }
+
+/* the question's pictures (the Time Line's: how many chords, the ones going in) */
+.cc-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 20px; }
+.cc-chip { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 7px; border-radius: 12px; background: var(--paper-2); font-weight: 900; font-size: 16px; color: var(--ink); }
+.cc-chip-sw { width: 27px; height: 27px; border-radius: 8px; display: grid; place-items: center; background: #A98BF0; color: #fff; font-size: 15px; }
+.cc-chip-strip { gap: 4px; padding: 0 7px; }
+.cc-chip-strip i { padding: 3px 9px; border-radius: 7px; background: var(--c); color: var(--ck); font: 600 16px/1.2 var(--font-block); font-style: normal; }
+.cc-chip-strip b { padding: 0 4px; color: var(--ink-2); }
+.cc-chip-sw { min-width: 27px; width: auto; padding: 0 6px; font-family: var(--font-round); font-weight: 800; }
+.cc-chip-go { background: #9487A2; }
+.cc-chip-gap { background: repeating-linear-gradient(135deg, #CFC6DA 0 5px, #F2EEF6 5px 10px); box-shadow: inset 0 0 0 2px #9487A2; }
+
+@media (max-width: 640px) {
+  .tl-headbar { padding: 12px 14px 2px; gap: 8px; }
+  .tl-headbar .cc-play { width: 48px; height: 48px; }
+  .tl-headbar .btn { height: 42px; padding: 0 13px; font-size: 15px; }
+  .tl-restart { font-size: 0 !important; padding: 0 12px !important; }
+  .tl-restart svg { margin-right: 0 !important; }
+  .tl-scroll { padding: 10px 14px 6px; }
+  .tl-secrow { height: 112px; }
+  .tl-words span { font-size: 15px; }
+  .tl-tray { padding: 14px 14px 18px; gap: 10px; }
+  .cc-card.tl-card { width: 74px; height: 74px; border-radius: 17px; }
+  .cc-card.tl-card .cc-name { font-size: 24px; }
+  .cc-card.tl-card .cc-other { font-size: 12px; }
+}
+
+/* the Chord Chart's board (chord-chart.js boardHtml): the panel's blocks, smaller */
 .pw-board { display: flex; flex-direction: column; gap: 6px; container-type: inline-size; }
 .pw-board .strip-tower { height: 172px; flex: none; margin-top: 0; }
 .pw-board .crow { max-height: 52px; }
 .pw-board .cblock { border-radius: 10px; min-height: 26px; }
-.pw-pick-note { margin-top: 10px; }
-.pw-pick-note .fold-note { display: block; }
 
 /* the rhythm: its title, two tabs (Build your own · Pre-built), the box under them */
-.pw-rhythm { min-width: 0; container: pwrhythm / inline-size; }
-.pw-rhead { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 32px; margin-bottom: 8px; }
-.pw-rhead .pw-kicker { margin: 0; }
-.pw-rhead .seg-btn { padding: 6px 11px; font-size: 12.5px; }
 .pw-rtabs { display: flex; gap: 4px; padding-left: 10px; position: relative; z-index: 1; }
 .pw-rtab {
   padding: 8px 14px 7px; border-radius: 12px 12px 0 0; margin-bottom: -1px;
@@ -2566,255 +2795,29 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .pw-line .rl-line, .pw-line .rl-bar { opacity: .55; }
 .pw-line:hover { border-color: var(--accent); }
 .pw-line.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-soft); color: var(--accent-deep); }
-.pw-line-more { margin-left: auto; padding-left: 10px; font-size: 15px; color: var(--accent); }   /* closed to the one chosen: tap for every line */
-.pw-rnote { margin: 10px 0 0; }
-.pw-ownline { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; font-size: 14px; font-weight: 800; color: var(--ink-2); }
-.pw-ownline .seg-btn { padding: 6px 11px; font-size: 12.5px; }
-
-/* 2026-10-05 the Edit Chords page, top to bottom: Choose your chords and their
-   rhythm · Build your chord progression · Name it and hear it (the first time);
-   made and come back to, its name and chords head the page instead */
-.pw-sec { display: flex; flex-direction: column; gap: 10px; }
-.pw-sec + .pw-sec { padding-top: 18px; border-top: 1px solid var(--hairline); }
-.pw-h { margin: 0; font-family: var(--font-round); font-size: 19px; font-weight: 700; color: var(--ink); }
-.pw-headsec { gap: 12px; }
-.pw-namerow { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; }
-.pw-sec.pw-finish { padding: 14px 16px 16px; border: 1.5px solid #E7C4E1; border-radius: var(--r-lg); background: var(--accent-soft); }
-.pw-sec + .pw-sec.pw-finish { margin-top: 4px; }
-.pw-finish .pw-name.text-field { background: var(--surface); }
-.pw-empty { margin: 0; font-weight: 700; color: var(--ink-3); }
-.pw-headsec > .pw-none { margin: 0; }
-.pw-card.pw-sum { cursor: default; }                      /* the head's summary: look, not touch — change them below */
-.pw-card.pw-sum:hover { border-color: var(--hairline); }
-.pw-duo.rhythm-first { grid-template-columns: minmax(0, 1fr) minmax(250px, 330px); }
-@container pwmain (max-width: 600px) {
-  .pw-duo.rhythm-first { grid-template-columns: minmax(0, 1fr); }
-}
-/* Build your chord progression: right under the chords — its title and Each chord as one block, Add a chord beside it, the chords after */
-.pw-sec + .pw-sec.pw-build { padding-top: 2px; border-top: 0; }
-.pw-build-row { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 12px 16px; align-items: start; }
-.pw-build-head { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding-top: 2px; }
-.pw-build-head .pw-h { line-height: 1.2; }
-.pw-build-head .pw-each { flex-direction: column; align-items: flex-start; gap: 5px; }
-.pw-each-row { display: inline-flex; align-items: center; gap: 8px; }
-.pw-build-head .pw-each small { min-width: 0; }
-/* the chords four to a row, Add a chord in the next place */
-.pw-cards.pw-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 124px)); gap: 10px; }
-.pw-grid .pw-card { width: auto; min-width: 0; }
-.pw-grid .pw-mini { width: calc(100% - 16px); max-width: 96px; }
-@container pwmain (max-width: 600px) {
-  .pw-build-row { grid-template-columns: minmax(0, 1fr); }
-  .pw-cards.pw-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-  .pw-grid .pw-card-top { font-size: 20px; }
-  .pw-grid .pw-card-len { gap: 2px; font-size: 11px; }
-}
-/* the box a new chord goes into, listening */
-.pw-card.plus small { padding: 0 8px; text-align: center; line-height: 1.3; }
-.pw-card.plus.listening { border-color: var(--accent); background: var(--accent-soft); animation: pw-listen 1.8s ease-in-out infinite; }
-.pw-card.plus.listening small { font-size: 12px; color: var(--accent-deep); }
-.pw-listen { font-size: 26px; line-height: 1; color: var(--accent); }
-@keyframes pw-listen { 0%, 100% { box-shadow: 0 0 0 3px var(--accent-soft); } 50% { box-shadow: 0 0 0 7px rgba(156,22,142,.14); } }
-@media (prefers-reduced-motion: reduce) { .pw-card.plus.listening { animation: none; box-shadow: 0 0 0 3px var(--accent-soft); } }
-/* the changes under the board: sideways, each a switch (on until tapped again) */
-.pw-mods { display: flex; align-items: stretch; gap: 4px; }
-.pw-modrow { flex: 1; min-width: 0; display: flex; gap: 4px; overflow-x: auto; scroll-snap-type: x proximity; overscroll-behavior-x: contain; scrollbar-width: none; }
-.pw-modrow::-webkit-scrollbar { display: none; }
-.pw-mod { flex: 0 0 auto; min-width: 52px; padding: 4px 6px 3px; scroll-snap-align: start; touch-action: pan-x; }
-.pw-modnav { flex: none; width: 22px; border-radius: 8px; background: var(--paper-2); color: var(--ink-2); font-size: 18px; font-weight: 900; line-height: 1; }
-.pw-modnav:hover:not(:disabled) { background: var(--hairline); color: var(--ink); }
-.pw-mods.fits .pw-modnav, .pw-mods.fits .pw-mod.copy { display: none; }   /* the whole list fits: once, no arrows */
-.pw-mod .cmod-name .figs { font-size: .9em; vertical-align: -.15em; }        /* 6/4, 4/2: readable figures */
-
-/* a progression's chord: More chords… and a double-click (#pchord-sheet) */
-.sheet.pchord-sheet { max-width: 860px; max-height: 92vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; overflow: clip; }
-.pchord-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 14px; background: var(--paper); }
-.pchord-body > * { flex: none; }
-.ce-row { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 10px; align-items: center; }
-.ce-row .editor-label { padding-top: 0; }
-.ce-qrow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
-.ce-quality.sound-select { flex: none; width: 150px; height: 40px; }
-.ce-mods { display: flex; flex-wrap: wrap; gap: 5px; }
-.ce-mods .mod-chip { height: 40px; min-width: 44px; padding: 0 8px; }
-.ce-mods .mod-chip .figs { font-size: .82em; }
-.ce-rhythm { padding-top: 14px; border-top: 1px solid var(--hairline); }
-.ce-rhythm .pw-rhead { gap: 8px 14px; }
-
-/* phones: one column, the list a row of cards across the top */
+.pw-small-btn { height: 32px; padding: 0 12px; border-radius: 10px; font-size: 13px; }
+/* phones: the window fills the screen */
 @media (max-width: 720px) {
   .sheet.prog-sheet { height: 100%; max-height: 100%; border-radius: var(--r-xl) var(--r-xl) 0 0; }
   .pw-head { padding: 12px 12px 10px 16px; gap: 6px; }
   .pw-head h2 { font-size: 19px; }
-  .pw-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
-  .pw-list { flex-direction: row; align-items: stretch; overflow-x: auto; overflow-y: hidden; padding: 10px 12px; border-right: 0; border-bottom: 1px solid var(--hairline); }
-  .pw-list > .pw-kicker, .pw-list > .fold-note, .pw-list > .note-i { display: none; }
-  .pw-pcard { flex: none; width: 150px; }
-  .pw-new, .pw-starters-btn { flex: none; }
-  .pw-starters { flex-direction: row; }
-  .pw-starter { flex: none; width: 140px; }
-  .pw-main { padding: 12px 12px 18px; gap: 16px; }
-  .pw-name.text-field { width: 100%; }
-  .pw-card { width: 104px; }
-  .pw-mini { width: 84px; }
   .pw-foot { padding: 10px 12px; gap: 6px; flex-wrap: nowrap; }
   .pw-foot .btn { padding: 0 11px; height: 40px; font-size: 13px; }
-  .pw-foot .pw-long { display: none; }
-  .pw-foot .pw-short { display: inline; }
-  .pw-foot .pw-confirm { font-size: 13px; }
-  .sheet.pchord-sheet { height: 100%; max-height: 100%; border-radius: var(--r-xl) var(--r-xl) 0 0; }
-  .pchord-body { padding: 12px 12px 16px; }
-  .ce-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }
 
 /* ============================================================
-   THE CHORDS WINDOW — THE TIME LINE (was Chord Placement, the map of phase 3)
+   THE CHORDS WINDOW — its tabs (Chord Chart · Time Line)
    ============================================================ */
 .pw-tabs { flex: none; }
 .pw-tabs .seg-btn { padding: 7px 14px; }
-.pw-pcard { border-left: 5px solid var(--bd, var(--hairline)); }
-.pw-body.song { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; padding: 14px 18px 18px; background: var(--paper); }
-.pw-body.song > * { flex: none; }            /* never squeezed: the body scrolls instead (a phone squeezed the map under its card) */
-.mp-top { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
-.mp-top > .fold-note, .mp-top > .note-i { flex: 1 1 260px; }
-.mp-top > .note-i { flex: none; }
-.mp-play { flex: none; }
-.mp-wrap { display: grid; grid-template-columns: 70px minmax(0, 1fr); border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--hairline); overflow: hidden; }
-.mp-labels { display: grid; grid-template-rows: 30px 44px 98px; padding-top: 6px; border-right: 1px solid var(--hairline); }
-.mp-labels span { display: flex; align-items: center; padding-left: 12px; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
-.mp-scroll { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
-.mp-inner { position: relative; padding-top: 6px; }
-.mp-row { position: relative; }
-.mp-nums { height: 30px; }
-.mp-mels { height: 44px; }
-.mp-chords { height: 98px; }
-.mp-num {
-  position: absolute; top: 0; bottom: 0; display: grid; place-items: center;
-  border-left: 1px solid var(--hairline); font-size: 12px; font-weight: 800; color: var(--ink-3);
-  cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: pan-y;
-}
-.mp-num:hover { background: var(--paper-2); color: var(--ink); }
-.mp-num.past { color: #CFC4D9; }
-.mp-num.here { color: var(--accent); }
-.mp-num.drop { background: var(--accent-soft); color: var(--accent); }
-.mp-mel {
-  position: absolute; top: 6px; bottom: 6px; display: flex; align-items: center; gap: 6px; padding: 0 8px; overflow: hidden;
-  border-radius: 10px; background: var(--c); border: 1px solid rgba(43,29,56,.07);
-  font-size: 12px; font-weight: 700; color: var(--ink-2); white-space: nowrap; cursor: pointer;
-}
-.mp-mel b { flex: none; padding: 0 5px; border-radius: 5px; background: var(--surface); font-weight: 900; color: var(--ink); }
-.mp-mel span { overflow: hidden; text-overflow: ellipsis; }
-.mp-nomel, .mp-empty {
-  position: absolute; top: 6px; bottom: 6px; display: flex; align-items: center; padding: 0 12px; overflow: hidden;
-  border-radius: 10px; border: 1.5px dashed var(--hairline-2); font-size: 12px; font-weight: 700; color: var(--ink-3); white-space: nowrap;
-}
-.tl-group {                               /* a group: a progression in the song, its chords over it */
-  position: absolute; top: 4px; bottom: 4px;
-  border-radius: 12px; background: var(--bc); border: 2px solid var(--bd);
-  transition: box-shadow .13s;
-}
-.tl-group.loose { border-style: dashed; }
-.tl-group.waiting { opacity: .65; border-style: dashed; }
-.tl-group.on { box-shadow: 0 0 0 3px var(--edit-soft); border-color: var(--edit); }      /* no z-index: its grip stays over the chords */
-.tl-group.sounding { box-shadow: 0 0 0 3px rgba(156,22,142,.35); }
-.tl-group.dragging { opacity: .85; z-index: 3; box-shadow: var(--shadow-2); }
-.tl-ghead {                              /* its top strip: the corner tab ⠿ and its name — grab it to move all of it */
-  position: absolute; left: 0; right: 0; top: 0; height: 24px; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 4px;
-  font-size: 11.5px; font-weight: 800; color: var(--ink-2); white-space: nowrap; overflow: hidden;
-  cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none;
-}
-.tl-ghead b { flex: none; padding: 2px 8px 2px 4px; border-radius: 0 0 8px 0; font-weight: 900; color: var(--bd); }
-.tl-ghead span { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
-.tl-grip {                               /* six dots: grab here */
-  flex: none; width: 14px; height: 16px; border-radius: 5px; background-color: var(--bd);
-  -webkit-mask: radial-gradient(circle, #000 1.6px, transparent 1.9px) 0 0 / 7px 5.5px; mask: radial-gradient(circle, #000 1.6px, transparent 1.9px) 0 0 / 7px 5.5px;
-}
-.tl-ghead:hover .tl-grip, .tl-group.on .tl-grip { background-color: var(--edit); }
-.tl-group.dragging .tl-ghead { cursor: grabbing; }
-.tl-chord {                              /* one chord: its own block, moved, copied, taken out on its own */
-  position: absolute; top: 34px; bottom: 10px; z-index: 2; box-sizing: border-box;
-  display: flex; align-items: center; padding: 0 7px; overflow: hidden;
-  border-radius: 8px; background: var(--c); color: var(--ck); border: 1.5px solid rgba(43,29,56,.18);
-  font-family: var(--font-block); font-weight: 600; font-size: 15px; white-space: nowrap;
-  cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none;
-  transition: opacity .12s, box-shadow .12s;
-}
-.tl-chord span { overflow: hidden; text-overflow: clip; }
-.tl-chord:hover { box-shadow: 0 2px 6px rgba(43,29,56,.22); }
-.tl-chord.out { border-style: dashed; border-color: rgba(43,29,56,.5); }
-.tl-chord.sel { border: 3px solid var(--edit); box-shadow: 0 0 0 2px #fff, 0 2px 8px rgba(255,149,0,.45); z-index: 3; }
-.tl-chord.lifting { opacity: .4; }
-.tl-chord.sounding { box-shadow: 0 0 0 3px rgba(156,22,142,.45); }
-.tl-corner { position: absolute; right: 0; top: 0; width: 11px; height: 11px; background: linear-gradient(225deg, #fff 50%, transparent 50%); filter: drop-shadow(0 0 1px rgba(43,29,56,.35)); pointer-events: none; }
-.tl-point {                              /* the point: Paste goes in here, Play starts here */
-  position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1.5px; border-radius: 2px;
-  background: var(--edit); box-shadow: 0 0 6px rgba(255,149,0,.55); pointer-events: none; z-index: 4;
-}
-.tl-point::before { content: ''; position: absolute; left: -4px; top: -6px; width: 11px; height: 8px; background: var(--edit); clip-path: polygon(0 0, 100% 0, 50% 100%); }
-.tl-drop {                               /* where chords dragged go in */
-  position: absolute; top: 0; bottom: 0; width: 5px; margin-left: -2.5px; border-radius: 3px;
-  background: var(--accent); box-shadow: 0 0 0 3px rgba(156,22,142,.22); pointer-events: none; z-index: 6;
-}
-.tl-ghost {
-  position: fixed; z-index: 200; display: flex; gap: 4px; padding: 5px; border-radius: 11px;
-  background: var(--surface); border: 2px solid var(--edit); box-shadow: var(--shadow-2); pointer-events: none;
-}
-.tl-ghost i { font-style: normal; padding: 4px 10px; border-radius: 7px; background: var(--c); color: var(--ck); font-family: var(--font-block); font-weight: 600; font-size: 15px; }
-.tl-ghost.copy::after { content: '+'; display: grid; place-items: center; width: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 900; }
-.tl-tools { display: inline-flex; flex-wrap: wrap; gap: 6px; flex: none; }
-.tl-tool { height: 38px; padding: 0 13px; font-size: 13.5px; }
-.tl-tool:disabled { opacity: .4; }
-.tl-whose { margin: -4px 0 0; font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
-.mp-h {                                 /* a grip on each end, half in and half out: little of the chords under it */
-  position: absolute; top: 22%; bottom: 22%; width: 12px; border-radius: 6px;
-  background: var(--edit); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(43,29,56,.35);
-  cursor: ew-resize; z-index: 3;
-}
-.mp-h::after { content: ''; position: absolute; inset: -12px -10px; }      /* a finger's worth */
-.mp-h.l { left: -7px; }
-.mp-h.r { right: -7px; }
-.mp-sel { position: absolute; top: 0; bottom: 0; background: rgba(156,22,142,.10); border-left: 2px solid var(--accent); border-right: 2px solid var(--accent); pointer-events: none; z-index: 1; }
-.mp-head { position: absolute; top: 36px; bottom: 0; width: 3px; margin-left: -1px; border-radius: 2px; background: var(--sound); pointer-events: none; z-index: 4; }
-.mp-head::before { content: ''; position: absolute; top: -9px; left: -5px; border: 6.5px solid transparent; border-top-color: var(--sound); }
-.mp-ghost { position: fixed; z-index: 200; padding: 6px 14px; border-radius: 999px; background: var(--bc); border: 2px solid var(--bd); font-weight: 900; font-size: 13px; color: var(--ink); pointer-events: none; box-shadow: var(--shadow-2); opacity: .85; }
-.mp-ghost.over { opacity: 1; transform: scale(1.06); }
 
-.mp-card { padding: 14px 16px; border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--hairline); display: flex; flex-direction: column; gap: 12px; }
-.mp-card-title { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; font-family: var(--font-round); font-size: 20px; font-weight: 700; color: var(--ink); }
-.mp-where { font-family: var(--font); font-size: 15px; font-weight: 700; color: var(--ink-2); }
-.mp-times { font-family: var(--font); font-size: 12.5px; font-weight: 800; color: var(--ink-3); }
-.mp-swatch { width: 16px; height: 16px; border-radius: 5px; background: var(--bc); border: 2px solid var(--bd); }
-.mp-card-empty { margin: 0; font-size: 14px; font-weight: 700; color: var(--ink-3); }
-.mp-fields { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; font-size: 14px; font-weight: 700; color: var(--ink-2); }
-.mp-fields label { display: inline-flex; align-items: center; gap: 8px; }
-.mp-in { width: 64px; height: 36px; padding: 0 8px; border-radius: 9px; border: 1.5px solid var(--hairline-2); background: var(--surface); font-family: var(--font); font-size: 15px; font-weight: 800; color: var(--ink); text-align: center; }
-.mp-in.narrow { width: 54px; }
-.mp-in:focus { outline: none; border-color: var(--accent); }
-.mp-select { width: auto; text-align: left; padding-right: 4px; }
-.mp-toggle { height: 36px; padding: 0 12px; border-radius: 9px; border: 1.5px solid var(--hairline-2); background: var(--surface); font-size: 13px; font-weight: 800; color: var(--ink-2); }
-.mp-toggle.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.mp-flabel { font-weight: 800; }
-.mp-none { color: var(--ink-3); font-weight: 700; }
-.mp-herechip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 4px 4px 10px; border-radius: 999px; background: var(--paper-2); font-size: 13px; font-weight: 800; color: var(--ink); }
-.mp-herechip button { width: 22px; height: 22px; border-radius: 50%; background: var(--surface); color: var(--ink-2); font-weight: 900; }
-.mp-herechip button:hover { background: var(--danger); color: #fff; }
-.mp-small { height: 32px; padding: 0 10px; font-size: 13px; }
-.mp-actions { display: flex; flex-wrap: wrap; gap: 9px; }
-.mp-actions .btn svg { width: 14px; height: 14px; }
-.mp-putin { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
-.mp-putin .pw-kicker { margin: 0; }
-.mp-chip { padding: 7px 15px; border-radius: 999px; background: var(--bc); border: 2px solid var(--bd); font-size: 13.5px; font-weight: 900; color: var(--ink); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
-.mp-chip:disabled { opacity: .45; cursor: default; }
-.mp-chip.new { --bc: var(--surface); --bd: var(--hairline-2); color: var(--accent); cursor: pointer; }
-.mp-putin > .fold-note { flex: 1 1 260px; }
 @media (max-width: 720px) {
-  /* the head on two rows: the name, Undo and × on top; Build · In the song across under them */
+  /* the head on two rows: the name, Undo and × on top; Chord Chart · Time Line across under them */
   .pw-head { flex-wrap: wrap; row-gap: 8px; }
   .pw-head h2 { flex: 1 1 auto; }
   .pw-tabs { order: 5; flex: 1 1 100%; display: flex; }
   .pw-tabs .seg-btn { flex: 1; padding: 7px 9px; font-size: 13px; }
   .pw-head .pw-song { display: none; }
-  .pw-body.song { padding: 10px 12px 14px; }
-  .mp-wrap { grid-template-columns: 64px minmax(0, 1fr); }
-  .mp-labels span { padding-left: 8px; font-size: 9.5px; letter-spacing: .04em; }
 }
 
 /* ============================================================
@@ -2932,72 +2935,26 @@ body.capturing .ct-beats, body.capturing .ct-cursor, body.capturing .cb-grip { d
 .ct-lane { position: absolute; inset: 4px 5px; }
 .ct-lane .cbar { top: 0; bottom: 0; height: auto; }
 .ct-lane .cbar-add { position: absolute; top: 0; bottom: 0; height: auto; }
+/* AN INSTRUMENTAL LINE (score.js INSTRUMENTAL LINES; chord-track.js drawRestLine): a slim row of its bars and chords */
+.notation-line.instrumental { min-height: 0; padding-bottom: 12px; }
+.ct-rest { width: 100%; }
+.ct-rest .ct-chart { box-shadow: none; border: 2px dashed rgba(43,29,56,.18); background: rgba(255,255,255,.75); padding: 18px 12px 10px; }
 body.capturing .ct-head .ct-fold, body.capturing .ct-add { display: none !important; }
 body.capturing .ct-chart { box-shadow: none !important; border: 1px solid var(--hairline); }   /* html2canvas paints the shadow as a grey block */
 body.present-mode .ct-add { display: none; }
 
 /* ============================================================
-   INDIVIDUAL FOCUS — one chord of the song (progression-window.js; was the window Just here)
-   ============================================================ */
-.pw-body.focus { display: flex; flex-direction: column; gap: 16px; overflow-y: auto; padding: 16px 20px 18px; background: var(--paper); container: pwmain / inline-size; }
-.pw-body.focus > * { flex: none; }
-.hw-head { display: flex; align-items: center; gap: 10px; }
-.hw-title { margin: 0; flex: 0 1 auto; font-family: var(--font-round); font-size: 21px; font-weight: 700; color: var(--ink); }
-.hw-walk svg { stroke-width: 2.6; }
-.hw-split { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 16px; }
-.hw-cards { display: flex; flex-wrap: wrap; gap: 8px; flex: 1 1 auto; }
-.hw-card { width: 118px; }
-.hw-card .pw-card-tones i { color: var(--ink); }
-.hw-len { margin: 0; font-size: 13px; font-weight: 800; color: var(--ink-3); }      /* "1 bar", "2 bars" beside its beats */
-@media (max-width: 720px) {
-  .pw-body.focus { padding: 12px 12px 16px; }
-  .hw-title { font-size: 18px; }
-  .hw-card { width: 128px; }
-}
-
-/* ============================================================
    LISTEN ONLY (a lesson's "Chords: listen only" — progression-window.js)
    The same window to look and listen: every control that changes the
-   song is hidden or inert (the sheet's guard stops them too).
+   song is hidden (each page leaves its own out) or inert (the sheet's
+   guard stops them too).
    ============================================================ */
 #prog-sheet.readonly .pw-head h2::after {
   content: 'Listen only'; display: inline-block; vertical-align: 3px; margin-left: 10px;
   padding: 2px 9px; border-radius: 999px; background: var(--chord-soft); color: var(--ink-2);
   font-family: var(--font); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
 }
-#prog-sheet.readonly .pw-undo,
-#prog-sheet.readonly .pw-new,
-#prog-sheet.readonly .pw-starters-btn,
-#prog-sheet.readonly .pw-starters,
-#prog-sheet.readonly .pw-card.plus,
-#prog-sheet.readonly .pw-card button,
-#prog-sheet.readonly .pw-stepper button,
-#prog-sheet.readonly .pw-pick,
-#prog-sheet.readonly .pw-twobars,
-#prog-sheet.readonly .pw-rnote,
-#prog-sheet.readonly .fold-note:has([data-note="pw.list"]),
-#prog-sheet.readonly .fold-note:has([data-note="pw.cards"]),
-#prog-sheet.readonly .fold-note:has([data-note="tl.room"]),
-#prog-sheet.readonly .pw-foot [data-act="duplicate"],
-#prog-sheet.readonly .pw-foot [data-act="delete"],
-#prog-sheet.readonly .pw-foot [data-act="put"],
-#prog-sheet.readonly .mp-putin,
-#prog-sheet.readonly .mp-h,
-#prog-sheet.readonly .mp-herechip button,
-#prog-sheet.readonly [data-song="clear-here"],
-#prog-sheet.readonly [data-song="remove"],
-#prog-sheet.readonly [data-song="clear-sel"],
-#prog-sheet.readonly .rb-whose .btn { display: none !important; }
-#prog-sheet.readonly .pw-duo { grid-template-columns: minmax(0, 1fr); }      /* no board: the rhythm has the row */
-#prog-sheet.readonly .pw-name { border-color: transparent; background: transparent; box-shadow: none; pointer-events: none; }
-#prog-sheet.readonly .rb-kit, #prog-sheet.readonly .rb-kit * { cursor: default; }
-#prog-sheet.readonly [data-tab="focus"] { display: none; }
-#prog-sheet.readonly .tl-ghead, #prog-sheet.readonly .tl-chord { cursor: pointer; }
-#prog-sheet.readonly .mp-in, #prog-sheet.readonly .mp-toggle {
-  pointer-events: none; border-color: transparent; background: transparent; box-shadow: none;
-  -webkit-appearance: none; appearance: none;
-}
-#prog-sheet.readonly .mp-toggle:not(.on) { display: none; }
+#prog-sheet.readonly .pw-undo { display: none !important; }
 
 /* ============================================================
    THE RHYTHM PAGE (2026-10-25, RHYTHM-PAGE.md; js/components/rhythm-page.js)
@@ -3059,6 +3016,12 @@ body.capturing .rhythm-page { display: none; }
   font-family: var(--font-round); font-size: 15px; font-weight: 700; color: var(--ink-3);
 }
 body.hide-section-titles .rp-label { display: none; }
+/* an instrumental line (rhythm-page.js restHtml): its bars and their chords, nothing to shape */
+.rp-rest-bars { display: flex; flex-wrap: wrap; justify-content: center; row-gap: 26px; width: 100%; padding-top: 6px; }
+.rp-rest-bar { position: relative; flex: 0 1 300px; height: 46px; border-left: 2px solid var(--ink-3); }
+.rp-rest-bar:last-child { border-right: 2px solid var(--ink-3); }
+.rp-rest-bar > i { position: absolute; top: 5px; bottom: 5px; margin-left: 2px; border-radius: 9px; background: var(--c); color: var(--ck); display: flex; align-items: center; padding: 0 8px; overflow: hidden; font: 600 18px/1 var(--font-block); font-style: normal; white-space: nowrap; }
+.rp-rest-bar .rp-measure-number { left: 4px; }
 
 /* every row of a beat is boxed identically, so the grids line up; --gap is
    the extra room after the beat that its words need (rhythm-page.js layout) */

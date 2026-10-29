@@ -597,8 +597,15 @@
     const el = document.getElementById(id);
     if (el) el.classList.add('show');
   };
-  ui.closeSheet = function (id) {
+  /* A sheet may ask before it closes (2026-10-28, the Chords window's Focus:
+     "Save your changes?"): guardSheet(id, fn) — fn(close) returns false to
+     keep it open for now, and calls close() itself once the question is
+     answered. Every way out goes through here: ×, a tap outside, Esc, Done. */
+  const sheetGuards = {};
+  ui.guardSheet = function (id, fn) { sheetGuards[id] = fn; };
+  ui.closeSheet = function (id, force) {
     const el = document.getElementById(id);
+    if (!force && sheetGuards[id] && el && el.classList.contains('show') && sheetGuards[id](() => ui.closeSheet(id, true)) === false) return;
     if (el) el.classList.remove('show');
     SW.bus.emit('sheet:closed', { id });
   };
