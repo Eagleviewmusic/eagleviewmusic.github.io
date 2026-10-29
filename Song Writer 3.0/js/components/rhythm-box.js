@@ -2,8 +2,8 @@
    COMPONENT — the rhythm box: how a chord plays                SW.rhythmBox
    --------------------------------------------------------------------------
    The user's overhaul (2026-10-27): every place a chord rhythm is chosen
-   is this one box — a progression's rhythm (Edit Chords), one chord of it
-   (the chord editor), a chord on the music (its window). Three tabs:
+   is this one box — a progression's rhythm (Chord Charts), one chord of it
+   (the chord editor), a chord of the song (Individual Focus). Three tabs:
 
      [ Held ][ Pre-built ][ Build your own ]
 

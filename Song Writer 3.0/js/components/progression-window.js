@@ -1,11 +1,20 @@
 /* ==========================================================================
-   COMPONENT — the Chord Progression window: Edit Chords        #prog-sheet
+   COMPONENT — the Chords window                                 #prog-sheet
    --------------------------------------------------------------------------
-   Phase 2 of ../Song Writer Chord Progressions/ (DESIGN.md §4). Opened by
-   the Chord Progression button at the foot of the chord panel. Its two
-   tabs: Edit Chords ('build') and Chord Placement ('song', the map).
+   Phase 2 of ../Song Writer Chord Progressions/ (DESIGN.md §4). One window
+   for everything about the chords (2026-10-28, the user: "two different
+   menus doing different tasks … we need to unify everything"), its three
+   tabs:
+     INDIVIDUAL FOCUS ('focus') — one chord of the song: its chord, length
+       and rhythm (was the chord-on-the-music window, #here-sheet). A
+       double-click on a chord — over the music or on the Time Line —
+       opens the window here.
+     CHORD CHARTS ('build', was Edit Chords) — the progressions: made,
+       named, heard. The Chord Progression button opens the window here.
+     TIME LINE ('song', was Chord Placement) — the song's chords laid out
+       in groups of separate chords, moved, copied, pasted, taken out.
 
-   The Edit Chords page (2026-10-05), the first time — the draft, or a
+   The Chord Charts page (2026-10-05), the first time — the draft, or a
    progression made since the page was opened (`fresh`) — a guide, top
    to bottom:
 
@@ -63,15 +72,13 @@
      takes effect at once, with no gap and no strike played twice.
    • Every change is a step in the song's history (↶ ↷ in the head, ⌘Z).
    • Place it in the song — the first bar with no chords, to the end of
-     the melody (or once through past it); the window turns to Chord
-     Placement with it selected.
-   • CHORD PLACEMENT (phase 3, was "In the song") — the map: below, before the keys.
+     the melody (or once through past it); the window turns to the Time
+     Line with it selected.
+   • THE TIME LINE (was Chord Placement, phase 3) — below, before the keys.
+   • INDIVIDUAL FOCUS (was the chord on the music, and Just here, phase
+     4) — below, after the Time Line.
 
-   • THE CHORD ON THE MUSIC (was Just here, phase 4) — the window for one
-     chord of the song, its chord, length and rhythm: below, after Chord
-     Placement.
-
-   API  SW.progWin.open(progId?, 'build' | 'song') · openHere(tick) · close() · isOpen() · onTop() · keyDown(e)
+   API  SW.progWin.open(progId?, 'focus' | 'build' | 'song') · openHere(tick) · close() · isOpen() · onTop() · keyDown(e)
    ========================================================================== */
 (function () {
   'use strict';
@@ -99,10 +106,14 @@
   let confirmDelete = false;
   let beatOn = false;        // Hear it: the steady beat
   let renderTimer = 0;
-  let tab = 'build';         // 'build' (Edit Chords) | 'song' (Chord Placement)
-  let selFrom = null;        // Chord Placement: the stretch selected, by the bar it starts on
-  let selBars = null;        // Chord Placement: bars selected along the numbers, { a, b }
-  let playhead = 1;          // Chord Placement: where ▶ Play the song starts
+  let drawn = null;          // the tab last drawn
+  let tab = 'build';         // 'focus' (Individual Focus) | 'build' (Chord Charts) | 'song' (Time Line)
+  let here = null;           // Individual Focus: { at } — the chord that starts there, or (none) the empty beat
+  let selFrom = null;        // Time Line: the group selected, by the bar it starts on
+  let tlSel = [];            // Time Line: the chords selected, by where they start (ticks)
+  let tlAnchor = null;       // Time Line: ⇧-tap selects along from this chord
+  let tlPoint = 0;           // Time Line: the point (ticks) — where Paste goes in and Play starts
+  let clip = null;           // Time Line: what Copy took — { kind: 'chords', block } | { kind: 'group', st, name }
 
   const mt = () => SW.meters.byId(S.meter);
   const perBeat = () => mt().beatTicks / CELL;                    // cells in a beat: 4, or 6 in compound time
@@ -118,7 +129,7 @@
   }
   function onTop() {
     const top = topSheet();
-    return !!top && (top === sheet || top.id === 'here-sheet');
+    return !!top && top === sheet;
   }
 
   /* a chord, ready to draw */
@@ -232,10 +243,15 @@
     if (p && typeof sel === 'number' && sel >= p.chords.length) sel = null;
     const label = document.getElementById('song-chip-label');
     songEl.textContent = label ? '· ' + label.textContent : '';
+    if (tab === 'focus' && readOnly()) tab = 'build';            // listen only: no chord to change
+    const bodyTop = drawn === tab ? body.scrollTop : 0;          // the tab drawn again keeps its place
+    drawn = tab;
     syncTabs();
     sheet.classList.toggle('readonly', readOnly());
     body.classList.toggle('song', tab === 'song');
-    if (tab === 'song') { renderSong(); syncUndo(); return; }
+    body.classList.toggle('focus', tab === 'focus');
+    if (tab === 'song') { renderSong(); body.scrollTop = bodyTop; syncUndo(); return; }
+    if (tab === 'focus') { renderFocus(); body.scrollTop = bodyTop; syncUndo(); return; }
     body.innerHTML = '<aside class="pw-list">' + listHtml() + '</aside><section class="pw-main">' + mainHtml(p) + '</section>';
     foot.innerHTML = footHtml(p);
     SW.chordStrip.fitLabels(body.querySelector('.pw-board'));
@@ -256,10 +272,17 @@
   }
   function setTab(t) {
     if (t === tab) return;
-    if (t === 'song') stopHear();
+    if (t === 'focus' && readOnly()) return;
+    if (t !== 'build') stopHear();
+    // the chord selected on the Time Line is the one in focus — and back again
+    if (t === 'focus' && tab === 'song' && tlSel.length) here = { at: tlSel[0] };
+    if (t === 'song' && tab === 'focus' && here) {
+      const pc = T.chordAt(here.at);
+      if (pc) { tlSel = [pc.at]; tlAnchor = pc.at; selFrom = null; tlPoint = pc.at; }
+    }
     tab = t;
     fresh = null;                // left behind: next time it shows as made
-    mdrag = null;
+    td = null;
     render();
   }
   if (tabsEl) tabsEl.addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) setTab(b.dataset.tab); });
@@ -343,7 +366,7 @@
       '<input class="pw-name text-field" type="text" maxlength="24" value="' + esc(name) + '" aria-label="The progression’s name"' + (p ? '' : ' placeholder="' + esc(name) + '"') + (readOnly() ? ' readonly tabindex="-1"' : '') + '>' +
       '<button type="button" class="pw-hear' + (hearingThis ? ' on' : '') + '"' + (p && p.chords.length ? '' : ' disabled') + ' title="Hear it round and round (Space)">' + (hearingThis ? '<span class="sq"></span> Stop' : playIcon() + ' Hear it') + '</button>' +
       '<label class="pw-beat"><input type="checkbox" class="pw-beat-box"' + (beatOn ? ' checked' : '') + '> beat</label>' +
-      (readOnly() ? '' : '<span class="pw-gap"></span><button type="button" class="btn pw-put"' + (p && p.chords.length ? '' : ' disabled') + ' title="Put it in the song, from the first bar with no chords — then Chord Placement shows where">Place it in the song ▸</button>') +
+      (readOnly() ? '' : '<span class="pw-gap"></span><button type="button" class="btn pw-put"' + (p && p.chords.length ? '' : ' disabled') + ' title="Put it in the song, from the first bar with no chords — then the Time Line shows where">Place it in the song ▸</button>') +
     '</div>';
   }
   function eachHtml(p) {
@@ -397,7 +420,7 @@
     '</div>';
   }
 
-  /* the panel's board; `latch` (the Edit Chords page): every change under
+  /* the panel's board; `latch` (the Chord Charts page): every change under
      it, sideways, each on until tapped again — and the blocks wear them */
   function boardHtml(latch) {
     const offered = C.offered();
@@ -683,7 +706,7 @@
   }
 
   /* Put it in the song: the first bar with no chords, to the end of the
-     melody (or once through, past it) — then the map, with it selected. */
+     melody (or once through, past it) — then the Time Line, with it selected. */
   function putInSong() {
     const p = cur();
     if (!p || !p.chords.length) return;
@@ -694,8 +717,8 @@
     while (covered(from) && from < 999) from++;
     T.place(p.id, from);
     selFrom = from;
-    selBars = null;
-    playhead = from;
+    tlSel = [];
+    tlPoint = Math.max(0, g.T(from));
     stopHear();
     tab = 'song';
     fresh = null;
@@ -1229,21 +1252,33 @@
 
 
   /* ==================================================================
-     CHORD PLACEMENT (phase 3, DESIGN.md §5 — "In the song" there) — the map of the song's bars:
-     the melody's lines, and the stretches of chords over them.
-       • tap a band: select it (its card below: from, to, starts on,
-         just here, edit, take out); drag its ends to trim, its middle
-         to move it (its changes just here go with it)
-       • drag along the bar numbers: select bars; shift-tap: from the
-         playhead to there; a tap: the playhead goes there
-       • Put in: drag a progression onto a bar (it runs to the end of the
-         melody, or once through past it), or tap one — into the bars
-         selected, or from the first bar with no chords
-       • ▶ Play the song: the toolbar's Play, from the playhead, which
+     THE TIME LINE (2026-10-28; was Chord Placement, phase 3) — the song's
+     bars, its melody's lines, and its chords in GROUPS: each progression
+     in the song is a group of separate chords (track.js THE TIME LINE).
+       • a group's top strip (its corner tab ⠿ and name): a tap selects
+         the group (its card below: where it plays, how many times
+         through, its changes here, take it out); a drag moves all of it,
+         a bar at a time — the groups beside it move over to make room;
+         the selected group's right grip stretches it over more bars
+       • a chord: a tap selects it (⇧ along to it, ⌘ one more) — heard,
+         and the point goes to its nearer end; a drag moves it (all the
+         selected ones): inside its own row of chords end to end it is a
+         reorder (A B C D, B between C and D → A C B D), anywhere else it
+         leaves silence and goes in where it is let go (⌥: a copy), the
+         chords on the side with room moving over; a double tap:
+         Individual Focus on it
+       • THE POINT (an orange line): where Paste goes and Play starts — a
+         tap on empty time, a bar number, a chord's nearer end
+       • Copy ⌘C · Cut ⌘X · Paste ⌘V (at the point) · Duplicate ⌘D (right
+         after) · Delete (silence where they were) — buttons too; ← → the
+         chord before / after (none selected: the point a beat), ⌥← ⌥→ a
+         chord one place along its row; Enter: Individual Focus; Space:
+         Play; ⌘A every chord
+       • drag along the bar numbers: the chords in those bars, selected
+       • Put in: drag a progression onto a bar, or tap it (at the point)
+         — once through, a group of its own
+       • ▶ Play: the toolbar's Play, from the point's bar; the playhead
          follows the music (SW.player.position)
-     Stretches never overlap: one put over another takes those bars, and
-     the other carries on afterwards where it would have been — one "to
-     the end of the melody" stops where the new one starts (track.js).
      ================================================================== */
   const BANDS = [
     { bc: '#F6E4F4', bd: '#9C168E' }, { bc: '#DDF2E8', bd: '#2E8B57' }, { bc: '#E3ECFF', bd: '#3A5BD9' },
@@ -1255,13 +1290,14 @@
     const i = progId ? T.progressions().findIndex(p => p.id === progId) : -1;
     return i < 0 ? LOOSE : BANDS[i % BANDS.length];
   }
-  let m = null;                // the map's geometry, as last drawn
-  let mdrag = null;            // a drag on the map: bars, a band, its ends, a chip
+  let m = null;                // the Time Line's geometry, as last drawn
+  let td = null;               // a press on the Time Line: a chord, a group, its grip, the numbers, a chip, empty time
   let headTimer = 0;
+  let lastTlTap = null;        // { key, t }: a second tap soon after is a double tap
 
   function stretchName(r) {
     if (r.prog) { const p = T.prog(r.prog); return p ? p.name : '?'; }
-    return T.isVirtual() ? 'From the lane' : 'Just here';
+    return T.isVirtual() ? 'From the lane' : 'Chords';
   }
   const selIndex = list => (selFrom === null ? -1 : list.findIndex(r => r.from === selFrom));
   function timesText(n) {
@@ -1278,12 +1314,12 @@
     const g = T.grid();
     const evs = T.events(g);
     const list = T.shown(g);
-    const BW = window.innerWidth <= 720 ? 40 : 48;
-    const W0 = g.p0 ? Math.max(18, Math.round(BW * g.p0 / g.B)) : 0;
+    const BW = window.innerWidth <= 720 ? 64 : 88;
+    const W0 = g.p0 ? Math.max(24, Math.round(BW * g.p0 / g.B)) : 0;
     const firstBar = g.p0 ? 0 : 1;
     const trackLast = evs.end ? g.barAt(evs.end - 1) : 0;
     const waitingLast = list.reduce((mx, r) => Math.max(mx, r.from), 0);
-    const lastShown = Math.max(16, Math.max(g.lastBar, trackLast, waitingLast, playhead) + 8);
+    const lastShown = Math.max(16, Math.max(g.lastBar, trackLast, waitingLast, g.barAt(tlPoint)) + 8);
     const x = t => (t < g.p0 ? t / g.p0 * W0 : W0 + (t - g.p0) / g.B * BW);
     const xb = bar => (bar <= 0 ? 0 : W0 + (bar - 1) * BW);
     // where each stretch really plays: [a, z) — or waiting for the melody
@@ -1295,36 +1331,63 @@
       list.forEach((o, k) => { const s = Math.max(0, g.T(o.from)); if (k !== i && s > a) z = Math.min(z, s); });
       return { a, z: waiting ? a : z, last: waiting ? r.from : Math.min(last, g.barAt(z - 1)), waiting };
     });
-    return { g, evs, list, spans, BW, W0, firstBar, lastShown, x, xb, width: xb(lastShown + 1) };
+    const pcs = evs.filter(e => e.id);              // the chords, each with its group (e.stretch)
+    return { g, evs, pcs, list, spans, BW, W0, firstBar, lastShown, x, xb, width: xb(lastShown + 1) };
   }
-  function barAtClientX(clientX) {
+  /* a point on the screen → x on the Time Line, in its own pixels (the sheet
+     opens with a little zoom: the screen's pixels are not the map's until it ends) */
+  function mapX(clientX) {
     const inner = body.querySelector('.mp-inner');
     if (!inner || !m) return null;
-    const xx = clientX - inner.getBoundingClientRect().left;
+    const r = inner.getBoundingClientRect();
+    return (clientX - r.left) * (inner.offsetWidth / (r.width || 1));
+  }
+  function barAtClientX(clientX) {
+    const xx = mapX(clientX);
+    if (xx === null) return null;
     let bar = xx < m.W0 ? (m.g.p0 ? 0 : 1) : 1 + Math.floor((xx - m.W0) / m.BW);
     return Math.max(m.firstBar, Math.min(m.lastShown, bar));
   }
+  /* a point on the Time Line → ticks (the inverse of m.x) */
+  function tickAtX(clientX) {
+    const xx = mapX(clientX);
+    if (xx === null) return 0;
+    const t = m.W0 && xx < m.W0 ? xx / m.W0 * m.g.p0 : m.g.p0 + (xx - m.W0) / m.BW * m.g.B;
+    return Math.max(0, t);
+  }
+  const snapBeat = t => { const g = m.g; return Math.max(0, g.p0 + Math.round((t - g.p0) / g.b) * g.b); };
+  /* the bar a group put in at the point starts on: the nearest bar line */
+  function pointBar() {
+    const g = T.grid();
+    return Math.max(g.p0 ? 0 : 1, Math.round((tlPoint - g.p0) / g.B) + 1);
+  }
+  const playBar = () => Math.max(T.grid().p0 ? 0 : 1, T.grid().barAt(tlPoint));
+  const tool = (act, label, keys, off) => '<button type="button" class="btn tl-tool" data-tl="' + act + '"' + (off ? ' disabled' : '') + ' title="' + esc(label) + ' (' + keys + ')">' + label + '</button>';
 
   function renderSong() {
     const scroller = body.querySelector('.mp-scroll');
     const keepX = scroller ? scroller.scrollLeft : null;
     m = geometry();
-    const { g, list, spans, BW, W0, x, xb } = m;
+    const { g, list, spans, pcs, BW, W0, x, xb } = m;
     const si = selIndex(list);
     if (si < 0) selFrom = null;
+    tlSel = tlSel.filter(at => pcs.some(e => e.at === at));
     const playing = SW.player && SW.player.playing;
-    let html = '<div class="mp-top">' +
-      '<button type="button" class="pw-hear mp-play' + (playing ? ' on' : '') + '" data-song="play">' + (playing ? '<span class="sq"></span> Stop' : playIcon() + ' Play the song from bar ' + playhead) + '</button>' +
-      (readOnly() ? ui.note('song.map.listen', 'Each band is a progression and the bars it plays. Tap one to see it; tap a bar number to start playing there.')
-        : ui.note('song.map', 'Tap a band to change where it starts and stops. Drag its ends to trim it, its middle to move it. Drag along the bar numbers to select bars; tap a number to start playing there.')) +
+    const ro = readOnly();
+    const some = tlSel.length > 0 || si >= 0;
+    let html = '<div class="mp-top tl-top">' +
+      '<button type="button" class="pw-hear mp-play' + (playing ? ' on' : '') + '" data-song="play">' + (playing ? '<span class="sq"></span> Stop' : playIcon() + ' Play from bar ' + playBar()) + '</button>' +
+      (ro ? '' : '<span class="tl-tools">' + tool('copy', 'Copy', '⌘C', !some) + tool('cut', 'Cut', '⌘X', !some) +
+        tool('paste', 'Paste', '⌘V', !clip) + tool('delete', 'Delete', 'Delete', !some) + '</span>') +
+      (ro ? ui.note('tl.listen', 'Each band is a progression, its chords inside it. Tap one to see it; tap a bar number to start playing there.')
+        : ui.note('tl.how', 'Drag a chord to move it — dropped between two chords it slides in and the others make room. Drag a group by its top strip to move all of it. Tap a chord, then Copy, Cut, Paste (at the orange point) or Delete.')) +
       '</div>';
 
-    // the map
     let nums = '', mel = '', chords = '';
     for (let b = m.firstBar; b <= m.lastShown; b++) {
       const w = b === 0 ? W0 : BW;
       const past = b > Math.max(g.lastBar, m.evs.end ? g.barAt(m.evs.end - 1) : 0);
-      nums += '<div class="mp-num' + (past ? ' past' : '') + (b === playhead ? ' here' : '') + '" data-bar="' + b + '" style="left:' + xb(b) + 'px;width:' + w + 'px">' + (b > 0 ? b : '') + '</div>';
+      nums += '<div class="mp-num' + (past ? ' past' : '') + (b === playBar() ? ' here' : '') + '" data-bar="' + b + '" style="left:' + xb(b) + 'px;width:' + w + 'px">' + (b > 0 ? b : '') + '</div>';
     }
     const model = SW.score.read().lines;
     g.song.lines.forEach((le, i) => {
@@ -1332,80 +1395,99 @@
       const left = x(le.at), w = x(le.at + le.padded) - left;
       const words = (model[i] ? model[i].syllables : []).map(s => s.text).filter(t => t && t !== '-').join(' ');
       const label = model[i] && model[i].label ? '<b>' + esc(model[i].label) + '</b>' : '';
-      mel += '<div class="mp-mel" data-bar="' + Math.max(m.firstBar, g.barAt(le.at)) + '" style="left:' + (left + 1) + 'px;width:' + Math.max(8, w - 3) + 'px;--c:' + lineColour(i) + '" title="' + esc(words) + '">' + label + '<span>' + esc(words.length > 40 ? words.slice(0, 38) + '…' : words) + '</span></div>';
+      mel += '<div class="mp-mel" data-bar="' + Math.max(m.firstBar, g.barAt(le.at)) + '" style="left:' + (left + 1) + 'px;width:' + Math.max(8, w - 3) + 'px;--c:' + lineColour(i) + '" title="' + esc(words) + '">' + label + '<span>' + esc(words.length > 60 ? words.slice(0, 58) + '…' : words) + '</span></div>';
     });
     const melEnd = x(g.total);
     if (m.width - melEnd > BW) mel += '<div class="mp-nomel" style="left:' + (melEnd + 2) + 'px;width:' + (m.width - melEnd - 6) + 'px">no melody yet — the chords play on</div>';
 
+    // the groups, then their chords over them
     list.forEach((r, i) => {
       const sp = spans[i];
       const band = bandOf(r.prog);
+      const p = r.prog ? T.prog(r.prog) : null;
       const left = x(sp.a), w = sp.waiting ? BW : x(sp.z) - left;
-      let inner = '<span class="mp-bname">' + esc(stretchName(r)) + (sp.waiting ? ' · waits for the melody' : '') + '</span>';
-      const evs = m.evs.filter(e => e.stretch === i);
-      evs.forEach((e, k) => {
-        const ex = x(e.at) - left;
-        const nx = (k + 1 < evs.length ? x(evs[k + 1].at) : x(e.end)) - left;
-        const l = look(e.id);
-        inner += '<span class="mp-tick" style="left:' + ex + 'px"></span>' +
-          (nx - ex >= 26 ? '<span class="mp-ch" style="left:' + (ex + 4) + 'px;max-width:' + (nx - ex - 6) + 'px">' + C.labelHTML(e.id ? l.name : '·') + '</span>' : '') +
-          (e.here ? '<span class="mp-corner" style="left:' + (x(e.end) - left - 11) + 'px" title="Changed just here"></span>' : '');
-      });
       const on = i === si;
-      chords += '<div class="mp-band' + (on ? ' on' : '') + (sp.waiting ? ' waiting' : '') + (r.prog ? '' : ' loose') + '" data-stretch="' + i + '" style="left:' + (left + 1) + 'px;width:' + Math.max(10, w - 2) + 'px;--bc:' + band.bc + ';--bd:' + band.bd + '" title="' + esc(stretchName(r)) + '">' +
-        (on ? '<span class="mp-h l" data-handle="l" title="Drag: where it starts"></span><span class="mp-h r" data-handle="r" title="Drag: where it stops"></span>' : '') +
-        inner + '</div>';
+      const times = p && !sp.waiting ? timesText((sp.z - sp.a) / g.b / T.cycleBeats(p)) : '';
+      chords += '<div class="tl-group' + (on ? ' on' : '') + (sp.waiting ? ' waiting' : '') + (r.prog ? '' : ' loose') + '" data-stretch="' + i + '" style="left:' + (left + 1) + 'px;width:' + Math.max(12, w - 2) + 'px;--bc:' + band.bc + ';--bd:' + band.bd + '">' +
+        '<div class="tl-ghead" data-ghead="' + i + '" title="' + esc(stretchName(r)) + (ro ? '' : ' — drag here to move all of it') + '"><span class="tl-grip" aria-hidden="true"></span><b>' + esc(stretchName(r)) + '</b>' +
+          (sp.waiting ? '<span>waits for the melody</span>' : times && times !== 'once through' ? '<span>' + esc(times) + '</span>' : '') + '</div>' +
+        (on && !ro ? '<span class="mp-h r" data-handle="r" title="Drag: more bars, or fewer"></span>' : '') +
+      '</div>';
     });
-    if (!list.length) chords += '<div class="mp-empty" style="left:2px;width:' + Math.min(m.width - 4, BW * 12) + 'px">No chords in the song yet — put a progression in, below</div>';
+    pcs.forEach(e => {
+      const l = look(e.id);
+      const cx = x(e.at), cw = x(e.end) - cx;
+      chords += '<div class="tl-chord' + (tlSel.indexOf(e.at) !== -1 ? ' sel' : '') + (l.inScale ? '' : ' out') + '" data-at="' + e.at + '" data-si="' + e.stretch + '" style="left:' + (cx + 2) + 'px;width:' + Math.max(4, cw - 4) + 'px;--c:' + l.color + ';--ck:' + l.ink + '" title="' + esc(l.name) + (e.here ? ' — changed here' : '') + '">' +
+        (cw >= 16 ? '<span>' + C.labelHTML(l.name) + '</span>' : '') + (e.here ? '<i class="tl-corner"></i>' : '') + '</div>';
+    });
+    if (!list.length) chords += '<div class="mp-empty" style="left:2px;width:' + Math.min(m.width - 4, BW * 10) + 'px">No chords in the song yet — put a progression in, below</div>';
 
-    const selRect = selBars ? '<div class="mp-sel" style="left:' + xb(selBars.a) + 'px;width:' + (xb(selBars.b + 1) - xb(selBars.a)) + 'px"></div>' : '';
     html += '<div class="mp-wrap"><div class="mp-labels"><span>Bar</span><span>Melody</span><span>Chords</span></div>' +
       '<div class="mp-scroll"><div class="mp-inner" style="width:' + m.width + 'px">' +
-        selRect +
         '<div class="mp-row mp-nums">' + nums + '</div>' +
         '<div class="mp-row mp-mels">' + mel + '</div>' +
-        '<div class="mp-row mp-chords">' + chords + '</div>' +
-        '<div class="mp-head" style="left:' + x(Math.max(0, g.T(playhead))) + 'px"></div>' +
+        '<div class="mp-row mp-chords">' + chords +
+          '<div class="tl-point" style="left:' + x(tlPoint) + 'px" title="The point: Paste goes here, Play starts here"></div>' +
+        '</div>' +
+        '<div class="mp-head" style="display:none"></div>' +
       '</div></div></div>';
 
-    // the card
-    html += '<div class="mp-card">' + songCardHtml(si) + '</div>';
+    html += '<div class="mp-card">' + tlCardHtml(si) + '</div>';
 
-    // put in
     html += '<div class="mp-putin"><p class="pw-kicker">Put in</p>' +
       T.progressions().map(p => { const b = bandOf(p.id); return '<button type="button" class="mp-chip" data-chip="' + p.id + '" style="--bc:' + b.bc + ';--bd:' + b.bd + '"' + (p.chords.length ? '' : ' disabled title="No chords yet"') + '>' + esc(p.name) + '</button>'; }).join('') +
       '<button type="button" class="mp-chip new" data-song="new">+ New</button>' +
-      ui.note('song.putin', selBars ? 'Tap a progression to fill bars ' + selBars.a + (selBars.b > selBars.a ? '–' + selBars.b : '') + ' with it.' : 'Drag one onto a bar — or select bars along the numbers, then tap one. Tapped with no bars selected, it goes in at the first bar with no chords.') +
+      ui.note('tl.putin', 'Drag one onto a bar, or tap one to put it in at the point (bar ' + pointBar() + ') — once through, a group of its own. The groups after it move over if they need to.') +
       '</div>';
 
     body.innerHTML = html;
-    foot.innerHTML = ui.note('song.overlap', 'Stretches never overlap: putting one over another gives it those bars, and the other carries on afterwards where it would have been — unless it runs to the end of the melody: then it stops where the new one starts.') +
+    foot.innerHTML = ui.note('tl.room', 'Groups never overlap: one moved or put in among others goes in at the bar line nearest, and the groups on the side with room move over.') +
       '<span class="pw-gap"></span><button type="button" class="btn btn-primary" data-act="done">Done</button>';
     const sc = body.querySelector('.mp-scroll');
     if (sc) {
       if (keepX !== null) sc.scrollLeft = keepX;
       else if (si >= 0) sc.scrollLeft = Math.max(0, x(spans[si].a) - 60);
+      else if (tlSel.length) sc.scrollLeft = Math.max(0, x(tlSel[0]) - 120);
+      else sc.scrollLeft = Math.max(0, x(tlPoint) - 120);
     }
     paintHead();
   }
   const LINE_TINTS = ['#E9F3FE', '#FFF6DC', '#E8F7EE', '#FBE9F4', '#EFEAFE', '#FFEDE0'];
   const lineColour = i => LINE_TINTS[i % LINE_TINTS.length];
 
-  function songCardHtml(si) {
+  /* the card under the Time Line: the group selected, the chords selected, or how to start */
+  function tlCardHtml(si) {
+    if (si >= 0) return groupCardHtml(si);
     const g = m.g;
-    if (si < 0) {
-      if (selBars) {
-        const t = selBars.a === selBars.b ? 'Bar ' + selBars.a : 'Bars ' + selBars.a + '–' + selBars.b;
-        const hasChords = m.evs.some(e => e.at < g.T(selBars.b + 1) && e.end > g.T(selBars.a));
-        return '<h3 class="mp-card-title">' + t + '</h3>' +
-          '<div class="mp-actions">' +
-            '<button type="button" class="btn" data-song="play-sel">' + playIcon() + ' Play from bar ' + selBars.a + '</button>' +
-            (hasChords ? '<button type="button" class="btn pw-ghost" data-song="clear-sel">Take the chords out of these bars</button>' : '') +
-            '<button type="button" class="btn pw-ghost" data-song="unselect">Done selecting</button>' +
-          '</div>';
+    if (tlSel.length) {
+      const sel = m.pcs.filter(e => tlSel.indexOf(e.at) !== -1);
+      const first = sel[0], last = sel[sel.length - 1];
+      const b1 = g.barAt(first.at), b2 = g.barAt(last.end - 1);
+      const bars = b1 === b2 ? 'bar ' + b1 : 'bars ' + b1 + '–' + b2;
+      const r = m.list[first.stretch];
+      const p = r && r.prog ? T.prog(r.prog) : null;
+      const groups = new Set(sel.map(e => e.stretch));
+      let title, whose = '';
+      if (sel.length === 1) {
+        const beats = Math.round((first.end - first.at) / g.b * 100) / 100;
+        title = C.labelHTML(look(first.id).name) + ' <span class="mp-where">· ' + bars + (first.at !== g.T(b1) ? ', beat ' + (Math.round((1 + (first.at - g.T(b1)) / g.b) * 100) / 100) : '') + ' · ' + beats + (beats === 1 ? ' beat' : ' beats') + '</span>';
+      } else title = sel.length + ' chords <span class="mp-where">· ' + bars + '</span>';
+      if (groups.size === 1 && p) {
+        whose = r.home ? 'In <b>' + esc(p.name) + '</b>, made on the music: a change here changes ' + esc(p.name) + ' in Chord Charts too.'
+          : 'In <b>' + esc(p.name) + '</b>: a change here is just here — ' + esc(p.name) + ' in Chord Charts stays as it is.';
       }
-      return '<p class="mp-card-empty">' + (m.list.length ? 'Tap a band to see where it plays.' : 'Put a progression in from the row below.') + '</p>';
+      return '<h3 class="mp-card-title">' + title + '</h3>' + (whose ? '<p class="tl-whose">' + whose + '</p>' : '') +
+        '<div class="mp-actions">' +
+          (sel.length === 1 && !readOnly() ? '<button type="button" class="btn" data-tl="focus">Individual Focus</button>' : '') +
+          '<button type="button" class="btn" data-tl="play-sel">' + playIcon() + ' Play from bar ' + b1 + '</button>' +
+          (readOnly() ? '' : '<button type="button" class="btn pw-ghost" data-tl="duplicate" title="A copy right after it (⌘D)">Duplicate</button>') +
+          '<button type="button" class="btn pw-ghost" data-tl="unselect">Done selecting</button>' +
+        '</div>';
     }
+    return '<p class="mp-card-empty">' + (m.list.length ? 'Tap a chord to select it — or a group’s top strip to select the whole group.' : 'Put a progression in from the row below.') + '</p>';
+  }
+  function groupCardHtml(si) {
+    const g = m.g;
     const r = m.list[si], sp = m.spans[si];
     const band = bandOf(r.prog);
     const p = r.prog ? T.prog(r.prog) : null;
@@ -1416,11 +1498,13 @@
     const where = sp.waiting ? 'from bar ' + r.from + ' — waits for the melody to reach it' : (r.from === sp.last ? 'bar ' + r.from : 'bars ' + r.from + '–' + sp.last);
     let html = '<h3 class="mp-card-title"><span class="mp-swatch" style="--bc:' + band.bc + ';--bd:' + band.bd + '"></span>' + esc(name) + ' <span class="mp-where">· ' + esc(where) + '</span>' +
       (p && !sp.waiting ? ' <span class="mp-times">' + esc(timesText(times)) + '</span>' : '') + '</h3>';
+    if (p) html += '<p class="tl-whose">' + (r.home ? 'Made on the music: changing its chords here changes <b>' + esc(p.name) + '</b> in Chord Charts too.'
+      : 'Placed from Chord Charts: it plays <b>' + esc(p.name) + '</b> — change it there and it changes here too, except the chords changed here.') + '</p>';
     html += '<div class="mp-fields">' +
       '<label>From bar <input type="number" class="mp-in" data-field="from" min="' + m.firstBar + '" max="999" value="' + r.from + '"></label>' +
       '<label>to bar <input type="number" class="mp-in" data-field="to" min="' + r.from + '" max="999" value="' + (r.to === 'melody' ? sp.last : r.to) + '"></label>' +
       (p ? '<label>or <input type="number" class="mp-in narrow" data-field="times" min="1" max="99" step="1" value="' + Math.max(1, Math.round(times) || 1) + '"> times through</label>' : '') +
-      '<button type="button" class="mp-toggle' + (r.to === 'melody' ? ' on' : '') + '" data-song="to-melody" title="It grows and shrinks with the melody, and stops where the next progression starts">to the end of the melody</button>' +
+      '<button type="button" class="mp-toggle' + (r.to === 'melody' ? ' on' : '') + '" data-song="to-melody" title="It grows and shrinks with the melody, and stops where the next group starts">to the end of the melody</button>' +
     '</div>';
     if (p && p.chords.length > 1) {
       let acc = 0, matched = false;
@@ -1433,42 +1517,44 @@
       }).join('');
       html += '<div class="mp-fields"><label>Starts on chord <select class="mp-in mp-select" data-field="phase">' + (matched ? '' : '<option selected disabled>partway into a chord</option>') + opts + '</select></label></div>';
     }
-    if (r.prog) {
+    if (r.prog && !r.home) {
       const here = r.here || [];
-      html += '<div class="mp-fields mp-here"><span class="mp-flabel">Just here:</span>' +
-        (here.length ? here.map(h => '<span class="mp-herechip">bar ' + h.bar + (h.beat > 1 ? ' beat ' + h.beat : '') + ' · ' + h.chords.map(c => C.labelHTML(look(c.chord).name)).join(' ') +
+      html += '<div class="mp-fields mp-here"><span class="mp-flabel">Changed here:</span>' +
+        (here.length ? here.map(h => '<span class="mp-herechip">bar ' + h.bar + (h.beat > 1 ? ' beat ' + h.beat : '') + ' · ' + h.chords.map(c => (c.chord ? C.labelHTML(look(c.chord).name) : '—')).join(' ') +
           '<button type="button" data-unhere="' + h.bar + ':' + h.beat + ':' + h.beats + '" title="Back to ' + esc(name) + ' there" aria-label="Back to the progression there">×</button></span>').join('') +
-          '<button type="button" class="btn pw-ghost mp-small" data-song="clear-here">Clear them</button>'
-          : '<span class="mp-none">none</span>') +
+          '<button type="button" class="btn pw-ghost mp-small" data-song="clear-here">Back to ' + esc(name) + ' everywhere</button>'
+          : '<span class="mp-none">nothing — it plays ' + esc(name) + ' as it is</span>') +
       '</div>';
     }
     html += '<div class="mp-actions">' +
-      (p ? '<button type="button" class="btn" data-song="edit">' + (readOnly() ? 'Look at ' : 'Edit ') + esc(p.name) + '</button>' : '') +
+      (p ? '<button type="button" class="btn" data-song="edit">' + (readOnly() ? 'Look at ' : 'Open ') + esc(p.name) + ' in Chord Charts</button>' : '') +
       '<button type="button" class="btn" data-song="play-band">' + playIcon() + ' Play from bar ' + r.from + '</button>' +
+      (readOnly() ? '' : '<button type="button" class="btn pw-ghost" data-tl="duplicate" title="A copy of the group right after it (⌘D)">Duplicate</button>') +
       '<button type="button" class="btn pw-ghost" data-song="remove">Take it out of the song</button>' +
     '</div>';
     return html;
   }
 
-  /* the playhead: where Play starts, and — while it plays — where the music is */
+  /* the playhead, while the song plays: where the music is */
   function paintHead() {
     if (!m || tab !== 'song') return;
     const head = body.querySelector('.mp-head');
     if (!head) return;
     const pos = SW.player && SW.player.position ? SW.player.position() : null;
-    const t = pos === null ? Math.max(0, m.g.T(playhead)) : pos;
-    head.style.left = m.x(t) + 'px';
-    head.classList.toggle('moving', pos !== null);
-    body.querySelectorAll('.mp-band').forEach(b => {
+    head.style.display = pos === null ? 'none' : '';
+    body.querySelectorAll('.tl-group').forEach(b => {
       const sp = m.spans[Number(b.dataset.stretch)];
       b.classList.toggle('sounding', pos !== null && sp && pos >= sp.a && pos < sp.z);
     });
-    if (pos !== null) {
-      // keep the playhead in view
-      const sc = body.querySelector('.mp-scroll');
-      const hx = m.x(t);
-      if (sc && (hx < sc.scrollLeft + 20 || hx > sc.scrollLeft + sc.clientWidth - 40)) sc.scrollLeft = Math.max(0, hx - 80);
-    }
+    body.querySelectorAll('.tl-chord').forEach(c => {
+      const e = m.pcs.find(p => p.at === Number(c.dataset.at));
+      c.classList.toggle('sounding', pos !== null && !!e && pos >= e.at && pos < e.end);
+    });
+    if (pos === null) return;
+    const hx = m.x(pos);
+    head.style.left = hx + 'px';
+    const sc = body.querySelector('.mp-scroll');                // keep the playhead in view
+    if (sc && (hx < sc.scrollLeft + 20 || hx > sc.scrollLeft + sc.clientWidth - 40)) sc.scrollLeft = Math.max(0, hx - 80);
   }
   function followHead() {
     clearTimeout(headTimer);
@@ -1476,68 +1562,200 @@
     paintHead();
     headTimer = setTimeout(followHead, 50);
   }
-
   function playSongFrom(bar) {
     stopHear();
     const g = T.grid();
     SW.player.playFrom(Math.max(0, g.T(bar)));
   }
-  function firstEmptyBar() {
-    const g = T.grid();
-    const evs = T.events(g);
-    let b = 1;
-    while (b < 999 && evs.some(e => e.at < g.T(b + 1) && e.end > g.T(b))) b++;
-    return b;
-  }
-  function putProg(id, a, b) {
-    const p = T.prog(id);
-    if (!p || !p.chords.length) return;
-    T.place(id, a, b);
-    selFrom = a;
-    selBars = null;
-  }
 
-  /* the map's gestures */
-  body.addEventListener('pointerdown', e => {
-    if (tab !== 'song' || !m) return;
-    const t = e.target;
-    if (t.closest('.note-i')) return;
-    const num = t.closest('.mp-num');
-    if (num) {
-      e.preventDefault();
-      mdrag = { kind: 'bars', anchor: Number(num.dataset.bar), moved: false, shift: e.shiftKey, id: e.pointerId };
+  /* ---- the Time Line's chords: select, copy, paste, take out ---- */
+  const clipText = () => (!clip ? '' : clip.kind === 'group' ? clip.name : clip.block.chords.length === 1 ? look(clip.block.chords[0].chord).name : clip.block.chords.length + ' chords');
+  function tlCopy() {
+    const list = T.shown();
+    const si = selIndex(list);
+    if (si >= 0) {
+      const st = T.tlGroupCopy(si);
+      if (!st) return false;
+      clip = { kind: 'group', st, name: stretchName(list[si]) };
+    } else if (tlSel.length) {
+      const block = T.tlBlock(tlSel);
+      if (!block) return false;
+      clip = { kind: 'chords', block };
+    } else return false;
+    ui.toast('Copied ' + clipText() + ' — Paste puts it in at the orange point');
+    renderSong();
+    return true;
+  }
+  function tlDelete() {
+    const si = selIndex(T.shown());
+    if (si >= 0) { selFrom = null; T.removeStretch(si); return; }
+    if (!tlSel.length) return;
+    const ats = tlSel;
+    tlSel = [];
+    if (!T.tlRemove(ats)) renderSong();
+  }
+  function tlCut() { if (tlCopy()) tlDelete(); }
+  /* Paste: at the point — a group at the bar line nearest it; the point then follows on, so pasting again lays the next copy after */
+  function tlPaste(at) {
+    if (!clip) return;
+    if (clip.kind === 'group') {
+      if (clip.st.prog && !T.prog(clip.st.prog)) { ui.toast(clip.name + ' is not in this song any more'); clip = null; renderSong(); return; }
+      const b = T.tlGroupTo(-1, at === undefined ? pointBar() : at, clip.st);
+      if (b === null) return;
+      selFrom = b;
+      tlSel = [];
+      const g = T.grid();
+      tlPoint = g.T(b + (clip.st.to - clip.st.from) + 1);
       return;
     }
-    const band = t.closest('.mp-band');
-    if (band) {
+    const ats = T.tlPut(clip.block, at === undefined ? tlPoint : at);
+    if (!ats.length) return;
+    tlSel = ats;
+    tlAnchor = ats[0];
+    selFrom = null;
+    tlPoint = ats[0] + clip.block.len;
+  }
+  /* Duplicate: a copy right after (a group: after its last bar) — the clipboard kept as it was */
+  function tlDuplicate() {
+    const keep = clip;
+    const list = T.shown();
+    const si = selIndex(list);
+    if (si >= 0) {
+      if (!tlCopy()) return;
+      tlPaste(T.lastOf(list[si]) + 1);
+    } else if (tlSel.length) {
+      const block = T.tlBlock(tlSel);
+      if (!block) return;
+      clip = { kind: 'chords', block };
+      tlPaste(tlSel[0] + block.len);
+    }
+    clip = keep;
+  }
+  /* ⌥← ⌥→: the selected chords one place along their row (a reorder) */
+  function tlNudge(d) {
+    if (!tlSel.length || !m) return;
+    const sel = m.pcs.filter(e => tlSel.indexOf(e.at) !== -1);
+    const first = sel[0], last = sel[sel.length - 1];
+    const nb = d > 0 ? m.pcs.find(e => e.at === last.end && e.stretch === last.stretch) : m.pcs.find(e => e.end === first.at && e.stretch === first.stretch);
+    if (!nb) return;
+    const ats = T.tlPut(T.tlBlock(tlSel), d > 0 ? nb.end : nb.at, tlSel);
+    if (ats.length) { tlSel = ats; tlAnchor = ats[0]; }
+  }
+  /* ← →: the chord before / after (heard); none selected: the point a beat */
+  function tlWalk(d) {
+    if (!m) return;
+    if (!tlSel.length) {
+      tlPoint = Math.max(0, snapBeat(tlPoint) + d * m.g.b);
+      selFrom = null;
+      renderSong();
+      return;
+    }
+    const ref = d > 0 ? Math.max.apply(null, tlSel) : Math.min.apply(null, tlSel);
+    const i = m.pcs.findIndex(e => e.at === ref);
+    const n = m.pcs[Math.max(0, Math.min(m.pcs.length - 1, i + d))];
+    if (!n) return;
+    tlSel = [n.at];
+    tlAnchor = n.at;
+    tlPoint = d > 0 ? n.end : n.at;
+    if (C.isKnown(n.id)) C.play(n.id, 'progression');
+    renderSong();
+  }
+  /* a tap on a chord: select it (⇧ along to it, ⌘ one more), the point to its nearer end; a double tap: Individual Focus */
+  function tapChord(at, clientX, shift, meta) {
+    const now = Date.now();
+    if (!shift && !meta && lastTlTap && lastTlTap.key === 'c' + at && now - lastTlTap.t < 450 && !readOnly()) { lastTlTap = null; focusOn(at); return; }
+    lastTlTap = { key: 'c' + at, t: now };
+    if (shift && tlAnchor !== null) {
+      const a = Math.min(tlAnchor, at), z = Math.max(tlAnchor, at);
+      tlSel = m.pcs.filter(e => e.at >= a && e.at <= z).map(e => e.at);
+    } else if (meta) {
+      tlSel = tlSel.indexOf(at) !== -1 ? tlSel.filter(x => x !== at) : tlSel.concat([at]).sort((a, b) => a - b);
+      tlAnchor = at;
+    } else { tlSel = [at]; tlAnchor = at; }
+    selFrom = null;
+    const e = m.pcs.find(p => p.at === at);
+    if (e) {
+      const tx = tickAtX(clientX);
+      tlPoint = tx - e.at < e.end - tx ? e.at : e.end;
+      if (C.isKnown(e.id)) C.play(e.id, 'progression');
+    }
+    renderSong();
+  }
+  /* Individual Focus on the chord at a tick (none there: that beat) */
+  function focusOn(tick) {
+    const pc = T.chordAt(tick);
+    here = { at: pc ? pc.at : tick };
+    setTab('focus');
+  }
+  /* where chords dragged would go in: a chord under the pointer → its nearer end; empty time → its beat (the grab kept) */
+  function dropTick(clientX, clientY, d) {
+    const over = document.elementFromPoint(clientX, clientY);
+    if (!over || !over.closest('.mp-scroll')) return null;
+    const moving = new Set(d.ats);
+    const c = over.closest('.tl-chord');
+    if (c && !moving.has(Number(c.dataset.at))) {
+      const e = m.pcs.find(p => p.at === Number(c.dataset.at));
+      const r = c.getBoundingClientRect();
+      if (e) return clientX < r.left + r.width / 2 ? e.at : e.end;
+    }
+    let t = snapBeat(tickAtX(clientX) - d.grab);
+    const inside = m.pcs.find(p => !moving.has(p.at) && p.at < t && t < p.end);
+    if (inside) t = t - inside.at <= inside.end - t ? inside.at : inside.end;
+    return t;
+  }
+
+  /* the Time Line's gestures */
+  body.addEventListener('pointerdown', e => {
+    if (tab !== 'song' || !m || (e.button && e.button !== 0)) return;
+    const t = e.target;
+    if (t.closest('.note-i, .fold-note, .mp-card, .tl-top')) return;
+    const id = e.pointerId;
+    const num = t.closest('.mp-num');
+    if (num) { e.preventDefault(); td = { kind: 'bars', anchor: Number(num.dataset.bar), moved: false, id }; return; }
+    const h = t.closest('.mp-h');
+    if (h) {
       e.preventDefault();
-      const i = Number(band.dataset.stretch);
-      const h = t.closest('.mp-h');
-      mdrag = { kind: h ? (h.dataset.handle === 'l' ? 'start' : 'end') : 'move', i, band, x0: e.clientX, bar0: barAtClientX(e.clientX), moved: false, id: e.pointerId };
+      const band = h.closest('.tl-group');
+      td = { kind: 'end', i: Number(band.dataset.stretch), band, x0: e.clientX, moved: false, id };
+      return;
+    }
+    const gh = t.closest('.tl-ghead');
+    if (gh) {
+      e.preventDefault();
+      const band = gh.closest('.tl-group');
+      td = { kind: 'group', i: Number(band.dataset.stretch), band, x0: e.clientX, bar0: barAtClientX(e.clientX), moved: false, id };
+      return;
+    }
+    const ch = t.closest('.tl-chord');
+    if (ch) {
+      e.preventDefault();
+      const at = Number(ch.dataset.at);
+      td = { kind: 'chord', at, x0: e.clientX, y0: e.clientY, grab: tickAtX(e.clientX) - at, moved: false, id, shift: e.shiftKey, meta: e.metaKey || e.ctrlKey };
       return;
     }
     const chip = t.closest('.mp-chip[data-chip]');
     if (chip && !chip.disabled) {
       e.preventDefault();
-      mdrag = { kind: 'chip', prog: chip.dataset.chip, x0: e.clientX, y0: e.clientY, moved: false, id: e.pointerId, chip };
+      td = { kind: 'chip', prog: chip.dataset.chip, x0: e.clientX, y0: e.clientY, moved: false, id, chip };
       return;
     }
     const mel = t.closest('.mp-mel');
-    if (mel) { playhead = Number(mel.dataset.bar); selBars = null; renderSong(); return; }
-    if (t.closest('.mp-chords, .mp-mels') && !t.closest('.mp-band')) { if (selFrom !== null || selBars) { selFrom = null; selBars = null; renderSong(); } }
+    if (mel) { tlPoint = Math.max(0, m.g.T(Number(mel.dataset.bar))); tlSel = []; selFrom = null; renderSong(); return; }
+    if (t.closest('.mp-chords')) { e.preventDefault(); td = { kind: 'empty', tick: snapBeat(tickAtX(e.clientX)), id }; }
   });
   window.addEventListener('pointermove', e => {
-    if (!mdrag || e.pointerId !== mdrag.id) return;
-    const d = mdrag;
+    if (!td || e.pointerId !== td.id) return;
+    const d = td;
     if (d.kind === 'bars') {
       const bar = barAtClientX(e.clientX);
       if (bar === null) return;
       if (bar !== d.anchor) d.moved = true;
       if (!d.moved) return;
-      selBars = { a: Math.min(d.anchor, bar), b: Math.max(d.anchor, bar) };
+      const a = Math.min(d.anchor, bar), b = Math.max(d.anchor, bar);
+      d.a = a; d.b = b;
       const sel = body.querySelector('.mp-sel') || (() => { const s = document.createElement('div'); s.className = 'mp-sel'; body.querySelector('.mp-inner').prepend(s); return s; })();
-      sel.style.left = m.xb(selBars.a) + 'px';
-      sel.style.width = (m.xb(selBars.b + 1) - m.xb(selBars.a)) + 'px';
+      sel.style.left = m.xb(a) + 'px';
+      sel.style.width = (m.xb(b + 1) - m.xb(a)) + 'px';
       return;
     }
     if (d.kind === 'chip') {
@@ -1559,62 +1777,115 @@
       if (d.bar !== null) { const n = body.querySelector('.mp-num[data-bar="' + d.bar + '"]'); if (n) n.classList.add('drop'); }
       return;
     }
-    // a band: trim its ends, or move it (listen only: a tap selects it, nothing moves)
-    if (readOnly()) return;
+    if (readOnly() || d.kind === 'empty') return;             // listen only: a tap selects, nothing moves
+    if (d.kind === 'chord') {
+      if (!d.moved && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 6) return;
+      if (!d.moved) {
+        d.moved = true;
+        if (tlSel.indexOf(d.at) === -1) { tlSel = [d.at]; tlAnchor = d.at; selFrom = null; }
+        d.ats = tlSel.slice().sort((a, b) => a - b);
+        body.querySelectorAll('.tl-chord').forEach(c => {
+          const on = d.ats.indexOf(Number(c.dataset.at)) !== -1;
+          c.classList.toggle('sel', on);
+          c.classList.toggle('lifting', on);
+        });
+        d.ghost = document.createElement('div');
+        d.ghost.className = 'tl-ghost';
+        d.ghost.innerHTML = m.pcs.filter(p => d.ats.indexOf(p.at) !== -1).map(p => { const l = look(p.id); return '<i style="--c:' + l.color + ';--ck:' + l.ink + '">' + C.labelHTML(l.name) + '</i>'; }).join('');
+        document.body.appendChild(d.ghost);
+        d.mark = document.createElement('div');
+        d.mark.className = 'tl-drop';
+        body.querySelector('.mp-chords').appendChild(d.mark);
+      }
+      d.ghost.style.left = (e.clientX + 10) + 'px';
+      d.ghost.style.top = (e.clientY - 18) + 'px';
+      d.ghost.classList.toggle('copy', e.altKey);
+      d.to = dropTick(e.clientX, e.clientY, d);
+      d.mark.style.display = d.to === null ? 'none' : '';
+      if (d.to !== null) d.mark.style.left = m.x(d.to) + 'px';
+      return;
+    }
+    // a group: moved by its strip, or stretched by its right grip — a bar at a time
     const bar = barAtClientX(e.clientX);
     if (bar === null) return;
     if (!d.moved && Math.abs(e.clientX - d.x0) < 6) return;
-    d.moved = true;
     const r = m.list[d.i], sp = m.spans[d.i];
     if (!r) return;
-    d.band.classList.add('dragging');
-    if (d.kind === 'start') {
-      d.to = Math.min(bar, sp.last);
-      d.band.style.left = (m.xb(d.to) + 1) + 'px';
-      d.band.style.width = Math.max(10, m.x(sp.z) - m.xb(d.to) - 2) + 'px';
-    } else if (d.kind === 'end') {
+    if (!d.moved) {
+      d.moved = true;
+      d.band.classList.add('dragging');
+      d.chords = Array.from(body.querySelectorAll('.tl-chord[data-si="' + d.i + '"]'));
+    }
+    if (d.kind === 'end') {
       d.to = Math.max(bar, r.from);
-      d.band.style.width = Math.max(10, m.xb(d.to + 1) - m.x(sp.a) - 2) + 'px';
+      d.band.style.width = Math.max(12, m.xb(d.to + 1) - m.x(sp.a) - 2) + 'px';
     } else {
       d.delta = Math.max(m.firstBar - r.from, bar - d.bar0);
-      d.band.style.transform = 'translateX(' + (d.delta * m.BW) + 'px)';
+      const tx = 'translateX(' + (d.delta * m.BW) + 'px)';
+      d.band.style.transform = tx;
+      d.chords.forEach(c => { c.style.transform = tx; });
     }
   });
-  const endMapDrag = e => {
-    if (!mdrag || (e && e.pointerId !== mdrag.id)) return;
-    const d = mdrag;
-    mdrag = null;
+  const endTlDrag = e => {
+    if (!td || (e && e.pointerId !== td.id)) return;
+    const d = td;
+    td = null;
+    if (d.ghost) d.ghost.remove();
+    if (d.mark) d.mark.remove();
     if (d.kind === 'bars') {
-      if (!d.moved) {
-        if (d.shift) selBars = { a: Math.min(playhead, d.anchor), b: Math.max(playhead, d.anchor) };
-        else { playhead = d.anchor; selBars = null; }
-      }
+      if (d.moved) {
+        const g = m.g;
+        tlSel = m.pcs.filter(p => p.at >= g.T(d.a) && p.at < g.T(d.b + 1)).map(p => p.at);
+        tlAnchor = tlSel[0] !== undefined ? tlSel[0] : null;
+        tlPoint = Math.max(0, g.T(d.a));
+      } else { tlPoint = Math.max(0, m.g.T(d.anchor)); tlSel = []; }
+      selFrom = null;
+      renderSong();
+      return;
+    }
+    if (d.kind === 'empty') {
+      const now = Date.now();
+      if (lastTlTap && lastTlTap.key === 'e' + d.tick && now - lastTlTap.t < 450 && !readOnly()) { lastTlTap = null; focusOn(d.tick); return; }
+      lastTlTap = { key: 'e' + d.tick, t: now };
+      tlPoint = d.tick;
+      tlSel = [];
       selFrom = null;
       renderSong();
       return;
     }
     if (d.kind === 'chip') {
       body.querySelectorAll('.mp-num.drop').forEach(n => n.classList.remove('drop'));
-      if (d.ghost) d.ghost.remove();
-      if (!d.moved) {
-        if (selBars) putProg(d.prog, selBars.a, selBars.b);
-        else { const a = firstEmptyBar(); putProg(d.prog, a); }
-      } else if (d.bar !== null && d.bar !== undefined) putProg(d.prog, d.bar);
+      if (readOnly()) return;
+      const b = !d.moved ? T.tlPlace(d.prog, pointBar()) : (d.bar !== null && d.bar !== undefined ? T.tlPlace(d.prog, d.bar) : null);
+      if (b !== null && b !== undefined) { selFrom = b; tlSel = []; schedule(); }
       return;
     }
+    if (d.kind === 'chord') {
+      if (!d.moved) { tapChord(d.at, d.x0, d.shift, d.meta); return; }
+      if (d.to === null || d.to === undefined) { renderSong(); return; }
+      const ats = T.tlPut(T.tlBlock(d.ats), d.to, e && e.altKey ? null : d.ats);
+      if (ats.length) { tlSel = ats; tlAnchor = ats[0]; }
+      selFrom = null;
+      renderSong();
+      return;
+    }
+    // a group
     const r = m.list[d.i];
-    if (!d.moved) { selFrom = r ? r.from : null; selBars = null; renderSong(); return; }
+    if (!d.moved) { selFrom = r ? r.from : null; tlSel = []; if (r) tlPoint = Math.max(0, m.g.T(r.from)); renderSong(); return; }
     if (!r) { renderSong(); return; }
-    if (d.kind === 'start' && d.to !== undefined && d.to !== r.from) { selFrom = d.to; T.setStretch(d.i, { from: d.to }); }
-    else if (d.kind === 'end' && d.to !== undefined && d.to !== (r.to === 'melody' ? m.spans[d.i].last : r.to)) { selFrom = r.from; T.setStretch(d.i, { to: d.to }); }
-    else if (d.kind === 'move' && d.delta) { selFrom = Math.max(m.firstBar, r.from + d.delta); T.moveStretch(d.i, d.delta); }
-    else renderSong();
+    if (d.kind === 'end' && d.to !== undefined && d.to !== (r.to === 'melody' ? m.spans[d.i].last : r.to)) { selFrom = r.from; T.setStretch(d.i, { to: d.to }); }
+    else if (d.kind === 'group' && d.delta) {
+      const b = T.tlGroupTo(d.i, r.from + d.delta);
+      if (b !== null) selFrom = b;
+      renderSong();
+    } else renderSong();
   };
-  window.addEventListener('pointerup', endMapDrag);
+  window.addEventListener('pointerup', endTlDrag);
   window.addEventListener('pointercancel', e => {
-    if (!mdrag || e.pointerId !== mdrag.id) return;
-    if (mdrag.ghost) mdrag.ghost.remove();
-    mdrag = null;
+    if (!td || e.pointerId !== td.id) return;
+    if (td.ghost) td.ghost.remove();
+    if (td.mark) td.mark.remove();
+    td = null;
     if (tab === 'song') renderSong();
   });
 
@@ -1631,14 +1902,21 @@
       T.setHereSpan(si, bar, beat, beats, null);
       return;
     }
+    switch (b.dataset.tl) {
+      case 'copy': tlCopy(); return;
+      case 'cut': tlCut(); return;
+      case 'paste': tlPaste(); return;
+      case 'delete': tlDelete(); return;
+      case 'duplicate': tlDuplicate(); return;
+      case 'focus': if (tlSel.length) focusOn(tlSel[0]); return;
+      case 'play-sel': if (tlSel.length) { tlPoint = Math.min.apply(null, tlSel); playSongFrom(playBar()); } return;
+      case 'unselect': tlSel = []; renderSong(); return;
+    }
     switch (b.dataset.song) {
       case 'play':
-        if (SW.player.playing) SW.player.stop(); else playSongFrom(playhead);
+        if (SW.player.playing) SW.player.stop(); else playSongFrom(playBar());
         break;
-      case 'play-sel': if (selBars) { playhead = selBars.a; playSongFrom(selBars.a); } break;
-      case 'play-band': if (r) { playhead = Math.max(m.firstBar, r.from); playSongFrom(playhead); } break;
-      case 'clear-sel': if (selBars) { const s = selBars; selBars = null; T.clearBars(s.a, s.b); } break;
-      case 'unselect': selBars = null; renderSong(); break;
+      case 'play-band': if (r) { tlPoint = Math.max(0, g.T(r.from)); playSongFrom(Math.max(m.firstBar, r.from)); } break;
       case 'new': tab = 'build'; selProg = null; sel = null; fresh = null; render(); break;
       case 'edit': if (r && r.prog) { selProg = r.prog; sel = null; tab = 'build'; fresh = null; render(); } break;
       case 'remove': if (si >= 0) { selFrom = null; T.removeStretch(si); } break;
@@ -1691,31 +1969,45 @@
 
   function songKeyDown(e) {
     const k = e.key || '';
-    const list = T.shown();
-    const si = selIndex(list);
+    const ro = readOnly();
+    if ((e.metaKey || e.ctrlKey) && !e.altKey) {
+      switch (k.toLowerCase()) {
+        case 'c': e.preventDefault(); tlCopy(); return true;
+        case 'x': e.preventDefault(); if (!ro) tlCut(); return true;
+        case 'v': e.preventDefault(); if (!ro) tlPaste(); return true;
+        case 'd': e.preventDefault(); if (!ro) tlDuplicate(); return true;
+        case 'a': e.preventDefault(); if (m) { tlSel = m.pcs.map(p => p.at); tlAnchor = tlSel[0] !== undefined ? tlSel[0] : null; selFrom = null; renderSong(); } return true;
+      }
+      return false;
+    }
     switch (k) {
       case ' ':
         e.preventDefault();
-        if (!e.repeat) { if (SW.player.playing) SW.player.stop(); else playSongFrom(playhead); }
+        if (!e.repeat) { if (SW.player.playing) SW.player.stop(); else playSongFrom(playBar()); }
         return true;
       case 'Delete': case 'Backspace':
         e.preventDefault();
-        if (si >= 0) { selFrom = null; T.removeStretch(si); }
+        if (!ro) tlDelete();
+        return true;
+      case 'Enter':
+        e.preventDefault();
+        if (!ro) focusOn(tlSel.length ? tlSel[0] : tlPoint);
         return true;
       case 'ArrowLeft': case 'ArrowRight':
         e.preventDefault();
-        playhead = Math.max(m ? m.firstBar : 1, playhead + (k === 'ArrowLeft' ? -1 : 1));
-        renderSong();
+        if (e.altKey) { if (!ro) tlNudge(k === 'ArrowLeft' ? -1 : 1); } else tlWalk(k === 'ArrowLeft' ? -1 : 1);
         return true;
     }
-    return true;                  // the chord and melody keys are quiet on the map
+    return true;                  // the chord and melody keys are quiet on the Time Line
   }
 
 
   /* ==================================================================
-     THE CHORD ON THE MUSIC (2026-10-27; was Just here, phase 4) — opened
-     by a double-click (a double tap) on a chord over the music, Enter
-     with the cursor on one, or on empty time. One chord, all of it:
+     INDIVIDUAL FOCUS (2026-10-28 a tab of the Chords window; was THE
+     CHORD ON THE MUSIC, 2026-10-27, and Just here, phase 4) — opened by a
+     double-click (a double tap) on a chord over the music or on the Time
+     Line, Enter with the cursor on one, or on empty time; its tab shows
+     the chord at the music's cursor (or the first). One chord, all of it:
        • which chord — the board (its keys; Z X C V B held), More chords…,
          No chord (it goes, and the time is silent);
        • how long — − + a beat at a time (on the music: drag its end);
@@ -1726,25 +2018,29 @@
      chords made on the music are their progression — a change here
      changes it; a progression placed from the window changes just here
      (Back to Verse undoes that; Change it in Verse too writes a one-chord
-     change into it). ← → go to the chord before / after. Every change is
-     heard, drawn at once, and one Undo step.
+     change into it). ‹ › (← →) go to the chord before / after. Every
+     change is heard, drawn at once, and one Undo step.
      ================================================================== */
-  const hereSheet = document.getElementById('here-sheet');
-  const hereBody = document.getElementById('here-body');
-  const hereFoot = document.getElementById('here-foot');
-  const hereTitle = document.getElementById('here-title');
-  let here = null;           // { at }: the chord that starts there — or, with none, the empty beat
-  const hereOpen = () => !!(hereSheet && hereSheet.classList.contains('show'));
   const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'));
 
   function openHere(tick) {
-    if (!hereSheet || !SW.settings.can('chords')) return;
+    if (!SW.settings.can('chords')) return;
     const pc = T.chordAt(tick);
     here = { at: pc ? pc.at : tick };
     stopHear();
     if (SW.player && SW.player.playing) SW.player.stop();
-    ui.openSheet('here-sheet');
-    renderHere();
+    if (!isOpen()) { prepare(); ui.openSheet('prog-sheet'); }
+    tab = 'focus';
+    fresh = null;
+    render();
+  }
+  /* the chord Individual Focus shows when nothing chose one: the music's cursor, the Time Line's, the first */
+  function focusDefault() {
+    const cs = S.chordSel && typeof S.chordSel.at === 'number' ? S.chordSel.at : null;
+    if (cs !== null) { const pc = T.chordAt(cs); return pc ? pc.at : cs; }
+    if (tlSel.length) return tlSel[0];
+    const first = T.events().find(e => e.id);
+    return first ? first.at : Math.max(0, T.grid().T(1));
   }
   /* the chord there now (Undo, a drag on the music: it may have gone) */
   function hereNow() {
@@ -1759,7 +2055,7 @@
     const beat = Math.round((1 + (here.at - g.T(bar)) / g.b) * 100) / 100;
     return (bar ? 'Bar ' + bar : 'The pick-up') + (beat !== 1 ? ', beat ' + beat : '');
   }
-  /* the rhythm box's scope for the chord on the music */
+  /* the rhythm box's scope for the chord in focus */
   function hereScope(g, ev, p) {
     const n = (ev.end - ev.at) / CELL;
     const held = ev.rhythm ? ev.rhythm === T.HELD : (!p || p.rhythm === T.HELD);
@@ -1773,21 +2069,20 @@
       toAll: p ? v => T.rhythmToAll(at, p.id, v === T.HELD ? T.HELD : T.rhythmOf(v)) : null,
       barNo: k => bar + k,
       write: v => T.setChord(at, { rhythm: v }),
-      redraw: renderHere
+      redraw: render
     };
   }
 
-  function renderHere() {
-    if (!here || !hereOpen()) return;
+  function renderFocus() {
+    if (!here) here = { at: focusDefault() };
     const { g, ev, r, p } = hereNow();
     const l = ev ? look(ev.id) : null;
-    hereTitle.textContent = hereWhere(g) + ' — ' + (ev ? l.name : 'no chord yet');
     // whose chord it is, and so where a change goes
     let note;
     if (!ev) note = 'No chord here yet: pick one and it goes on this beat — it lasts to the next chord, or the bar line.';
     else if (r && r.home && p) {
       const elsewhere = T.stretches().some(x => x.prog === p.id && !x.home);
-      note = 'Part of <b>' + esc(p.name) + '</b>, made here on the music: a change here changes ' + esc(p.name) + (elsewhere ? ' — everywhere it is placed' : '') + '. It is in <b>Chord Progression</b> to use again.';
+      note = 'Part of <b>' + esc(p.name) + '</b>, made here on the music: a change here changes ' + esc(p.name) + (elsewhere ? ' — everywhere it is placed' : '') + '. It is in <b>Chord Charts</b> to use again.';
     } else if (p) {
       const bare = JSON.parse(JSON.stringify(r));
       delete bare.here;
@@ -1797,7 +2092,13 @@
         ? 'Changed just here — ' + esc(p.name) + ' itself plays <b>' + names + '</b> here.'
         : esc(p.name) + ' plays it here (' + ordinal((under.length ? under[0].pass || 0 : 0) + 1) + ' time through). A change here is just here — ' + esc(p.name) + ' stays as it is.';
     } else note = 'A chord that belongs to no progression.';
-    let html = ui.note('here.what', note, { block: true });
+    const many = T.events(g).filter(e => e.id).length;
+    let html = '<div class="hw-head">' +
+      '<button type="button" class="pw-hbtn hw-walk" data-hwalk="-1" title="The chord before (←)" aria-label="The chord before"' + (many ? '' : ' disabled') + '><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>' +
+      '<h3 class="hw-title">' + esc(hereWhere(g)) + ' — ' + (ev ? C.labelHTML(l.name) : 'no chord yet') + '</h3>' +
+      '<button type="button" class="pw-hbtn hw-walk" data-hwalk="1" title="The chord after (→)" aria-label="The chord after"' + (many ? '' : ' disabled') + '><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>' +
+    '</div>';
+    html += ui.note('here.what', note, { block: true });
     if (ev) {
       const beats = Math.round((ev.end - ev.at) / g.b * 100) / 100;
       const tones = l.tones.map(t => '<i style="--c:' + t.color + ';color:' + SW.chordStrip.inkOn(t.color) + '">' + esc(C.toneText(t)) + '</i>').join('');
@@ -1819,16 +2120,16 @@
       pickHtml('<button type="button" class="btn pw-small-btn" data-hw="more">More chords…</button>' + (ev ? '<button type="button" class="btn pw-small-btn" data-hw="none">No chord</button>' : ''),
         ui.note('here.pick', 'Tap a chord (or press its key — hold <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd> <kbd>V</kbd> <kbd>B</kbd> to change it). <b>No chord</b> takes it out.')) +
     '</div>';
-    hereBody.innerHTML = html;
-    SW.rhythmBox.layout(hereBody);
+    body.innerHTML = html;
+    SW.rhythmBox.layout(body);
     const h = ev && p && r && !r.home ? T.hereAt(here.at) : null;
     const one = !!(h && !h.empty && h.entry !== undefined && h.chords.length === 1);
-    hereFoot.innerHTML =
+    foot.innerHTML =
       (p && r && !r.home ? '<button type="button" class="btn" data-hw="back"' + (ev && ev.here ? '' : ' disabled') + ' title="What ' + esc(p.name) + ' plays here, back again">Back to ' + esc(p.name) + '</button>' +
         '<button type="button" class="btn pw-ghost" data-hw="writeback"' + (one ? '' : ' disabled') + ' title="' + (one ? 'Make this part of ' + esc(p.name) + ' — every time through' : 'Only a change of one whole chord can go into the progression') + '">Change it in ' + esc(p.name) + ' too</button>' : '') +
       (ev ? '<button type="button" class="btn pw-ghost" data-hw="remove" title="Take it out (Delete): the time is silent">Take it out</button>' : '') +
       '<span class="pw-gap"></span><button type="button" class="btn btn-primary" data-hw="done">Done</button>';
-    SW.chordStrip.fitLabels(hereBody.querySelector('.pw-board'));
+    SW.chordStrip.fitLabels(body.querySelector('.pw-board'));
   }
   function herePick(place) {
     const e = C.entry(place);
@@ -1842,7 +2143,7 @@
     if (hereNow().ev) T.setChord(here.at, { chord: id, place: place || null });
     else T.putChord(here.at, place ? { chord: id, place } : { chord: id });
     if (SW.ctrack) SW.ctrack.select({ at: here.at });
-    renderHere();
+    render();
   }
   function hereLength(d) {
     const { g, ev } = hereNow();
@@ -1862,54 +2163,56 @@
     here.at = n.at;
     if (n.id && C.isKnown(n.id)) C.play(n.id, 'progression');
     if (SW.ctrack) SW.ctrack.select({ at: n.at });
-    renderHere();
+    render();
   }
 
-  if (hereSheet) {
-    hereBody.addEventListener('pointerdown', e => {
-      const modTab = e.target.closest('.pw-board .cmod');
-      if (modTab) { holdTab(modTab, e); return; }
-      const block = e.target.closest('.pw-board .cblock');
-      if (block) { e.preventDefault(); herePick(block.dataset.place); }
-    });
-    hereBody.addEventListener('click', e => {
-      const b = e.target.closest('button');
-      if (!b || !here) return;
-      if (b.dataset.hlen) { hereLength(Number(b.dataset.hlen)); return; }
-      if (b.dataset.hw === 'more') {
-        const { g, ev } = hereNow();
-        openChordEditor({
-          title: 'More chords — ' + hereWhere(g),
-          spec: (ev && C.parse(ev.id)) || { root: '1', q: 'maj', mods: [] },
-          onChange: sp => { if (here) hereSet(C.toId(sp), null); }
-        });
-        return;
-      }
-      if (b.dataset.hw === 'none') { T.removeChord(here.at); renderHere(); return; }
-      const { g, ev, p } = hereNow();
-      if (ev) SW.rhythmBox.click(b, hereScope(g, ev, p));
-    });
-    hereFoot.addEventListener('click', e => {
-      const b = e.target.closest('button[data-hw]');
-      if (!b || !here) return;
-      const { g, ev, p } = hereNow();
-      if (b.dataset.hw === 'done') { ui.closeSheet('here-sheet'); return; }
-      if (b.dataset.hw === 'remove') { T.removeChord(here.at); renderHere(); return; }
-      if (b.dataset.hw === 'back' && ev) {
-        const bar = g.barAt(ev.at);
-        T.setHereSpan(ev.stretch, bar, 1 + (ev.at - g.T(bar)) / g.b, (ev.end - ev.at) / g.b, null);
-        const back = T.chordAt(here.at);
-        if (back) here.at = back.at;
-        renderHere();
-        return;
-      }
-      if (b.dataset.hw === 'writeback') {
-        const name = p ? p.name : 'the progression';
-        if (T.writeBack(here.at)) { ui.toast('Now ' + name + ' plays it every time through'); renderHere(); }
-        else ui.toast('Only a change of one whole chord of ' + name + ' can go into it');
-      }
-    });
-  }
+  body.addEventListener('pointerdown', e => {
+    if (tab !== 'focus' || !here) return;
+    const modTab = e.target.closest('.pw-board .cmod');
+    if (modTab) { holdTab(modTab, e); return; }
+    const block = e.target.closest('.pw-board .cblock');
+    if (block) { e.preventDefault(); herePick(block.dataset.place); }
+  });
+  body.addEventListener('click', e => {
+    if (tab !== 'focus' || !here) return;
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.hwalk) { hereWalk(Number(b.dataset.hwalk)); return; }
+    if (b.dataset.hlen) { hereLength(Number(b.dataset.hlen)); return; }
+    if (b.dataset.hw === 'more') {
+      const { g, ev } = hereNow();
+      openChordEditor({
+        title: 'More chords — ' + hereWhere(g),
+        spec: (ev && C.parse(ev.id)) || { root: '1', q: 'maj', mods: [] },
+        onChange: sp => { if (here) hereSet(C.toId(sp), null); }
+      });
+      return;
+    }
+    if (b.dataset.hw === 'none') { T.removeChord(here.at); render(); return; }
+    const { g, ev, p } = hereNow();
+    if (ev) SW.rhythmBox.click(b, hereScope(g, ev, p));
+  });
+  foot.addEventListener('click', e => {
+    if (tab !== 'focus') return;
+    const b = e.target.closest('button[data-hw]');
+    if (!b || !here) return;
+    const { g, ev, p } = hereNow();
+    if (b.dataset.hw === 'done') { close(); return; }
+    if (b.dataset.hw === 'remove') { T.removeChord(here.at); render(); return; }
+    if (b.dataset.hw === 'back' && ev) {
+      const bar = g.barAt(ev.at);
+      T.setHereSpan(ev.stretch, bar, 1 + (ev.at - g.T(bar)) / g.b, (ev.end - ev.at) / g.b, null);
+      const back = T.chordAt(here.at);
+      if (back) here.at = back.at;
+      render();
+      return;
+    }
+    if (b.dataset.hw === 'writeback') {
+      const name = p ? p.name : 'the progression';
+      if (T.writeBack(here.at)) { ui.toast('Now ' + name + ' plays it every time through'); render(); }
+      else ui.toast('Only a change of one whole chord of ' + name + ' can go into it');
+    }
+  });
   function hereKeyDown(e) {
     const t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return false;
@@ -1927,31 +2230,16 @@
       case 'Delete': case 'Backspace':
         e.preventDefault();
         T.removeChord(here.at);
-        renderHere();
+        render();
         return true;
-      case 'Enter': e.preventDefault(); ui.closeSheet('here-sheet'); return true;
+      case 'Enter': e.preventDefault(); close(); return true;
     }
     return true;
   }
-  SW.bus.on('sheet:closed', d => { if (d.id === 'here-sheet') { here = null; C.clearMods(); } });
-  // a change anywhere (a drag on the music, Undo): the window shows what is there now. Undo
-  // loads the song again (score:loaded, then score:changed 'history' at once) — only
-  // another song closes it
-  let hereCloseTimer = 0;
-  SW.bus.on('score:changed', d => {
-    if (d && d.reason === 'history') clearTimeout(hereCloseTimer);
-    if (hereOpen()) renderHere();
-  });
-  SW.bus.on('score:loaded', () => {
-    if (!hereOpen()) return;
-    clearTimeout(hereCloseTimer);
-    hereCloseTimer = setTimeout(() => ui.closeSheet('here-sheet'), 0);
-  });
-  ['chords:changed', 'names:changed'].forEach(evt => SW.bus.on(evt, () => { if (hereOpen()) renderHere(); }));
+
 
   /* ================= KEYS (app.js hands them over while the window is on top) ================= */
   function keyDown(e) {
-    if (here && topSheet() && topSheet().id === 'here-sheet') return hereKeyDown(e);
     const t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return false;
     const k = e.key || '';
@@ -1960,9 +2248,10 @@
       if (k.toLowerCase() === 'y' || e.shiftKey) SW.history.redo(); else SW.history.undo();
       return true;
     }
+    if (tab === 'focus' && here) return hereKeyDown(e);
+    if (tab === 'song') return songKeyDown(e);
     if (e.metaKey || e.ctrlKey) return false;
     if (readOnly() && k !== ' ' && !((k === 'ArrowLeft' || k === 'ArrowRight') && !e.altKey)) return true;   // listen only: Space and the arrows
-    if (tab === 'song') return songKeyDown(e);
     const key1 = k.length === 1 ? k.toLowerCase() : null;
     if (key1 && C.isModKey(key1)) {                      // here a change is a switch: on until pressed again
       e.preventDefault();
@@ -1999,7 +2288,7 @@
      before its own handler sees it; drags never move. */
   const readOnly = () => !SW.settings.can('chords');
   const RO_OK = '[data-tab], .sheet-close, [data-act="done"], .pw-pcard, .pw-pplay, .pw-hear, .pw-beat, .note-i, .fold-note, ' +
-    '[data-song="play"], [data-song="play-sel"], [data-song="play-band"], [data-song="unselect"], [data-song="edit"]';
+    '[data-song="play"], [data-song="play-band"], [data-song="edit"], [data-tl="copy"], [data-tl="play-sel"], [data-tl="unselect"]';
   function roGuard(e) {
     if (!isOpen() || !readOnly()) return;
     const t = e.target;
@@ -2011,17 +2300,25 @@
   }
   ['pointerdown', 'click', 'dblclick', 'change', 'input'].forEach(type => sheet.addEventListener(type, roGuard, true));
 
-  /* ================= OPEN / CLOSE ================= */
-  function open(progId, which) {
-    if (!SW.settings.can('chords') && !SW.settings.can('chordsListen')) return;
+  /* ================= OPEN / CLOSE =================
+     The Chord Progression button opens it on Chord Charts (or the Time
+     Line, if that was last); a double-click on a chord — openHere — on
+     Individual Focus. */
+  function prepare(progId) {
     const list = T.progressions();
     selProg = (progId && T.prog(progId)) ? progId : (T.prog(selProg) ? selProg : (list[0] ? list[0].id : null));
     sel = null;
     fresh = null;
-    if (which === 'song' || which === 'build') tab = which;
-    selBars = null;
     confirmDelete = false;
     showStarters = false;
+    drawn = null;
+  }
+  function open(progId, which) {
+    if (!SW.settings.can('chords') && !SW.settings.can('chordsListen')) return;
+    prepare(progId);
+    if (which === 'song' || which === 'build' || which === 'focus') tab = which;
+    else if (tab === 'focus') tab = 'build';
+    if (tab === 'focus' && !here) here = { at: focusDefault() };
     if (SW.player && SW.player.playing) SW.player.stop();
     ui.openSheet('prog-sheet');
     render();
@@ -2033,23 +2330,30 @@
     stopHear();
     releasePreview();
     clearTimeout(headTimer);
-    if (mdrag && mdrag.ghost) mdrag.ghost.remove();
-    mdrag = null;
+    if (td && td.ghost) td.ghost.remove();
+    if (td && td.mark) td.mark.remove();
+    td = null;
+    here = null;
     C.clearMods();
     confirmDelete = false;
   });
   // the song changed (a step, Undo, another song): draw it again, and Hear it plays what is there now
   SW.bus.on('score:changed', () => { if (isOpen()) { schedule(); rehear(); } });
+  // another song: a group copied is this song's progression (its id means another one there) — chords copied paste anywhere.
+  // Undo loads the song again too (score:loaded, then score:changed 'history' at once): that keeps it
+  let clipTimer = 0;
+  SW.bus.on('score:loaded', () => { clearTimeout(clipTimer); if (clip && clip.kind === 'group') clipTimer = setTimeout(() => { clip = null; }, 0); });
+  SW.bus.on('score:changed', d => { if (d && d.reason === 'history') clearTimeout(clipTimer); });
   SW.bus.on('score:loaded', () => { if (isOpen()) { if (selProg && !T.prog(selProg)) selProg = null; schedule(); rehear(); } });
   ['chords:changed', 'names:changed', 'meter:changed', 'key:changed', 'layout:changed'].forEach(evt => SW.bus.on(evt, () => { if (isOpen()) { schedule(); rehear(); } }));
   SW.bus.on('history:changed', () => { if (isOpen()) syncUndo(); });
   // a held tab or key: the board's blocks relabel in place (a re-render would drop the pointer holding the tab)
   SW.bus.on('mods:changed', () => {
-    [isOpen() ? body.querySelector('.pw-board') : null, hereOpen() ? hereBody.querySelector('.pw-board') : null].forEach(relabelBoard);
+    relabelBoard(isOpen() ? body.querySelector('.pw-board') : null);
   });
   function relabelBoard(board) {
     if (!board) return;
-    const latch = board.classList.contains('latch');     // Edit Chords: the blocks wear the changes switched on
+    const latch = board.classList.contains('latch');     // Chord Charts: the blocks wear the changes switched on
     board.querySelectorAll('.cblock').forEach(b => {
       const e = C.entry(b.dataset.place);
       if (!e) return;
@@ -2070,7 +2374,6 @@
     if (isOpen() && tab === 'song') { renderSong(); followHead(); }
   });
   SW.bus.on('policy:changed', () => {
-    if (hereOpen() && !SW.settings.can('chords')) ui.closeSheet('here-sheet');
     if (!isOpen()) return;
     if (!SW.settings.can('chords') && !SW.settings.can('chordsListen')) close(); else render();   // listen only: the same window, read-only
   });

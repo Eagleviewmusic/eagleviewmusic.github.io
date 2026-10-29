@@ -67,6 +67,8 @@
               setHere setHereSpan hereAt writeBack clear
      on the music      flat() · chordAt(tick) · putChord(tick, step) · moveChord(at, to, copy) ·
                        resizeChord(at, from, end) · removeChord(at) · setChord(at, patch) · homeOf(progId)
+     the Time Line     tlBlock(ats) · tlPut(block, tick, movingAts?) · tlRemove(ats) ·
+                       tlGroupTo(index, bar, stretch?) · tlGroupCopy(index) · tlPlace(progId, bar) · makeRoom(…)
      selfTest()        pure checks of the rhythm and timing rules
    Event: 'track:changed' { why } (after SW.score.changed('track'))
    ========================================================================== */
@@ -1136,8 +1138,13 @@
       if (C) r.to = Math.max(r.from, g.barAt(Math.max(0, g.T(r.from)) + C - 1));
     });
   }
-  /* the chords as they should sound → the track */
+  /* the chords as they should sound → the track (applyFlat: written, not yet committed) */
   function writeFlat(next, why) {
+    if (!applyFlat(next)) return false;
+    commit(why || 'chords');
+    return true;
+  }
+  function applyFlat(next) {
     const g = grid();
     materialize(g);
     const ranges = diffFlat(flat(g), next);
@@ -1181,7 +1188,6 @@
       return false;
     });
     S.progressions = S.progressions.filter(p => !gone.has(p.id) || S.track.some(r => r.prog === p.id));
-    commit(why || 'chords');
     return true;
   }
 
@@ -1281,6 +1287,226 @@
   }
   /* the stretch a progression was made in on the music (null: none) */
   const homeOf = id => S.track.find(r => r.home && r.prog === id) || null;
+
+  /* ================= THE TIME LINE (2026-10-28) =================
+     The Chords window's Time Line (progression-window.js). A progression
+     in the song is a GROUP — its stretch — full of separate chords:
+       • a group moves whole, a bar at a time (its corner);
+       • chords moved inside their own row of chords (chords end to end)
+         are a reorder: A B C D, B dropped between C and D → A C B D; the
+         row keeps its bars;
+       • anywhere else moved chords leave silence where they were and go
+         in at the drop point; a paste goes in at the point. Between two
+         chords, the chords on the side with room (silence past their row
+         of chords) move over to make it — the side whose room is nearer,
+         the later one on a tie; with room on neither side the later ones
+         push along until there is. The group it goes into makes room a
+         chord at a time; any other group in the way moves whole (a group
+         never gives its own silence to another's chords);
+       • a group whose chords are pushed past its bars grows to keep them;
+         one all of whose chords are pushed along whole bars moves with
+         them; a group left with no chord goes;
+       • a group moved, pasted or put in goes in at a bar line the same
+         way, a group at a time: never inside another (its nearer end),
+         the groups on the side with room moving over.
+     What sounds is written by writeFlat's rules (a progression placed from
+     the window changes just here; one made on the music changes itself),
+     so a group still follows its progression wherever it was not changed.
+     One gesture, one Undo step. */
+
+  /* Room for [t, t + L) among items ({ at, end }, in order, none
+     overlapping; t never inside one) → { at: where the block goes,
+     shifts: how far each item moves } */
+  function makeRoom(items, t, L, min) {
+    const n = items.length;
+    let li = -1;
+    items.forEach((it, i) => { if (it.end <= t) li = i; });
+    const ri = li + 1;
+    const lf = li >= 0 ? items[li].end : min;
+    const rf = ri < n ? items[ri].at : Infinity;
+    const shifts = items.map(() => 0);
+    if (rf - lf >= L) return { at: Math.max(lf, Math.min(t, rf - L)), shifts };
+    // the run of items end to end from item i, going d (+1 later, -1 earlier): how far it reaches, and the silence past it
+    const run = (i, d) => {
+      let k = i;
+      while (k + d >= 0 && k + d < n && (d > 0 ? items[k + 1].at === items[k].end : items[k - 1].end === items[k].at)) k += d;
+      if (d > 0) return { far: items[k].end - items[i].at, room: k + 1 < n ? items[k + 1].at - items[k].end : Infinity };
+      return { far: items[i].end - items[k].at, room: items[k].at - (k > 0 ? items[k - 1].end : min) };
+    };
+    const needR = t + L - rf;                   // the later ones move this far (the block at t)
+    const needL = lf - (rf - L);                // or the earlier ones this far back (the block ending where the later ones start)
+    const R = ri < n ? run(ri, 1) : null, Lr = li >= 0 ? run(li, -1) : null;
+    const okR = !!R && R.room >= needR, okL = !!Lr && Lr.room >= needL;
+    // the side whose room is nearer (the later one on a tie); with room on neither, the later ones push along
+    if (okL && (!okR || Lr.far < R.far)) {
+      let lim = rf - L;
+      for (let k = li; k >= 0 && items[k].end > lim; k--) { shifts[k] = lim - items[k].end; lim = items[k].at + shifts[k]; }
+      return { at: rf - L, shifts };
+    }
+    let need = t + L;
+    for (let k = ri; k < n && items[k].at < need; k++) { shifts[k] = need - items[k].at; need = items[k].end + shifts[k]; }
+    return { at: t, shifts };
+  }
+  /* the chords as the Time Line shows them: flat pieces, each with its group (`si`: its stretch) */
+  function tlPieces(g) {
+    return events(g).filter(e => e.id).map(e => {
+      const o = { at: e.at, end: e.end, chord: e.id, si: e.stretch };
+      if (e.place) o.place = e.place;
+      if (e.rhythm) o.rhythm = e.rhythm;
+      return o;
+    });
+  }
+  function bare(pc) {
+    const o = { at: pc.at, end: pc.end, chord: pc.chord };
+    if (pc.place) o.place = pc.place;
+    if (pc.rhythm) o.rhythm = pc.rhythm;
+    return o;
+  }
+  /* a stretch moved k bars, its changes just here with it ('melody' → the bars it plays, `last`) */
+  function shiftBars(r, k, last) {
+    if (r.to === 'melody') r.to = last;
+    r.from += k;
+    r.to += k;
+    if (r.here) r.here.forEach(h => { h.bar += k; });
+  }
+  /* the chords starting at `ats`, as a block to put in somewhere — their places
+     one to another kept: { len, chords: [{ at, end, chord, place?, rhythm? }] from 0 } */
+  function tlBlock(ats) {
+    const set = new Set(ats);
+    const list = flat().filter(pc => set.has(pc.at));
+    if (!list.length) return null;
+    const a = list[0].at;
+    return { len: list[list.length - 1].end - a, chords: list.map(pc => Object.assign(bare(pc), { at: pc.at - a, end: pc.end - a })) };
+  }
+  /* PUT IN a block at tick t — `moving`: the starts of the chords it is,
+     which leave where they were (a move); none: a paste (or a copy).
+     Returns the starts of the chords put in. */
+  function tlPut(block, t, moving) {
+    if (!block || !block.chords.length) return [];
+    const g = grid();
+    materialize(g);
+    const all = tlPieces(g);
+    const mov = new Set((moving || []).filter(at => all.some(pc => pc.at === at)));
+    t = Math.max(0, t);
+    // a reorder: chords end to end in one group, moved inside their own row
+    if (mov.size) {
+      const runs = [];
+      all.forEach(pc => { const r = runs[runs.length - 1]; if (r && r[r.length - 1].end === pc.at && r[r.length - 1].si === pc.si) r.push(pc); else runs.push([pc]); });
+      const run = runs.find(r => r.some(pc => mov.has(pc.at)));
+      const inRun = run.filter(pc => mov.has(pc.at));
+      const k0 = run.indexOf(inRun[0]);
+      if (inRun.length === mov.size && run.slice(k0, k0 + inRun.length).every(pc => mov.has(pc.at)) &&
+          t >= run[0].at && t <= run[run.length - 1].end) {
+        const rest = run.filter(pc => !mov.has(pc.at));
+        const k = rest.filter(pc => pc.end <= t).length;
+        const order = rest.slice(0, k).concat(inRun, rest.slice(k));
+        let s = run[0].at;
+        const laid = order.map(pc => { const o = Object.assign(bare(pc), { at: s, end: s + pc.end - pc.at }); s = o.end; return o; });
+        if (applyFlat(all.filter(pc => run.indexOf(pc) === -1).map(bare).concat(laid).sort((a, b) => a.at - b.at))) commit('order');
+        return laid.filter((o, i) => mov.has(order[i].at)).map(o => o.at);
+      }
+    }
+    const rest = all.filter(pc => !mov.has(pc.at));
+    const inside = rest.find(pc => pc.at < t && t < pc.end);
+    if (inside) t = t - inside.at <= inside.end - t ? inside.at : inside.end;
+    // the group it joins: the chord it follows, or the one it comes before, or the group whose bars hold it
+    const before = rest.find(pc => pc.end === t), after = rest.find(pc => pc.at === t);
+    const held = holdings(g);
+    const hold = held.findIndex(h => h.a <= t && t < h.z);
+    const into = before ? before.si : after ? after.si : hold >= 0 ? hold : null;
+    // what makes room: the chords of the group it goes into, one by one — every other group whole
+    const items = rest.filter(pc => pc.si === into).map(pc => ({ at: pc.at, end: pc.end, pc }));
+    held.forEach((h, i) => { if (i !== into && h.z > h.a) items.push({ at: h.a, end: h.z, si: i }); });
+    items.sort((a, b) => a.at - b.at);
+    const rm = makeRoom(items, t, block.len, 0);
+    const dxOf = pc => { const k = items.findIndex(it => (it.pc ? it.pc === pc : it.si === pc.si)); return k >= 0 ? rm.shifts[k] : 0; };
+    const moved = rest.map(pc => { const dx = dxOf(pc); return Object.assign({}, pc, { at: pc.at + dx, end: pc.end + dx, dx }); });
+    const put = block.chords.map(c => Object.assign(bare(c), { at: rm.at + c.at, end: rm.at + c.end, si: into }));
+    // the groups follow their chords
+    const lasts = S.track.map(r => reach(r, S.track, g.lastBar));
+    const gone = new Set();
+    S.track.forEach((r, i) => {
+      const mine = moved.filter(pc => pc.si === i);
+      const now = mine.concat(put.filter(pc => pc.si === i));
+      if (!now.length) { if (!r.home && all.some(pc => pc.si === i)) gone.add(r); return; }
+      const d = mine.length === now.length && mine.every(pc => pc.dx === mine[0].dx) ? mine[0].dx : 0;
+      if (d && d % g.B === 0) { shiftBars(r, d / g.B, lasts[i]); return; }
+      const b1 = g.barAt(Math.min.apply(null, now.map(pc => pc.at)));
+      const b2 = g.barAt(Math.max.apply(null, now.map(pc => pc.end)) - 1);
+      if (b2 > lasts[i]) r.to = b2;
+      if (b1 < r.from) { if (r.home) r.from = b1; else shiftStart(r, b1 - r.from, g.mt, byIdNow()); }
+    });
+    // never overlapping: a group grown into the next one takes those bars
+    S.track = S.track.filter(r => !gone.has(r)).sort((x, y) => x.from - y.from);
+    for (let i = 1; i < S.track.length; i++) {
+      const p = S.track[i - 1], r = S.track[i];
+      if (p.to === 'melody' || r.from > p.to) continue;
+      const k = p.to + 1 - r.from;
+      if (r.home) r.from += k; else shiftStart(r, k, g.mt, byIdNow());
+      if (r.to !== 'melody' && r.to < r.from) r.to = r.from;
+    }
+    applyFlat(moved.map(bare).concat(put.map(bare)).sort((a, b) => a.at - b.at));
+    commit(mov.size ? 'move' : 'paste');
+    return put.map(pc => pc.at);
+  }
+  /* TAKE OUT the chords starting at `ats`: silence where they were; a group left with none goes */
+  function tlRemove(ats) {
+    const g = grid();
+    materialize(g);
+    const set = new Set(ats);
+    const all = tlPieces(g);
+    if (!all.some(pc => set.has(pc.at))) return false;
+    const left = all.filter(pc => !set.has(pc.at));
+    const gone = new Set(S.track.filter((r, i) => !r.home && all.some(pc => pc.si === i) && !left.some(pc => pc.si === i)));
+    S.track = S.track.filter(r => !gone.has(r));
+    applyFlat(left.map(bare));
+    commit('remove');
+    return true;
+  }
+  /* a group as it plays (its bars, not "to the end of the melody"), to paste as a placement of its progression */
+  function tlGroupCopy(index) {
+    const g = grid();
+    const list = current(g);
+    const r = list[index];
+    if (!r) return null;
+    const o = clone(r);
+    o.to = reach(r, list, g.lastBar);
+    delete o.home;
+    return o;
+  }
+  /* A GROUP to bar `bar`: the stretch `index` moved there — or, index -1,
+     `st` put in (a pasted group, a progression put in). Returns its bar. */
+  function tlGroupTo(index, bar, st) {
+    const g = grid();
+    materialize(g);
+    const minBar = g.p0 > 0 ? 0 : 1;
+    const lasts = S.track.map(r => reach(r, S.track, g.lastBar));
+    const r0 = index >= 0 ? S.track[index] : st;
+    if (!r0) return null;
+    const len = (index >= 0 ? lasts[index] : (r0.to === 'melody' ? r0.from : r0.to)) - r0.from + 1;
+    const others = S.track.filter((r, i) => i !== index);
+    const olasts = lasts.filter((x, i) => i !== index);
+    const items = others.map((r, i) => ({ at: r.from, end: olasts[i] + 1 }));
+    bar = Math.max(minBar, Math.round(bar));
+    const inside = items.find(it => it.at < bar && bar < it.end);
+    if (inside) bar = bar - inside.at <= inside.end - bar ? inside.at : inside.end;
+    const rm = makeRoom(items, bar, len, minBar);
+    if (index >= 0 && rm.at === r0.from && rm.shifts.every(x => !x)) return r0.from;
+    others.forEach((r, i) => { if (rm.shifts[i]) shiftBars(r, rm.shifts[i], olasts[i]); });
+    const moved = clone(r0);
+    moved.to = moved.from + len - 1;                        // the bars it plays, wherever it goes
+    shiftBars(moved, rm.at - moved.from);
+    S.track = others.concat([moved]).sort((x, y) => x.from - y.from);
+    commit(index >= 0 ? 'move' : 'place');
+    return moved.from;
+  }
+  /* a progression put in at a bar: once through, a group of its own */
+  function tlPlace(progId, bar) {
+    const p = findProg(progId);
+    if (!p || !p.chords.length) return null;
+    const mt = meterOf();
+    return tlGroupTo(-1, bar, { prog: progId, from: bar, to: bar + Math.max(1, Math.ceil(cycleBeats(p, mt) / mt.beats)) - 1 });
+  }
 
   /* ================= WHEN THE SONG CHANGES (DESIGN §10) =================
      Called by score.js before it records the change, so the chords move in
@@ -1505,6 +1731,14 @@
     const toEnd = [{ prog: 'p1', from: 9, to: 'melody' }];
     eq('laid on its start', cutList(toEnd, 9, 16, mt4, { p1: verse }, 56, true), []);
     eq('grown into from before', cutList(toEnd, 1, 12, mt4, { p1: verse }, 56, true), [{ prog: 'p1', from: 13, to: 'melody' }]);
+    // the Time Line's room: the later chords move into the silence after them; with none, the earlier into the silence before; with neither, the later push along
+    const its = list2 => list2.map(([a, e]) => ({ at: a, end: e }));
+    eq('room later', makeRoom(its([[0, 4], [4, 8], [8, 12], [12, 16], [20, 24]]), 8, 4, 0), { at: 8, shifts: [0, 0, 4, 4, 0] });
+    eq('room earlier', makeRoom(its([[8, 12], [12, 16], [16, 20], [20, 24], [24, 28], [30, 34]]), 16, 4, 0), { at: 12, shifts: [-4, -4, 0, 0, 0, 0] });
+    eq('room pushed', makeRoom(its([[0, 4], [4, 8], [8, 12], [14, 18]]), 4, 4, 0), { at: 4, shifts: [0, 4, 4, 2] });
+    eq('room free', makeRoom(its([[0, 4], [12, 16]]), 6, 4, 0), { at: 6, shifts: [0, 0] });
+    eq('room in a gap too small', makeRoom(its([[0, 4], [6, 10]]), 4, 4, 0), { at: 4, shifts: [0, 2] });
+    eq('room nearer earlier', makeRoom(its([[4, 8], [8, 12], [12, 16], [16, 20], [20, 24]]), 8, 4, 0), { at: 4, shifts: [-4, 0, 0, 0, 0] });
     // a new time signature: ta ta ti-ti ta in 4/4 → 12/8 → 4/4 comes back; 4/4 → 3/4 drops the last beat
     const keep = { p: S.progressions, t: S.track };
     S.progressions = [{ id: 'p1', name: 'V', rhythm: 'q q e e q', chords: [{ chord: 'I', rhythm: 'h h' }] }];
@@ -1540,7 +1774,7 @@
     addProg, setProg, removeProg, duplicateProg, moveProg,
     setStep, insertStep, removeStep, moveStep,
     place, setStretch, moveStretch, trimStart, removeStretch, clear, clearBars,
-    // for the map (the window's Chord Placement)
+    // for the Time Line (the Chords window)
     shown: g => current(g || grid()),                               // the stretches on show (an old song's lane, read as one)
     lastOf: (r, g) => { g = g || grid(); return reach(r, current(g), g.lastBar); },   // the last bar a stretch plays ('melody' resolved, up to the next stretch)
     cycleBeats: p => cycleBeats(p, meterOf()),
@@ -1549,6 +1783,8 @@
     hereAt, setHere, setHereSpan, writeBack,
     // the chords on the music, a beat at a time (2026-10-27)
     HELD, flat, chordAt, putSpan: tick => putSpan(tick), putChord, moveChord, resizeChord, removeChord, setChord, rhythmToAll, homeOf, tidyCells,
+    // the Time Line: groups of chords (2026-10-28)
+    tlBlock, tlPut, tlRemove, tlGroupTo, tlGroupCopy, tlPlace, makeRoom,
     selfTest
   };
 })();
