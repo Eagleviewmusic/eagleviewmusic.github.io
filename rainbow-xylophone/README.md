@@ -73,3 +73,12 @@ Library" in the Save window was REMOVED the same day (it confused what the
 link saved); its storage key `rainbow_xylophone_custom_scales` is unused.
 The tutorial's step 8 now describes Scales + Save. Not yet in
 `Eagle View Music/` (tiers 2 and 3).
+
+## Locked links keep students on the page (2026-10-30)
+
+A link made with **Lock the setting menu in the linked version** (`lock=1`)
+now hides the Eagle View back button as well as the gear, so the page has no
+links at all. On a phone the title still gives way (the header has no room), so
+a locked phone shows just the ? button on the left. In the source, `App.tsx`:
+`showBackLink = !IN_IFRAME && !isLocked`. The checkbox text and tutorial step 8
+say so. Not yet in the published copy in `Eagle View Music/`.
