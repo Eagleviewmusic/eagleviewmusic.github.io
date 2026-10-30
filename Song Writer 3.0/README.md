@@ -86,7 +86,10 @@ and the test songs, 2026-10-01; again 2026-10-26).
 **Storage**: 3.0 has its own keys (`song_writer_30_*`, since 2026-10-27; 2.5's were
 `song_writer_25_*`). On its first run it copies 2.5's library, View and Layout settings,
 lessons and syllable choices across once — or 2.0's, when that origin never ran 2.5;
-the older keys are only read (`js/core.js` carryOver). New View prefs: `tapDetail` (snap to sixteenths), `showBeats`.
+the older keys are only read (`js/core.js` carryOver). The Teacher Library's songs are left
+out of that copy (2026-10-30): the shelf files them fresh, so an older app's copy never stands in
+for one. Inside the Recording Studio's frame (which cannot save) a device that never ran 3.0 has
+its 2.5 songs read where they are (`js/studio-bridge.js` liveLibrary). New View prefs: `tapDetail` (snap to sixteenths), `showBeats`.
 
 ## Inside the Recording Studio (`?embed=studio`, 2026-10-22)
 

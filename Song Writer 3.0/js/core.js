@@ -34,7 +34,17 @@
       const from = localStorage.getItem('song_writer_25_library_v1') ? 'song_writer_25_' : 'song_writer_2_';
       ['library_v1', 'active_song_v1', 'view_prefs_v1', 'layout_v1', 'lessons_v1', 'lesson_sources_v1',
        'syllable_choices_v1', 'skip_delete_section_confirm'].forEach(k => {
-        const v = localStorage.getItem(from + k);
+        let v = localStorage.getItem(from + k);
+        /* not the Teacher Library's songs: an older app's copy of one may be missing what only
+           3.0 reads (2.5 drops instrumental bars and the Chord Chart), and the shelf would keep
+           it (same date). 3.0's shelf files them fresh from the books out (2026-10-30). */
+        if (v !== null && k === 'library_v1') {
+          try {
+            const lib = JSON.parse(v);
+            Object.keys(lib).forEach(id => { const r = lib[id]; if (r && r.received && r.book) delete lib[id]; });
+            v = JSON.stringify(lib);
+          } catch (e) { /* unreadable: copied as it is, as before */ }
+        }
         if (v !== null && localStorage.getItem('song_writer_30_' + k) === null) localStorage.setItem('song_writer_30_' + k, v);
       });
     } catch (e) { /* storage blocked: start fresh */ }

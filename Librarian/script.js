@@ -44,11 +44,23 @@
 
   /* ------------------------------------------------------------------
      THE APPS — where each keeps its library, and what counts as blank.
-     Song Writer 1.0, 2.0 and 2.5 publish under one slug: a 1.0 song goes
-     as { content } (1.0's text, which 2.0 also reads), a 2.0 or 2.5 song
-     as { score }. When two have the same id, the newer one goes — 2.5
-     copied 2.0's library on its first run, so most songs sit in both.
+     Song Writer 1.0, 2.0, 2.5 and 3.0 publish under one slug: a 1.0 song
+     goes as { content } (1.0's text, which 2.0 also reads), a 2.0, 2.5 or
+     3.0 song as { score }. When two have the same id, the newer one goes —
+     each copied the one before's library on its first run, so most songs
+     sit in several; a tie goes to the first source listed (3.0).
      ------------------------------------------------------------------ */
+  /* a Song Writer 2.0 / 2.5 / 3.0 song with no words (an instrumental line has none) */
+  const scoreBlank = rec => {
+    const lines = (rec.score && rec.score.lines) || [];
+    const words = [];
+    lines.forEach(l => (l.syllables || []).forEach(s => {
+      const t = String((s && s.text) || '').trim();
+      if (t && t !== '-') words.push(t.toLowerCase());
+    }));
+    return !words.length || words.join(' ') === 'start here';
+  };
+  const scoreData = rec => (rec.layout ? { score: rec.score, layout: rec.layout } : { score: rec.score });
   const SOURCES = [
     {
       app: 'rhythm-poetry', name: 'Rhythm Poetry', key: 'rhythm_poetry_song_library_v3',
@@ -75,22 +87,29 @@
       blank: rec => !(rec.tracks || []).some(t => (t.beats || []).some(b => (b.cells || []).some(Boolean)))
     },
     {
-      /* Song Writer 2.5 (the hub's Song Writer since 2026-10-04): 2.0's
-         record shape under its own key. */
+      /* Song Writer 3.0 (the hub's Song Writer since 2026-10-30): 2.5's
+         record shape under its own key — the score may carry a Chord Chart,
+         instrumental lines ({ label, bars }) and word hyphens, sent as they
+         are. Listed before 2.5 so a song 3.0 copied and never changed goes
+         out as 3.0's. */
+      app: 'song-writer', name: 'Song Writer', from: '3.0', key: 'song_writer_30_library_v1',
+      builtIns: ['twinkle', 'mary', 'starspangledbanner'],
+      reserved: id => id === 'sandbox',
+      kind: () => 'song',
+      blank: scoreBlank,
+      data: scoreData,
+      settings: true
+    },
+    {
+      /* Song Writer 2.5 (the hub's Song Writer 2026-10-04 → 10-30): 2.0's
+         record shape under its own key. Still read: a bookmark can still
+         open it. */
       app: 'song-writer', name: 'Song Writer', from: '2.5', key: 'song_writer_25_library_v1',
       builtIns: ['twinkle', 'mary', 'starspangledbanner'],
       reserved: id => id === 'sandbox',
       kind: () => 'song',
-      blank: rec => {
-        const lines = (rec.score && rec.score.lines) || [];
-        const words = [];
-        lines.forEach(l => (l.syllables || []).forEach(s => {
-          const t = String((s && s.text) || '').trim();
-          if (t && t !== '-') words.push(t.toLowerCase());
-        }));
-        return !words.length || words.join(' ') === 'start here';
-      },
-      data: rec => (rec.layout ? { score: rec.score, layout: rec.layout } : { score: rec.score }),
+      blank: scoreBlank,
+      data: scoreData,
       settings: true
     },
     {
@@ -98,16 +117,8 @@
       builtIns: ['twinkle', 'mary', 'starspangledbanner'],
       reserved: id => id === 'sandbox',
       kind: () => 'song',
-      blank: rec => {
-        const lines = (rec.score && rec.score.lines) || [];
-        const words = [];
-        lines.forEach(l => (l.syllables || []).forEach(s => {
-          const t = String((s && s.text) || '').trim();
-          if (t && t !== '-') words.push(t.toLowerCase());
-        }));
-        return !words.length || words.join(' ') === 'start here';
-      },
-      data: rec => (rec.layout ? { score: rec.score, layout: rec.layout } : { score: rec.score }),
+      blank: scoreBlank,
+      data: scoreData,
       settings: true
     },
     {
@@ -283,6 +294,7 @@
   function collect() {
     partLibs = {};
     const byKey = new Map();
+    const in30 = new Set();          // songs Song Writer 3.0 has a copy of
     SOURCES.forEach(src => {
       const lib = readLibrary(src.key);
       Object.keys(lib).forEach(id => {
@@ -322,11 +334,14 @@
           dataOf: src.data || null
         };
         const k = src.app + '|' + id;
+        if (src.from === '3.0') in30.add(k);
         const had = byKey.get(k);
         if (!had || item.updatedAt > had.updatedAt) byKey.set(k, item);
       });
     });
     items = [...byKey.values()];
+    // an older Song Writer's copy won (changed there since 3.0 copied it): 3.0's is the older one
+    items.forEach(i => { i.older30 = i.app === 'song-writer' && i.from !== '3.0' && in30.has(i.app + '|' + i.id); });
   }
 
   /* ---------------- what is already in the Teacher Library ---------------- */
@@ -478,6 +493,13 @@
       t.className = 'tag tag-warn';
       t.textContent = 'No Layout Settings yet';
       t.title = 'This piece was saved before pieces kept their Layout Settings. Open it in the app, set it up, and save it (turn Auto-save on, or Save as…) — then its settings travel with it.';
+      tags.appendChild(t);
+    }
+    if (item.older30 && s !== 'blank') {
+      const t = document.createElement('span');
+      t.className = 'tag tag-warn';
+      t.textContent = 'Newer in Song Writer ' + item.from;
+      t.title = 'This song was changed in Song Writer ' + item.from + ' after Song Writer 3.0 copied it, so that copy is the one that goes out — without what only 3.0 keeps (its Chord Chart, instrumental bars). To send the 3.0 one instead, open it in Song Writer 3.0 and save it there.';
       tags.appendChild(t);
     }
     /* A pairing carries its songs whole, so it needs nothing else to

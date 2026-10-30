@@ -4,7 +4,7 @@ A multitrack recorder that holds the Eagle View Music instruments. Pick a
 track, pick an instrument — the **Virtual Keyboard**, the **Digital Accordion**
 or the **Rainbow Xylophone** — and play it right here in the studio while the
 other tracks play back. Songs from **Ostinato Builder 2.0** and **Song Writer
-2.5** can be brought in as tracks too, so the apps can build one bigger
+3.0** can be brought in as tracks too, so the apps can build one bigger
 project together. The mix saves as an MP3 or WAV.
 
 Built 2026-10-22 (sandbox only). Folder `Claude Apps/Recording Studio/`;
@@ -145,7 +145,7 @@ the computer keyboard always plays whichever instrument is showing.
   alone — `timeline({ play })` / `timeline({ section })`. It starts on how the
   piece is set to play; a Looped one, on the section it was left showing. The
   part chosen is the pass that *Plays N times* repeats.
-- **Song Writer 2.5** — opened in a hidden frame with `?embed=studio`
+- **Song Writer 3.0** (2.5 until 2026-10-30) — opened in a hidden frame with `?embed=studio`
   (`js/embed.js` swaps its storage for a read-through layer first, as Ostinato
   Builder does for the Music Stand) and `window.SongWriterStudio` (`js/studio-bridge.js`):
 
@@ -298,7 +298,7 @@ duck), the timing test with real taps, a touch screen / smart board, Safari
 The studio needs the changes made for it in its neighbours, so they go
 together: **Virtual Keyboard** (`script.js`, `recorder.js`, `styles.css`,
 `index.html`), **Digital Accordion** (`script.js`, `README.md`), **Song Writer
-2.5** (`js/embed.js`, `js/studio-bridge.js`, `index.html`, `js/library.js`,
+3.0** (`js/embed.js`, `js/studio-bridge.js`, `index.html`, `js/library.js`,
 `js/lessons.js`, `js/audio.js`, `js/player.js`, `README.md`) and the
 **Rainbow Xylophone** (`Claude Apps/rainbow-xylophone/` — its `index.html`
 carries the bundle inline; source in `App Projects/rainbow-xylophone/`).

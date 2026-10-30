@@ -188,8 +188,8 @@ const Theory = (() => {
   const SCALES = [
     { id: 'major', name: 'Major', family: 'Diatonic', degrees: ['1', '2', '3', '4', '5', '6', '7'],
       chords: [C('1', 'maj', 'I'), C('5', 'maj', 'V'), C('4', 'maj', 'IV'), C('6', 'min', 'vi'), C('2', 'min', 'ii'), C('3', 'min', 'iii'), C('2', 'maj', 'V/V'), C('3', 'maj', 'V/vi'), C('b7', 'maj', 'IV/IV')],
-      top: [C('b6', 'maj', 'bVI'), C('4', 'min', 'iv'), C('#4', 'dim7', 'vii°7/V'), C('7', 'maj', 'V/iii'), C('6', 'maj', 'V/ii')],
-      more: [C('b2', 'dom7', 'bII7'), C('b3', 'maj', 'bIII'), C('1', 'aug', 'I+'), C('7', 'dim'), C('5', 'dom7'), C('2', 'min7'), C('4', 'maj7'), C('1', 'maj7'), C('1', 'dom7', 'V/IV'), C('5', 'sus4'), C('1', 'add9'), C('6', 'min7'), C('1', 'six')] },
+      top: [C('b6', 'maj', 'bVI'), C('4', 'min', 'iv'), C('5', 'min', 'ii/IV'), C('7', 'min', 'iii/V'), C('6', 'maj', 'V/ii')],   // 3 and 4 were vii°7/V and V/iii until 2026-10-28 (the user's change)
+      more: [C('#4', 'dim7', 'vii°7/V'), C('7', 'maj', 'V/iii'), C('b2', 'dom7', 'bII7'), C('b3', 'maj', 'bIII'), C('1', 'aug', 'I+'), C('7', 'dim'), C('5', 'dom7'), C('2', 'min7'), C('4', 'maj7'), C('1', 'maj7'), C('1', 'dom7', 'V/IV'), C('5', 'sus4'), C('1', 'add9'), C('6', 'min7'), C('1', 'six')] },
 
     { id: 'minor', name: 'Minor', family: 'Diatonic', degrees: ['1', '2', 'b3', '4', '5', 'b6', 'b7'],
       chords: [C('1', 'min', 'i'), C('5', 'maj', 'V'), C('b6', 'maj', 'bVI'), C('4', 'min', 'iv'), C('b7', 'maj', 'bVII'), C('b3', 'maj', 'bIII'), C('4', 'maj', 'IV'), C('5', 'min', 'v'), C('2', 'm7b5', 'iiø7')],

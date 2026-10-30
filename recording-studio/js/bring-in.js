@@ -6,7 +6,7 @@
    screen, in a guest mode that cannot write its storage (README.md,
    "Bringing songs in"):
      Ostinato Builder 2.0   ?embed=music-stand   window.MusicStandBridge
-     Song Writer 2.5        ?embed=studio        window.SongWriterStudio
+     Song Writer 3.0        ?embed=studio        window.SongWriterStudio
    The music is copied (D6): the track keeps where it came from, not a link.
 
    An ostinato becomes one track of hits, repeated; a song becomes a melody
@@ -22,7 +22,7 @@
       blurb: 'An ostinato’s rhythms, on its own percussion — a loop: drag its end out for as many bars as you like.'
     },
     song: {
-      name: 'Song Writer', url: '../Song%20Writer%202.5/index.html?embed=studio', bridge: 'SongWriterStudio',
+      name: 'Song Writer', url: '../Song%20Writer%203.0/index.html?embed=studio', bridge: 'SongWriterStudio',
       blurb: 'A song’s melody and its chords, each on a track of its own.'
     }
   };

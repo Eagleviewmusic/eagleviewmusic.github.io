@@ -109,6 +109,14 @@
   /* ---------------- the library ---------------- */
   function liveLibrary() {
     EMBED.forget(L.STORAGE_KEY);
+    /* A device that has only ever used 2.5 (or 2.0): 3.0's first run copies those songs over
+       (core.js carryOver), but this frame cannot save, so they are read where they are — the
+       same rule, into this frame's memory only (2026-10-30: the studio listed the built-ins alone) */
+    if (localStorage.getItem(L.STORAGE_KEY) === null) {
+      const old = localStorage.getItem('song_writer_25_library_v1') !== null ? 'song_writer_25_library_v1' : 'song_writer_2_library_v1';
+      const v = localStorage.getItem(old);
+      if (v !== null) localStorage.setItem(L.STORAGE_KEY, v);
+    }
     return L.getStoredLibrary();
   }
 
