@@ -2407,14 +2407,14 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .cc-hub { display: flex; flex-direction: column; min-height: 100%; }
 .cc-shelf {
   display: flex; flex-wrap: wrap; align-items: center; gap: 18px 14px; flex: none;   /* wrapped, never scrolled: a swipe on a card is a drag (touch, the smartboard) */
-  min-height: 148px; padding: 20px 22px 20px;
+  min-height: 121px; padding: 20px 22px 20px;          /* 2026-10-29 (user): the cards a quarter shorter, the shelf with them */
   background: linear-gradient(var(--paper), var(--surface)); border-bottom: 1px solid var(--hairline);
   transition: background .15s;
 }
 .cc-shelf.drop { background: var(--accent-soft); }
 .cc-card {
   --c: #888; --cink: #fff;
-  position: relative; flex: none; width: 100px; height: 108px; padding: 6px 6px 6px 20px;
+  position: relative; flex: none; width: 100px; height: 81px; padding: 6px 6px 6px 20px;
   border-radius: 22px; background: var(--c);
   background-image: linear-gradient(180deg, rgba(255,255,255,.2), rgba(255,255,255,0) 55%);
   color: var(--cink); font-family: var(--font-block);
@@ -2424,9 +2424,9 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
   transition: transform .12s, opacity .12s;
 }
 .cc-card.out-of-scale { background-image: repeating-linear-gradient(45deg, rgba(0,0,0,.12) 0 7px, transparent 7px 14px); }
-.cc-name { font-size: 32px; font-weight: 600; line-height: 1; white-space: nowrap; }
+.cc-name { font-size: calc(32px * var(--ns, 1)); font-weight: 600; line-height: 1; white-space: nowrap; }   /* --ns: a long name shrinks (chords.js nameScale) */
 .cc-other { font-family: var(--font); font-size: 14px; font-weight: 900; line-height: 1; opacity: .92; white-space: nowrap; }
-.cc-dots { position: absolute; left: 10px; top: 14px; bottom: 16px; width: 8px; border-radius: 4px; background: rgba(255,255,255,.3); }
+.cc-dots { position: absolute; left: 10px; top: 11px; bottom: 13px; width: 8px; border-radius: 4px; background: rgba(255,255,255,.3); }
 .cc-dots i { position: absolute; left: 0; width: 8px; height: 8px; margin-bottom: -4px; border-radius: 50%; background: var(--cink); }
 .cc-uses {
   position: absolute; top: -9px; right: -9px; min-width: 28px; height: 28px; padding: 0 7px; border-radius: 14px;
@@ -2436,11 +2436,25 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .cc-card.flash { animation: cc-flash .6s ease; }
 @keyframes cc-flash { 35% { transform: scale(1.1); } }
 .cc-card.cc-lifted { opacity: .28; }
-.cc-plus { background: transparent; background-image: none; border: 3px dashed var(--hairline-2); color: var(--ink-3); box-shadow: none; cursor: pointer; padding: 0; }
-.cc-plus svg { width: 36px; height: 36px; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; }
-.cc-plus:hover { border-color: var(--accent); color: var(--accent); }
-.cc-plus.listening { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); animation: cc-listen 1.2s ease-in-out infinite; }
+/* the ? boxes (2026-10-29, user): empty places on the chart — tapped, one waits for the next chord played */
+.cc-blank {
+  background: transparent; background-image: none; border: 3px dashed var(--hairline-2); color: var(--ink-3); box-shadow: none; cursor: pointer; padding: 0;
+  font-family: var(--font-round); font-size: 36px; font-weight: 700; line-height: 1;
+}
+.cc-blank:hover { border-color: var(--accent); color: var(--accent); }
+.cc-blank.waiting { border-color: var(--accent); color: var(--accent); }
+.cc-blank.armed { background: var(--accent-soft); animation: cc-listen 1.2s ease-in-out infinite; }
 @keyframes cc-listen { 50% { transform: scale(1.06); } }
+/* to the right of the boxes, the way in (the user's words) */
+.cc-hint { flex: 0 1 220px; margin: 0 0 0 6px; font-size: 15px; font-weight: 800; line-height: 1.3; color: var(--ink-3); }
+/* the round + : one more ? box, waiting */
+.cc-addbox {
+  flex: none; width: 44px; height: 44px; margin-left: 2px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 2px rgba(156,22,142,.25); cursor: pointer; transition: filter .13s, transform .06s;
+}
+.cc-addbox:hover { filter: brightness(.96); }
+.cc-addbox:active { transform: scale(.94); }
+.cc-addbox svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; }
 .cc-starter { opacity: .32; cursor: pointer; padding: 6px; }
 .cc-starter:hover { opacity: .62; }
 .cc-gap { flex: none; width: 6px; align-self: stretch; margin: 8px -4px; border-radius: 3px; background: var(--accent); }
@@ -2450,7 +2464,7 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 
 /* the wave */
 .cc-mid { padding: 16px 22px 4px; }
-.cc-wave { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 16px; }
+.cc-wave { display: grid; grid-template-columns: 100px minmax(0, 1fr) 30px; gap: 16px; }
 .cc-transport { display: flex; flex-direction: column; align-items: center; gap: 9px; padding-top: 30px; }
 .cc-play { width: 62px; height: 62px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; box-shadow: 0 4px 12px rgba(156,22,142,.35); transition: filter .13s, transform .06s; }
 .cc-play:hover { filter: brightness(1.1); }
@@ -2484,6 +2498,17 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
   background: var(--c); color: var(--cink); font-family: var(--font-block); font-size: 14px; font-weight: 600; line-height: 26px;
   text-align: center; white-space: nowrap; overflow: hidden; box-shadow: inset 0 -3px 0 rgba(0,0,0,.12);
 }
+/* the fold (2026-10-29, user): folded, a strip a quarter the height — ▶ and the wave; the chevron opens it all */
+.cc-fold { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--paper-2); color: var(--ink-2); }
+.cc-fold:hover { background: var(--accent-soft); color: var(--accent); }
+.cc-fold svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; transition: transform .18s; }
+.cc-wave:not(.folded) .cc-fold svg { transform: rotate(180deg); }
+.cc-wave.folded { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.cc-wave.folded .cc-transport { padding-top: 0; }
+.cc-wave.folded .cc-play { width: 44px; height: 44px; box-shadow: 0 3px 8px rgba(156,22,142,.3); }
+.cc-wave.folded .cc-play svg { width: 19px; height: 19px; }
+.cc-wave.folded .cc-loop, .cc-wave.folded .cc-layer, .cc-wave.folded .cc-wtabs, .cc-wave.folded .cc-lane { display: none; }
+.cc-wave.folded .cc-wbody { height: 44px; border-radius: 12px; }
 
 /* the board: the panel's blocks, bigger */
 .cc-play-area { display: flex; justify-content: center; padding: 10px 22px 22px; }
@@ -2494,7 +2519,36 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .cc-under .strip-mods { flex: 1; min-width: 0; }
 .cc-more { flex: none; padding: 0 14px; border-radius: 10px; border: 1.5px solid var(--hairline-2); background: var(--surface); font-size: 13px; font-weight: 800; color: var(--ink-2); }
 .cc-more:hover { background: var(--paper-2); color: var(--ink); }
-.cblock.cc-on::after { content: ''; position: absolute; left: 7px; top: 7px; width: 9px; height: 9px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(43,29,56,.3); }
+.cblock.cc-on::after, .cc-cb.cc-on::after { content: ''; position: absolute; left: 7px; top: 7px; width: 9px; height: 9px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(43,29,56,.3); }
+.cc-boardpick { flex: none; }
+.cc-boardpick .seg-btn { padding: 6px 12px; }
+
+/* the circle of fifths in blocks (chord-circle.js, 2026-10-29): two ovals, the majors outside and their
+   relative minors inside; 7 columns; heights in units (--u) so a phone can shrink it whole */
+.cc-board.circle { width: min(1000px, 100%); }
+.cc-circle { --cg: 10px; --u: 1px; position: relative; height: calc(var(--h) * var(--u)); margin: 2px 0 14px; user-select: none; -webkit-user-select: none; }
+.cc-cb {
+  --cw: calc((100% - 6 * var(--cg)) / 7);
+  position: absolute; left: calc(var(--n) * (var(--cw) + var(--cg))); top: calc(var(--y) * var(--u)); width: var(--cw);
+  display: flex; align-items: center; justify-content: center; padding: 0 4px;
+  border-radius: 12px; background: var(--c); color: var(--cink);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 55%);
+  font-family: var(--font-block); font-weight: 600; line-height: 1; white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 -3px 0 rgba(0,0,0,.18), 0 2px 5px rgba(0,0,0,.18);
+  cursor: pointer; touch-action: none; transition: transform .08s, filter .08s;
+}
+.cc-cb.maj { height: calc(46 * var(--u)); font-size: 24px; }
+.cc-cb.min { height: calc(40 * var(--u)); font-size: 19px; }
+.cc-cb[style*="--cink:#1c1a22"] { text-shadow: 0 1px 0 rgba(255,255,255,.35); }
+.cc-cb.out-of-scale { background-image: repeating-linear-gradient(45deg, rgba(0,0,0,.1) 0 6px, transparent 6px 12px); box-shadow: inset 0 0 0 2px rgba(255,255,255,.45), inset 0 -3px 0 rgba(0,0,0,.18); }
+.cc-cb:hover { filter: brightness(1.08); }
+.cc-cb.is-on { transform: scale(1.06); filter: brightness(1.2) saturate(1.1); z-index: 3; }
+.cc-cb.home { outline: 3px solid var(--ink-2); outline-offset: 3px; }
+.cc-cbn { max-width: 100%; overflow: hidden; text-overflow: ellipsis; pointer-events: none; font-size: calc(100% * var(--nsw, 1)); }
+.cc-cb.cc-ghost { position: fixed; }
+.cc-ccenter { position: absolute; left: 50%; top: calc(var(--h) * var(--u) / 2); transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.cc-ckey { font-size: 12.5px; font-weight: 900; color: var(--ink-3); white-space: nowrap; }
+.cc-cnames .seg-btn { min-width: 38px; padding: 5px 10px; font-family: var(--font-block); font-size: 15px; font-weight: 600; }
 .cc-hub.ro .cc-card { cursor: default; }
 
 /* the question (D5; Focus and the Time Line will ask too) */
@@ -2508,24 +2562,41 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .cc-keep:hover { color: var(--ink); }
 
 @media (max-width: 640px) {
-  .cc-shelf { min-height: 128px; padding: 16px 14px 18px; gap: 12px; }
-  .cc-card { width: 84px; height: 92px; border-radius: 19px; }
-  .cc-name { font-size: 27px; }
+  .cc-shelf { min-height: 105px; padding: 16px 14px 18px; gap: 22px 12px; }
+  .cc-card .cc-tune { width: 27px; height: 27px; bottom: -18px; }
+  .cc-card .cc-tune svg { width: 15px; height: 15px; }
+  .cc-card { width: 84px; height: 69px; border-radius: 19px; }
+  .cc-blank { font-size: 30px; }
+  .cc-addbox { width: 40px; height: 40px; }
+  .cc-hint { flex-basis: 100%; margin: -4px 0 0; font-size: 13.5px; }
+  .cc-name { font-size: calc(27px * var(--ns, 1)); }
   .cc-mid { padding: 12px 14px 4px; }
-  .cc-wave { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .cc-wave { grid-template-columns: minmax(0, 1fr) 30px; gap: 10px; }
+  .cc-wave:not(.folded) .cc-wmain { grid-column: 1 / -1; grid-row: 2; }
+  .cc-wave:not(.folded) .cc-fold { grid-column: 2; grid-row: 1; align-self: center; }
   .cc-transport { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; padding-top: 0; }
   .cc-play { width: 52px; height: 52px; }
   .cc-layer { width: auto; padding: 0 12px; }
   .cc-play-area { padding: 8px 14px 18px; }
   .cc-hub .pw-board .strip-tower { height: 172px; }
+  .cc-circle { --cg: 4px; --u: .8px; }
+  .cc-cb { padding: 0 2px; border-radius: 9px; }
+  .cc-cb.maj { font-size: 16px; }
+  .cc-cbn { font-size: calc(100% * var(--ns, 1)); }
+  .cc-cb.min { font-size: 13px; }
+  .cc-ckey { display: none; }
+  .cc-cb.cc-on::after { left: 4px; top: 4px; width: 6px; height: 6px; box-shadow: 0 0 0 1.5px rgba(43,29,56,.3); }
+  .cc-cnames .seg-btn { min-width: 30px; padding: 4px 7px; font-size: 13px; }
+  .cc-under { flex-wrap: wrap; }
+  .cc-under .strip-mods { flex-basis: 100%; }
 }
 
 /* the selected card's tune button: Focus on its notes */
 .cc-tune {
-  position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); width: 36px; height: 36px; border-radius: 50%;
+  position: absolute; bottom: -19px; left: 50%; transform: translateX(-50%); width: 31px; height: 31px; border-radius: 50%;   /* below the shorter card's names (2026-10-29) */
   display: grid; place-items: center; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-2); cursor: pointer;
 }
-.cc-tune svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.cc-tune svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
 .cc-tune:hover { background: var(--paper-2); }
 
 /* ============================================================
@@ -2684,7 +2755,7 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
   padding: 16px 22px 20px; border-top: 1px solid var(--hairline); background: linear-gradient(var(--surface), var(--paper));
 }
 .cc-card.tl-card { width: 88px; height: 88px; padding: 6px; border-radius: 20px; }
-.cc-card.tl-card .cc-name { font-size: 28px; }
+.cc-card.tl-card .cc-name { font-size: calc(28px * var(--ns, 1)); }
 .tl-sep { flex: none; width: 2px; align-self: stretch; margin: 6px 2px; border-radius: 1px; background: var(--hairline-2); }
 .tl-clip {
   position: relative; flex: none; width: 116px; height: 84px; padding: 12px 10px 10px; border-radius: 18px;
@@ -2693,28 +2764,75 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 }
 .tl-strip { display: flex; gap: 3px; width: 100%; height: 46px; }
 .tl-strip i { min-width: 5px; border-radius: 6px; background: var(--c); }
-.tl-pin { position: absolute; top: -13px; left: 50%; margin-left: -13px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: #fff; }
-.tl-pin svg { width: 15px; height: 15px; fill: currentColor; stroke: none; }
+.tl-pin { position: absolute; top: -15px; left: 50%; margin-left: -15px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: #fff; box-shadow: 0 0 0 3px var(--surface); }
+.tl-pin::before { content: ''; position: absolute; inset: -9px; border-radius: 50%; }   /* a finger-sized target */
+.tl-pin svg { width: 16px; height: 16px; fill: currentColor; stroke: none; }
+.tl-pin .unpin { display: none; fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; }
+@media (hover: hover) {                                    /* a tap on the pin takes the copy off: an × says so under a mouse */
+  .tl-pin:hover { background: var(--accent); }
+  .tl-pin:hover .pin { display: none; }
+  .tl-pin:hover .unpin { display: block; }
+}
 .tl-view.ro .tl-c, .tl-view.ro .tl-sec { cursor: default; }
 /* a copied section on the clipboard card: its tab and its chords */
 .tl-clip.sec { width: 132px; flex-direction: column; align-items: stretch; gap: 6px; padding: 10px; background: var(--sb); border-color: var(--sbd); box-shadow: 4px 4px 0 var(--sbd); }
 .tl-clip.sec .tl-strip { height: 30px; }
 .tl-clab { align-self: flex-start; height: 26px; min-width: 34px; padding: 0 10px; border-radius: 9px; display: grid; place-items: center; background: var(--sbd); color: #fff; font-family: var(--font-round); font-size: 16px; font-weight: 800; }
 .tl-clab svg { width: 16px; height: 16px; fill: currentColor; }
+.tl-glab { max-width: 100%; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-bn.quiet { border-left-color: transparent; }            /* a bar without its number (further out): a short tick, under the number before it */
+.tl-bn.quiet::before { content: ''; position: absolute; left: -2px; bottom: 0; height: 8px; border-left: 2px solid var(--hairline-2); }
 
-/* the question's pictures (the Time Line's: how many chords, the ones going in) */
-.cc-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 20px; }
-.cc-chip { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 7px; border-radius: 12px; background: var(--paper-2); font-weight: 900; font-size: 16px; color: var(--ink); }
-.cc-chip-sw { width: 27px; height: 27px; border-radius: 8px; display: grid; place-items: center; background: #A98BF0; color: #fff; font-size: 15px; }
-.cc-chip-strip { gap: 4px; padding: 0 7px; }
-.cc-chip-strip i { padding: 3px 9px; border-radius: 7px; background: var(--c); color: var(--ck); font: 600 16px/1.2 var(--font-block); font-style: normal; }
-.cc-chip-strip b { padding: 0 4px; color: var(--ink-2); }
-.cc-chip-sw { min-width: 27px; width: auto; padding: 0 6px; font-family: var(--font-round); font-weight: 800; }
-.cc-chip-go { background: #9487A2; }
-.cc-chip-gap { background: repeating-linear-gradient(135deg, #CFC6DA 0 5px, #F2EEF6 5px 10px); box-shadow: inset 0 0 0 2px #9487A2; }
+/* THE ZOOM (2026-10-29): Close up · Mid (about 20 bars) · Top (about 36) — the same Time Line,
+   further out: shorter rows, each line's words instead of each word, smaller dots and names
+   (the sizes CHORD_PX in chord-timeline.js measures names by) */
+.tl-zoom { flex: none; padding: 3px; border-radius: 14px; }
+.tl-zoom .seg-btn { width: 48px; height: 40px; padding: 0; border-radius: 11px; display: grid; place-items: center; }
+.tl-zoom .seg-btn svg { width: 24px; height: 24px; fill: currentColor; }
+.tl-view:not(.z-close) .tl-slab {
+  display: block; height: 27px; line-height: 27px; min-width: 40px; padding: 0 12px; font-size: 17px; border-radius: 10px 10px 0 0;
+  max-width: max(40px, var(--sw)); overflow: hidden; text-overflow: ellipsis;
+}
+.tl-view:not(.z-close) .tl-slab.blank svg { vertical-align: -4px; }
+.tl-view:not(.z-close) .tl-shead { top: -34px; }
+.tl-view:not(.z-close) .tl-secrow { margin-top: 32px; }
+.tl-view:not(.z-close) .tl-sec, .tl-view:not(.z-close) .tl-gap { border-radius: 12px; }
+.tl-words .tl-line { padding-left: 8px; text-overflow: ellipsis; }
+.tl-view.z-mid .tl-ruler, .tl-view.z-mid .tl-bn { height: 34px; }
+.tl-view.z-mid .tl-bn { padding-left: 6px; font-size: 18px; }
+.tl-view.z-mid .tl-secrow { height: 100px; }
+.tl-view.z-mid .tl-contour { top: 12px; height: 42px; }
+.tl-view.z-mid .tl-contour i { width: 9px; height: 9px; margin: -4px 0 0 2px; }
+.tl-view.z-mid .tl-words { bottom: 9px; }
+.tl-view.z-mid .tl-words span { font-size: 16px; }
+.tl-view.z-mid .tl-gap { font-size: 17px; }
+.tl-view.z-mid .tl-chrow, .tl-view.z-mid .tl-c, .tl-view.z-mid .tl-mark { height: 64px; border-radius: 11px; }
+.tl-view.z-mid .tl-c { font-size: 20px; padding: 0 2px; }
+.tl-view.z-mid .tl-stretch { width: 14px; height: 36px; margin-top: -18px; }
+.tl-view.z-mid .tl-stretch::after { left: 4px; top: 10px; bottom: 10px; }
+.tl-view.z-mid .tl-stretch.l { left: -8px; }
+.tl-view.z-mid .tl-stretch.r { right: -8px; }
+.tl-view.z-top .tl-ruler, .tl-view.z-top .tl-bn { height: 30px; }
+.tl-view.z-top .tl-bn { padding-left: 5px; font-size: 16px; }
+.tl-view.z-top .tl-secrow { height: 82px; }
+.tl-view.z-top .tl-contour { top: 9px; height: 34px; }
+.tl-view.z-top .tl-contour i { width: 7px; height: 7px; margin: -3px 0 0 1px; }
+.tl-view.z-top .tl-words { bottom: 6px; }
+.tl-view.z-top .tl-words span { font-size: 15px; }
+.tl-view.z-top .tl-gap { font-size: 15px; }
+.tl-view.z-top .tl-chrow, .tl-view.z-top .tl-c, .tl-view.z-top .tl-mark { height: 52px; border-radius: 9px; }
+.tl-view.z-top .tl-c { font-size: 16px; padding: 0 2px; box-shadow: inset 0 -4px 0 rgba(0,0,0,.14); }
+.tl-view.z-top .tl-c.sel { box-shadow: inset 0 -4px 0 rgba(0,0,0,.14), 0 0 0 3px var(--gold); }
+.tl-view.z-top .tl-stretch { width: 12px; height: 30px; margin-top: -15px; border-radius: 6px; }
+.tl-view.z-top .tl-stretch::after { left: 3px; top: 8px; bottom: 8px; }
+.tl-view.z-top .tl-stretch.l { left: -7px; }
+.tl-view.z-top .tl-stretch.r { right: -7px; }
+
 
 @media (max-width: 640px) {
-  .tl-headbar { padding: 12px 14px 2px; gap: 8px; }
+  .tl-headbar { padding: 12px 14px 2px; gap: 6px; }
+  .tl-zoom .seg-btn { width: 36px; }
+  .tl-zoom .seg-btn svg { width: 22px; height: 22px; }
   .tl-headbar .cc-play { width: 48px; height: 48px; }
   .tl-headbar .btn { height: 42px; padding: 0 13px; font-size: 15px; }
   .tl-restart { font-size: 0 !important; padding: 0 12px !important; }
@@ -2724,7 +2842,7 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
   .tl-words span { font-size: 15px; }
   .tl-tray { padding: 14px 14px 18px; gap: 10px; }
   .cc-card.tl-card { width: 74px; height: 74px; border-radius: 17px; }
-  .cc-card.tl-card .cc-name { font-size: 24px; }
+  .cc-card.tl-card .cc-name { font-size: calc(24px * var(--ns, 1)); }
   .cc-card.tl-card .cc-other { font-size: 12px; }
 }
 

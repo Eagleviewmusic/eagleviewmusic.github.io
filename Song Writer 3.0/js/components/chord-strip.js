@@ -41,7 +41,7 @@
 
    API
      SW.chordStrip.render()               redraw (scale, key, names, set, layout)
-     SW.chordStrip.blockHtml(entry, w, { noEdit }) · modTabHtml(M) · inkOn(colour) · fitLabels(root)
+     SW.chordStrip.blockHtml(entry, w, { noEdit }) · modTabHtml(M, { toggle }) · inkOn(colour) · fitLabels(root)
                                           the blocks, drawn elsewhere (the window's board)
      SW.chordStrip.openSpecEditor(opts)   the chord editor for any chord: { title, spec, onChange(spec), label?, reset? }
      SW.chordStrip.trigger(place, src, holder?)   play a place + light + (Edit) write to the lane;
@@ -110,11 +110,13 @@
       blockInner(entry, d, opts) + '</button>';
   }
 
-  function modTabHtml(Mk) {
+  // o.toggle: the Chord Chart's tabs (2026-10-29, user) — a press turns one on, the next press off
+  function modTabHtml(Mk, o) {
     const f = C.slotFunc(Mk);
     if (!f && !editable()) return '';
-    return '<button type="button" class="cmod' + (f ? '' : ' empty') + (C.heldMods.has(Mk) ? ' on' : '') + '" data-mod="' + Mk + '" data-hold title="' +
-      (f ? C.escapeHtml(f.does) + ' — hold ' + Mk + ' (or this tab) while you play a chord' : 'No button — the pencil chooses what ' + Mk + ' does') + '">' +
+    const toggle = !!(o && o.toggle), on = C.heldMods.has(Mk);
+    return '<button type="button" class="cmod' + (f ? '' : ' empty') + (on ? ' on' : '') + '" data-mod="' + Mk + '" data-hold' + (toggle ? ' aria-pressed="' + on + '"' : '') + ' title="' +
+      (f ? C.escapeHtml(f.does) + (toggle ? ' — press ' + Mk + ' (or this tab) to turn it on, again to turn it off' : ' — hold ' + Mk + ' (or this tab) while you play a chord') : 'No button — the pencil chooses what ' + Mk + ' does') + '">' +
       '<b class="cmod-key">' + Mk + '</b><span class="cmod-name">' + C.modLabelHTML(f) + '</span></button>';
   }
 

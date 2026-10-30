@@ -312,7 +312,11 @@ must still read:
 | `colours` | boolean, default `true` | Section colours (was an unremembered toolbar button). |
 | `playLight` | `note` · `box` · `both` · `off`, default `note` | While it plays → Light up (2026-10-01): the sounding note glows, a box behind its word, both, or nothing. Every light is behind the note. Replaces `lightNotes` (boolean): a stored `false` reads as `off`. |
 | `colourPictures` | boolean, default `true` | Library → Keep the section colours in saved pictures. |
-| `voicing`, `laneChordsPlay` | as before | Now shown in the Sound popover. |
+| `laneChordsPlay` | as before | Now shown in the Sound popover. (`voicing` — 1.0's chord voicings or Digital Accordion's — was here too until 2026-10-29; Digital Accordion's always now, a stored value is ignored.) |
+| `waveOpen` | boolean, default `false` | 2026-10-29: the Chord Chart's sound wave open in full (`true`) or folded to ▶ and the wave. |
+| `chartBoard` | `circle` · `panel`, default `circle` | 2026-10-29: the Chord Chart's chords — the circle of fifths in blocks, or the panel's blocks. |
+| `circleNames` | `letter` · `roman`, default `letter` | 2026-10-29: the circle's names (its own C · I switch; `chordNames` is the panel's). |
+| `tlZoom` | `close` · `mid` · `top`, default `close` | 2026-10-29: the Time Line's zoom — every beat, about 20 bars across, about 36 bars across. |
 
 Sound's Melody, Steady beat, Count-in and At the end are not stored (reset
 each visit, as Rhythm Poetry's switches are).

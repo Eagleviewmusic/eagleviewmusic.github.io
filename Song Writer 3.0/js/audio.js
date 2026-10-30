@@ -10,8 +10,8 @@
               preferences (Sound popover): melodySound · melodyVolume ·
               chordSound · chordVolume · room.
 
-              1.0's arithmetic is kept: the same frequencies, the same chord
-              voicings, a tapped block rings half a second; a tapped chord
+              1.0's arithmetic is kept: the same frequencies, a tapped
+              block rings half a second; a tapped chord
               three quarters of a second (half of 1.0's, since 2026-09-27),
               a chord in playback the full second and a half. The count-in and steady-beat clicks stay
               Song Writer's own short triangle ticks, dry, straight to the
@@ -22,7 +22,8 @@
 
    The chord engine (SW.chords) moved to js/chords.js on 2026-09-27: the
    scale-driven board, the Z X C V B functions and the voicings live
-   there; 1.0's own voicings (generateChordForKey) stay here for it.
+   there (Digital Accordion's alone since 2026-10-29: 1.0's voicings,
+   generateChordForKey, were a Sound choice until then).
    ========================================================================== */
 (function () {
   'use strict';
@@ -156,31 +157,6 @@
     };
   }
 
-  /* ---- 1.0: transposeNote / generateChordForKey ---- */
-  function transposeNote(noteWithOctave, semitonesUp, octaveShift) {
-    const noteMatch = noteWithOctave.match(/^([A-G][b#]?)(\d+)$/);
-    if (!noteMatch) return null;
-    const noteName = noteMatch[1];
-    const octave = parseInt(noteMatch[2], 10);
-    let noteIndex = M.CHROMATIC_NOTES.indexOf(noteName);
-    if (noteIndex === -1) {
-      const enharmonics = { 'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb' };
-      noteIndex = M.CHROMATIC_NOTES.indexOf(enharmonics[noteName]);
-    }
-    if (noteIndex === -1) return null;
-    let newNoteIndex = (noteIndex + semitonesUp) % 12;
-    if (newNoteIndex < 0) newNoteIndex += 12;
-    const newOctave = octave + Math.floor((noteIndex + semitonesUp) / 12) + (octaveShift || 0);
-    return M.CHROMATIC_NOTES[newNoteIndex] + newOctave;
-  }
-  function generateChordForKey(key, chordSymbol) {
-    const transposition = M.KEY_TRANSPOSITION[key];
-    if (!transposition) return null;
-    const baseVoicing = M.BASE_CHORD_VOICINGS[chordSymbol];
-    if (!baseVoicing) return null;
-    return baseVoicing.map(n => transposeNote(n, transposition.semitones, transposition.octaveShift)).filter(Boolean);
-  }
-
   /* ---- 1.0: playNoteWithAccidental / playHarmony, reading the DOM ---- */
   function playNoteElement(noteElement) {
     if (!noteElement || noteElement.classList.contains('rest-note')) return;
@@ -296,7 +272,7 @@
     context: audioCtx,
     now: () => audioCtx().currentTime,
     calculateFrequency, getFrequencyForNote, getModifiedFrequency,
-    playNote, playChordFrequencies, holdChord, transposeNote, generateChordForKey,
+    playNote, playChordFrequencies, holdChord,
     playNoteElement, playHarmony, tone, click, noteOn, noteOff, renderSide,
     playMidi(midi) { playNote(M.midiToFreq(midi)); },
     applyMix, previewMelody, previewChords, soundGroups, CHORD_PLAY_HOLD,

@@ -19,6 +19,10 @@
        greyed (one of them always stays on)
      • the part already played is solid, the rest faded; the playhead
        follows the music
+     • ⌄ — the fold (2026-10-29, user): folded, it is a strip a quarter
+       the height, ▶ and the wave alone (a tap and a drag still work);
+       open, all of the above. Folded to start; remembered (View
+       preference waveOpen)
    Chords pressed while it plays (the chart, the board) sound on top of it
    (chord-chart.js).
 
@@ -145,7 +149,8 @@
     const tab = s => '<button type="button" class="cc-wtab" data-jump="' + s.at + '" style="left:' + pct(s.at) + '%;max-width:' + (pct(s.end) - pct(s.at)) + '%;--tb:' + s.tint[0] + ';--td:' + s.tint[1] + '">' + C.escapeHtml(s.label || '·') + '</button>';
     const lane = n.chords.map(c => '<span class="cc-lchord" style="left:' + pct(c.at) + '%;width:' + (pct(c.end) - pct(c.at)) + '%;--c:' + c.color + ';--cink:' + c.ink + '">' + C.labelHTML(c.name) + '</span>').join('');
     const on = S.playing && mine;
-    return '<div class="cc-wave" id="cc-wave">' +
+    const open = isOpen();
+    return '<div class="cc-wave' + (open ? '' : ' folded') + '" id="cc-wave">' +
       '<div class="cc-transport">' +
         '<button type="button" class="cc-play' + (on ? ' on' : '') + '" title="' + (on ? 'Stop (Space)' : 'Play the song (Space)') + '" aria-label="' + (on ? 'Stop' : 'Play') + '">' + (on ? ICON_STOP : ICON_PLAY) + '</button>' +
         '<button type="button" class="cc-loop' + (loopOn ? ' on' : '') + '" title="Round and round" aria-pressed="' + loopOn + '">' + ICON_LOOP + '</button>' +
@@ -159,11 +164,23 @@
           '<div class="cc-phead"></div></div>' +
         '<div class="cc-lane">' + lane + '</div>' +
       '</div>' +
+      '<button type="button" class="cc-fold" aria-expanded="' + open + '" title="' + foldTitle(open) + '" aria-label="' + foldTitle(open) + '">' + ICON_FOLD + '</button>' +
     '</div>';
+  }
+  const isOpen = () => !!(SW.settings && SW.settings.view && SW.settings.view.waveOpen);
+  const foldTitle = open => (open ? 'Fold the wave' : 'Show the whole wave');
+  function fold(open) {
+    SW.settings.setView({ waveOpen: open }, { quiet: true });
+    if (!root || !document.contains(root)) return;
+    root.classList.toggle('folded', !open);
+    const b = root.querySelector('.cc-fold');
+    if (b) { b.setAttribute('aria-expanded', open); b.title = foldTitle(open); b.setAttribute('aria-label', foldTitle(open)); }
+    draw();
   }
   const ICON_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg>';
   const ICON_STOP = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg>';
   const ICON_LOOP = '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>';
+  const ICON_FOLD = '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><path d="M6 9l6 6 6-6"/></svg>';
 
   function attach(el) {
     root = el;
@@ -315,6 +332,7 @@
     const b = e.target.closest('button');
     if (!b) return;
     if (b.classList.contains('cc-play')) { toggle(); return; }
+    if (b.classList.contains('cc-fold')) { fold(!isOpen()); return; }
     if (b.classList.contains('cc-loop')) {
       loopOn = !loopOn;
       b.classList.toggle('on', loopOn);

@@ -102,10 +102,6 @@
     'I': 'f', 'ii': 'g', 'iii': 'r', 'IV': 's', 'V': 'd', 'vi': 'a', 'V/V': 'e', 'V/vi': 'q', 'IV/IV': 'w',
     'bVI': '1', 'iv': '2', 'vii°7/V': '3', 'V/iii': '4', 'V/ii': '5'
   };
-  /* 1.0's nine voicings, by the canonical id of each (Sound → Chord voicing → Song Writer 1.0) */
-  const CLASSIC_OF = {};
-  Object.keys(LEGACY_ID).forEach(old => { if (M.BASE_CHORD_VOICINGS[old]) CLASSIC_OF[LEGACY_ID[old]] = old; });
-
   /* ---------------- Z X C V B: the functions ---------------- */
   const SLOT_KEYS = ['Z', 'X', 'C', 'V', 'B'];
   const MOD_FUNCS = [
@@ -389,6 +385,11 @@
       return low ? '<span class="figs"><i>' + top + '</i><i>' + low + '</i></span>' : '<sup class="fig">' + top + '</sup>';
     });
   }
+  /* how far a long name shrinks to fit a card or a block (2026-10-29): V7sus4 to 0.58 of the size */
+  function nameScale(text) {
+    const n = Array.from(String(text)).length;
+    return n <= 3 ? 1 : n === 4 ? 0.84 : n === 5 ? 0.7 : n === 6 ? 0.58 : n === 7 ? 0.5 : 0.44;
+  }
   function modLabelHTML(f) {
     if (!f) return '—';
     return f.figs ? '<span class="figs"><i>' + f.figs.join('</i><i>') + '</i></span>' : escapeHtml(f.name);
@@ -439,7 +440,7 @@
   /* The notes a chord sounds, as MIDI. An inverted chord: the bass tone
      at the bottom (no higher than B3), the others close above, the bass
      doubled on top when that leaves three. Otherwise Digital Accordion's
-     voicing — or 1.0's for its nine, when Sound → Chord voicing says so. */
+     voicing (1.0's nine were a choice under Sound until 2026-10-29). */
   function midis(x, opts) {
     const o = opts || {};
     if (o.voice) { const v = cleanVoice(o.voice); if (v) return voiceMidis(v); }   // the chord's own notes (a VOICE, below) win
@@ -458,12 +459,6 @@
       const out = [bass].concat(upper);
       if (out.length < 4) out.push(bass + 12);
       return out;
-    }
-    const classic = (view().voicing || 'classic') === 'classic' && !eff.mods.length && CLASSIC_OF[toId(spec)];
-    if (classic) {
-      const names = SW.audio.generateChordForKey(S.key, classic) || [];
-      const list = names.map(M.midiFromName).filter(m => m !== null);
-      if (list.length) return list;
     }
     return T.chordMidis(keyIndex(), spec.root, spec.q, 0, eff.tones);
   }
@@ -693,8 +688,9 @@
      keyboard's lights, the bend and the corner follow each strike; the
      lane keeps what was written when the chord went down.
        holdPlace(place, holder, source) → id   holder: a key's code, 'p' + a pointer
+       holdSpec(x, holder, source) → id        any chord, no place (the Chord Chart's circle, 2026-10-29)
        releaseHold(holder) → place | null · isHeld(place) · releaseAllHolds() */
-  const holding = new Map();                 // holder → { place, id, list, voice }
+  const holding = new Map();                 // holder → { place | base (a spec), id, list, voice }
   function holdPlace(place, holder, source) {
     const e = entry(place);
     if (!e) return null;
@@ -704,6 +700,17 @@
     if (!list.length) return null;
     S.selectedChord = { place, id };
     holding.set(holder, { place, id, list, voice: SW.audio.holdChord(list.map(M.midiToFreq)) });
+    announce(id, list, source);
+    return id;
+  }
+  function holdSpec(x, holder, source) {
+    const base = parse(x);
+    if (!base) return null;
+    releaseHold(holder);
+    const id = toId(withHeld(base));
+    const list = midis(id);
+    if (!list.length) return null;
+    holding.set(holder, { place: null, base, id, list, voice: SW.audio.holdChord(list.map(M.midiToFreq)) });
     announce(id, list, source);
     return id;
   }
@@ -718,8 +725,8 @@
   function releaseAllHolds() { Array.from(holding.keys()).forEach(releaseHold); }
   function restrike() {
     holding.forEach(h => {
-      const e = entry(h.place);
-      if (!e) return;
+      const e = h.place ? entry(h.place) : { spec: h.base };
+      if (!e || !e.spec) return;
       const id = toId(withHeld(e.spec));
       const list = midis(id);
       if (!list.length || (list.length === h.list.length && list.every((m, i) => m === h.list[i]))) return;
@@ -727,7 +734,7 @@
       h.voice = SW.audio.holdChord(list.map(M.midiToFreq));
       h.id = id;
       h.list = list;
-      S.selectedChord = { place: h.place, id };
+      if (h.place) S.selectedChord = { place: h.place, id };
       announce(id, list, 'mod');
     });
   }
@@ -790,11 +797,11 @@
     parse, toId, isKnown, sameChord,
     describe, midis, spellTones, play, playPlace, announce, clearSounding, bend, bendDelta,
     cleanVoice, voiceMidis, voiceOf, refitVoice, voiceNotes, spellMidi, pairOf, nameVoice, describeVoiced,
-    holdPlace, releaseHold, isHeld, releaseAllHolds,
+    holdPlace, holdSpec, releaseHold, isHeld, releaseAllHolds,
     offered, placeShown, placeAllowed, setIndex, setChordSet, describeSet,
     heldMods, setMod, clearMods, isModKey, slotFunc, setSlot, resetSlots, modSlots, withHeld,
     placeForKey, keyOf,
     naming, setNaming, tonesOn, setTones, nameOf, otherNameOf, toneText,
-    labelHTML, modLabelHTML, figured, escapeHtml
+    labelHTML, nameScale, modLabelHTML, figured, escapeHtml
   };
 })();

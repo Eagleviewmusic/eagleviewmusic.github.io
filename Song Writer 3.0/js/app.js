@@ -397,10 +397,11 @@
   };
   window.addEventListener('pointerup', wakeOnLift, true);
 
-  // a held Z X C V B, or a held note, lets go with the key, whatever else is going on
+  // a held Z X C V B, or a held note, lets go with the key, whatever else is going on — but on the
+  // Chord Chart Z X C V B are toggles (chord-chart.js): they stay on until pressed again
   document.addEventListener('keyup', event => {
     SW.keymap.keyUp(event);
-    if (event.key && event.key.length === 1 && SW.chords.isModKey(event.key)) SW.chords.setMod(event.key.toUpperCase(), false);
+    if (event.key && event.key.length === 1 && SW.chords.isModKey(event.key) && !(SW.chordChart && SW.chordChart.latches())) SW.chords.setMod(event.key.toUpperCase(), false);
   });
 
   /* ---------------- start ---------------- */

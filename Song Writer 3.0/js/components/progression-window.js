@@ -12,16 +12,18 @@
        the song in bars, its sections and their chords, a draft until
        Apply (a dot on the tab while one waits).
      FOCUS ('focus', no tab) — components/chord-focus.js: one chord's notes
-       on a grand staff, gone into from a card, More chords…, a double-click
+       on a grand staff, gone into from a card, Create Chord, a double-click
        on the music or on the Time Line — and come back out of.
 
    Here: the tabs, ↶ ↷ (Focus undoes its notes, the Time Line its draft, the
    chart the song), the keys (app.js hands them over while the window is on
    top), listen-only lessons (D19: the window opens to look and listen —
    one guard on the sheet stops every other control), and the ways in and
-   out. Every way out (×, Esc, a tap outside) asks first when Focus has
-   changes (Save · Save as New · Don't save) or the Time Line a draft
-   (Apply · Not now).
+   out. Every way out (×, Esc, a tap outside) of Focus goes back to where
+   it was opened from — the Chord Chart or the Time Line (2026-10-29,
+   user); only Focus from the music closes the window — asking first when
+   it has changes (Save · Save as New · Don't save). The Time Line never
+   asks: its draft stays as it is, applied or not (2026-10-29, user).
 
    (Until 2026-10-29 this file was the whole window: the progressions'
    Chord Charts page, its chord editor #pchord-sheet, Hear it, the old
@@ -93,13 +95,12 @@
       if (b.dataset.tab === 'song') b.classList.toggle('pw-dot', wait);
     });
   }
-  function setTab(t, asked) {
+  function setTab(t) {
     if (t === tab) return;
     if (t === 'focus' && (readOnly() || !SW.chordFocus.isOpen())) return;
     // out of Focus with changes: its question first (Save · Save as New · Don't save), then here
     if (tab === 'focus' && SW.chordFocus.dirty()) { SW.chordFocus.leave(() => setTab(t)); return; }
-    // out of the Time Line with a draft: Apply · Not now first (D14) — into Focus never asks
-    if (tab === 'song' && t !== 'focus' && !asked && SW.chordTimeline.mustAsk()) { SW.chordTimeline.leave(() => setTab(t, true)); return; }
+    // out of the Time Line: no question — the draft stays as it is, the tab's dot says one waits
     if (tab === 'focus') SW.chordFocus.closed();
     if (tab === 'song' && t !== 'focus') SW.chordTimeline.closed();
     if (tab === 'chart' && SW.songWave) SW.songWave.stop();      // the wave's music stays with the wave
@@ -133,7 +134,10 @@
       b.style.setProperty('--c', nb.style.getPropertyValue('--c'));
       b.style.setProperty('--ink', nb.style.getPropertyValue('--ink'));
     });
-    board.querySelectorAll('.cmod[data-mod]').forEach(t => t.classList.toggle('on', C.heldMods.has(t.dataset.mod)));
+    board.querySelectorAll('.cmod[data-mod]').forEach(t => {
+      t.classList.toggle('on', C.heldMods.has(t.dataset.mod));
+      if (t.hasAttribute('aria-pressed')) t.setAttribute('aria-pressed', C.heldMods.has(t.dataset.mod));   // the chart's toggles
+    });
     SW.chordStrip.fitLabels(board);
   }
 
@@ -194,9 +198,12 @@
     render();
   }
   function close() { ui.closeSheet('prog-sheet'); }
+  /* ×, Esc, a tap outside: Focus goes back to the page it was opened from (its question first, with
+     changes) and the window stays open; Focus from the music closes it. Everything else just closes. */
   ui.guardSheet('prog-sheet', closeNow => {
-    if (tab === 'focus' && SW.chordFocus && SW.chordFocus.isOpen() && SW.chordFocus.dirty()) { SW.chordFocus.leave(closeNow); return false; }
-    if (tab === 'song' && SW.chordTimeline && SW.chordTimeline.mustAsk()) { SW.chordTimeline.leave(closeNow); return false; }
+    if (tab !== 'focus' || !SW.chordFocus || !SW.chordFocus.isOpen()) return true;
+    if (SW.chordFocus.origin() !== 'music') { SW.chordFocus.leave(); return false; }
+    if (SW.chordFocus.dirty()) { SW.chordFocus.leave(closeNow); return false; }
     return true;
   });
 

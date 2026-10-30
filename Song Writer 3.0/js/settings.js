@@ -8,7 +8,7 @@
          which page is up (the Pitch · Notation · Rhythm switch), which
          workspace components are out (View → Staging), section colours,
          and what the Sound popover remembers
-         (Chords, Chord voicing). Never travels in a link. Edited in the
+         (Chords, the sounds). Never travels in a link. Edited in the
          View and Sound popovers.
 
    LAYOUT (song_writer_30_layout_v1) — what is on the page and what can be
@@ -66,7 +66,6 @@
     chordNames: 'roman',    // the panel's names: 'roman' (I IV V) | 'letter' (C F G) — the I/C button on the panel
     chordTones: false,      // ♪ notes: the notes inside every chord block
     modSlots: ['sus2', 'add9', 'sus4', 'b7', 'maj7'],   // what Z X C V B do (js/chords.js MOD_FUNCS ids, or null)
-    voicing: 'classic',     // Sound → Chord voicing: 'classic' (1.0) | 'keyblocks'
     melodySound: 'piano',   // Sound → Melody: a Key Blocks / Virtual Keyboard sound (lib/audio.js)
     melodyVolume: 100,      //   and its volume, %
     chordSound: 'piano',    // Sound → Chords
@@ -84,6 +83,10 @@
     staffColours: true,     // 2026-10-26 Colors on the Notation page: the notes in their pitch colours (off: black)
     foldedNotes: {},        // 2.5 the explaining notes folded into their ⓘ: { noteId: true } (core.js ui.note)
     chartFolded: false,     // 2.5 the chords after the melody folded to their title (chord-track.js)
+    waveOpen: false,        // 2026-10-29 the Chord Chart's sound wave: false = folded to ▶ and the wave, true = all of it (song-wave.js)
+    chartBoard: 'circle',   // 2026-10-29 the Chord Chart's chords: 'circle' (the circle of fifths in blocks, chord-circle.js) | 'panel'
+    circleNames: 'letter',  //   and the circle's names: 'letter' (C Am B♭) | 'roman' (I vi ♭VII) — its own C · I switch
+    tlZoom: 'close',        // 2026-10-29 the Time Line's zoom: 'close' (every beat) | 'mid' (about 20 bars) | 'top' (about 36 bars) (chord-timeline.js)
     chordRhythm: true       // 2.5 the chord track shows its strikes as dots (chord-track.js)
   };
   const view = Object.assign({}, VIEW_DEFAULTS);
@@ -160,6 +163,7 @@
     ['rhythmCircles', 'rhythmColours', 'pitchMarks', 'staffColours'].forEach(k => { if (typeof view[k] !== 'boolean') view[k] = true; });
     if (PLAY_LIGHTS.indexOf(view.playLight) === -1) view.playLight = VIEW_DEFAULTS.playLight;
     if (KB_LIGHTS.indexOf(view.kbLights) === -1) view.kbLights = VIEW_DEFAULTS.kbLights;
+    if (['close', 'mid', 'top'].indexOf(view.tlZoom) === -1) view.tlZoom = VIEW_DEFAULTS.tlZoom;
   }
   function saveView() {
     try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (e) {}
@@ -450,8 +454,9 @@
 
   /* ---------------- the Sound popover — what you hear ----------------
      Melody, Steady beat, Count-in and At the end are this visit's (reset
-     each time, like Rhythm Poetry's switches); Chords and Chord voicing
-     are View preferences and are remembered. */
+     each time, like Rhythm Poetry's switches); Chords is a View
+     preference and is remembered. Chords always sound in Digital
+     Accordion's voicings: 1.0's were a choice here until 2026-10-29 (user). */
   const AT_END_NOTES = {
     stop: 'Play stops at the end of the song.',
     round: 'Go round starts again from where Play began, without a count-in.',
@@ -473,7 +478,6 @@
     document.querySelectorAll('#at-end-seg .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.end === snd.atEnd));
     const note = $('at-end-note');
     if (note) note.textContent = AT_END_NOTES[snd.atEnd] || '';
-    document.querySelectorAll('#voicing-seg .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.voicing === view.voicing));
     syncMixer();
   }
 
@@ -572,7 +576,6 @@
     // a keyboard preference: set as one (setKeyboard), so only the keyboard repaints
     $('kb-lights-seg').addEventListener('click', e => { const b = e.target.closest('.seg-btn'); if (b) setKeyboard({ kbLights: b.dataset.kl }); });
     wireMixer();
-    $('voicing-seg').addEventListener('click', e => { const b = e.target.closest('.seg-btn'); if (b) setView({ voicing: b.dataset.voicing }, { quiet: true }); });
     $('at-end-seg').addEventListener('click', e => {
       const b = e.target.closest('.seg-btn');
       if (!b) return;

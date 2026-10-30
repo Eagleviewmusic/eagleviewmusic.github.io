@@ -106,9 +106,9 @@
     selectedChord: null,     // { place, id } — the panel chord last pressed (1.0: selectedChord)
     soundingChord: null,     // { id, midis } — what the left hand is holding
     /* Sound (the popover): what Play lets you hear. Reset every visit,
-       as Rhythm Poetry's switches are; Chords and Chord voicing are View
-       preferences and are remembered (settings.js). */
-    sound: { melody: true, beat: false, countIn: true, atEnd: 'stop' }
+       as Rhythm Poetry's switches are; Chords is a View preference and
+       is remembered (settings.js). */
+    sound: { melody: true, beat: false, countIn: false, atEnd: 'stop' }   // count-in off to start (user, 2026-10-29)
   };
 
   /* ------------------------------------------------------------------
@@ -204,18 +204,6 @@
     'C6': 1046.50, 'C#6': 1108.73, 'Db6': 1108.73, 'D6': 1174.66, 'D#6': 1244.51, 'Eb6': 1244.51,
     'E6': 1318.51, 'F6': 1396.91, 'F#6': 1479.98, 'Gb6': 1479.98, 'G6': 1567.98, 'G#6': 1661.22,
     'Ab6': 1661.22, 'A6': 1760.00, 'A#6': 1864.66, 'Bb6': 1864.66, 'B6': 1975.53, 'Cb6': 1975.53
-  };
-
-  const BASE_CHORD_VOICINGS = {
-    'I': ['C3', 'C4', 'E4', 'G4'],
-    'ii': ['D3', 'D4', 'F4', 'A4'],
-    'iii': ['E3', 'E4', 'G4', 'B4'],
-    'IV': ['F3', 'F4', 'A4', 'C5'],
-    'V': ['G3', 'D4', 'G4', 'B4'],
-    'vi': ['A3', 'E4', 'A4', 'C5'],
-    'V/V': ['D3', 'D4', 'F#4', 'A4'],
-    'V/vi': ['E3', 'E4', 'G#4', 'B4'],
-    'IV/IV': ['Bb3', 'D4', 'F4', 'Bb4']
   };
 
   const CHROMATIC_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
@@ -472,7 +460,7 @@
 
   SW.music = {
     noteColorsByKey, keySignatureColors, LETTER_COLORS, letterNamesByKey, chordColorMapping,
-    chordNamesByKey, NOTE_FREQUENCIES, BASE_CHORD_VOICINGS, CHROMATIC_NOTES, KEY_TRANSPOSITION,
+    chordNamesByKey, NOTE_FREQUENCIES, CHROMATIC_NOTES, KEY_TRANSPOSITION,
     solfegeKeyMap, SOLFEGE_INTERVALS, DEFAULT_SOLFEGE_OCTAVE, KEY_SIGNATURES_CHROMATIC_INDEX, KEYS,
     noteOrder, noteToSolfege, noteToShorthandMap, shorthandToNoteMap, NOTE_HEIGHTS, LINE_COLORS,
     LETTER_PC, displayKey, noteClassOf, octaveOf, noteMidi, midiFromName, midiToFreq, spellNote,

@@ -1234,7 +1234,7 @@
   /* CHORDS FOLLOW THE SCALE (D16): a chord picked from the panel
      remembers its key (`place`); with Layout settings → Melody follows the
      scale on, it becomes that key's chord in the new scale — I IV V vi in
-     major, i iv v VI in natural minor. Chords from More chords… (no place)
+     major, i iv v VI in natural minor. Chords from Create Chord (no place)
      stay as they are. */
   function followScale() {
     const re = st => {

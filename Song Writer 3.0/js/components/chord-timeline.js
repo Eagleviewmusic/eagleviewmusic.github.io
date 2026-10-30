@@ -8,8 +8,10 @@
    section's, its label), width how long it lasts, the orange line the
    point, a dot on the tab a draft.
 
-     • A DRAFT, not the song (D13): every change here waits until Apply
-       (or the question on the way out — D14). It is kept for the song
+     • A DRAFT, not the song (D13): every change here waits until Apply.
+       Leaving never asks (2026-10-29, user — the D14 question, Apply ·
+       Chords only · Not now, is gone): the Time Line stays as it is,
+       applied or not, for coming back to. It is kept for the song
        (song_writer_30_chord_drafts_v1, { songId: { base, chords, items?,
        shape?, starts?, p0? } }) through a reload, until applied or started
        over; the Time Line tab wears a dot while one waits. `base` is what
@@ -33,7 +35,8 @@
        kept); anywhere else it starts on the beat and lasts to the next
        chord or the bar line (D17), struck once and held (D18). The
        CLIPBOARD CARD at its start is what Copy took — chords, or a
-       section with its chords: drag it in, or tap it (at the point).
+       section with its chords: drag it in, or tap it (at the point); a
+       tap on its pin takes it off (2026-10-30).
      • A CHORD: a tap selects it (⇧ along to it), hears it, and the point
        goes to its start; a drag moves it a beat at a time (⌥: a copy) —
        all the selected ones; the grips on the selected one stretch or
@@ -45,18 +48,25 @@
        the chords in those bars.
      • ▶ plays the draft from the point — its sections in their new order
        (⟲ round the whole song); ↺ Start over goes back to the song as it
-       is; Apply puts the draft in the song, one Undo step. With sections
-       changed the way out asks Apply all · Chords only (the chords at
-       their bars, the melody as it was — D15) · Not now. ⌘Z ⇧⌘Z (↶ ↷)
-       undo the draft, a step at a time.
+       is; Apply puts the draft in the song (its sections in their new
+       order, if they moved), one Undo step. ⌘Z ⇧⌘Z (↶ ↷) undo the draft,
+       a step at a time.
+     • THE ZOOM (2026-10-29, the user): three levels beside ⟲ — Close up
+       (every beat, the words under their notes: the deepest), Mid (about
+       20 bars across) and Top (about 36: most songs whole). Out there the
+       words are each line's, the bar numbers every 2nd or 4th bar when
+       they would crowd, and a chord too narrow for its name is its colour;
+       everything works the same at every level. − / + (or a pinch) change
+       it, the point (or the middle) staying where it was; remembered (View
+       pref tlZoom). A phone shows fewer bars, never too small to read.
      • Keys: Space ▶ · ← → the chord (or section) before / after (nothing
        selected: the point a beat) · ⌥← ⌥→ the selection a beat (a
        section, a bar) · Delete · Enter Focus · ⌘C ⌘X ⌘V (at the point)
-       ⌘D (Repeat) ⌘A.
+       ⌘D (Repeat) ⌘A · − + the zoom.
    Listen only (D19): play, loop, the point, the tray's chords heard —
    nothing changes.
 
-   API  SW.chordTimeline.render(body) · keyDown(e) · mustAsk() · leave(then) · waiting() ·
+   API  SW.chordTimeline.render(body) · keyDown(e) · waiting() ·
         undo() · redo() · canUndo() · canRedo() · closed()
    ========================================================================== */
 (function () {
@@ -91,6 +101,16 @@
   let seq = 0;           // new items' ids
   let fresh0 = true;     // the page opened again: it scrolls to the point
   let reveal = null;     // a tick to scroll to at the next draw, only when it is out of sight (a section tapped)
+  let zoomAnchor = null; // { tick, off }: the tick that stays `off` px into the view when the zoom changes
+
+  /* THE ZOOM: Close up is 56 px a beat (44 on a phone); Mid and Top fit about 20 and 36 bars
+     across the view, but never under their fewest px a bar (a phone shows fewer) */
+  const ZOOMS = ['close', 'mid', 'top'];
+  const ZOOM_FIT = { mid: { bars: 20, least: 34 }, top: { bars: 36, least: 18 } };
+  const ZOOM_NAME = { close: 'Close up: every beat', mid: 'Mid: about 20 bars', top: 'Top: about 36 bars' };
+  const CHORD_PX = { close: 28, mid: 20, top: 16 };           // a chord's name, and empty bars' (as style.css)
+  const GAP_PX = { close: 20, mid: 17, top: 15 };
+  const zoomNow = () => { const z = SW.settings && SW.settings.view && SW.settings.view.tlZoom; return ZOOMS.indexOf(z) === -1 ? 'close' : z; };
 
   const readOnly = () => !SW.settings.can('chords');
   const active = () => !!D && SW.progWin && SW.progWin.isOpen() && SW.progWin.tab() === 'song';
@@ -407,11 +427,15 @@
     const items = curItems();
     const L = layout(items);
     const g = L.g;
-    const beatPx = window.innerWidth <= 640 ? 44 : 56;
-    const K = beatPx / g.b;                                       // px a tick
+    const zoom = zoomNow();
+    const phone = window.innerWidth <= 640;
+    const across = Math.max(200, (bodyEl.clientWidth || window.innerWidth) - (phone ? 28 : 44));   // the view, less .tl-scroll's padding
+    const fit = ZOOM_FIT[zoom];
+    const K = fit ? Math.max(fit.least, across / fit.bars) / g.B : (phone ? 44 : 56) / g.b;      // px a tick
+    const barPx = K * g.B;
     const dEvs = T.draftEvents(D.chords, g);
     const last = Math.max(L.total, dEvs.end || 0, point + 1, 1);
-    const shownBars = Math.max(12, g.barAt(last - 1) + 4);
+    const shownBars = Math.max(fit ? Math.ceil(across / barPx) : 12, g.barAt(last - 1) + 4);
     const x = t => t * K;
     const width = x(g.T(shownBars + 1));
     const colour = tintsFor(items);
@@ -421,9 +445,10 @@
       const sp = L.spans.get(it.id);
       if (!sp) return;
       if (it.kind === 'gap') { gaps.push({ id: it.id, a: sp.at, z: sp.end, label: gapName(it, sp) }); return; }
-      const words = [], dots = [];
+      const words = [], dots = [], lines = [];
       sp.rows.forEach(r => {
         const d = r.at - r.le.at;
+        let text = '', joins = false;                            // the line's words whole (Mid, Top): a syllable whose word goes on joins the next
         r.le.events.forEach(ev => {
           const at = ev.at + d;
           const top = ev.pitches && ev.pitches.length ? ev.pitches[ev.pitches.length - 1] : null;
@@ -432,16 +457,21 @@
           if (syl && syl.querySelector('.harmony-stack') === ev.stack) {
             const tx = syl.querySelector('.text');
             const w = tx ? tx.textContent.trim() : '';
-            if (w && w !== '-') words.push({ at, w });
+            if (w && w !== '-') {
+              words.push({ at, w });
+              text += (text && !joins ? ' ' : '') + w;
+              joins = !!syl.dataset.hy;
+            }
           }
         });
+        lines.push({ at: r.at, end: r.at + r.padded, text });
       });
-      secs.push({ id: it.id, at: sp.at, end: sp.end, label: it.label, tint: colour[it.label] || TINTS[0], words, dots });
+      secs.push({ id: it.id, at: sp.at, end: sp.end, label: it.label, tint: colour[it.label] || TINTS[0], words, dots, lines });
     });
     // chords on past the song
     if ((dEvs.end || 0) > L.total) gaps.push({ id: null, a: L.total, z: Math.max(L.total + 1, g.T(g.barAt(dEvs.end - 1) + 1)), label: 'Outro' });
     gaps.forEach(gp => { gp.has = D.chords.some(pc => pc.at < gp.z && pc.end > gp.a); });
-    geo = { L, g, K, x, width, shownBars, secs, gaps, lo, hi, dEvs, beatPx };
+    geo = { L, g, K, x, width, shownBars, secs, gaps, lo, hi, dEvs, zoom, barPx };
     return geo;
   }
   const tickAt = clientX => {
@@ -464,9 +494,21 @@
     copy: '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>',
     repeat: '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><rect x="2.5" y="7" width="8" height="10" rx="2"/><rect x="13.5" y="7" width="8" height="10" rx="2" stroke-dasharray="3 2.4"/></svg>',
     trash: '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>',
-    pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8l-1.5 6 3.5 3v2H6v-2l3.5-3z"/><rect x="11" y="14" width="2" height="7" rx="1"/></svg>',
-    grip: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="1.8"/><circle cx="15" cy="7" r="1.8"/><circle cx="9" cy="12" r="1.8"/><circle cx="15" cy="12" r="1.8"/><circle cx="9" cy="17" r="1.8"/><circle cx="15" cy="17" r="1.8"/></svg>'
+    pin: '<svg viewBox="0 0 24 24" aria-hidden="true" class="pin"><path d="M8 3h8l-1.5 6 3.5 3v2H6v-2l3.5-3z"/><rect x="11" y="14" width="2" height="7" rx="1"/></svg>',
+    unpin: '<svg viewBox="0 0 24 24" aria-hidden="true" class="unpin"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    grip: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="1.8"/><circle cx="15" cy="7" r="1.8"/><circle cx="9" cy="12" r="1.8"/><circle cx="15" cy="12" r="1.8"/><circle cx="9" cy="17" r="1.8"/><circle cx="15" cy="17" r="1.8"/></svg>',
+    // the zoom: bars as wide as each level draws them — two, four, six across
+    close: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="6" width="9.5" height="12" rx="2.5"/><rect x="13.5" y="6" width="9.5" height="12" rx="2.5"/></svg>',
+    mid: '<svg viewBox="0 0 24 24" aria-hidden="true">' + [0, 1, 2, 3].map(i => '<rect x="' + (1 + i * 6) + '" y="6" width="4" height="12" rx="1.5"/>').join('') + '</svg>',
+    top: '<svg viewBox="0 0 24 24" aria-hidden="true">' + [0, 1, 2, 3, 4, 5].map(i => '<rect x="' + (1 + i * 4) + '" y="6" width="2" height="12" rx="1"/>').join('') + '</svg>'
   };
+  /* how wide a text draws in the page's own fonts: a name further out only where it fits */
+  const ruler0 = document.createElement('canvas').getContext('2d');
+  function textW(text, px, face) {
+    const fam = getComputedStyle(document.documentElement).getPropertyValue(face === 'block' ? '--font-block' : '--font-round').trim() || 'sans-serif';
+    ruler0.font = (face === 'block' ? '600 ' : '800 ') + px + 'px ' + fam;
+    return ruler0.measureText(String(text)).width;
+  }
   function look(pc) {
     const card = pc.k ? cardOf(pc.k) : null;
     const voice = card ? card.voice : pc.voice;
@@ -490,28 +532,39 @@
     const changed = !ro && differs();
 
     let ruler = '';
+    const every = [1, 2, 4, 8].find(s => n.barPx * s >= 30) || 8;           // a number every bar, or every 2nd / 4th when they would crowd
     for (let b = g.p0 ? 0 : 1; b <= n.shownBars; b++) {
       const a = barStart(b), w = x(g.T(b + 1)) - x(a);
-      ruler += '<div class="tl-bn" data-bar="' + b + '" style="left:' + x(a) + 'px;width:' + w + 'px">' + (b > 0 ? b : '') + '</div>';
+      const named = b > 0 && (b - 1) % every === 0;
+      ruler += '<div class="tl-bn' + (named || b === 0 ? '' : ' quiet') + '" data-bar="' + b + '" style="left:' + x(a) + 'px;width:' + w + 'px">' + (named ? b : '') + '</div>';
     }
+    const close = n.zoom === 'close';
     const band = n.hi - n.lo || 1;
-    const secs = n.gaps.map(gp => '<div class="tl-gap' + (gp.has ? ' has' : '') + (gp.id && gp.id === selSec ? ' sel' : '') + (gp.id ? '' : ' outro') + '"' + (gp.id ? ' data-gap="' + gp.id + '"' : '') +
-        ' data-at="' + gp.a + '" style="left:' + (x(gp.a) + 2) + 'px;width:' + Math.max(8, x(gp.z) - x(gp.a) - 4) + 'px">' + gp.label + (gp.id && gp.id === selSec ? secTools(gp.id) : '') + '</div>').join('') +
+    const secs = n.gaps.map(gp => {
+      const gw = Math.max(8, x(gp.z) - x(gp.a) - 4);
+      const named = close || textW(gp.label, GAP_PX[n.zoom], 'round') <= gw - 18;       // too narrow: the dashed bars say it
+      return '<div class="tl-gap' + (gp.has ? ' has' : '') + (gp.id && gp.id === selSec ? ' sel' : '') + (gp.id ? '' : ' outro') + '"' + (gp.id ? ' data-gap="' + gp.id + '"' : '') +
+        ' data-at="' + gp.a + '" style="left:' + (x(gp.a) + 2) + 'px;width:' + gw + 'px" title="' + esc(gp.label) + '">' + (named ? '<span class="tl-glab">' + esc(gp.label) + '</span>' : '') + (gp.id && gp.id === selSec ? secTools(gp.id) : '') + '</div>';
+    }).join('') +
       n.secs.map(s => {
-        const words = s.words.map((w, i) => {
+        // close up, each word under its note; further out, each line's words from its start
+        const words = close ? s.words.map((w, i) => {
           const nx = s.words[i + 1] ? s.words[i + 1].at : s.end;
           return '<span style="left:' + (x(w.at) - x(s.at)) + 'px;max-width:' + Math.max(12, x(nx) - x(w.at)) + 'px">' + esc(w.w) + '</span>';
-        }).join('');
+        }).join('') : s.lines.map(l => (l.text && x(l.end) - x(l.at) >= 40 ? '<span class="tl-line" style="left:' + (x(l.at) - x(s.at)) + 'px;max-width:' + (x(l.end) - x(l.at) - 6) + 'px">' + esc(l.text) + '</span>' : '')).join('');
         const dots = s.dots.map(d => '<i style="left:' + (x(d.at) - x(s.at)) + 'px;top:' + ((1 - (d.midi - n.lo) / band) * 100).toFixed(1) + '%;--nc:' + d.color + '"></i>').join('');
-        return '<div class="tl-sec' + (s.id === selSec ? ' sel' : '') + '" data-sec="' + s.id + '" data-at="' + s.at + '" style="left:' + (x(s.at) + 2) + 'px;width:' + Math.max(8, x(s.end) - x(s.at) - 4) + 'px;--sb:' + s.tint[0] + ';--sbd:' + s.tint[1] + '">' +
+        const sw = Math.max(8, x(s.end) - x(s.at) - 4);
+        return '<div class="tl-sec' + (s.id === selSec ? ' sel' : '') + '" data-sec="' + s.id + '" data-at="' + s.at + '" style="left:' + (x(s.at) + 2) + 'px;width:' + sw + 'px;--sw:' + sw + 'px;--sb:' + s.tint[0] + ';--sbd:' + s.tint[1] + '">' +
           '<div class="tl-shead"><span class="tl-slab' + (s.label ? '' : ' blank') + '">' + (s.label ? esc(s.label) : ICON.grip) + '</span>' + (s.id === selSec ? secTools(s.id) : '') + '</div>' +
           '<div class="tl-contour">' + dots + '</div><div class="tl-words">' + words + '</div></div>';
       }).join('');
 
-    body.innerHTML = '<div class="tl-view' + (ro ? ' ro' : '') + '">' +
+    body.innerHTML = '<div class="tl-view z-' + n.zoom + (ro ? ' ro' : '') + '">' +
       '<div class="tl-headbar">' +
         '<button type="button" class="cc-play tl-play' + (playing ? ' on' : '') + '" data-tline="play" title="' + (playing ? 'Stop (Space)' : 'Play from the point (Space)') + '" aria-label="' + (playing ? 'Stop' : 'Play') + '">' + (playing ? ICON.stop : ICON.play) + '</button>' +
         '<button type="button" class="cc-loop tl-loop' + (loopOn ? ' on' : '') + '" data-tline="loop" title="Round and round" aria-pressed="' + loopOn + '">' + ICON.loop + '</button>' +
+        '<div class="seg tl-zoom" role="group" aria-label="How much of the song you see">' + ZOOMS.map(z =>
+          '<button type="button" class="seg-btn' + (z === n.zoom ? ' active' : '') + '" data-tline="zoom" data-z="' + z + '" title="' + ZOOM_NAME[z] + ' (− +)" aria-label="' + ZOOM_NAME[z] + '" aria-pressed="' + (z === n.zoom) + '">' + ICON[z] + '</button>').join('') + '</div>' +
         '<span class="pw-gap"></span>' +
         (ro ? '' : '<button type="button" class="btn tl-restart" data-tline="restart"' + (changed ? '' : ' disabled') + ' title="Back to the song as it is">' + ICON.restart + 'Start over</button>' +
           '<button type="button" class="btn btn-primary tl-apply" data-tline="apply"' + (changed ? '' : ' disabled') + ' title="Put this in the song">Apply</button>') +
@@ -519,7 +572,7 @@
       '<div class="tl-scroll"><div class="tl" style="width:' + n.width + 'px">' +
         '<div class="tl-ruler">' + ruler + '</div>' +
         '<div class="tl-secrow">' + secs + '</div>' +
-        '<div class="tl-chrow" style="background-size:' + x(g.B) + 'px 100%,' + x(g.b) + 'px 100%;background-position:' + x(g.p0 % g.B) + 'px 0,' + x(g.p0 % g.b) + 'px 0">' + rowHtml() + '</div>' +
+        '<div class="tl-chrow" style="background-size:' + x(g.B) + 'px 100%,' + (x(g.b) < 10 ? x(g.B) : x(g.b)) + 'px 100%;background-position:' + x(g.p0 % g.B) + 'px 0,' + x(g.p0 % (x(g.b) < 10 ? g.B : g.b)) + 'px 0">' + rowHtml() + '</div>' +      // beats closer than 10 px: bar lines only
         '<div class="tl-pt" style="left:' + x(point) + 'px"></div>' +
         '<div class="tl-ph" hidden></div>' +
       '</div></div>' +
@@ -527,7 +580,8 @@
     '</div>';
     const sc = body.querySelector('.tl-scroll');
     if (fresh0) { scrollTo = point; fresh0 = false; }
-    if (scrollTo !== null) { sc.scrollLeft = Math.max(0, x(scrollTo) - 120); scrollTo = null; }
+    if (zoomAnchor) { sc.scrollLeft = Math.max(0, x(zoomAnchor.tick) - zoomAnchor.off); zoomAnchor = null; scrollTo = null; }
+    else if (scrollTo !== null) { sc.scrollLeft = Math.max(0, x(scrollTo) - 120); scrollTo = null; }
     else if (keepX !== null) sc.scrollLeft = keepX;
     else sc.scrollLeft = Math.max(0, x(point) - 120);
     if (reveal !== null) {
@@ -536,6 +590,7 @@
       reveal = null;
     }
     paintHead();
+    placeTools();
     if (askAfter) { const a = askAfter; askAfter = null; setTimeout(a, 0); }
   }
   /* the selected section's tools beside its tab (Copy · Repeat · Delete), or the selected bars' (Delete) */
@@ -554,18 +609,23 @@
     const { x } = geo;
     const ro = readOnly();
     const one = sel.length === 1;
+    const close = geo.zoom === 'close';
+    const px = CHORD_PX[geo.zoom];
     let html = '';
     D.chords.forEach(pc => {
       const l = look(pc);
       const w = x(pc.end) - x(pc.at);
       const on = sel.indexOf(pc.at) !== -1;
+      // its name when it fits (further out, measured); else its colour alone
+      const named = close ? w >= 34 : textW(l.name, px, 'block') <= w - 8;
       html += '<div class="tl-c' + (on ? ' sel' : '') + (l.inScale ? '' : ' out') + '" data-at="' + pc.at + '" style="left:' + (x(pc.at) + 2) + 'px;width:' + Math.max(6, w - 4) + 'px;--c:' + l.color + ';--ck:' + l.ink + '" title="' + esc(l.name) + '">' +
-        (w >= 34 ? '<span>' + C.labelHTML(l.name) + '</span>' : '') +
-        (on && one && !ro ? '<i class="tl-stretch l" data-grip="l"></i><i class="tl-stretch r" data-grip="r"></i>' : '') + '</div>';
+        (named ? '<span>' + C.labelHTML(l.name) + '</span>' : '') +
+        (on && one && !ro && (close || w >= 40) ? '<i class="tl-stretch l" data-grip="l"></i><i class="tl-stretch r" data-grip="r"></i>' : '') + '</div>';
     });
     if (sel.length && !ro) {
-      const last = D.chords.filter(pc => sel.indexOf(pc.at) !== -1).pop();
-      html += '<div class="tl-acts" style="left:' + (x(last.end) - 2) + 'px">' +
+      const list = D.chords.filter(pc => sel.indexOf(pc.at) !== -1);
+      const end = x(list[list.length - 1].end) - 2;
+      html += '<div class="tl-acts" data-start="' + (x(list[0].at) + 2) + '" data-end="' + end + '" style="left:' + end + 'px">' +
         '<button type="button" data-tline="copy" title="Copy (⌘C)" aria-label="Copy">' + ICON.copy + '</button>' +
         '<button type="button" data-tline="repeat" title="Repeat: a copy right after (⌘D)" aria-label="Repeat">' + ICON.repeat + '</button>' +
         '<button type="button" data-tline="delete" title="Delete" aria-label="Delete">' + ICON.trash + '</button></div>';
@@ -576,6 +636,8 @@
     if (clip && clip.kind === 'sec' && clip.shape !== shapeSig()) clip = null;      // its lines are not the song's any more
     return !!clip;
   }
+  /* the clipboard card's pin: a tap takes the card off the tray (2026-10-30, the user: some will want it gone when they are done) */
+  const pinHtml = () => '<button type="button" class="tl-pin" data-tline="unpin" title="Take it off" aria-label="Take the copy off">' + ICON.pin + ICON.unpin + '</button>';
   function trayHtml() {
     const ro = readOnly();
     const cards = cardsNow();
@@ -584,14 +646,30 @@
       const strip = clip.chords.map(pc => { const l = look(pc); return '<i style="--c:' + l.color + ';flex:' + (pc.end - pc.at) + '"></i>'; }).join('');
       if (clip.kind === 'sec') {
         const tint = tintsFor(curItems())[clip.label] || TINTS[0];
-        html += '<div class="tl-clip sec" style="--sb:' + tint[0] + ';--sbd:' + tint[1] + '" title="Drag it in — or tap: at the point (⌘V)"><span class="tl-pin">' + ICON.pin + '</span>' +
+        html += '<div class="tl-clip sec" style="--sb:' + tint[0] + ';--sbd:' + tint[1] + '" title="Drag it in — or tap: at the point (⌘V)">' + pinHtml() + '' +
           '<span class="tl-clab">' + (clip.label ? esc(clip.label) : ICON.grip) + '</span><span class="tl-strip">' + strip + '</span></div><span class="tl-sep"></span>';
-      } else html += '<div class="tl-clip" title="Drag it in — or tap: at the point (⌘V)"><span class="tl-pin">' + ICON.pin + '</span><span class="tl-strip">' + strip + '</span></div><span class="tl-sep"></span>';
+      } else html += '<div class="tl-clip" title="Drag it in — or tap: at the point (⌘V)">' + pinHtml() + '<span class="tl-strip">' + strip + '</span></div><span class="tl-sep"></span>';
     }
     html += cards.map(e => SW.chordChart.cardHtml(e, 0, true)).join('');
     if (!ro) html += SW.chordChart.starters(cards).map(place => SW.chordChart.starterHtml(place, true)).join('');
     return html;
   }
+
+  /* the selection's tools: under its end, slid along under the selection just enough to stay
+     inside the window (2026-10-30, the user: a chord at the far left had them cut off at its edge) */
+  function placeTools() {
+    const el = bodyEl.querySelector('.tl-chrow .tl-acts');
+    const tl = bodyEl.querySelector('.tl'), sc = bodyEl.querySelector('.tl-scroll');
+    if (!el || !tl || !sc) return;
+    const tr = tl.getBoundingClientRect(), sr = sc.getBoundingClientRect();
+    const k = tl.offsetWidth / (tr.width || 1);                       // screen px → the Time Line's own
+    const inL = Math.max(0, (sr.left - tr.left) * k + 8), inR = (sr.right - tr.left) * k - 8;
+    const w = el.offsetWidth;
+    const end = Number(el.dataset.end), start = Number(el.dataset.start);   // `left` is the tools' right edge
+    const r = Math.max(Math.min(end, inR), inL + w);                  // in sight
+    el.style.left = Math.min(Math.max(r, start + 24), end + w - 24) + 'px';   // and always under some of the selection
+  }
+  bodyEl.addEventListener('scroll', e => { if (e.target.classList && e.target.classList.contains('tl-scroll')) placeTools(); }, true);
 
   /* the playhead, while the draft plays */
   function paintHead() {
@@ -611,6 +689,38 @@
     if (sc && !press && (hx < sc.scrollLeft + 20 || hx > sc.scrollLeft + sc.clientWidth - 60)) sc.scrollLeft = Math.max(0, hx - 80);
     raf = requestAnimationFrame(paintHead);
   }
+
+  /* another zoom: what stays where it was on screen — `at` (under a pinch), else the point when it
+     is in sight, else the middle of the view */
+  function setZoom(z, at) {
+    if (ZOOMS.indexOf(z) === -1 || z === zoomNow()) return;
+    const sc = bodyEl.querySelector('.tl-scroll');
+    if (at) zoomAnchor = at;
+    else if (sc && geo) {
+      const off = geo.x(point) - sc.scrollLeft;
+      zoomAnchor = off >= 0 && off <= sc.clientWidth - 44 ? { tick: point, off } : { tick: (sc.scrollLeft + sc.clientWidth / 2) / geo.K, off: sc.clientWidth / 2 };
+    }
+    SW.settings.setView({ tlZoom: z }, { quiet: true });
+    redraw();
+  }
+  const zoomBy = (d, at) => { const i = ZOOMS.indexOf(zoomNow()) + d; if (i >= 0 && i < ZOOMS.length) setZoom(ZOOMS[i], at); };
+  /* a pinch on a trackpad (the browser sends it as ⌃ + the wheel): a level at a time */
+  let pinch = 0, pinchT = 0, pinchRest = 0;
+  bodyEl.addEventListener('wheel', e => {
+    if (!active() || !e.ctrlKey || !e.target.closest('.tl-scroll') || !geo) return;
+    e.preventDefault();                                           // never the page's own zoom
+    const now = Date.now();
+    if (now < pinchRest) return;
+    if (now - pinchT > 300) pinch = 0;
+    pinchT = now;
+    pinch += e.deltaY;
+    if (Math.abs(pinch) < 40) return;
+    const sc = bodyEl.querySelector('.tl-scroll');
+    const tick = tickAt(e.clientX);
+    zoomBy(pinch > 0 ? 1 : -1, { tick, off: geo.x(tick) - sc.scrollLeft });
+    pinch = 0;
+    pinchRest = now + 350;                                        // one level for one pinch
+  }, { passive: false });
 
   /* ---------------- sound ---------------- */
   const draftEvents = g => T.draftEvents(D ? D.chords : [], g);
@@ -936,7 +1046,7 @@
     });
   }
 
-  /* ---------------- Apply, Start over, the question on the way out ---------------- */
+  /* ---------------- Apply, Start over ---------------- */
   /* APPLY ALL: the song's lines in the draft's order (empty bars an instrumental line, Y4) and its chords, one Undo step */
   function applyAll() {
     const model = SW.score.read();
@@ -961,17 +1071,14 @@
     if (!T.applyDraft(chords)) SW.score.changed('section');
     return true;
   }
-  function apply(chordsOnly) {
+  function apply() {
     if (!D || readOnly()) return false;
     stop();
-    const msg = restructured() && !chordsOnly ? 'The song has your changes' : 'The chords are in the song';
+    const big = restructured();
+    const msg = big ? 'The song has your changes' : 'The chords are in the song';
     let ok;
-    if (restructured() && !chordsOnly) { ok = applyAll(); point = 0; scrollTo = 0; }       // a new shape: from its top
-    else if (restructured()) {
-      // CHORDS ONLY (D15): the chords at the bars the Time Line has them at, the melody as it is
-      const dp = T.grid().p0 - layout(D.items).p0;
-      ok = T.applyDraft(D.chords.map(pc => Object.assign({}, pc, { at: pc.at + dp, end: pc.end + dp })).filter(pc => pc.at >= 0));
-    } else ok = T.applyDraft(D.chords);
+    if (big) { ok = applyAll(); point = 0; scrollTo = 0; }       // a new shape: from its top
+    else ok = T.applyDraft(D.chords);
     const id = D.id;
     D = fresh(id, songBase());
     sel = [];
@@ -987,59 +1094,6 @@
       buttons: [{ label: 'Start over', primary: true, act: () => { stop(); const keep = D.hist.concat([snap()]); D = fresh(D.id, songBase()); D.hist = keep; D.edited = true; sel = []; selSec = null; persist(); redraw(); } }]
     });
   }
-  /* what the draft changes, as pictures: how many chords (by their place in their section: a chord that
-     only travelled with its section is no change), the ones going in, the sections more or fewer, where
-     the words start */
-  function chips() {
-    const A = layout(songItems()), Z = layout(curItems());
-    const keyOf = L => pc => {
-      const sp = spanAt(L, pc.at);
-      const where = sp ? (sp.it.kind === 'sec' ? 's' + sp.it.src.join(',') : 'g') + '@' + (pc.at - sp.at) : 'z@' + (pc.at - L.total);
-      return [where, pc.end - pc.at, pc.chord, pc.k || '', pc.rhythm || ''].join('|');
-    };
-    const song = cleanList(T.draftPieces());
-    const KA = song.map(keyOf(A)), KZ = D.chords.map(keyOf(Z));
-    const SA = new Set(KA), SZ = new Set(KZ);
-    const added = D.chords.filter((pc, i) => !SA.has(KZ[i]));
-    const gone = song.filter((pc, i) => !SZ.has(KA[i]));
-    const n = Math.max(added.length, gone.length);
-    let html = n ? '<span class="cc-chip"><span class="cc-chip-sw">♪</span>' + n + (n === 1 ? ' chord' : ' chords') + '</span>' : '';
-    if (added.length) html += '<span class="cc-chip cc-chip-strip">' + added.slice(0, 6).map(pc => { const l = look(pc); return '<i style="--c:' + l.color + ';--ck:' + l.ink + '">' + C.labelHTML(l.name) + '</i>'; }).join('') + (added.length > 6 ? '<b>+' + (added.length - 6) + '</b>' : '') + '</span>';
-    if (!restructured()) return html;
-    const tints = tintsFor(curItems());
-    const count = items => { const c = {}; items.forEach(it => { if (it.kind === 'sec') c[it.label] = (c[it.label] || 0) + 1; }); return c; };
-    const ca = count(A.items), cz = count(Z.items);
-    let sec = '';
-    Object.keys(Object.assign({}, ca, cz)).forEach(l => {
-      const t = tints[l] || TINTS[0], a = ca[l] || 0, z = cz[l] || 0;
-      if (z === a) return;
-      sec += '<span class="cc-chip"><span class="cc-chip-sw" style="background:' + t[1] + '">' + (l ? esc(l) : '•') + '</span>' + (z > a ? '× ' + z : '− ' + (a - z)) + '</span>';
-    });
-    const firstBar = L => { const s = L.items.find(it => it.kind === 'sec'); const sp = s && L.spans.get(s.id); return sp ? L.g.barAt(sp.at + sp.P) : 1; };
-    const fa = firstBar(A), fz = firstBar(Z);
-    if (fz !== fa) sec += '<span class="cc-chip"><span class="cc-chip-sw cc-chip-go">→</span>bar ' + fz + '</span>';
-    const gaps = Z.items.filter(it => it.kind === 'gap').length - A.items.filter(it => it.kind === 'gap').length;
-    if (gaps > 0) sec += '<span class="cc-chip"><span class="cc-chip-sw cc-chip-gap"></span>+ ' + gaps + '</span>';
-    if (!sec) sec = '<span class="cc-chip"><span class="cc-chip-sw cc-chip-go">⇄</span>' + Z.items.filter(it => it.kind === 'sec').map(it => (it.label ? esc(it.label) : '•')).join(' ') + '</span>';
-    return html + sec;
-  }
-  const mustAsk = () => !readOnly() && !!D && D.id === songId() && differs();
-  /* leaving with differences (the chart's tab, ×, Esc, a tap outside — D14): Apply (all · Chords only) · Not now, or Keep editing */
-  function leave(then) {
-    stop();
-    if (!mustAsk()) { then(); return; }
-    const big = restructured();
-    SW.chordChart.ask({
-      title: 'Put these changes in the song?',
-      chips: chips(),
-      buttons: (big
-        ? [{ label: 'Apply all', primary: true, act: () => { apply(false); then(); } },
-           { label: 'Chords only', act: () => { apply(true); then(); } }]
-        : [{ label: 'Apply', primary: true, act: () => { apply(false); then(); } }])
-        .concat([{ label: 'Not now', act: () => then() }])
-    });
-  }
-
   /* ---------------- gestures ---------------- */
   const overEl = (sel0, x, y, pad) => { const r = bodyEl.querySelector(sel0); if (!r) return false; const b = r.getBoundingClientRect(); return x >= b.left && x <= b.right && y >= b.top - pad && y <= b.bottom + pad; };
   const overRow = (x, y) => overEl('.tl-chrow', x, y, 16);
@@ -1302,8 +1356,10 @@
         b.setAttribute('aria-pressed', loopOn);
         if (mine && SW.player.playing) SW.player.playFrom(Math.floor(SW.player.position() || point), how({ loop: loopOn }));
         return;
+      case 'zoom': setZoom(b.dataset.z); return;
+      case 'unpin': clip = null; redraw(); return;
       case 'restart': restart(); return;
-      case 'apply': apply(false); return;
+      case 'apply': apply(); return;
       case 'copy': copySel(); return;
       case 'repeat': repeatSel(); return;
       case 'delete': removeSel(); return;
@@ -1333,6 +1389,8 @@
       case ' ': e.preventDefault(); if (!e.repeat) play(); return true;
       case 'Delete': case 'Backspace': e.preventDefault(); if (ro) return true; if (secOn) deleteItem(selSec); else removeSel(); return true;
       case 'Enter': e.preventDefault(); if (!ro && sel.length) focusOn(byAt(sel[0])); return true;
+      case '-': case '_': e.preventDefault(); zoomBy(1); return true;
+      case '=': case '+': e.preventDefault(); zoomBy(-1); return true;
       case 'ArrowLeft': case 'ArrowRight': {
         e.preventDefault();
         const d = k === 'ArrowLeft' ? -1 : 1;
@@ -1354,7 +1412,7 @@
   SW.bus.on('song:opened', () => { D = null; sel = []; selSec = null; clip = null; });
 
   SW.chordTimeline = {
-    render, keyDown, mustAsk, leave, waiting, undo, redo, closed,
+    render, keyDown, waiting, undo, redo, closed,
     canUndo: () => !!D && (D.hist.length > 0 || (songSteps() && SW.history.canUndo())),
     canRedo: () => !!D && (D.fut.length > 0 || (songSteps() && SW.history.canRedo()))
   };

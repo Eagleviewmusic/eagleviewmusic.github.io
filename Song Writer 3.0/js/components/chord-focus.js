@@ -7,7 +7,7 @@
      from the Chord Chart   a double-tap on a card, its tune button, Enter
      from the music         a double-click on a chord (it was Individual Focus)
      from the Time Line     a double-click on a chord, Enter
-     More chords…           a new chord to build (unlocked), Put it on the chart
+     Create Chord           a new chord to build (unlocked), Put it on the chart
 
    The chord on a treble and a bass staff, in the song's key signature,
    with the same notes on a keyboard under it; its name above follows its
@@ -31,10 +31,13 @@
        from the song, that spot alone takes it
      • ⌘Z ⇧⌘Z (↶ ↷) undo the notes here, one step at a time
    Any other way out with changes (‹ back, a tab, ×, Esc, a tap outside)
-   asks: Save · Save as New · Don't save — or Keep editing (D12).
+   asks: Save · Save as New · Don't save — or Keep editing (D12). ×, Esc
+   and a tap outside go back like ‹ (2026-10-29, user): to the Chord
+   Chart or the Time Line, whichever it was opened from — from the music,
+   the window closes.
 
    API  SW.chordFocus.openCard(k) · atSpot(tick, origin) · atDraft(piece, hooks) · openNew() · render(body, foot) ·
-        keyDown(e) · dirty() · leave(then) · undo() · redo() · canUndo() · canRedo() · closed()
+        keyDown(e) · dirty() · origin() · leave(then) · undo() · redo() · canUndo() · canRedo() · closed()
    ========================================================================== */
 (function () {
   'use strict';
@@ -296,7 +299,7 @@
     if (F.sel !== null && F.sel >= F.notes.length) F.sel = null;
     const d = C.describeVoiced(F.chord, F.notes);
     const big = C.labelHTML(C.nameOf(d)), small = d.unnamed ? '' : C.labelHTML(C.otherNameOf(d));
-    const nv = F.isNew ? C.nameVoice(F.notes) : null;                 // More chords…: the colour of the chord being built
+    const nv = F.isNew ? C.nameVoice(F.notes) : null;                 // Create Chord: the colour of the chord being built
     const color = C.describe(nv && !nv.unnamed ? nv.id : F.chord).color;
     const selN = F.sel !== null ? notesNow()[F.sel] : null;
     body.innerHTML =
@@ -331,7 +334,7 @@
     SW.progWin.setTab(o === 'song' ? 'song' : 'chart');
   }
   const tidy = (chord, notes) => { const eng = C.voiceOf(chord); return eng && JSON.stringify(eng) === JSON.stringify(notes) ? null : clone(notes); };
-  /* Save: the card's notes, everywhere it is in the song (Y2) — More chords…: on the chart */
+  /* Save: the card's notes, everywhere it is in the song (Y2) — Create Chord: on the chart */
   function save(then) {
     if (F.isNew) { saveNew(then); return; }
     const o = F.origin;
@@ -373,8 +376,7 @@
       buttons: [{ label: 'Save', primary: true, act: after(save) }, { label: 'Save as New', act: after(saveNew) }, { label: 'Don’t save', act: () => { F = null; go(); } }]
     });
   }
-  // every way out of the window goes past the question (×, a tap outside, Esc, Done)
-  // the window's ways out ask through progression-window.js's guard (Focus's question, or the Time Line's)
+  // the window's ways out (×, a tap outside, Esc) come here through progression-window.js's guard
   function closed() { holdOff(); F = null; }
 
   /* ---------------- gestures ---------------- */
@@ -453,7 +455,7 @@
   }
 
   SW.chordFocus = {
-    openCard, atSpot, atDraft, openNew, render, keyDown, dirty, leave, closed,
+    openCard, atSpot, atDraft, openNew, render, keyDown, dirty, leave, closed, origin: () => (F ? F.origin : null),
     undo, redo, canUndo: () => !!F && F.hist.length > 0, canRedo: () => !!F && F.fut.length > 0, isOpen: () => !!F
   };
 })();
