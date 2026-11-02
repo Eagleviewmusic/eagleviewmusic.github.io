@@ -165,7 +165,7 @@
   // Words | Words and notes, and every opening of the window: the button only for the words
   const seg = $('words-view-seg');
   if (seg) seg.addEventListener('click', () => setTimeout(syncButton, 0));
-  const writeBtn = $('textEditorBtn');
+  const writeBtn = $('textEditorBtn');            // the Edit box's Lyrics (the toolbar's Write until 2026-10-31)
   if (writeBtn) writeBtn.addEventListener('click', () => { close(); setTimeout(syncButton, 0); });
   // closed by its × or the backdrop: the next opening starts at the words
   const popup = $('textEditorPopup');

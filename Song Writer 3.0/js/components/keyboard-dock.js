@@ -187,7 +187,7 @@
   function accText(alter) { return alter > 0 ? '♯'.repeat(alter) : alter < 0 ? '♭'.repeat(-alter) : ''; }
 
   function readSong() {
-    const key = S.key;
+    const key = M.keyNow();                       // the key where the selection is (KEY CHANGES)
     const tonic = M.KEY_SIGNATURES_CHROMATIC_INDEX[key] || 0;
     palette = {};
     // the notes of the song's scale (the key's major scale unless the scale
@@ -235,7 +235,7 @@
     if (!IS_BLACK[pc]) return WHITE_LETTER[pc];
     // sharps or flats as the key signature of this key and scale has them
     // (D minor's keyboard says B♭, D major's C♯); none: C major's mix
-    const ks = SW.staff && SW.staff.keySignature ? SW.staff.keySignature(S.key, S.scale) : null;
+    const ks = SW.staff && SW.staff.keySignature ? SW.staff.keySignature(M.keyNow(), S.scale) : null;
     if (ks) return ks.kind < 0 ? NAMES_FLAT[pc] : ks.kind > 0 ? NAMES_SHARP[pc] : NAMES_C[pc];
     const k = M.spelledKey();
     if (k === 'C') return NAMES_C[pc];
@@ -311,7 +311,7 @@
     if (!panel) return;
     const slot = document.getElementById('corner-panel');
     const b = document.body.classList;
-    const cornerOut = slot && b.contains('show-strip') && b.contains('show-dock') && !b.contains('editing');   // the Edit box has the corner's place
+    const cornerOut = slot && b.contains('show-strip') && b.contains('show-dock') && !b.contains('box-open');   // the Edit box has the corner's place
     if (cornerOut) { if (panel.parentNode !== slot) slot.appendChild(panel); }
     else if (panel.parentNode !== dock) dock.insertBefore(panel, stage);
     dock.classList.toggle('panel-away', !!cornerOut);
@@ -406,7 +406,7 @@
     const lo = Math.max(0, b - W + 1), hi = Math.min(a, TOTAL - W);
     if (lo > hi) return null;
     const middle = a - (W - (b - a + 1)) / 2;
-    const tonic = M.KEY_SIGNATURES_CHROMATIC_INDEX[S.key] || 0;
+    const tonic = M.KEY_SIGNATURES_CHROMATIC_INDEX[M.keyNow()] || 0;
     const tonicWhite = IS_BLACK[tonic] ? tonic - 1 : tonic;
     let best = null;
     for (let s = lo; s <= hi; s++) {
@@ -781,6 +781,7 @@
   // a tap on the manuscript, or the chord panel put away (chords.js clearSounding); arrows and pitch changes leave the chord alone
   SW.bus.on('chord:cleared', () => { lit.chord = []; rebend(); if (viewport) paint(); });
   SW.bus.on('key:changed', () => { lit.chord = []; render(); });
+  SW.bus.on('keyhere:changed', () => { lit.chord = []; render(); });   // the selection went into another key (KEY CHANGES)
   SW.bus.on('keyboard:changed', d => {
     if (!viewport) return;
     dress();

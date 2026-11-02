@@ -9,9 +9,12 @@
 
       RHYTHM        [◎ Colors]   the page's view toggle, beside the kicker
       caption: "Block · G4 — tap a value"
-      [block] [𝅝] [𝅗𝅥]
-      [♩]     [♪] [𝅘𝅥𝅯]
+      [𝅝] [𝅗𝅥] [♩]
+        [♪] [𝅘𝅥𝅯]                 a short last row sits centred
       [• Dotted] [‿ Tie] [𝄽 Rest]
+
+   Not on the Pitch page (2026-10-30, the user: no rhythms there — its
+   Rest is the Note section's, edit-box.js BY PAGE).
 
      • tap a value on a BLOCK    the block is written on the staff with
                                  that value (js/staff.js), plays, and the
@@ -21,8 +24,10 @@
      • tap the lit value again   the note becomes a rest of that length,
                                  and back (RP's EASY rule — there is no
                                  rest button of its own, DECISIONS D10)
-     • tap the block circle      a note goes back to being a block; on a
-                                 block it is the block's rest
+     • Rest on a BLOCK           the block goes quiet (grey), and back —
+                                 as on the Pitch page (2026-10-30: the
+                                 block circle that did this, and turned a
+                                 note back into a block, is gone)
      • the dot                   dotted, half as long again. On a note it
                                  dots that note; on a block (or a value with
                                  no dotted form) it lights and WAITS: the next
@@ -140,7 +145,8 @@
   /* The Rest button (2.5): armed, it waits for the next value tapped —
      a rest that long goes in AFTER the selected note or rest (score.js
      insertRestAfterCurrent). The circles show rests meanwhile; Dotted
-     makes it a dotted rest. */
+     makes it a dotted rest. On a block it arms nothing: the block itself
+     goes quiet, and back (2026-10-30). */
   let restPending = false;
 
   function activeStack() {
@@ -169,21 +175,25 @@
     const allRest = !!stack && Array.from(stack.querySelectorAll('.note')).every(n => n.classList.contains('rest-note'));
     const bases = offeredBases();
     const anyDot = bases.some(dotOffered);
-    const blockColour = note && !allRest ? (note.style.backgroundColor || '#9487A2') : '#9487A2';
     const glyphH = Math.round(circleSize() * 0.66);
+    const pg = SW.settings.page ? SW.settings.page() : 'notation';
 
-    if (restPending && (!stack || !SW.settings.can('rest'))) restPending = false;
-    let html = '<button class="value-choice value-block' + (stack && !notated && !restPending ? ' on' : '') + (stack && !notated && allRest && !restPending ? ' is-rest' : '') +
-      '" data-block="1" style="--c:' + blockColour + '" title="' +
-      (notated ? 'Back to a block — its rhythm undecided' : 'A block: pitch only, its rhythm still to be decided — tap again for a rest') +
-      '" aria-label="Block"' + (stack && !restPending ? '' : ' disabled') + '><span class="blk-glyph"></span></button>';
+    // nothing waits while the Pitch page is out (the section is away there), and a block is never armed
+    if (restPending && (!stack || !SW.settings.can('rest') || pg === 'pitch' || !notated)) restPending = false;
+    if (dotPending && pg === 'pitch') dotPending = false;
+    /* The block circle left 2026-10-30 (the user): the circles are the
+       values only, in rows of three, a short last row centred — a grid of
+       six half-columns, each circle two wide. */
+    let html = '';
+    const lastRow = bases.length % 3 || 3, lastFrom = bases.length - lastRow;
     const preview = dotPending && (!notated || restPending);      // the circles show what a tap will write
-    bases.forEach(b => {
+    bases.forEach((b, i) => {
       const plain = V.withDot(b, false) || V.withDot(b, true);
       const shown = preview && dotOffered(b) ? V.withDot(b, true) : plain;
       const on = notated && cv.base === b && !restPending;
       const restName = V.byId(shown).name.replace(' note', ' rest');
-      html += '<button class="value-choice' + (on ? ' on' : '') + (on && allRest ? ' is-rest' : '') + (restPending ? ' rest-preview' : '') + '" data-base="' + b + '" style="--c:' + V.colour(plain) +
+      const col = i >= lastFrom ? ';grid-column:' + (2 * (i - lastFrom) + 4 - lastRow) + ' / span 2' : '';
+      html += '<button class="value-choice' + (on ? ' on' : '') + (on && allRest ? ' is-rest' : '') + (restPending ? ' rest-preview' : '') + '" data-base="' + b + '" style="--c:' + V.colour(plain) + col +
         '" title="' + (restPending ? restName + ' — goes in after this note'
           : V.byId(plain).name + (on ? ' — tap again for a rest' : notated ? '' : ' — writes this block on the staff')) +
         '" aria-label="' + (restPending ? restName : V.byId(plain).name) + '"' + (stack ? '' : ' disabled') + '>' +
@@ -209,12 +219,14 @@
       : 'Tie — the note goes on for another eighth, tied (the beats after it stay put)';
     tieBtn.setAttribute('aria-pressed', String(ts.tied));
 
-    // the rest (2.5): removed where Layout settings switch rests off
+    // the rest (2.5): removed where Layout settings switch rests off. On a block: the block's own rest
     restBtn.hidden = !SW.settings.can('rest');
     restBtn.disabled = !stack;
-    restBtn.classList.toggle('on', restPending);
-    restBtn.setAttribute('aria-pressed', String(restPending));
+    const restLit = restPending || (!!stack && !notated && allRest);
+    restBtn.classList.toggle('on', restLit);
+    restBtn.setAttribute('aria-pressed', String(restLit));
     restBtn.title = restPending ? 'Tap a value: a rest that long goes in after this note — tap Rest again to cancel'
+      : stack && !notated ? (allRest ? 'A rest — tap for the note again' : 'Rest — this block goes quiet (grey)')
       : 'Rest — then tap a value: a rest that long goes in after this note';
 
     // the caption: 2.0's staff card, in words
@@ -243,7 +255,6 @@
       place.classList.toggle('over', at.crosses);
     } else place.textContent = '';
     // Beats / Colors: the page's own meaning
-    const pg = SW.settings.page ? SW.settings.page() : 'notation';
     beatsDef = BEATS_BY_PAGE[pg] || BEATS_BY_PAGE.notation;
     const v = SW.settings.view || {};
     const beatsOn = beatsDef.on(v);
@@ -305,7 +316,6 @@
   }
 
   row.addEventListener('click', e => {
-    if (e.target.closest('.value-block')) { unwrite(); return; }
     const c = e.target.closest('.value-choice');
     if (!c) return;
     const { stack } = activeStack();
@@ -365,6 +375,14 @@
     e.stopPropagation();
     SW.ui.closeAllPopovers();
     if (!SW.settings.can('rest')) return;
+    const { stack } = activeStack();
+    if (stack && !SW.score.isNotated(stack) && !restPending) {
+      // a block: it goes quiet itself (grey), and back — nothing to wait for
+      dotPending = false;
+      SW.score.toggleRestOnCurrentNote();
+      render();
+      return;
+    }
     restPending = !restPending;
     if (!restPending) dotPending = false;
     render();
@@ -383,6 +401,8 @@
 
   ['selection', 'score:loaded', 'score:changed', 'key:changed', 'layout:changed', 'mode:changed', 'view:changed'].forEach(evt => SW.bus.on(evt, render));
   SW.bus.on('mode:changed', () => { if (!S.editing && (dotPending || restPending)) { dotPending = false; restPending = false; render(); } });
+  // Dotted or Rest waiting for a value: the box closing takes the circles away, so the wait ends with it
+  SW.bus.on('editbox:changed', d => { if (!d.open && (dotPending || restPending)) { dotPending = false; restPending = false; render(); } });
   let rt = 0;
   window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(render, 120); });
   render();

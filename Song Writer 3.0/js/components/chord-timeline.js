@@ -33,14 +33,19 @@
        than four) — a tap hears one, a drag puts it on the chord row: on a
        chord's first beat it becomes that chord (its length and rhythm
        kept); anywhere else it starts on the beat and lasts to the next
-       chord or the bar line (D17), struck once and held (D18). The
+       chord or the bar line (D17), struck once and held (D18). Zoomed
+       out (Mid, Top — 2026-10-30, user) a drop is a whole bar: the bar it
+       lands in, one bar long, over whatever was there (a chord that
+       started on that bar line lends it its rhythm). The
        CLIPBOARD CARD at its start is what Copy took — chords, or a
        section with its chords: drag it in, or tap it (at the point); a
        tap on its pin takes it off (2026-10-30).
      • A CHORD: a tap selects it (⇧ along to it), hears it, and the point
        goes to its start; a drag moves it a beat at a time (⌥: a copy) —
        all the selected ones; the grips on the selected one stretch or
-       shrink it a beat at a time, the chords beside it giving way; a
+       shrink it a beat at a time, the chords beside it giving way (Close
+       and Mid: always — on a narrow chord at Mid they sit just outside
+       it, 2026-10-30; Top: when it is wide enough); a
        double tap (or Enter): Focus on it — Save brings you back here, and
        Save as New swaps just this spot. Under the selection: Copy ·
        Repeat (a copy right after) · Delete (silence where it was).
@@ -72,6 +77,7 @@
 (function () {
   'use strict';
   const SW = window.SW;
+  const M = SW.music;
   const C = SW.chords;
   const T = SW.track;
   const ui = SW.ui;
@@ -257,6 +263,8 @@
         const o = { at: Math.round(pc.at), end: Math.round(pc.end), chord: pc.chord };
         ['k', 'place', 'rhythm'].forEach(f => { if (typeof pc[f] === 'string' && pc[f]) o[f] = pc[f]; });
         if (Array.isArray(pc.voice)) o.voice = clone(pc.voice);
+        const arp = T.cleanArp ? T.cleanArp(pc.arp) : null;                  // its notes one by one (2026-10-30)
+        if (arp) o.arp = arp;
         return o;
       }).sort((a, b) => a.at - b.at);
   }
@@ -410,8 +418,8 @@
   }
   /* nothing of the draft's to undo, and it is the song as it is (just applied, say): the song's own Undo */
   const songSteps = () => !!D && !D.edited && !!SW.history;
-  function undo() { if (!D) return; if (D.hist.length) step(D.hist, D.fut); else if (songSteps() && SW.history.canUndo()) SW.history.undo(); }
-  function redo() { if (!D) return; if (D.fut.length) step(D.fut, D.hist); else if (songSteps() && SW.history.canRedo()) SW.history.redo(); }
+  function undo() { if (!D) return; if (D.hist.length) step(D.hist, D.fut); else if (songSteps() && SW.history.canUndo(SW.history.forChords())) SW.history.undo(SW.history.forChords()); }
+  function redo() { if (!D) return; if (D.fut.length) step(D.fut, D.hist); else if (songSteps() && SW.history.canRedo(SW.history.forChords())) SW.history.redo(SW.history.forChords()); }
   function redraw() { if (SW.progWin && SW.progWin.isOpen()) SW.progWin.render(); }
 
   /* ---------------- the song, measured ---------------- */
@@ -512,7 +520,7 @@
   function look(pc) {
     const card = pc.k ? cardOf(pc.k) : null;
     const voice = card ? card.voice : pc.voice;
-    const d = C.isKnown(pc.chord) ? C.describeVoiced(pc.chord, voice) : null;
+    const d = C.isKnown(pc.chord) ? M.withKey(SW.keys.atTick(pc.at), () => C.describeVoiced(pc.chord, voice)) : null;   // in its bar's key (KEY CHANGES)
     if (!d || !d.known) return { name: String(pc.chord), color: '#B9AEC4', ink: '#2B1D38', inScale: true };
     return { name: C.nameOf(d), color: d.color, ink: SW.chordStrip.inkOn(d.color), inScale: d.inScale };
   }
@@ -618,9 +626,9 @@
       const on = sel.indexOf(pc.at) !== -1;
       // its name when it fits (further out, measured); else its colour alone
       const named = close ? w >= 34 : textW(l.name, px, 'block') <= w - 8;
-      html += '<div class="tl-c' + (on ? ' sel' : '') + (l.inScale ? '' : ' out') + '" data-at="' + pc.at + '" style="left:' + (x(pc.at) + 2) + 'px;width:' + Math.max(6, w - 4) + 'px;--c:' + l.color + ';--ck:' + l.ink + '" title="' + esc(l.name) + '">' +
+      html += '<div class="tl-c' + (on ? ' sel' : '') + (l.inScale ? '' : ' out') + (!close && w < 40 ? ' narrow' : '') + '" data-at="' + pc.at + '" style="left:' + (x(pc.at) + 2) + 'px;width:' + Math.max(6, w - 4) + 'px;--c:' + l.color + ';--ck:' + l.ink + '" title="' + esc(l.name) + '">' +
         (named ? '<span>' + C.labelHTML(l.name) + '</span>' : '') +
-        (on && one && !ro && (close || w >= 40) ? '<i class="tl-stretch l" data-grip="l"></i><i class="tl-stretch r" data-grip="r"></i>' : '') + '</div>';
+        (on && one && !ro && (close || geo.zoom === 'mid' || w >= 40) ? '<i class="tl-stretch l" data-grip="l"></i><i class="tl-stretch r" data-grip="r"></i>' : '') + '</div>';
     });
     if (sel.length && !ro) {
       const list = D.chords.filter(pc => sel.indexOf(pc.at) !== -1);
@@ -727,7 +735,7 @@
   const how = extra => Object.assign({ events: draftEvents, song: draftSong, countIn: false, beat: false }, extra);
   function hear(pc) {
     const card = pc.k ? cardOf(pc.k) : null;
-    if (C.isKnown(pc.chord)) C.play(pc.chord, 'progression', { voice: card ? card.voice : pc.voice });
+    if (C.isKnown(pc.chord)) M.withKey(SW.keys.atTick(pc.at), () => C.play(pc.chord, 'progression', { voice: card ? card.voice : pc.voice }));
   }
   function play() {
     if (mine && SW.player.playing) { SW.player.stop(); return; }
@@ -758,11 +766,30 @@
     if (e.voice) o.voice = clone(e.voice);
     return o;
   }
-  /* a card dropped at a tick (D17): on a chord's first beat it becomes that chord; else to the next chord or the bar line */
+  /* zoomed out (Mid, Top), a drop is a whole bar (2026-10-30, user) */
+  const barDrops = () => !!geo && geo.zoom !== 'close';
+  /* a card dropped at a tick (D17): on a chord's first beat it becomes that chord; else to the next chord or the bar line —
+     zoomed out, the bar it lands in, one bar long, over whatever was there */
   function putCard(e, tick) {
     if (!e) return;
     edit(() => {
       const g = geo.g;
+      if (barDrops()) {
+        const [a, z] = putSpan(tick);
+        const on = byAt(a);                                          // a chord that started on that bar line: its rhythm, over the bar
+        const pc = Object.assign({ at: a, end: z }, fromCard(e));
+        if (on && (on.rhythm || on.arp)) {
+          const r = F.refit(on, a, z, g);
+          if (r && r !== T.HELD) { pc.rhythm = r; if (on.arp) pc.arp = clone(on.arp); }
+        } else if (e.rhythm) Object.assign(pc, T.cardSpot(e, a, z, g));
+        D.chords = F.lay(D.chords, pc);
+        sel = [a];
+        selSec = null;
+        anchor = a;
+        point = a;
+        hear(pc);
+        return;
+      }
       const on = byAt(tick);
       let pc;
       if (on) {
@@ -776,6 +803,7 @@
         if (inside) end = Math.min(end, inside.end);
         D.chords.forEach(x => { if (x.at > tick) end = Math.min(end, x.at); });
         pc = Object.assign({ at: tick, end }, fromCard(e));
+        if (e.rhythm) Object.assign(pc, T.cardSpot(e, tick, end, g));         // in empty time: its card's rhythm (the Chord Chart's Rhythm section)
         D.chords = F.lay(D.chords, pc);
       }
       sel = [tick];
@@ -785,9 +813,10 @@
       hear(pc);
     });
   }
-  /* where a card dropped at a tick would go: [at, end) */
+  /* where a card dropped at a tick would go: [at, end) — zoomed out, the bar it is in */
   function putSpan(tick) {
     const g = geo.g;
+    if (barDrops()) { const b = barOf(tick); return [barStart(b), g.T(b + 1)]; }
     const on = byAt(tick);
     if (on) return [on.at, on.end];
     let end = g.T(g.barAt(tick) + 1);
@@ -1262,7 +1291,8 @@
       if (!pc) return;
       p.moved = true;
       const g = geo.g;
-      const tk = beatSnap(tickAt(e.clientX));
+      // the edge moves as far as the pointer has (a grip just outside a narrow chord never jumps it a beat)
+      const tk = beatSnap((p.side === 'r' ? pc.end : pc.at) + tickAt(e.clientX) - tickAt(p.x0));
       if (p.side === 'r') {
         const minEnd = Math.min(pc.end, g.p0 + (Math.floor((pc.at - g.p0) / g.b) + 1) * g.b);
         p.a2 = pc.at;
@@ -1413,7 +1443,7 @@
 
   SW.chordTimeline = {
     render, keyDown, waiting, undo, redo, closed,
-    canUndo: () => !!D && (D.hist.length > 0 || (songSteps() && SW.history.canUndo())),
-    canRedo: () => !!D && (D.fut.length > 0 || (songSteps() && SW.history.canRedo()))
+    canUndo: () => !!D && (D.hist.length > 0 || (songSteps() && SW.history.canUndo(SW.history.forChords()))),
+    canRedo: () => !!D && (D.fut.length > 0 || (songSteps() && SW.history.canRedo(SW.history.forChords())))
   };
 })();

@@ -174,7 +174,9 @@ Stack went with the Digital tower (2026-09-27).
 
 `theory.js` lists every scale with its chords in order of importance (the first nine fill
 the default tower, keys F D S A G R E Q W), a `top` row of five for the number keys
-1–5 (from the Chord Layers hand-off of 2026-09-21; in major ♭VI iv vii°7/V V/iii V/ii), and a
+1–5 (from the Chord Layers hand-off of 2026-09-21; in major ♭VI iv ii/IV iii/V V/ii — 3 and 4
+were vii°7/V and V/iii until the user changed them on 2026-10-28; layouts saved before then are
+upgraded on open, layout version 5), and a
 **More chords** bank. Six qualities were added for the number row: 6/9, 9sus4, 7♯9, 7♭9,
 9♯5 and 13♭9; five- and six-note chords voice root-in-the-bass with the rest close above
 (the fifth dropped when there are six). The ten scales that existed
@@ -240,7 +242,7 @@ unchanged (it is copied into other apps).
 
 Fourteen chords, each with its own key in the split preset, by rank of importance: **F** the
 tonic chord (I), **D S A** ranks 2–4 (V IV vi), **G R** ranks 5–6 (ii iii), **E Q W** ranks 7–9
-(V/V V/vi IV/IV), and **1 2 3 4 5** the five of the number row (♭VI iv vii°7/V V/iii V/ii) — so
+(V/V V/vi IV/IV), and **1 2 3 4 5** the five of the number row (♭VI iv ii/IV iii/V V/ii) — so
 the same finger holds the same relationship in every scale (`CHORD_ROLE`: `scale.chords[i]` →
 its key; `top[i]` → the number i + 1; `chordRole()`). The Panels view shows them as F (3/4 wide)
 beside G; A S D; Q W E R; 1 2 3 4 5, and `buildChordSide` builds new layouts' rows in that shape.
@@ -419,7 +421,7 @@ not part of a layout, so a shared layout does not force a phone into the keyboar
 **The touch layout** (`fill.js`, `window.fillRound`; `fitRound()` → `fillLayout()` in script.js):
 
 - The notes go **by pitch**, the chords **by importance** (the presets' rank: I V IV vi ii iii, then
-  V/V V/vi IV/IV, ♭VI iv vii°7/V V/iii V/ii; a chord the presets don't know comes last). They are
+  V/V V/vi IV/IV, ♭VI iv ii/IV iii/V V/ii; a chord the presets don't know comes last). They are
   cut into rows, bottom to top, and each row reads left to right — a chord row in the standard
   board's left-to-right order (a designed board's, if the side has one), with the six everyday
   chords before the others (vi ii iii V/V, not vi V/V ii iii). So the bottom row is I with its

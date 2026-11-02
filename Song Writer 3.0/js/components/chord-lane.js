@@ -48,7 +48,7 @@
     if (!syl || !SW.ctrack) return;
     const tick = tickOf(syl);
     if (tick === null) return;
-    if (S.editing && SW.settings.can('chords')) SW.ctrack.selectAtTick(tick);
+    if (SW.ctrack.editable ? SW.ctrack.editable() : S.editing && SW.settings.can('chords')) SW.ctrack.selectAtTick(tick);
     else SW.ctrack.playAtTick(tick);
   }
 

@@ -2,32 +2,49 @@
    COMPONENT SLOT — the chord panel (left hand)              #chord-strip
    and the corner under it                                    #dock-corner
    --------------------------------------------------------------------------
-   Digital Accordion's chord side, in Song Writer's frame: the fourteen
-   chords of the song's scale in the Panels shape (rows share the height;
-   F is wide), the Core · Full · Extended · Extreme set button, the
-   Z X C V B tabs along the bottom, and — with the hat on — a pencil on
-   every chord that opens the chord editor. js/chords.js is the engine.
+   Digital Accordion's chord side, in Song Writer's frame: the set button
+   chooses what is out (2026-10-30, user — it was Core · Full · Extended ·
+   Extreme, with Z X C V B tabs along the bottom; the tabs and the title
+   that never fitted went):
 
-         [ Chords        (C) (♪)     Extreme ]   C/I: names as letters or numerals; ♪: the notes in every chord
-         [ 1 ][ 2 ][ 3 ][ 4 ][ 5 ]              ♭VI iv ii/IV iii/V V/ii
-         [ Q ][ W ][ E ][ R ]                   V/vi IV/IV V/V iii
-         [ A ][ S ][ D ]                        vi IV V
-         [ F  F  F ][ G ]                       I  ii
-         [ Z sus2 ][ X add9 ][ C sus4 ][ V ♭7 ][ B maj7 ]    (✎ in Edit)
+     CHORD CHART (to start)  the song's Chord Chart, in its order, as equal
+                             blocks — each with its own notes (Focus);
+                             a key when one fits (below)
+     FULL · EXTENDED · EXTREME   the scale's places in the Panels shape
+                             (rows share the height; F is wide)
+     EVERYTHING              every major and minor chord, the circle of
+                             fifths stood up as equal blocks four across:
+                             the home pair on top, the tritone's at the
+                             bottom (chord-circle.js stack)
+
+         [ (C) (♪)          Extreme ]   C/I: names as letters or numerals; ♪: the notes in every chord
+         [ 1 ][ 2 ][ 3 ][ 4 ][ 5 ]      ♭VI iv ii/IV iii/V V/ii
+         [ Q ][ W ][ E ][ R ]           V/vi IV/IV V/V iii
+         [ A ][ S ][ D ]                vi IV V
+         [ F  F  F ][ G ]               I  ii
+
+   KEYS in the Chord Chart and Everything: a chord wears the key of the
+   place whose chord it is (I on F, IV on S, V on D, vi on A …; a chart
+   card picked from a key keeps it); the chart's others take the keys left
+   over, the number row first. ♪ on: the notes, and no keys — a block too
+   short for its name and its notes shows just the notes. js/chords.js is
+   the engine.
 
    PLAYING — tap a chord, or press its key (F D S A G R E Q W, 1–5) in
    Perform; in Edit the letters are 1.0's solfège keys unless a lane slot
-   is chosen (glowing), when the left hand takes them back. Hold a tab
-   (or Z X C V B) while you play: every chord relabels to what it would
-   become, and the chord that sounds — and is written into the lane — is
-   the modified one. A chord rings while its block or key is held, and a
-   tab (or Z X C V B) pressed or let go meanwhile strikes it again,
-   changed — so a suspension trills (2026-10-02, Digital Accordion's way).
+   is chosen (glowing), when the left hand takes them back. A chord rings
+   while its block or key is held (Digital Accordion's way). A chart card
+   sounds with its own notes and goes on the music as that card; held on
+   past a moment (key, mouse or finger), a card with a rhythm (its Rhythm
+   section) plays it round and round, in step with the press, until it
+   is let go (2026-10-30, user: it still sounds the moment it is pressed —
+   a live performance). Extreme and Everything hide their key letters;
+   the keys still play them.
 
-   EDITING — the hat on: ✎ on a chord opens the editor (root, quality,
-   permanent functions such as 7ths and 6/4, a label, back to the
-   scale's chord); ✎ at the end of the tabs opens the Z X C V B chooser.
-   Re-chording is saved with the song (score.board).
+   EDITING — until 2026-10-30 a pencil on every chord (in the Edit box's
+   chord section) opened the editor below (root, quality, 7ths and 6/4, a
+   label); the user took that section away — the Chord Chart and Focus
+   change chords now. A song's re-chorded places (score.board) still play.
 
    THE CORNER — under the panel, beside the keyboard: the chord selected
    (or the tonic chord until one is), its other name, and its notes as
@@ -54,8 +71,14 @@
   'use strict';
   const SW = window.SW;
   const S = SW.state;
-  /* the pencils: in Edit — but not while the Edit box plays chords (2.5, edit-box.js pane) */
-  const editable = () => S.editing && !(SW.editBox && SW.editBox.pane() === 'chords');
+  const M = SW.music;
+  /* the pencils: retired 2026-10-30 (user) with the Edit box's chord section, where they were — the Chord
+     Chart and Focus change chords now. The chord editor below stays (openSpecEditor), no longer reached
+     from the panel. */
+  const editable = () => false;
+  // a press that can put its chord on the music, on letting go (or dragged there): the song's
+  // notes changeable, or its chords alone (the Edit box's Chords tab with the lock on — 2026-10-31)
+  const live = () => S.editing || !!(SW.ctrack && SW.ctrack.editable && SW.ctrack.editable());
   const C = SW.chords;
   const ui = SW.ui;
   const el = document.getElementById('chord-strip');
@@ -63,6 +86,11 @@
   if (!el || !C) return;
 
   let litTimer = null;
+  let shown = [];               // the Chord Chart's or Everything's chords as drawn: [{ id, voice, k, place, key, home }]
+  let selI = null;              // the one last played
+  const own = new Map();        // holder → { i, voice }: one of them held down
+  const ownSet = () => { const id = C.panelSet().id; return id === 'chart' || id === 'everything'; };
+  const HOLD_MS = 380;          // a Chord Chart chord held this long plays its rhythm (as on the Chord Chart's cards)
   const BASE_FS = { f: 34, g: 20, a: 20, s: 20, d: 20, q: 17, w: 17, e: 17, r: 17, '1': 15, '2': 15, '3': 15, '4': 15, '5': 15 };
 
   /* dark or light writing on a colour */
@@ -110,6 +138,117 @@
       blockInner(entry, d, opts) + '</button>';
   }
 
+  /* ---------------- the Chord Chart and Everything (2026-10-30) ---------------- */
+  const samePitch = (a, b) => !!(a && b) && a.q === b.q && Theory.degreeSemis(a.root) === Theory.degreeSemis(b.root);
+  /* the keys they wear: a card picked from a key keeps it; else the place whose chord it is (exactly,
+     then root and quality alike); `rest`: the chart's others take the keys left over, the number row first */
+  const SPARE = ['1', '2', '3', '4', '5', 'q', 'w', 'e', 'r', 'g', 'a', 's', 'd', 'f'];
+  function assignKeys(list, rest) {
+    const used = new Set();
+    const take = (it, p) => { it.key = p; used.add(p); };
+    list.forEach(it => { if (it.place && C.PLACES.indexOf(it.place) !== -1 && !used.has(it.place)) take(it, it.place); });
+    const ids = {};
+    C.PLACES.forEach(p => { const e = C.entry(p); if (e) ids[p] = C.toId(e.spec); });
+    list.forEach(it => { if (!it.key) { const p = C.PLACES.find(q => !used.has(q) && ids[q] === it.id); if (p) take(it, p); } });
+    list.forEach(it => {
+      if (it.key) return;
+      const sp = C.parse(it.id);
+      const p = C.PLACES.find(q => !used.has(q) && C.entry(q) && samePitch(C.entry(q).spec, sp));
+      if (p) take(it, p);
+    });
+    if (rest) list.forEach(it => { if (!it.key) { const p = SPARE.find(q => !used.has(q)); if (p) take(it, p); } });
+  }
+  /* rows of equal blocks; a short row is filled out with gaps so every block is the same size */
+  function eqRows(rows, fs) {
+    return rows.map(r => '<div class="crow">' + r.map(i => (i === null ? '<span class="cblock-pad" aria-hidden="true"></span>' : ownBlockHtml(i, fs))).join('') + '</div>').join('');
+  }
+  const chartCards = () => (SW.chordChart ? SW.chordChart.chartNow().cards : []);
+  const chartSig = cards => cards.map(e => [e.id, e.chord, e.place || '', JSON.stringify(e.voice || null)].join(':')).join('|');
+  let drawnSig = null;          // the chart as the panel last drew it
+  function chartTower() {
+    const cards = chartCards();
+    drawnSig = chartSig(cards);
+    shown = cards.filter(e => C.isKnown(e.chord)).map(e => ({ id: e.chord, voice: e.voice || null, k: e.id, place: e.place || null }));
+    assignKeys(shown, true);
+    if (!shown.length) return '<div class="strip-tower down"><p class="strip-empty">No chords on the Chord Chart yet — the Chord Chart button opens it, and the set button shows more chords</p></div>';
+    const n = shown.length, cols = n <= 4 ? 2 : n <= 9 ? 3 : 4;
+    const rows = [];
+    for (let i = 0; i < n; i += cols) rows.push(Array.from({ length: cols }, (x, j) => (i + j < n ? i + j : null)));
+    return '<div class="strip-tower down" data-rows="' + rows.length + '">' + eqRows(rows, cols === 2 ? 26 : cols === 3 ? 20 : 16) + '</div>';
+  }
+  function circleTower() {
+    const grid = SW.chordCircle.stack();
+    shown = [];
+    const rows = grid.map(r => r.map(c => { if (!c) return null; shown.push({ id: c.id, voice: null, k: null, place: null, home: c.home }); return shown.length - 1; }));
+    assignKeys(shown, false);
+    return '<div class="strip-tower down circle" data-rows="' + rows.length + '">' + eqRows(rows, 15) + '</div>';
+  }
+  const describeOwn = it => (it.voice ? C.describeVoiced(it.id, it.voice) : C.describe(it.id));
+  function ownBlockHtml(i, fs) {
+    const it = shown[i];
+    const d = describeOwn(it);
+    const cls = ['cblock', 'own'];
+    if (!d.inScale) cls.push('out-of-scale');
+    if (C.tonesOn()) cls.push('has-tones');
+    if (it.home) cls.push('home');
+    if (selI === i) cls.push('selected');
+    const title = d.roman + ' — ' + d.letter + ' · ' + d.tones.map(t => t.name).join(' ') + (it.key ? ' (key ' + C.keyOf(it.key) + ')' : '');
+    return '<button type="button" class="' + cls.join(' ') + '" data-i="' + i + '" data-fs="' + fs + '" style="--c:' + d.color + ';--ink:' + inkOn(d.color) + '" title="' + C.escapeHtml(title) + '">' +
+      (it.key ? '<span class="cb-key">' + C.keyOf(it.key) + '</span>' : '') + mainHtml(C.nameOf(d)) + tonesHtml(d) + '</button>';
+  }
+  /* one of them played: held (a holder) until release, or struck once; in Edit it goes on the cursor's beat */
+  function playShown(i, source, holder, later) {
+    const it = shown[i];
+    if (!it) return null;
+    if (holder !== undefined) releaseOwn(holder);
+    const list = C.midis(it.id, { voice: it.voice });
+    if (!list.length) return null;
+    const freqs = list.map(SW.music.midiToFreq);
+    if (holder !== undefined) {
+      const h = { i, voice: SW.audio.holdChord(freqs), t0: SW.audio.now() };
+      own.set(holder, h);
+      // LIVE (2026-10-30, user): it sounds the moment it is pressed; held on, a chart card plays its rhythm —
+      // in step with the press (its first strike was the press), the chord ringing until the rhythm's next sound
+      const card = it.k ? chartCards().find(e => e.id === it.k) : null;
+      if (card && card.rhythm && card.rhythm !== SW.track.HELD && SW.chordRhythm) {
+        h.timer = setTimeout(() => {
+          if (own.get(holder) !== h) return;
+          h.timer = 0;
+          const lp = SW.chordRhythm.loop(card, { t0: h.t0 });
+          if (!lp) return;
+          h.loop = lp;
+          const at = lp.next();
+          h.handoff = h.voice;
+          h.voice = null;
+          h.handoffTimer = setTimeout(() => { if (h.handoff) { h.handoff.stop(); h.handoff = null; } }, at === null ? 400 : Math.max(0, (at - SW.audio.now()) * 1000));
+        }, HOLD_MS);
+      }
+    } else SW.audio.playChordFrequencies(freqs);
+    S.selectedChord = { place: null, id: it.id, voice: it.voice, key: it.key || null };
+    C.announce(it.id, list, source || 'strip');
+    selI = i;
+    el.querySelectorAll('.cblock').forEach(b => b.classList.toggle('selected', b.dataset.i === String(i)));
+    flashingI = i;
+    paintOn();
+    clearTimeout(litTimer);
+    litTimer = setTimeout(() => { flashing = null; flashingI = null; paintOn(); }, 260);
+    if (!later && SW.ctrack && SW.ctrack.takesChord()) SW.ctrack.put(it.id, it.place, it.k);
+    renderCorner();
+    return it.id;
+  }
+  const stepOf = i => { const it = shown[i], st = { chord: it.id }; if (it.place) st.place = it.place; if (it.k) st.k = it.k; return st; };
+  function releaseOwn(holder) {
+    const h = own.get(holder);
+    if (!h) return false;
+    own.delete(holder);
+    clearTimeout(h.timer);
+    clearTimeout(h.handoffTimer);
+    if (h.voice) h.voice.release();
+    if (h.handoff) h.handoff.release();
+    if (h.loop) h.loop.stop();
+    return true;
+  }
+
   // o.toggle: the Chord Chart's tabs (2026-10-29, user) — a press turns one on, the next press off
   function modTabHtml(Mk, o) {
     const f = C.slotFunc(Mk);
@@ -120,31 +259,37 @@
       '<b class="cmod-key">' + Mk + '</b><span class="cmod-name">' + C.modLabelHTML(f) + '</span></button>';
   }
 
-  function render() {
+  /* the scale's places in the Panels shape (Full, Extended, Extreme) */
+  function placesTower() {
     const offered = C.offered();
     let rows = '';
     C.SHAPE.forEach(row => {
       const cells = row.filter(cell => offered.indexOf(cell.place) !== -1).map(cell => blockHtml(C.entry(cell.place), cell.w)).join('');
       if (cells) rows += '<div class="crow">' + cells + '</div>';
     });
-    const setI = C.setIndex();
-    const set = C.CHORD_SETS[setI], next = C.CHORD_SETS[(setI + 1) % C.CHORD_SETS.length];
-    const tabs = C.SLOT_KEYS.map(modTabHtml).join('') +
-      (editable() ? '<button type="button" class="cmod-edit" title="Choose what Z X C V B do"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' : '');
+    return '<div class="strip-tower" data-rows="' + (rows.match(/class="crow"/g) || []).length + '">' + (rows || '<p class="strip-empty">No chords in this set are switched on in Layout settings</p>') + '</div>';
+  }
+  function render() {
+    const set = C.panelSet(), next = C.nextPanelSet();
+    let tower;
+    if (set.id === 'chart') tower = chartTower();
+    else if (set.id === 'everything' && SW.chordCircle) tower = circleTower();
+    else { shown = []; tower = placesTower(); }
+    // Extreme and Everything: too many for their letters — the keys still play them (2026-10-30, user)
+    if (set.id === 'extreme' || set.id === 'everything') tower = tower.replace('class="strip-tower', 'class="strip-tower nokeys');
+    if (selI !== null && !shown[selI]) selI = null;
     // the names button shows the OTHER way: "C" (the key's letter) while the numerals are on, "I" while the letters are
     const letters = C.naming() === 'letter';
-    const tonicLetter = (Theory.spellDegree(S.key, '1').name || 'C');
+    const tonicLetter = (Theory.spellDegree(M.keyNow(), '1').name || 'C');
     el.innerHTML =
       '<div class="strip-head">' +
-        '<span class="strip-title">Chords</span>' +
         '<button type="button" class="head-btn name-btn' + (letters ? ' letters' : '') + '" title="' + (letters ? 'Chord names as roman numerals (I IV V)' : 'Chord names as letters (' + tonicLetter + ' F G)') + '">' + (letters ? 'I' : C.escapeHtml(tonicLetter)) + '</button>' +
         '<button type="button" class="head-btn tones-btn' + (C.tonesOn() ? ' on' : '') + '" aria-pressed="' + String(C.tonesOn()) + '" title="♪ notes — show the notes inside every chord">' +
           '<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="8.5" cy="17.5" rx="4.4" ry="3" fill="currentColor" stroke="none" transform="rotate(-18 8.5 17.5)"/><path d="M12.4 16.8V4.2"/><path d="M12.4 4.2c4.2 1.6 6.3 4.6 5.2 9.2"/></svg>' +
         '</button>' +
-        '<button type="button" class="set-btn" data-set="' + set.id + '" title="How many chords are out: ' + C.CHORD_SETS.map(c => c.name).join(' · ') + ' — tap for ' + next.name + '"><span class="set-long">' + set.name + '</span><span class="set-short">' + set.short + '</span></button>' +
+        '<button type="button" class="set-btn" data-set="' + set.id + '" title="Which chords are out: ' + C.PANEL_SETS.map(c => c.name).join(' · ') + ' — tap for ' + next.name + '"><span class="set-long">' + set.name + '</span><span class="set-short">' + set.short + '</span></button>' +
       '</div>' +
-      '<div class="strip-tower" data-rows="' + (rows.match(/class="crow"/g) || []).length + '">' + (rows || '<p class="strip-empty">No chords in this set are switched on in Layout settings</p>') + '</div>' +
-      '<div class="strip-mods" role="group" aria-label="Chord buttons Z X C V B">' + tabs + '</div>' +
+      tower +
       progButtonHtml();
     fitLabels();
     paintOn();
@@ -195,26 +340,30 @@
     (root && root.querySelectorAll ? root : el).querySelectorAll('.cblock').forEach(b => {
       const main = b.querySelector('.cb-main');
       if (!main) return;
-      const base = BASE_FS[b.dataset.place] || 17;
+      const base = Number(b.dataset.fs) || BASE_FS[b.dataset.place] || 17;
       main.style.fontSize = base + 'px';
       const avail = b.clientWidth - 8;
       if (avail <= 0) return;
       const need = main.scrollWidth;
       if (need > avail) main.style.fontSize = Math.max(9, Math.floor(base * avail / need * 10) / 10) + 'px';
-      // the notes column (♪): pills sized to what the block has left under the name
+      // the notes column (♪, no key caps then — 2026-10-30): pills sized to what the block has left under the
+      // name; too short for the name and its notes, the name goes and the notes have it all
       const tones = b.querySelector('.cb-tones');
       let tonesH = 0;
+      b.classList.remove('no-name');
       if (tones) {
         const n = tones.children.length || 1;
-        const room = b.clientHeight - 15 - 10 - Math.min(base, 22) - 4;   // the key cap, padding, the name
-        const th = Math.max(11, Math.min(17, Math.floor((room - 2 * (n - 1)) / n)));
+        const per = room => Math.floor((room - 2 * (n - 1)) / n);
+        let th = per(b.clientHeight - 10 - Math.min(parseFloat(main.style.fontSize) * 1.05, 22) - 3);
+        if (th < 12) { b.classList.add('no-name'); th = per(b.clientHeight - 8); }
+        th = Math.max(9, Math.min(17, th));
         tones.style.setProperty('--th', th + 'px');
-        tones.style.setProperty('--tf', Math.max(8, Math.min(10.5, th * 0.62)).toFixed(1) + 'px');
+        tones.style.setProperty('--tf', Math.max(7.5, Math.min(10.5, th * 0.62)).toFixed(1) + 'px');
         tonesH = n * th + 2 * (n - 1) + 3;
       }
       // and the height: a two-line name in a short block
-      const tall = b.clientHeight - 6 - tonesH - (tones ? 15 : 0);
-      if (tall > 0 && main.scrollHeight > tall) main.style.fontSize = Math.max(9, Math.floor(parseFloat(main.style.fontSize) * tall / main.scrollHeight * 10) / 10) + 'px';
+      const tall = b.clientHeight - 6 - tonesH;
+      if (!b.classList.contains('no-name') && tall > 0 && main.scrollHeight > tall) main.style.fontSize = Math.max(9, Math.floor(parseFloat(main.style.fontSize) * tall / main.scrollHeight * 10) / 10) + 'px';
     });
   }
 
@@ -224,10 +373,20 @@
      function key pressed or let go meanwhile strikes it again, changed
      (chords.js HOLDING A CHORD — Digital Accordion's way). */
   let flashing = null;                       // the place just struck, lit for a moment however short the press
+  let flashingI = null;                      // … or the Chord Chart's / Everything's chord
   function paintOn() {
-    el.querySelectorAll('.cblock').forEach(b => b.classList.toggle('is-on', b.dataset.place === flashing || C.isHeld(b.dataset.place)));
+    const heldI = new Set([...own.values()].map(h => String(h.i)));
+    el.querySelectorAll('.cblock').forEach(b => b.classList.toggle('is-on', b.dataset.i !== undefined
+      ? b.dataset.i === String(flashingI) || heldI.has(b.dataset.i)
+      : b.dataset.place === flashing || C.isHeld(b.dataset.place)));
   }
   function trigger(place, source, holder, later) {
+    // the Chord Chart and Everything: the chord that wears this key
+    if (ownSet() && shown.length) {
+      const i = shown.findIndex(it => it.key === place);
+      if (i < 0) { ui.toast('No chord on ' + C.keyOf(place) + ' in ' + C.panelSet().name + ' — the set button shows more'); return null; }
+      return playShown(i, source, holder, later);
+    }
     if (C.offered().indexOf(place) === -1) {
       if (C.entry(place)) ui.toast(C.placeShown(place) ? 'That chord is switched off in Layout settings' : 'That chord is outside the ' + C.CHORD_SETS[C.setIndex()].name + ' set — tap the set button for more');
       return;
@@ -265,7 +424,7 @@
     carry = null;
     if (!SW.ctrack) return;
     if (c.out) SW.ctrack.dropAt(e.clientX, e.clientY, c.step);
-    else if (c.put && SW.ctrack.takesChord()) SW.ctrack.put(c.step.chord, c.step.place || null);
+    else if (c.put && SW.ctrack.takesChord()) SW.ctrack.put(c.step.chord, c.step.place || null, c.step.k);
   });
   window.addEventListener('pointercancel', e => {
     if (!carry || e.pointerId !== carry.pid) return;
@@ -275,17 +434,19 @@
 
   /* A held chord let go (its key up, its finger lifted). */
   function release(holder) {
-    if (C.releaseHold(holder)) paintOn();
+    const a = C.releaseHold(holder), b = releaseOwn(holder);
+    if (a || b) paintOn();
   }
 
   /* ---------------- the corner: what the left hand holds ---------------- */
   function renderCorner() {
     if (!now) return;
-    const sel = S.selectedChord && C.entry(S.selectedChord.place) ? S.selectedChord.place : null;
+    const loose = S.selectedChord && !S.selectedChord.place && S.selectedChord.id && C.isKnown(S.selectedChord.id) ? S.selectedChord : null;   // the Chord Chart's or Everything's
+    const sel = loose ? null : S.selectedChord && C.entry(S.selectedChord.place) ? S.selectedChord.place : null;
     const home = sel || (C.offered()[0] || 'f');
     const e = C.entry(home);
-    if (!e) { now.innerHTML = ''; return; }
-    const d = C.describe(e.spec, { held: true });
+    if (!e && !loose) { now.innerHTML = ''; return; }
+    const d = loose ? (loose.voice ? C.describeVoiced(loose.id, loose.voice) : C.describe(loose.id)) : C.describe(e.spec, { held: true });
     const main = C.nameOf(d);
     const alt = C.otherNameOf(d);
     const tones = d.tones.map(t => '<i style="--c:' + t.color + ';color:' + inkOn(t.color) + '" title="' + t.name + ' · ' + t.solfege + ' · ' + t.degreeLabel + '">' + C.escapeHtml(C.toneText(t)) + '</i>').join('');
@@ -293,10 +454,11 @@
     let note = d.quality;
     if (held.length) note = 'holding ' + held.map(f => f.name).join(' + ');
     else if (!d.inScale) note = 'outside the scale';
-    now.className = 'corner-now' + (sel ? '' : ' idle') + (d.modded ? ' modded' : '');
+    now.className = 'corner-now' + (sel || loose ? '' : ' idle') + (d.modded ? ' modded' : '');
     now.title = (sel ? 'The chord in hand' : 'The tonic chord — tap a chord, or press its key') + ': ' + d.roman + ' — ' + d.letter + ' · ' + d.tones.map(t => t.name).join(' ');
     now.innerHTML =
-      '<div class="cn-row"><span class="cn-name" style="--c:' + d.color + '">' + C.labelHTML(main) + '</span><span class="cn-key" title="Its key">' + C.keyOf(home) + '</span></div>' +
+      '<div class="cn-row"><span class="cn-name" style="--c:' + d.color + '">' + C.labelHTML(main) + '</span>' +
+        (loose && !loose.key ? '' : '<span class="cn-key" title="Its key">' + C.keyOf(loose ? loose.key : home) + '</span>') + '</div>' +
       '<div class="cn-alt">' + C.escapeHtml(alt) + '<span class="cn-note">' + C.escapeHtml(note) + '</span></div>' +
       '<div class="cn-tones">' + tones + '</div>';
   }
@@ -318,11 +480,18 @@
     const b = e.target.closest('.cblock');
     if (!b) return;
     e.preventDefault();
+    if (b.dataset.i !== undefined) {                 // the Chord Chart's or Everything's: held until the finger lifts
+      try { b.setPointerCapture(e.pointerId); } catch (err) {}
+      const i = Number(b.dataset.i);
+      const oid = playShown(i, 'strip', 'p' + e.pointerId, live());
+      if (oid && live()) carry = { pid: e.pointerId, x: e.clientX, y: e.clientY, step: stepOf(i), out: false, put: !!(SW.ctrack && SW.ctrack.takesChord()) };
+      return;
+    }
     if (e.target.closest('.cb-edit')) { openEditor(b.dataset.place); return; }
     // a finger on a block holds the chord until it lifts (a second finger can work the tabs)
     try { b.setPointerCapture(e.pointerId); } catch (err) {}
-    const id = trigger(b.dataset.place, 'strip', 'p' + e.pointerId, S.editing);
-    if (id && S.editing) carry = { pid: e.pointerId, x: e.clientX, y: e.clientY, step: C.heldMods.size ? { chord: id } : { chord: id, place: b.dataset.place }, out: false, put: !!(SW.ctrack && SW.ctrack.takesChord()) };
+    const id = trigger(b.dataset.place, 'strip', 'p' + e.pointerId, live());
+    if (id && live()) carry = { pid: e.pointerId, x: e.clientX, y: e.clientY, step: C.heldMods.size ? { chord: id } : { chord: id, place: b.dataset.place }, out: false, put: !!(SW.ctrack && SW.ctrack.takesChord()) };
   });
   ['pointerup', 'pointercancel'].forEach(type => window.addEventListener(type, e => release('p' + e.pointerId)));
   el.addEventListener('click', e => {
@@ -332,10 +501,9 @@
     const setBtn = e.target.closest('.set-btn');
     if (setBtn) {
       e.stopPropagation();
-      const i = C.setIndex();
-      const next = C.CHORD_SETS[(i + 1) % C.CHORD_SETS.length];
-      C.setChordSet(next.id);
-      ui.toast(C.describeSet(C.setIndex()));
+      selI = null;
+      C.setChordSet(C.nextPanelSet().id);
+      ui.toast(C.describePanelSet());
       return;
     }
     if (e.target.closest('.cmod-edit')) { e.stopPropagation(); openModsSheet(); }
@@ -419,7 +587,7 @@
     const paintChips = () => {
       chips.innerHTML = '';
       Theory.chromaticDegrees(C.scaleId()).forEach(deg => {
-        const sp = Theory.spellDegree(S.key, deg);
+        const sp = Theory.spellDegree(M.keyNow(), deg);
         const c = document.createElement('button');
         c.type = 'button';
         c.className = 'chip root-chip' + (scaleSet.has(Theory.degreeSemis(deg)) ? ' in-scale' : ' dim') + (Theory.degreeSemis(deg) === Theory.degreeSemis(spec.root) ? ' selected' : '');
@@ -574,9 +742,13 @@
   }
 
   /* ---------------- events ---------------- */
-  ['chords:changed', 'key:changed', 'names:changed', 'layout:changed', 'mode:changed', 'policy:changed', 'editpane:changed'].forEach(evt => SW.bus.on(evt, render));
+  ['chords:changed', 'key:changed', 'keyhere:changed', 'names:changed', 'layout:changed', 'mode:changed', 'policy:changed', 'editpane:changed'].forEach(evt => SW.bus.on(evt, render));
   SW.bus.on('mods:changed', relabel);
   ['track:changed', 'score:loaded', 'score:changed'].forEach(evt => SW.bus.on(evt, updateProgButton));
+  // the Chord Chart set: drawn again when the chart changes (a card on or off, moved, its notes saved)
+  ['track:changed', 'score:loaded', 'score:changed'].forEach(evt => SW.bus.on(evt, () => {
+    if (C.panelSet().id === 'chart' && chartSig(chartCards()) !== drawnSig) render();
+  }));
   SW.bus.on('chord:played', renderCorner);
   SW.bus.on('score:loaded', renderCorner);
   SW.bus.on('view:changed', fitLabels);

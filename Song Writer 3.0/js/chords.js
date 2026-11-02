@@ -54,6 +54,7 @@
      bend() · bendDelta(deg)                       the chord in hand bends the scale (the keyboard's)
      holdPlace(place, holder, source) · releaseHold(holder) · isHeld(place)   a chord held down (rings, re-strikes)
      offered() · placeShown(place) · setChordSet(id) · setIndex() · CHORD_SETS
+     panelSet() · nextPanelSet() · describePanelSet() · PANEL_SETS   the panel's set button (2026-10-30)
      heldMods · setMod(M, on) · clearMods() · slotFunc(M) · setSlot(M, id) · MOD_FUNCS
      placeForKey(k) · keyOf(place) · isModKey(k)
    Events: chords:changed { why } · mods:changed { held } · chord:played { id, midis, source }
@@ -90,6 +91,17 @@
     { id: 'extreme', name: 'Extreme', short: 'Xtrm', places: '12345', desc: 'everything, the number row too' }
   ];
   const EXTREME = CHORD_SETS.length - 1;
+  /* THE PANEL'S SETS (2026-10-30, user): what the set button cycles through — the song's Chord Chart to
+     start, then Full, Extended, Extreme (the places, as CHORD_SETS: Core left the cycle) and Everything (all
+     24 majors and minors round the circle of fifths, tonic on top — chord-strip.js draws the two new ones).
+     Stored as View pref chordSet; Chart and Everything offer every place to the rest of the app. */
+  const PANEL_SETS = [
+    { id: 'chart', name: 'Chord Chart', short: 'Chart' },
+    { id: 'full', name: 'Full', short: 'Full' },
+    { id: 'extended', name: 'Extended', short: 'Extd' },
+    { id: 'extreme', name: 'Extreme', short: 'Xtrm' },
+    { id: 'everything', name: 'Everything', short: 'All' }
+  ];
   const SET_OF = {};
   CHORD_SETS.forEach((s, i) => s.places.split('').forEach(p => { SET_OF[p] = i; }));
   /* the fourteen ids Song Writer wrote before the board (1.0's nine + the number row) */
@@ -122,7 +134,9 @@
   const heldMods = new Set();                      // slot keys held right now
 
   const view = () => (SW.settings && SW.settings.view) || {};
-  const keyIndex = () => M.KEY_SIGNATURES_CHROMATIC_INDEX[S.key] || 0;
+  // the key in effect (core.js keyNow — KEY CHANGES): a chord in the song is read in its bar's key
+  // (M.withKey around it), anything else in the key where the selection is
+  const keyIndex = () => M.KEY_SIGNATURES_CHROMATIC_INDEX[M.keyNow()] || 0;
   /* the key as Theory spells it — Song Writer's own spelling (F♯ stays
      F♯, G♭ stays G♭), respelled only where the scale needs it (D♭ minor
      is C♯ minor), exactly as the blocks are (core.js spelledKey) */
@@ -242,7 +256,20 @@
   /* ---------------- the chord set ---------------- */
   function setIndex() {
     const i = CHORD_SETS.findIndex(c => c.id === view().chordSet);
-    return i < 0 ? EXTREME : i;
+    return i < 0 ? EXTREME : i;                       // the Chord Chart and Everything: every place is out
+  }
+  /* the panel's set now — Chart and Everything need every chord allowed (a lesson that limits them: Extreme) */
+  const everyAllowed = () => PLACES.every(placeAllowed);
+  function panelSet() {
+    const id = view().chordSet;
+    if ((id === 'chart' || id === 'everything') && !everyAllowed()) return PANEL_SETS[3];
+    return PANEL_SETS.find(p => p.id === id) || PANEL_SETS[0];
+  }
+  /* the next set the button gives */
+  function nextPanelSet() {
+    const list = everyAllowed() ? PANEL_SETS : PANEL_SETS.filter(p => p.id !== 'chart' && p.id !== 'everything');
+    const i = list.findIndex(p => p.id === panelSet().id);
+    return list[(i + 1) % list.length];
   }
   function placeShown(place) { return setIndex() === EXTREME || SET_OF[place] <= setIndex(); }
   function placeAllowed(place) {
@@ -252,9 +279,15 @@
   /* the places that are out right now: in the set, and allowed by Layout settings */
   function offered() { return PLACES.filter(p => placeShown(p) && placeAllowed(p) && entry(p)); }
   function setChordSet(id) {
-    if (!CHORD_SETS.some(c => c.id === id) || id === view().chordSet) return;
+    if (!PANEL_SETS.some(c => c.id === id) || id === view().chordSet) return;
     SW.settings.setView({ chordSet: id }, { quiet: true });
     SW.bus.emit('chords:changed', { why: 'set' });
+  }
+  function describePanelSet() {
+    const p = panelSet();
+    if (p.id === 'chart') return 'Chord Chart — the chords on the song’s Chord Chart';
+    if (p.id === 'everything') return 'Everything — every major and minor chord, round the circle of fifths';
+    return describeSet(setIndex());
   }
   function describeSet(i) {
     if (i === EXTREME) return 'Extreme — all ' + offered().length + ' chords';
@@ -784,10 +817,11 @@
   SW.bus.on('scale:changed', () => { S.selectedChord = null; clearSounding(); clearMods(); SW.bus.emit('chords:changed', { why: 'scale' }); });
   // a new key: the chord in hand was the old key's (the keyboard drops its lit keys, and its bend)
   SW.bus.on('key:changed', clearSounding);
+  SW.bus.on('keyhere:changed', clearSounding);
   SW.bus.on('score:loaded', () => { S.selectedChord = null; S.soundingChord = null; clearMods(); SW.bus.emit('chords:changed', { why: 'song' }); });
   SW.bus.on('layout:changed', () => SW.bus.emit('chords:changed', { why: 'layout' }));
   // the chord panel put away (the Song or Keyboard tab, View, a lesson): its chord leaves the keys
-  ['view:changed', 'policy:changed'].forEach(evt => SW.bus.on(evt, () => { if (SW.settings && !SW.settings.shows('strip')) clearSounding(); }));
+  ['view:changed', 'policy:changed', 'editpane:changed'].forEach(evt => SW.bus.on(evt, () => { if (SW.settings && !SW.settings.panelOut()) clearSounding(); }));
   window.addEventListener('blur', clearMods);
 
   SW.chords = {
@@ -799,6 +833,7 @@
     cleanVoice, voiceMidis, voiceOf, refitVoice, voiceNotes, spellMidi, pairOf, nameVoice, describeVoiced,
     holdPlace, holdSpec, releaseHold, isHeld, releaseAllHolds,
     offered, placeShown, placeAllowed, setIndex, setChordSet, describeSet,
+    PANEL_SETS, panelSet, nextPanelSet, describePanelSet,
     heldMods, setMod, clearMods, isModKey, slotFunc, setSlot, resetSlots, modSlots, withHeld,
     placeForKey, keyOf,
     naming, setNaming, tonesOn, setTones, nameOf, otherNameOf, toneText,

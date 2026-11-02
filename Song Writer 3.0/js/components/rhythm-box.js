@@ -34,7 +34,8 @@
        toAll(),                   'chord': every chord of the progression plays this (held, a pre-built)
        barNo(k),                  the song's bar numbers over the circles (or null)
        write(v),                  v: 'held' · cells over its span · null (its progression's again)
-       setBars(n), redraw() }
+       setBars(n), redraw(),
+       bare }                     the circles alone, no tabs (the Chord Chart's Rhythm section, 2026-10-30)
 
    API  SW.rhythmBox.html(sc) · click(button, sc) → handled? · layout(root) ·
         presets(sc) · held(sc) — the tab a scope opens on: tabOf(sc)
@@ -167,19 +168,19 @@
     return parts.join(' and ') || '';
   }
   function html(sc) {
-    const t = tabOf(sc);
+    const t = sc.bare ? 'build' : tabOf(sc);
     const m = meter();
     let h = '<div class="rbox" data-rbkey="' + esc(sc.key) + '">';
     // whose rhythm it is: its progression's, or its own
-    if (sc.kind === 'chord' && sc.follows && !sc.own) {
+    if (!sc.bare && sc.kind === 'chord' && sc.follows && !sc.own) {
       h += '<div class="rb-whose">' + SW.ui.note('rb.follows', 'It plays <b>' + esc(sc.follows) + '</b>’s rhythm. Choose one here and it has its own.') + '</div>';
-    } else if (sc.kind === 'chord' && sc.own && !sc.readOnly) {
+    } else if (!sc.bare && sc.kind === 'chord' && sc.own && !sc.readOnly) {
       h += '<div class="rb-whose rb-own"><span class="rb-own-tag">Its own rhythm</span>' +
         (sc.follows ? '<button type="button" class="btn pw-small-btn" data-rbback title="It plays ' + esc(sc.follows) + '’s rhythm again">Back to ' + esc(sc.follows) + '’s</button>' : '') +
         (sc.toAll && (sc.held || matchesPreset(sc)) ? '<button type="button" class="btn pw-small-btn" data-rball title="Every chord of ' + esc(sc.follows) + ' plays this rhythm">Every chord of ' + esc(sc.follows) + '</button>' : '') +
       '</div>';
     }
-    if (!sc.readOnly) {
+    if (!sc.readOnly && !sc.bare) {
       const tabBtn = (id, label) => '<button type="button" class="pw-rtab' + (t === id ? ' on' : '') + '" data-rbtab="' + id + '" role="tab" aria-selected="' + (t === id) + '">' + label + '</button>';
       const bars = sc.kind === 'bar' && t !== 'held'
         ? '<div class="seg pw-bars" role="group" aria-label="How long the rhythm is"><button type="button" class="seg-btn' + (sc.bars === 2 ? '' : ' active') + '" data-rbbars="1">1 bar</button><button type="button" class="seg-btn' + (sc.bars === 2 ? ' active' : '') + '" data-rbbars="2">2 bars</button></div>'

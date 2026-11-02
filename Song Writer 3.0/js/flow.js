@@ -209,6 +209,7 @@
           ids.forEach((id, j) => {
             const src = it.cols[Math.min(j, it.cols.length - 1)];
             const c = clone(j < it.cols.length ? src : first);
+            if (j > 0) delete c.key;                     // a key change stays on the sound's first piece (keys.js)
             c.v = id;
             if (j < ids.length - 1 && !it.rest) c.tie = true; else if (lastTie && !it.rest) c.tie = true; else delete c.tie;
             emit(it.si, c);
@@ -582,7 +583,9 @@
       const g = detail() ? 6 : 12;
       const cs = cellsOf(r.model);
       const cells = cs.cells.slice();
-      const toTick = sec => r.beat0 + Math.round((sec - r.t0) / r.secPerTick / g) * g;
+      // a swung song is tapped swung (timing.js SWING): the taps are read back straight, from the beat the take began on
+      const sw = SW.timing.swing(0, r.mt);
+      const toTick = sec => r.beat0 + Math.round(sw.back((sec - r.t0) / r.secPerTick) / g) * g;
       const taps = r.taps.filter(t => t.off !== null || t === r.taps[r.taps.length - 1]);
       const q = [];
       taps.forEach((t, i) => {

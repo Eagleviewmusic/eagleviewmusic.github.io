@@ -5,11 +5,12 @@
    rhythm-poetry-lesson-policy):
 
    VIEW  (song_writer_30_view_prefs_v1) — how the room looks: type, sizes,
-         which page is up (the Pitch · Notation · Rhythm switch), which
-         workspace components are out (View → Staging), section colours,
-         and what the Sound popover remembers
+         which page is up (the Pitch · Notation · Rhythm switch), whether
+         the keyboard is out (the Edit box's Piano), section colours,
+         and what the Sound tab remembers
          (Chords, the sounds). Never travels in a link. Edited in the
-         View and Sound popovers.
+         Sound/Look popover and Options (the View and Sound popovers until
+         2026-10-31).
 
    LAYOUT (song_writer_30_layout_v1) — what is on the page and what can be
          BUILT on it: the note range, accidentals, rests, harmony,
@@ -45,11 +46,11 @@
   const VIEW_DEFAULTS = {
     workspace: 'song',      // 'song' | 'keyboard' | 'chords' | 'custom' — the old top-centre switch (2026-10-25: still read and written, nothing depends on it)
     rhythmPage: false,      // 2026-10-25 the Rhythm page is up (Rhythm Poetry's circles over the song — rhythm-page.js); the Pitch · Notation · Rhythm switch
-    showStrip: false,       // the left-hand chord strip
+    showStrip: false,       // the left-hand chord strip — no switch since 2026-11-01 (user): the Edit box's Chords tab brings the panel; always off (loadView)
     showLane: true,         // View → Chord track: the song's chords above the words (chord-track.js; the key keeps the old lane's name).
                             //   2026-10-05: its own switch — no workspace sets it; with it on, chords that are there show
     trackOwn: false,        //   (set once the switch was freed from the workspaces: the old stored value was the workspace's, not a choice)
-    showDock: false,        // the keyboard under the score
+    showDock: false,        // the keyboard under the score — the Edit box's Piano button (its Options switch went 2026-11-01)
     showStaff: true,        // notes with a rhythm are written on a treble staff
     colours: true,          // section colours: a pastel band behind each line
     blockSize: 'auto',      // 'auto' = Justify width (fit the window), or 'fixed'
@@ -62,13 +63,15 @@
     kbColor: '#9C168E',     //   the one colour, for 'single' (Song Writer's plum to start)
     kbLights: 'both',       // View → Keyboard notes light up the: 'melody' | 'chords' | 'both' | 'neither' (2026-10-08; was kbChordLights, a switch for the chords' wash)
     dockHeight: 'md',       // the keyboard: 'sm' | 'md' | 'lg', or px from its grip
-    chordSet: 'extreme',    // the chord panel: 'core' | 'full' | 'extended' | 'extreme' (js/chords.js)
+    chordSet: 'chart',      // the chord panel: 'chart' | 'full' | 'extended' | 'extreme' | 'everything' (js/chords.js PANEL_SETS; 'core' until 2026-10-30)
+    chordSetV2: false,      //   set once the panel's sets changed (2026-10-30): every panel starts on the Chord Chart once
     chordNames: 'roman',    // the panel's names: 'roman' (I IV V) | 'letter' (C F G) — the I/C button on the panel
     chordTones: false,      // ♪ notes: the notes inside every chord block
     modSlots: ['sus2', 'add9', 'sus4', 'b7', 'maj7'],   // what Z X C V B do (js/chords.js MOD_FUNCS ids, or null)
-    melodySound: 'piano',   // Sound → Melody: a Key Blocks / Virtual Keyboard sound (lib/audio.js)
+    melodySound: 'epiano',  // Sound → Melody: a Key Blocks / Virtual Keyboard sound (lib/audio.js) — Electric piano since 2026-10-31 (user; Piano until then)
     melodyVolume: 100,      //   and its volume, %
-    chordSound: 'piano',    // Sound → Chords
+    chordSound: 'marimba',  // Sound → Chords — Marimba since 2026-10-31 (user; Piano until then)
+    soundsV2: false,        //   set once the defaults changed (2026-10-31): a melody or chords still on the old Piano default move to them once
     chordVolume: 100,
     room: 35,               // Sound → Room: the reverb, % (Key Blocks' default)
     laneChordsPlay: true,   // Sound → Chords: the lane's chords sound where they change
@@ -87,7 +90,15 @@
     chartBoard: 'circle',   // 2026-10-29 the Chord Chart's chords: 'circle' (the circle of fifths in blocks, chord-circle.js) | 'panel'
     circleNames: 'letter',  //   and the circle's names: 'letter' (C Am B♭) | 'roman' (I vi ♭VII) — its own C · I switch
     tlZoom: 'close',        // 2026-10-29 the Time Line's zoom: 'close' (every beat) | 'mid' (about 20 bars) | 'top' (about 36 bars) (chord-timeline.js)
-    chordRhythm: true       // 2.5 the chord track shows its strikes as dots (chord-track.js)
+    chordRhythm: true,      // 2.5 the chord track shows its strikes as dots (chord-track.js)
+    editOpen: false,        // 2026-10-31 the Edit box is out (the rail's › — edit-box.js THE RAIL)
+    lockScore: false,       // 2026-10-31 the lock (the rail's small circle, Options → Lock the score): the score only
+                            //   changes with the Edit box open, and its Chords pane never changes the music's chords
+    noteNames: 'off',       // 2026-10-31 Look → Display Note Names: 'off' | 'letter' | 'sol' (score.js setNames; the
+                            //   toolbar's glasses until then — both names, on or off, forgotten at reload)
+    slTab: 'look',          // 2026-10-31 the Sound/Look popover's open tab: 'sound' | 'look'
+    keyMode: 'transpose'    // 2026-10-31 Look → When the key is changed: 'transpose' (the key you are in moves, notes and all)
+                            //   | 'change' (Create Key Change: a new key from that bar on — js/keys.js)
   };
   const view = Object.assign({}, VIEW_DEFAULTS);
   /* View → Light up selected/played (2026-10-01; the selection too since
@@ -99,13 +110,14 @@
      sounding plum). */
   const PLAY_LIGHTS = ['note', 'box', 'both', 'off'];
   const KB_LIGHTS = ['melody', 'chords', 'both', 'neither'];
+  const NOTE_NAMES = ['off', 'letter', 'sol'];
   function lightColour() { return (M.noteColour && M.noteColour('do')) || '#9C168E'; }
   function syncLight() {
     const c = lightColour();
     root.style.setProperty('--light', c);
     root.style.setProperty('--light-glow', ui.tint(c, 0.55));
   }
-  ['key:changed', 'scale:changed', 'score:loaded'].forEach(evt => SW.bus.on(evt, syncLight));
+  ['key:changed', 'keyhere:changed', 'scale:changed', 'score:loaded'].forEach(evt => SW.bus.on(evt, syncLight));
 
   /* The three workspaces — what is on the stage — the Song · Keyboard ·
      Chords switch in the top bar. (2.0 called them Classic · Melody ·
@@ -135,6 +147,8 @@
     } catch (e) {}
     if (OLD_WORKSPACE[view.workspace]) view.workspace = OLD_WORKSPACE[view.workspace];
     if (!view.trackOwn) { view.showLane = true; view.trackOwn = true; }   // once: the stored value was the workspace's
+    // Display Chord Panel left Options on 2026-11-01 (user): a panel left out would have nothing to put it away
+    view.showStrip = false;
     if (!WORKSPACES[view.workspace]) view.workspace = workspaceFor(view);
     view.blockPct = ui.clamp(Math.round(Number(view.blockPct)) || 100, 50, 160);
     view.textPct = ui.clamp(Math.round(Number(view.textPct)) || 100, 60, 250);
@@ -143,6 +157,11 @@
     if (KEY_COLOURS.indexOf(view.kbColors) === -1) view.kbColors = VIEW_DEFAULTS.kbColors;
     if (!/^#[0-9a-f]{6}$/i.test(String(view.kbColor))) view.kbColor = VIEW_DEFAULTS.kbColor;
     const hasSound = id => SW.audio && SW.audio.hasSound(id);
+    if (!view.soundsV2) {   // once: the old Piano default becomes the new one (a Piano picked after this stays)
+      if (view.melodySound === 'piano') view.melodySound = VIEW_DEFAULTS.melodySound;
+      if (view.chordSound === 'piano') view.chordSound = VIEW_DEFAULTS.chordSound;
+      view.soundsV2 = true;
+    }
     if (!hasSound(view.melodySound)) view.melodySound = VIEW_DEFAULTS.melodySound;
     if (!hasSound(view.chordSound)) view.chordSound = VIEW_DEFAULTS.chordSound;
     ['melodyVolume', 'chordVolume', 'room'].forEach(k => {
@@ -150,7 +169,8 @@
       view[k] = isNaN(n) ? VIEW_DEFAULTS[k] : ui.clamp(n, 0, 100);
     });
     if (SW.chords) {
-      if (!SW.chords.CHORD_SETS.some(c => c.id === view.chordSet)) view.chordSet = VIEW_DEFAULTS.chordSet;
+      if (!view.chordSetV2) { view.chordSet = VIEW_DEFAULTS.chordSet; view.chordSetV2 = true; }   // once: the new sets start on the Chord Chart
+      if (!SW.chords.PANEL_SETS.some(c => c.id === view.chordSet)) view.chordSet = VIEW_DEFAULTS.chordSet;
       if (view.chordNames !== 'letter') view.chordNames = 'roman';
       view.chordTones = !!view.chordTones;
       const slots = Array.isArray(view.modSlots) && view.modSlots.length === 5 ? view.modSlots : VIEW_DEFAULTS.modSlots;
@@ -158,12 +178,16 @@
     }
     if (typeof view.dockHeight === 'number') view.dockHeight = ui.clamp(Math.round(view.dockHeight) || 100, 52, 600);
     else if (!DOCK_HEIGHTS.includes(view.dockHeight)) view.dockHeight = 'md';
-    ['showStrip', 'showLane', 'showDock', 'showStaff', 'colours', 'kbFocus', 'laneChordsPlay', 'followScroll', 'colourPictures', 'tapDetail', 'showBeats', 'rhythmPage']
+    ['showStrip', 'showLane', 'showDock', 'showStaff', 'colours', 'kbFocus', 'laneChordsPlay', 'followScroll', 'colourPictures', 'tapDetail', 'showBeats', 'rhythmPage',
+     'editOpen', 'lockScore']
       .forEach(k => { view[k] = !!view[k]; });
     ['rhythmCircles', 'rhythmColours', 'pitchMarks', 'staffColours'].forEach(k => { if (typeof view[k] !== 'boolean') view[k] = true; });
     if (PLAY_LIGHTS.indexOf(view.playLight) === -1) view.playLight = VIEW_DEFAULTS.playLight;
     if (KB_LIGHTS.indexOf(view.kbLights) === -1) view.kbLights = VIEW_DEFAULTS.kbLights;
     if (['close', 'mid', 'top'].indexOf(view.tlZoom) === -1) view.tlZoom = VIEW_DEFAULTS.tlZoom;
+    if (NOTE_NAMES.indexOf(view.noteNames) === -1) view.noteNames = VIEW_DEFAULTS.noteNames;
+    if (view.slTab !== 'sound') view.slTab = 'look';
+    if (view.keyMode !== 'change') view.keyMode = 'transpose';
   }
   function saveView() {
     try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (e) {}
@@ -178,14 +202,20 @@
   }
 
   /* What is actually out: the preference, less whatever a lesson leaves
-     out. (While the hat is on, the chord panel sits in the foot of the
-     Edit box — edit-box.js WHERE IT SITS.) */
+     out. (While the Edit box is out, the chord panel sits in it, in its
+     Chords pane — edit-box.js WHERE IT SITS.) */
   function shows(part) {
     const allow = SW.lessons ? SW.lessons.shellAllows : () => true;
     if (part === 'strip') return view.showStrip && allow('strip');
     if (part === 'lane') return view.showLane && allow('strip');
     if (part === 'dock') return view.showDock && allow('dock');
     return true;
+  }
+  /* The chord panel to play: Display Chord Panel, or the Edit box's
+     Chords pane, which has the panel whether or not that switch is on
+     (2026-10-31) — either way the letter keys are the accordion's split. */
+  function panelOut() {
+    return shows('strip') || !!(SW.editBox && SW.editBox.pane() === 'chords');
   }
 
   /* Rounded: the app's own font. Early reader (Andika): the a and g
@@ -280,13 +310,15 @@
     if (!o.quiet) SW.bus.emit('view:changed', { view });
   }
 
-  // the hat on or off: the left column changes hands (panel ↔ Edit box, the panel in its foot).
-  // Unlocking always brings the Rhythm page's circles back (the user, 2026-10-26: Beats on
-  // at every unlock; switched off and then locked, they stay off).
-  SW.bus.on('mode:changed', d => {
-    if (d && d.editing && !view.rhythmCircles) setView({ rhythmCircles: true });
+  // the Edit box out or away: the left column changes hands (panel ↔ Edit box, the panel in its
+  // Chords pane). Opening it always brings the Rhythm page's circles back (the user, 2026-10-26: Beats
+  // on at every unlock — the box's opening is that moment since 2026-10-31; switched off and the box
+  // closed, they stay off).
+  SW.bus.on('editbox:changed', d => {
+    if (d && d.open && !view.rhythmCircles) setView({ rhythmCircles: true });
     else applyView();
   });
+  SW.bus.on('mode:changed', () => applyView());
 
   function setView(patch, opts) {
     Object.assign(view, patch);
@@ -338,43 +370,55 @@
     });
   }
 
-  /* ---------------- the View popover ----------------
-     2026-10-08 (user): Scale · Text size · Lyric font, then Music Page
-     (1–6), then Staging (7–10); a heading and the option's name, no
-     explaining text. Music Page: Display Staff Notation · Light up
-     selected/played · Follow along as song plays · Display Chord
-     Progression in the music (showLane — the chord track) · Display Chord
-     Rhythms in the music with dots · Background Section Colors. Staging:
-     Display Chord Panel · Display Keyboard · Keyboard notes light up the ·
-     Keyboard Colors. */
+  /* ---------------- Sound/Look → Look, and Options (2026-10-31, the user) ----------------
+     The View popover (2026-10-08: Scale · Text size · Lyric font, Music
+     Page, Staging; a heading and the option's name, no explaining text)
+     split in two. LOOK, the everyday tools: Scale · Text size · Lyric font,
+     then Music Page — Light up selected/played · Follow along as song plays
+     · Background Section Colors · Display Chords (Off · Chord Names ·
+     +Rhythms: showLane and chordRhythm, two switches until then) · Display
+     Note Names (Off · Letters · Solfège: the toolbar's glasses until then).
+     OPTIONS, the deeper customising: the lock, Staging (Keyboard notes
+     light up the · Keyboard Colors), Layout settings… and How this works.
+     Display Chord Panel and Display Keyboard left Staging on 2026-11-01
+     (user): the Edit box's Chords tab brings the panel, its Piano button
+     the keyboard. A lesson that leaves out "Look
+     options" (shell key 'view', its old name) takes Look and Options'
+     switches away, as it took View. */
   /* Display Staff Notation left View on 2026-10-25 (user): the Pitch ·
      Notation · Rhythm switch at the top is where the staff goes on and off. */
-  const PAGE_SWITCHES = [];
-  const PAGE_SWITCHES_MORE = [
-    { key: 'followScroll', name: 'Follow along as song plays' },
-    { key: 'showLane', name: 'Display Chord Progression in the music', part: 'strip' },
-    { key: 'chordRhythm', name: 'Display Chord Rhythms in the music with dots', part: 'strip' },
-    { key: 'colours', name: 'Background Section Colors' }
+  /* 2026-10-31 (user): the lock, off to start, is here as well as on the rail. */
+  const PAGE_SWITCHES = [
+    { key: 'lockScore', name: 'Lock the score unless the Edit box is open', can: 'edit' }
   ];
-  const STAGE_SWITCHES = [
-    { key: 'showStrip', name: 'Display Chord Panel', part: 'strip' },
-    { key: 'showDock', name: 'Display Keyboard', part: 'dock' }
+  const LOOK_SWITCHES = [
+    { key: 'followScroll', name: 'Follow along as song plays' },
+    { key: 'colours', name: 'Background Section Colors' }
   ];
   function fillSwitches(listId, rows) {
     const list = $(listId);
-    if (!list) return;
+    if (!list) return 0;
     list.innerHTML = '';
     rows.forEach(s => {
       if (s.part && SW.lessons && !SW.lessons.shellAllows(s.part)) return;
+      if (s.can && !can(s.can)) return;
       list.appendChild(ui.switchRow(s.name, '', !!view[s.key], () => setView({ [s.key]: !view[s.key] })));
     });
+    return list.children.length;
   }
+  /* Display Chords: Off · Chord Names (the chord track) · +Rhythms (and its dots) */
+  function chordsShown() { return !view.showLane ? 'off' : view.chordRhythm ? 'rhythms' : 'names'; }
+  function radio(sel, key, val) {
+    document.querySelectorAll(sel).forEach(b => {
+      const on = b.dataset[key] === val;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-checked', String(on));
+    });
+  }
+  const allows = k => !SW.lessons || SW.lessons.shellAllows(k);
 
-  function syncViewControls() {
-    const allow = k => !SW.lessons || SW.lessons.shellAllows(k);
-    fillSwitches('page-switches', PAGE_SWITCHES);
-    fillSwitches('page-switches-more', PAGE_SWITCHES_MORE);
-    fillSwitches('stage-switches', STAGE_SWITCHES);
+  function syncLook() {
+    fillSwitches('look-switches', LOOK_SWITCHES);
     $('block-auto-btn').classList.toggle('active', view.blockSize === 'auto');
     $('block-fixed-btn').classList.toggle('active', view.blockSize === 'fixed');
     const pct = Math.round(blockScale() * 100);
@@ -387,18 +431,49 @@
     $('text-smaller-btn').disabled = view.textPct <= 60;
     $('text-bigger-btn').disabled = view.textPct >= 250;
     document.querySelectorAll('#lyric-font-row .font-chip').forEach(c => c.classList.toggle('active', c.dataset.font === view.lyricFont));
-    const radio = (sel, key, val) => document.querySelectorAll(sel).forEach(b => {
-      const on = b.dataset[key] === val;
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-checked', String(on));
-    });
     radio('#play-light-seg .seg-btn', 'pl', view.playLight);
+    radio('#chords-show-seg .seg-btn', 'cs', chordsShown());
+    radio('#names-seg .seg-btn', 'nn', view.noteNames);
+    radio('#key-mode-seg .seg-btn', 'km', view.keyMode);
+    // the key's row goes when a lesson fixes the key (there is nothing to change it with)
+    showHide($('key-mode-row'), can('key'));
+    // the chords' row goes with the chords a lesson leaves in
+    showHide($('chords-show-row'), allows('strip'));
+  }
+
+  function syncOptions() {
+    const look = allows('view');
+    showHide($('lock-title'), fillSwitches('page-switches', look ? PAGE_SWITCHES : []) > 0);
+    // the keyboard's rows (Staging) go with the keyboard a lesson leaves in
+    showHide($('kb-lights-row'), look && allows('dock'));
+    showHide($('kb-colors-row'), look && allows('dock'));
     radio('#kb-lights-seg .seg-btn', 'kl', view.kbLights);
-    // the keyboard's rows go with the keyboard a lesson leaves in; Staging with whatever is left
-    showHide($('kb-lights-row'), allow('dock'));
-    showHide($('kb-colors-row'), allow('dock'));
     syncKeyColours();
-    showHide($('stage-title'), allow('dock') || allow('strip'));
+    showHide($('stage-title'), look && allows('dock'));
+  }
+
+  function syncViewControls() {
+    syncLook();
+    syncOptions();
+  }
+
+  /* The Sound/Look popover's two tabs (each is a lesson's to leave out:
+     shell keys 'sound' and 'view'); with one left, no tabs. */
+  function slTab() {
+    const sound = allows('sound'), look = allows('view');
+    return (view.slTab === 'sound' ? sound || !look : !look) ? 'sound' : 'look';
+  }
+  function syncSoundLook() {
+    const tab = slTab();
+    showHide($('sl-tabs'), allows('sound') && allows('view'));
+    document.querySelectorAll('#sl-tabs .seg-btn').forEach(b => {
+      const on = b.dataset.sl === tab;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', String(on));
+    });
+    $('sound-pane').hidden = tab !== 'sound';
+    $('look-pane').hidden = tab !== 'look';
+    if (tab === 'sound') syncSoundControls(); else syncLook();
   }
 
   /* ---------------- View → Key colours ---------------- */
@@ -452,11 +527,13 @@
     $('kb-color-custom').addEventListener('input', e => setKeyboard({ kbColors: 'single', kbColor: e.target.value.toUpperCase() }));
   }
 
-  /* ---------------- the Sound popover — what you hear ----------------
+  /* ---------------- Sound/Look → Sound — what you hear ----------------
      Melody, Steady beat, Count-in and At the end are this visit's (reset
      each time, like Rhythm Poetry's switches); Chords is a View
      preference and is remembered. Chords always sound in Digital
-     Accordion's voicings: 1.0's were a choice here until 2026-10-29 (user). */
+     Accordion's voicings: 1.0's were a choice here until 2026-10-29 (user).
+     The Count-in is Setup's since 2026-10-31 (the user) — still a sound
+     switch, so a lesson that leaves out the Sound options takes it too. */
   const AT_END_NOTES = {
     stop: 'Play stops at the end of the song.',
     round: 'Go round starts again from where Play began, without a count-in.',
@@ -474,14 +551,18 @@
         !!view.laneChordsPlay, () => { setView({ laneChordsPlay: !view.laneChordsPlay }, { quiet: true }); SW.bus.emit('sound:changed', { sound: snd }); }));
     }
     list.appendChild(ui.switchRow('Steady beat', 'A soft tick on every beat', snd.beat, () => setSound('beat', !snd.beat)));
-    list.appendChild(ui.switchRow('Count-in', 'Begin with a one-bar count-in', snd.countIn, () => setSound('countIn', !snd.countIn)));
+    const setup = $('setup-switches');
+    if (setup) {
+      setup.innerHTML = '';
+      if (allows('sound')) setup.appendChild(ui.switchRow('Start with a count-in', '', snd.countIn, () => setSound('countIn', !snd.countIn)));
+    }
     document.querySelectorAll('#at-end-seg .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.end === snd.atEnd));
     const note = $('at-end-note');
     if (note) note.textContent = AT_END_NOTES[snd.atEnd] || '';
     syncMixer();
   }
 
-  /* ---------------- the Sound popover — how it sounds ----------------
+  /* ---------------- Sound/Look → Sound — how it sounds ----------------
      The Virtual Keyboard's sounds: a sound and a volume for the melody
      and for the chords, and the Room (reverb) over both. View
      preferences, remembered; js/audio.js reads them at every note. */
@@ -551,8 +632,15 @@
   }
 
   function wireViewPopover() {
-    ui.registerPopover('view-btn', 'view-popover', syncViewControls);
-    ui.registerPopover('sound-btn', 'sound-popover', syncSoundControls);
+    ui.registerPopover('soundlook-btn', 'soundlook-popover', syncSoundLook);
+    ui.registerPopover('options-btn', 'options-popover', syncOptions);
+    $('sl-tabs').addEventListener('click', e => {
+      const b = e.target.closest('.seg-btn');
+      if (!b || b.dataset.sl === slTab()) return;
+      setView({ slTab: b.dataset.sl }, { quiet: true });
+      syncSoundLook();
+      $('soundlook-popover').scrollTop = 0;     // the new tab from its top
+    });
     document.querySelectorAll('#workspace-switch .side-tab').forEach(t => {
       t.addEventListener('click', () => setPage(t.dataset.page));
     });
@@ -573,6 +661,20 @@
     });
     wireKeyColours();
     $('play-light-seg').addEventListener('click', e => { const b = e.target.closest('.seg-btn'); if (b) setView({ playLight: b.dataset.pl }); });
+    $('chords-show-seg').addEventListener('click', e => {
+      const b = e.target.closest('.seg-btn');
+      if (b && b.dataset.cs !== chordsShown()) setView({ showLane: b.dataset.cs !== 'off', chordRhythm: b.dataset.cs === 'rhythms' });
+    });
+    $('key-mode-seg').addEventListener('click', e => {
+      const b = e.target.closest('.seg-btn');
+      if (b && b.dataset.km !== view.keyMode) setView({ keyMode: b.dataset.km });   // the range follows (allowedNotes)
+    });
+    $('names-seg').addEventListener('click', e => {
+      const b = e.target.closest('.seg-btn');
+      if (!b || b.dataset.nn === view.noteNames) return;
+      setView({ noteNames: b.dataset.nn });
+      SW.score.setNames(view.noteNames);
+    });
     // a keyboard preference: set as one (setKeyboard), so only the keyboard repaints
     $('kb-lights-seg').addEventListener('click', e => { const b = e.target.closest('.seg-btn'); if (b) setKeyboard({ kbLights: b.dataset.kl }); });
     wireMixer();
@@ -585,17 +687,7 @@
     });
     $('layout-settings-btn').addEventListener('click', openLayoutSheet);
     $('help-btn').addEventListener('click', () => ui.openSheet('help-sheet'));
-
-    // a mouse resting on View: the Scale slider (Rhythm Poetry's size gauge)
-    ui.setupHoverGauge({
-      trigger: $('view-btn'),
-      wrap: $('size-gauge-wrap'),
-      slider: $('size-gauge'),
-      label: $('size-gauge-label'),
-      getValue: () => Math.round(blockScale() * 100),
-      format: v => v + '%',
-      onInput: v => setBlockPct(v)
-    });
+    // (a mouse resting on View showed the Scale slider until 2026-10-31; it is the Look tab's first row)
 
     let t = null;
     window.addEventListener('resize', () => {
@@ -611,7 +703,7 @@
   function blankLayout() {
     return {
       v: 1,
-      notes: null,        // null = all eighteen; else the note classes allowed
+      notes: null,        // null = all twenty-two (eighteen until 2026-10-31); else the note classes allowed
       accidentals: true,
       rests: true,
       harmony: true,
@@ -740,7 +832,15 @@
   }
 
   /* ---- the questions the rest of the app asks ---- */
-  function allowedNotes() { return layout.notes || M.noteOrder; }
+  /* The rungs that may be written. Layout settings' range (a choice of the
+     twenty-two, each key's own) when it is narrowed; otherwise all twenty-two
+     — or, with Look → Create Key Change (js/keys.js), every rung whose notes
+     sound inside A♭2 … G6 in the key given (the key in effect when none). */
+  function allowedNotes(key) {
+    if (layout.notes) return layout.notes;
+    if (SW.keys && SW.keys.mode() === 'change') return SW.keys.rungsFor(key || M.keyNow());
+    return M.noteOrder;
+  }
   function allowedValues() {
     const all = SW.values.LIST.map(v => v.id);
     return layout.values ? all.filter(id => layout.values.indexOf(id) !== -1) : all;
@@ -802,37 +902,14 @@
     const shell = k => !L || L.shellAllows(k);
     document.body.classList.toggle('in-lesson', inLesson);
 
-    // the hat and the editing layer
-    showHide($('editToggle'), can('edit'));
+    // the editing layer (the rail and the Edit box: edit-box.js, on policy:changed)
     showHide($('rhythm-panel'), can('values'));
     showHide($('textEditorBtn'), can('textEditor'));
     showHide($('add-line-row'), can('structure'));
     document.body.classList.toggle('chords-locked', !can('chords'));
     document.body.classList.toggle('sections-locked', !can('sections'));
 
-    // key + time + tempo: plain text when they cannot change
-    const keyFixed = !can('key'), meterFixed = !can('meter'), tempoFixed = !can('tempo');
-    const keyBtn = $('keySignatureDisplay');
-    if (keyBtn) {
-      keyBtn.classList.toggle('fixed', keyFixed);
-      keyBtn.title = keyFixed ? 'The key stays as written in this lesson' : 'Key — tap to choose';
-    }
-    const ts = $('time-sig');
-    if (ts) {
-      ts.classList.toggle('fixed', meterFixed);
-      ts.title = meterFixed ? 'The time signature' : 'Tap the top number for the beats in a bar, the bottom one for 6/8-style time';
-    }
-    const tsTop = $('ts-top');
-    if (tsTop) tsTop.disabled = meterFixed;
-    const tsBottom = $('ts-bottom');
-    if (tsBottom) tsBottom.disabled = meterFixed;
-    const sig = $('signature');
-    if (sig) sig.classList.toggle('all-fixed', keyFixed && meterFixed);
-    const bpm = $('bpm-button');
-    if (bpm) {
-      bpm.classList.toggle('fixed', tempoFixed);
-      bpm.title = tempoFixed ? 'The tempo stays as written in this lesson' : 'Tap to type a tempo';
-    }
+    // (key + time + tempo: plain text when they cannot change — in Setup since 2026-10-31: app.js syncSetup, on policy:changed)
 
     // the stage: a tab goes when the lesson removes its part; with only
     // Song left, the whole switch goes (as Rhythm Poetry's one-side lesson)
@@ -842,8 +919,7 @@
     showHide(chTab, shell('strip'));
     // the page switch is never a lesson's to take away: it only changes how the song is seen (rule 1)
 
-    showHide($('sound-btn'), shell('sound'));
-    showHide($('view-btn'), shell('view'));
+    showHide($('soundlook-btn'), shell('sound') || shell('view'));
     showHide($('tg-present'), shell('present'));
     showHide($('song-chip'), !L || L.libraryMode() !== 'none');
     showHide($('copyVisualBtn'), shell('picture'));
@@ -880,7 +956,7 @@
      THE LAYOUT SETTINGS SHEET
      ================================================================== */
   const RANGE_PRESETS = [
-    { id: 'all', name: 'All eighteen', notes: null },
+    { id: 'all', name: 'All twenty-two', notes: null },
     { id: 'octave', name: 'Do to do′', notes: ['do', 're', 'mi', 'fa', 'so', 'la', 'ti', 'do-high'] },
     { id: 'five', name: 'Do to so', notes: ['do', 're', 'mi', 'fa', 'so'] },
     { id: 'penta', name: 'Pentatonic', notes: M.noteOrder.filter(n => ['Do', 'Re', 'Mi', 'So', 'La'].indexOf(M.noteToSolfege[n]) !== -1) }
@@ -910,7 +986,7 @@
   function renderLayoutNotes() {
     const presets = $('layout-range-presets');
     presets.innerHTML = '';
-    const cur = allowedNotes();
+    const cur = layout.notes || M.noteOrder;      // the sheet shows each key's own range
     RANGE_PRESETS.forEach(p => {
       const on = (p.notes || M.noteOrder).join() === cur.join();
       const chip = document.createElement('button');
@@ -933,11 +1009,12 @@
       b.className = 'range-block' + (on ? ' on' : '');
       b.style.setProperty('--h', M.NOTE_HEIGHTS[n]);
       b.style.setProperty('--c', M.noteColour(n));
-      b.title = sol + (M.octaveOf(n) < 0 ? ' (low)' : M.octaveOf(n) > 0 ? ' (high)' : '');
+      const oct = M.octaveOf(n);
+      b.title = sol + (oct < 0 ? ' (low)' : oct > 1 ? ' (two octaves up)' : oct > 0 ? ' (high)' : '');
       b.innerHTML = '<span class="range-bar"></span><span class="range-name"></span>';
-      b.querySelector('.range-name').textContent = sol.toLowerCase() + (M.octaveOf(n) < 0 ? ',' : M.octaveOf(n) > 0 ? '′' : '');
+      b.querySelector('.range-name').textContent = sol.toLowerCase() + (oct < 0 ? ',' : oct > 1 ? '″' : oct > 0 ? '′' : '');
       b.addEventListener('click', () => {
-        let list = allowedNotes().slice();
+        let list = (layout.notes || M.noteOrder).slice();
         const at = list.indexOf(n);
         if (at === -1) list.push(n);
         else if (list.length > 1) list.splice(at, 1);
@@ -1045,11 +1122,11 @@
 
   /* One line each, for the Set up for students sheet. */
   function layoutSummary() {
-    const notes = allowedNotes();
+    const notes = layout.notes || M.noteOrder;
     const lo = M.noteToSolfege[notes[0]].toLowerCase(), hi = M.noteToSolfege[notes[notes.length - 1]].toLowerCase();
     const off = ['accidentals', 'rests', 'harmony', 'connected'].filter(k => !layout[k]);
     return [
-      notes.length === M.noteOrder.length ? 'All eighteen notes' : `${notes.length} notes, ${lo} to ${hi}`,
+      notes.length === M.noteOrder.length ? 'All twenty-two notes' : `${notes.length} notes, ${lo} to ${hi}`,
       off.length ? 'No ' + off.join(', ').replace('accidentals', 'sharps or flats') : 'Sharps, flats, rests, harmony and connected notes',
       `${SW.chords.offered().length} chords on the panel`,
       `${allowedValues().length} note values`,
@@ -1068,7 +1145,7 @@
   SW.settings = {
     init, view, get layout() { return layout; },
     VIEW_DEFAULTS, WORKSPACES,
-    setView, setKeyboard, setWorkspace, setPage, page, toggleStrip, applyView, shows, blockScale, syncSoundControls, lightColour,
+    setView, setKeyboard, setWorkspace, setPage, page, toggleStrip, applyView, shows, panelOut, blockScale, syncSoundControls, lightColour,
     can, allowedNotes, allowedValues, allowedKeys, tempoRange, clampTempo,
     layoutSnapshot, applyLayoutSnapshot, resetLayout, layoutEditable, layoutSummary,
     usePieceLayout,

@@ -217,8 +217,8 @@
 
   /* The vertical placement: `yOf(step)` for a row whose bar base is at
      `base` px from the line's top. do's notehead sits at do's bar top. */
-  function geometry(base, bs) {
-    const doSp = M.spellNote('do', 'natural', S.key);
+  function geometry(base, bs, key) {
+    const doSp = M.spellNote('do', 'natural', key || M.keyNow());
     const doStep = step(doSp.letter, doSp.octave);
     const s = SS_PX * bs;
     const doY = base - M.NOTE_HEIGHTS.do * bs;
@@ -229,8 +229,8 @@
      top line plus room for a name over a down-stemmed note. Set on the
      line as --staff-top; the CSS makes every column at least that tall,
      so a wrapped row never lets its staff run up into the row above. */
-  function staffTop(bs) {
-    const doSp = M.spellNote('do', 'natural', S.key);
+  function staffTop(bs, key) {
+    const doSp = M.spellNote('do', 'natural', key || M.keyNow());
     const doStep = step(doSp.letter, doSp.octave);
     return (M.NOTE_HEIGHTS.do + (F5 - doStep) * STEP + 14) * bs;
   }
@@ -239,9 +239,9 @@
      signature: where each piece goes from the staff's left edge, and the
      width the line keeps for them (--staff-prefix). One function, so the
      room kept and the room drawn in can never disagree. */
-  function prefix(s, withTime) {
+  function prefix(s, withTime, key) {
     const k = s / UNITS;
-    const ks = keySignature(S.key, S.scale);
+    const ks = keySignature(key || M.keyNow(), S.scale);
     let x = s * 0.5;
     const clefX = x;
     x += gw('gClef', k) + s * 0.55;
@@ -265,6 +265,38 @@
       x += tw + s * 0.25;
     }
     return { clefX, sig, time, width: x + s * 0.5 };
+  }
+
+  /* KEY CHANGES (js/keys.js, 2026-10-31). A line is written in the key at
+     its first column (lineKey); where the key changes later in the line,
+     the new key signature goes just before that column — after a double
+     bar when it starts a bar (Create Key Change always starts one) — and a
+     change to a key with none cancels the old one with naturals. A row
+     that opens on a key change has it at its clef instead. The room every
+     row of a line keeps for its clef is the widest of the line's keys. */
+  const lineKey = line => (SW.keys ? SW.keys.at(line) : S.key);
+  function lineKeys(line) {
+    const keys = [lineKey(line)];
+    if (SW.keys) SW.keys.starts().forEach(e => { if (line.contains(e.stack) && keys.indexOf(e.key) === -1) keys.push(e.key); });
+    return keys;
+  }
+  function prefixWidth(line, s, withTime) {
+    return Math.max.apply(null, lineKeys(line).map(key => prefix(s, withTime, key).width));
+  }
+  // naturals for every accidental of the old key the new one drops (D to G: C♮; D to F: F♮ C♮), then the new key's
+  function changeGlyphs(from, to, s, k) {
+    const list = [];
+    let x = 0;
+    const put = (ks, letters, natural) => letters.forEach(l => {
+      const name = natural ? ACC_GLYPH['0'] : ACC_GLYPH[String(ks.sig[l])];
+      list.push({ name, x, st: SIG_POS[String(ks.kind)][l] });
+      x += gw(name, k) + s * 0.1;
+    });
+    const dropped = from.order.filter(l => (to.sig[l] || 0) !== from.sig[l]);
+    put(from, dropped, true);
+    if (dropped.length && to.order.length) x += s * 0.3;
+    put(to, to.order, false);
+    return { list, w: x };
   }
 
   /* ==================================================================
@@ -373,6 +405,7 @@
     let bar = -1, held = {};
     events.forEach(ev => {
       ev.accSet = new Set();
+      if (ev.keyTo) { ks = ev.keyTo; held = {}; }           // a key change: its signature from here (KEY CHANGES)
       if (!ev.notated || ev.rest) return;
       if (ev.bar !== bar) { bar = ev.bar; held = {}; }
       ev.pitches.forEach(pt => {
@@ -393,7 +426,8 @@
     let top = yOf(hi) - s * 0.6;
     const beamed = ev.beam !== null && ev.beam !== undefined;
     if (ev.value.base !== 'w' && ev.dir === 'up') top = Math.min(top, Math.min(yOf(hi) - s * (E.stem + 0.25), yOf(B4)) - (beamed ? s : 0));
-    if (S.showNames && (ev.dir === 'down' || ev.value.base === 'w')) top = Math.min(top, Math.min(yOf(hi), yOf(F5 + 1)) - s * 2.4);
+    // the name's room (one name since 2026-10-31: the letter or the solfège)
+    if (S.showNames && (ev.dir === 'down' || ev.value.base === 'w')) top = Math.min(top, Math.min(yOf(hi), yOf(F5 + 1)) - s * 1.8);
     return top;
   }
 
@@ -418,7 +452,7 @@
       const to = Math.max(yOf(lo) + s * (E.stem + flags * 0.25), yOf(B4));
       bottom = Math.max(bottom, to + (flags ? gb(flags === 2 ? 'flag16thDown' : 'flag8thDown', k) : 0));
     }
-    if (S.showNames && ev.dir === 'up' && v.base !== 'w') bottom = Math.max(bottom, yOf(lo) + s * 2.35);
+    if (S.showNames && ev.dir === 'up' && v.base !== 'w') bottom = Math.max(bottom, yOf(lo) + s * 1.65);
     return bottom;
   }
 
@@ -469,6 +503,7 @@
           const gap = (!p.notated && !c.notated) ? (sameWord ? 0 : s * SP.sylGap) : s * SP.inkGap;
           xi = x[i - 1] + Math.max(f * p.ideal, p.R + c.L + gap, (p.bw + c.bw) / 2 + (sameWord ? 0 : 2));
         }
+        if (c.keyLead) xi += c.keyLead;                 // a key change's signature goes in front (a row's first column has it at the clef)
       }
       if (c.sylStart) {
         // the word: centred under its anchor, clear of the last word and of a bar line
@@ -524,14 +559,26 @@
   function planLine(line, lineIndex, lastLine, bs) {
     const s = SS_PX * bs, k = s / UNITS;
     const le = SW.timing.lineEvents(line);
-    const ks = keySignature(S.key, S.scale);
+    const lk = lineKey(line);
+    const ks = keySignature(lk, S.scale);
     const cs = getComputedStyle(line);
     const avail = line.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
-    const pre = prefix(s, lineIndex === 0);
+    const pre = prefix(s, lineIndex === 0, lk);
+    pre.width = prefixWidth(line, s, lineIndex === 0);          // as --staff-prefix keeps it (render)
+    // where the key changes inside the line — the first column of the trigger's bar (keys.js
+    // starts): the signature from and to (readAccidentals, placeRow, the drawing)
+    const changeAt = new Map(SW.keys ? SW.keys.starts().map(e => [e.stack, e.key]) : []);
+    let ksNow = ks;
+    le.events.forEach((ev, i) => {
+      delete ev.keyTo; delete ev.keyFrom; ev.keyLead = 0;
+      if (!i || !changeAt.has(ev.stack)) return;
+      ev.keyFrom = ksNow;
+      ev.keyTo = ksNow = keySignature(changeAt.get(ev.stack), S.scale);
+    });
     const firstText = line.querySelector('.text');
     const lyricPx = firstText ? parseFloat(getComputedStyle(firstText).fontSize) || 22 : 22;
-    const gRel = geometry(0, bs);            // y from the bar base (negative: above it)
-    const staffTopPx = staffTop(bs);
+    const gRel = geometry(0, bs, lk);        // y from the bar base (negative: above it)
+    const staffTopPx = staffTop(bs, lk);
     const ctx = { s, avail, lyricGap: Math.max(8, lyricPx * 0.5), hyGap: Math.max(14, lyricPx * 1.1), textAllowance: Math.max(0, pre.width - s * 1.2) };
 
     // beam groups decide their direction together
@@ -597,6 +644,7 @@
       sylInfo.push(info);
       evs.forEach((ev, j) => {
         Object.assign(ev, columnInk(ev, s, k));
+        if (ev.keyTo) ev.keyLead = changeGlyphs(ev.keyFrom, ev.keyTo, s, k).w + s * 1.05;   // a double bar, the signature, a gap
         ev.sylStart = j === 0;
         ev.sylEnd = ev === reals[reals.length - 1];
         ev.syl = info;
@@ -710,7 +758,8 @@
         info.set(ev.stack, {
           dir: ev.dir, heads: ev.heads, accs: ev.accs, hw: ev.hw, stemW: ev.stemW, dotX: ev.dotX, dots: ev.dots,
           restW: ev.restW, f, x: p.x[i], L: ev.L, R: ev.R,
-          firstValue: ev.split ? ev.value : null, pieces: [], barsAfter: []
+          firstValue: ev.split ? ev.value : null, pieces: [], barsAfter: [],
+          keyFrom: ev.keyTo ? ev.keyFrom : null, keyTo: ev.keyTo || null, rowStart: i === 0
         });
       });
       const ownerOf = ev => ev.piece ? ev.owner : ev;
@@ -980,7 +1029,7 @@
     rows.forEach((row, ri) => {
       parts.push(renderRow(row, {
         bs, left, withTime: withTime && ri === 0, lastRow: ri === rows.length - 1,
-        lastLine, le, showNames: S.showNames, barNumbers, clock: clock || { at: 0, p0: 0 }, W, cuts, hits, glow,
+        lastLine, le, showNames: S.showNames, names: S.names, barNumbers, key: lineKey(line), clock: clock || { at: 0, p0: 0 }, W, cuts, hits, glow,
         soundStack: noteLight ? soundStack : null,
         selStack: noteLight ? activeStack : null, selNote: active
       }));
@@ -1081,7 +1130,7 @@
 
   /* ================= one visual row ================= */
   function renderRow(row, o) {
-    const g = geometry(row.base, o.bs);
+    const g = geometry(row.base, o.bs, o.key);
     const { S: s, k, yOf } = g;
     const lineW = Math.max(1, s * E.staffLine);
     const p = [];
@@ -1126,8 +1175,8 @@
       p.push(rect(o.left, y - lineW / 2, staffEnd - o.left, lineW, INK, ' class="sl"'));
     }
 
-    // clef, key signature, time signature
-    const pre = prefix(s, o.withTime);
+    // clef, key signature (the key the row opens in), time signature
+    const pre = prefix(s, o.withTime, row.events.length && SW.keys ? SW.keys.at(row.events[0].stack) : o.key);
     p.push(at('gClef', o.left + pre.clefX, yOf(step('G', 4)), k));
     pre.sig.forEach(a => p.push(at(a.name, o.left + a.x, yOf(a.st), k)));
     if (pre.time) {
@@ -1158,6 +1207,16 @@
     });
     const noNames = Object.assign({}, o, { showNames: false });
     const fillerOpacity = S.editing ? 0.38 : 1;
+    // a key change inside the row (KEY CHANGES): a double bar when it starts a bar, then the new
+    // signature, just before its column — a block's too
+    evs.forEach(ev => {
+      if (!ev.info || !ev.info.keyTo || ev.info.rowStart) return;
+      const gl = changeGlyphs(ev.info.keyFrom, ev.info.keyTo, s, k);
+      const headL = ev.notated ? ev.info.L : ev.stack.offsetWidth / 2;
+      const x0 = ev.x - headL - s * 0.45 - gl.w;
+      if (ev.info.barBeforeDx !== undefined) p.push(barLine(ev.x + ev.info.barBeforeDx + s * 0.4));
+      gl.list.forEach(a => p.push(at(a.name, x0 + a.x, yOf(a.st), k)));
+    });
     evs.forEach((ev, i) => {
       if (!ev.notated || !ev.info) return;
       if (ev.info.firstValue) { ev.value = ev.info.firstValue; ev.ticks = ev.value.ticks; }
@@ -1331,22 +1390,17 @@
       }
     }
 
-    // names (the glasses): opposite the stem
+    // names (Look → Display Note Names, 2026-10-31): opposite the stem — the letter in its
+    // pitch's colour, or the solfège in its place (the glasses drew both, the solfège beyond the letter)
     if (o.showNames) {
       const above = dir === 'down' || v.base === 'w';
       const pt = above ? ev.pitches[ev.pitches.length - 1] : ev.pitches[0];
-      const nm = pt.name.replace('#', '♯').replace('b', '♭');
+      const nm = o.names === 'sol' ? pt.sol.toLowerCase() : pt.name.replace('#', '♯').replace('b', '♭');
+      const k = o.names === 'sol' ? 0.85 : 0.9;
       const halo = ' paint-order="stroke" stroke="#fff" stroke-width="3" stroke-linejoin="round"';
-      if (above) {
-        const yTop = Math.min(yOf(hi), yOf(F5 + 1)) - s * 0.75;
-        p.push(text(cx, yTop, s * 0.9, nm, 'class="name" text-anchor="middle" font-weight="800" fill="' + pt.color + '"' + halo));
-        p.push(text(cx, yTop - s * 0.95, s * 0.7, pt.sol.toLowerCase(), 'text-anchor="middle" font-weight="700" fill="#5C4E6B"' + halo));
-        ev.topY = Math.min(ev.topY, yTop - s * 1.7);
-      } else {
-        const yBot = yOf(lo) + s * 1.35;
-        p.push(text(cx, yBot, s * 0.9, nm, 'class="name" text-anchor="middle" font-weight="800" fill="' + pt.color + '"' + halo));
-        p.push(text(cx, yBot + s * 0.8, s * 0.7, pt.sol.toLowerCase(), 'text-anchor="middle" font-weight="700" fill="#5C4E6B"' + halo));
-      }
+      const y = above ? Math.min(yOf(hi), yOf(F5 + 1)) - s * 0.75 : yOf(lo) + s * 1.35;
+      p.push(text(cx, y, s * k, nm, 'class="name" text-anchor="middle" font-weight="800" fill="' + pt.color + '"' + halo));
+      if (above) ev.topY = Math.min(ev.topY, y - s * 0.95);
     }
     return p.join('');
   }
@@ -1534,8 +1588,8 @@
       const wants = on && !!line.querySelector('.harmony-stack.notated');
       line.classList.toggle('has-staff', wants);
       if (wants) {
-        line.style.setProperty('--staff-prefix', n2(prefix(s, i === 0).width) + 'px');
-        line.style.setProperty('--staff-top', n2(staffTop(bs)) + 'px');
+        line.style.setProperty('--staff-prefix', n2(prefixWidth(line, s, i === 0)) + 'px');
+        line.style.setProperty('--staff-top', n2(staffTop(bs, lineKey(line))) + 'px');
         staffLines.push({ line, i });
       } else {
         clearLayout(line);

@@ -62,7 +62,7 @@
        'scale:changed'  { scale }                the song's scale (score.js setScale)
        'chords:changed' { why }                  the chord board, set, slots or scale changed (chords.js)
        'mods:changed'   { held }                 Z X C V B held or let go
-       'names:changed'  { on }
+       'names:changed'  { on, mode }
        'mode:changed'   { editing }
        'chord:played'   { id, midis, source }  'strip' | 'lane' | 'key' | 'number' | 'editor' | 'mod' (a held chord struck again) | 'track' (Play)
        'chord:cleared'  {}                       the chord's notes leave the keyboard (chords.js clearSounding)
@@ -102,12 +102,14 @@
   SW.state = {
     key: 'C',
     editing: false,          // the construction hat
-    showNames: false,        // the glasses
+    showNames: false,        // any note names out (Look → Display Note Names; the glasses until 2026-10-31)
+    names: 'off',            //   which: 'off' | 'letter' | 'sol' (score.js setNames)
     colorScheme: true,       // section colours (a View choice, remembered — settings.js)
     present: false,          // Present mode: full screen, Play · ‹ › · Exit
     accidentalMode: 'natural',
     meter: '4/4',            // the song's time signature (stored in the score)
     bpm: 100,                // the song's tempo (stored in the score)
+    swing: '',               // the song's swing: '' (none) | '8' | '16' (stored in the score; timing.js SWING)
     playing: false,          // SW.player is running the song
     scale: 'major',          // the song's scale (Theory.SCALES id; stored in the score) — drives the chord panel
     board: {},               // the song's re-chorded places on the panel: { d: { root, q, mods, label? } } (js/chords.js)
@@ -257,36 +259,75 @@
   /* The keys the key button offers, in 1.0's order. */
   const KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
+  /* The rungs, low to high: 1.0's eighteen (mi, … la″) and, since
+     2026-10-31 (the user), low do and re under them and ti″ and the do two
+     octaves up over them — twenty-two. The top do is `do-high2`
+     (octaveOf 2); older Song Writers drop the four new rungs on reading. */
   const noteOrder = [
+    'do-low', 're-low',
     'mi-low', 'fa-low', 'so-low', 'la-low', 'ti-low',
     'do', 're', 'mi', 'fa', 'so', 'la', 'ti',
-    'do-high', 're-high', 'mi-high', 'fa-high', 'so-high', 'la-high'
+    'do-high', 're-high', 'mi-high', 'fa-high', 'so-high', 'la-high',
+    'ti-high', 'do-high2'
   ];
+  /* EVERY RUNG a note may be on (2026-10-31, KEY CHANGES — js/keys.js):
+     the twenty-two above, which are each key's own range, and a further
+     octave's worth at each end — do,, … ti,, under low do and re″ … ti″′
+     over the top do — for Create Key Change, where the range is the
+     same few octaves of real pitch in every key (A♭2, the lowest note A♭
+     has, to G6, the highest G has), so a key whose do sits high reaches
+     lower than its own low do, and one whose do sits low higher than its
+     top do. Low to high. Older readers drop the new rungs. */
+  const LOW2 = ['do-low2', 're-low2', 'mi-low2', 'fa-low2', 'so-low2', 'la-low2', 'ti-low2'];
+  const HIGH2 = ['re-high2', 'mi-high2', 'fa-high2', 'so-high2', 'la-high2', 'ti-high2'];
+  const RUNGS = LOW2.concat(noteOrder, HIGH2);
+  const isRung = nc => RUNGS.indexOf(nc) !== -1;
+  const SOL7 = ['Do', 'Re', 'Mi', 'Fa', 'So', 'La', 'Ti'];
+  const SH7 = ['D', 'R', 'M', 'F', 'S', 'L', 'T'];
 
   const noteToSolfege = {
+    'do-low': 'Do', 're-low': 'Re',
     'mi-low': 'Mi', 'fa-low': 'Fa', 'so-low': 'So', 'la-low': 'La', 'ti-low': 'Ti',
     'do': 'Do', 're': 'Re', 'mi': 'Mi', 'fa': 'Fa', 'so': 'So', 'la': 'La', 'ti': 'Ti',
-    'do-high': 'Do', 're-high': 'Re', 'mi-high': 'Mi', 'fa-high': 'Fa', 'so-high': 'So', 'la-high': 'La'
+    'do-high': 'Do', 're-high': 'Re', 'mi-high': 'Mi', 'fa-high': 'Fa', 'so-high': 'So', 'la-high': 'La',
+    'ti-high': 'Ti', 'do-high2': 'Do'
   };
+  LOW2.forEach((nc, i) => { noteToSolfege[nc] = SOL7[i]; });
+  HIGH2.forEach((nc, i) => { noteToSolfege[nc] = SOL7[i + 1]; });
 
   const noteToShorthandMap = {
+    'do-low': 'D-1', 're-low': 'R-1',
     'mi-low': 'M-1', 'fa-low': 'F-1', 'so-low': 'S-1', 'la-low': 'L-1', 'ti-low': 'T-1',
     'do': 'D1', 're': 'R1', 'mi': 'M1', 'fa': 'F1', 'so': 'S1', 'la': 'L1', 'ti': 'T1',
-    'do-high': 'D2', 're-high': 'R2', 'mi-high': 'M2', 'fa-high': 'F2', 'so-high': 'S2', 'la-high': 'L2'
+    'do-high': 'D2', 're-high': 'R2', 'mi-high': 'M2', 'fa-high': 'F2', 'so-high': 'S2', 'la-high': 'L2',
+    'ti-high': 'T2', 'do-high2': 'D3'
   };
+  LOW2.forEach((nc, i) => { noteToShorthandMap[nc] = SH7[i] + '-2'; });
+  HIGH2.forEach((nc, i) => { noteToShorthandMap[nc] = SH7[i + 1] + '3'; });
 
   const shorthandToNoteMap = {
+    'D-1': 'do-low', 'R-1': 're-low',
     'M-1': 'mi-low', 'F-1': 'fa-low', 'S-1': 'so-low', 'L-1': 'la-low', 'T-1': 'ti-low',
     'D1': 'do', 'R1': 're', 'M1': 'mi', 'F1': 'fa', 'S1': 'so', 'L1': 'la', 'T1': 'ti',
-    'D2': 'do-high', 'R2': 're-high', 'M2': 'mi-high', 'F2': 'fa-high', 'S2': 'so-high', 'L2': 'la-high'
+    'D2': 'do-high', 'R2': 're-high', 'M2': 'mi-high', 'F2': 'fa-high', 'S2': 'so-high', 'L2': 'la-high',
+    'T2': 'ti-high', 'D3': 'do-high2'
   };
+  LOW2.concat(HIGH2).forEach(nc => { shorthandToNoteMap[noteToShorthandMap[nc]] = nc; });
 
   /* 1.0's bar heights in px at block size 100%. style.css repeats them as
-     calc(N * var(--bs)); keep the two in step. */
+     calc(N * var(--bs)); keep the two in step. The new rungs (2026-10-31)
+     carry on 1.0's steps: the low end narrowing (… 25, 20 → 16, 12), the
+     top ten apart (180 → 190, 200). */
   const NOTE_HEIGHTS = {
+    'do-low': 12, 're-low': 16,
     'mi-low': 20, 'fa-low': 25, 'so-low': 30, 'la-low': 40, 'ti-low': 50,
     'do': 60, 're': 70, 'mi': 80, 'fa': 90, 'so': 100, 'la': 110, 'ti': 120,
-    'do-high': 130, 're-high': 140, 'mi-high': 150, 'fa-high': 160, 'so-high': 170, 'la-high': 180
+    'do-high': 130, 're-high': 140, 'mi-high': 150, 'fa-high': 160, 'so-high': 170, 'la-high': 180,
+    'ti-high': 190, 'do-high2': 200,
+    // KEY CHANGES' wider range (2026-10-31): under low do the bars keep narrowing a little at a
+    // time (a bar can only get so short); over the top do they climb on ten apart
+    'do-low2': 4, 're-low2': 5, 'mi-low2': 6, 'fa-low2': 7, 'so-low2': 8, 'la-low2': 9, 'ti-low2': 10,
+    're-high2': 210, 'mi-high2': 220, 'fa-high2': 230, 'so-high2': 240, 'la-high2': 250, 'ti-high2': 260
   };
 
   const LINE_COLORS = ['#e3f2fd', '#fff8e1', '#fce4ec', '#e8f5e9'];
@@ -298,20 +339,45 @@
   }
 
   function noteClassOf(el) {
-    return el ? Array.from(el.classList).find(c => noteOrder.indexOf(c) !== -1) || null : null;
+    return el ? Array.from(el.classList).find(isRung) || null : null;
   }
 
-  /* octave offset of a note class: -1, 0 or +1 */
+  /* octave offset of a note class: -2 … +2 (the top do, and Create Key Change's wider rungs) */
   function octaveOf(noteClass) {
+    if (noteClass.endsWith('-high2')) return 2;
+    if (noteClass.endsWith('-low2')) return -2;
     if (noteClass.endsWith('-low')) return -1;
     if (noteClass.endsWith('-high')) return 1;
     return 0;
   }
 
+  /* ------------------------------------------------------------------
+     THE KEY IN EFFECT (2026-10-31, KEY CHANGES — js/keys.js). A song can
+     change key part way through, so "the key" depends on where you are:
+     keyNow() is the key in effect right now — inside withKey(k, fn), k
+     (a note, a column or a bar being drawn, sounded or written is always
+     handled inside its own key's withKey); otherwise the key where the
+     selection is (SW.keys.here() — what the chord panel, the keyboard,
+     the letter keys and Setup show); before keys.js is up, the song's
+     opening key (S.key). Every helper below that takes a key defaults to
+     keyNow(), so code that reads the key through them follows a key
+     change without knowing about it.
+     ------------------------------------------------------------------ */
+  let keyOverride = null;
+  function keyNow() {
+    if (keyOverride) return keyOverride;
+    return SW.keys ? SW.keys.here() : SW.state.key;
+  }
+  function withKey(k, fn) {
+    const was = keyOverride;
+    keyOverride = k || null;
+    try { return fn(); } finally { keyOverride = was; }
+  }
+
   /* The MIDI number a block sounds, by exactly 1.0's arithmetic
      (calculateFrequency counts semitones from C0; MIDI 12 is C0). */
   function noteMidi(noteClass, accidental, key) {
-    const k = key || SW.state.key;
+    const k = key || keyNow();
     const tonic = KEY_SIGNATURES_CHROMATIC_INDEX[k];
     const sol = noteToSolfege[noteClass];
     if (tonic === undefined || !sol) return null;
@@ -338,7 +404,7 @@
      C♯ minor); the block's own ♯/♭ is added on top. The pitch is always
      the chosen key's, so a respelling never moves a note. */
   function spellNote(noteClass, accidental, key) {
-    const k = key || SW.state.key;
+    const k = key || keyNow();
     const sol = noteToSolfege[noteClass];
     const base = (letterNamesByKey[spelledKey(k)] || letterNamesByKey.C)[sol] || 'C';
     const letter = base.charAt(0);
@@ -440,7 +506,7 @@
      Phrygian dominant, and the tonic's major for the rest. */
   function signatureScale(id) { return SIG_MODE[id || SW.state.scale] || 'major'; }
   function spelledKey(key, id) {
-    const k = key || SW.state.key;
+    const k = key || keyNow();
     const idx = KEY_SIGNATURES_CHROMATIC_INDEX[k];
     if (idx === undefined || !hasTheory()) return k;
     const flat = Theory.TONIC_FLAT[idx], sharp = Theory.TONIC_SHARP[idx];
@@ -463,8 +529,8 @@
     const sp = spellNote(noteClass, accidental);
     return sp.letter + prettyAlter(sp.alter);
   }
-  function noteColour(noteClass) {
-    const base = (letterNamesByKey[spelledKey()] || letterNamesByKey.C)[noteToSolfege[noteClass]] || 'C';
+  function noteColour(noteClass, key) {
+    const base = (letterNamesByKey[spelledKey(key)] || letterNamesByKey.C)[noteToSolfege[noteClass]] || 'C';
     return LETTER_COLORS[base.charAt(0)];
   }
 
@@ -473,6 +539,7 @@
     chordNamesByKey, NOTE_FREQUENCIES, CHROMATIC_NOTES, KEY_TRANSPOSITION,
     solfegeKeyMap, SOLFEGE_INTERVALS, DEFAULT_SOLFEGE_OCTAVE, KEY_SIGNATURES_CHROMATIC_INDEX, KEYS,
     noteOrder, noteToSolfege, noteToShorthandMap, shorthandToNoteMap, NOTE_HEIGHTS, LINE_COLORS,
+    RUNGS, isRung, keyNow, withKey,
     LETTER_PC, displayKey, noteClassOf, octaveOf, noteMidi, midiFromName, midiToFreq, spellNote,
     // the scale (Digital Accordion's, Do on the tonic)
     STEP_OF, accOf, alterOf, scaleOf, scaleSteps, stepAlters, inScale, scaleLadder, solfegeOf,

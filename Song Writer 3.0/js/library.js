@@ -592,7 +592,7 @@ O'er[S1] the[S1] land[D2] -[R2] of[M2] the[F2] free[S2] And[D2] the[R2] home[M2]
     ui.toast('Renamed “' + trimmed + '”');
   }
 
-  /* 1.0: a new song opens straight into Edit mode. */
+  /* 1.0: a new song opens straight into Edit mode — the Edit box out (2026-10-31). */
   function createNewSong(title) {
     const trimmed = (title && title.trim()) ? title.trim() : '';
     const lesson = SW.lessons && SW.lessons.meta();
@@ -605,7 +605,7 @@ O'er[S1] the[S1] land[D2] -[R2] of[M2] the[F2] free[S2] And[D2] the[R2] home[M2]
       if (!isSandboxId(currentSongId)) loadSongById(SANDBOX_ID);
       hideNewSongModal();
       ui.closeSheet('library-sheet');
-      SW.score.setEditing(true);
+      if (SW.editBox) SW.editBox.setOpen(true);
       ui.toast('A blank page in your sandbox');
       return;
     }
@@ -625,7 +625,7 @@ O'er[S1] the[S1] land[D2] -[R2] of[M2] the[F2] free[S2] And[D2] the[R2] home[M2]
     hideNewSongModal();
     ui.closeSheet('library-sheet');
     loadSongById(id, { autoSave: true });
-    SW.score.setEditing(true);
+    if (SW.editBox) SW.editBox.setOpen(true);
     ui.toast('New song created');
   }
 
@@ -648,9 +648,8 @@ O'er[S1] the[S1] land[D2] -[R2] of[M2] the[F2] free[S2] And[D2] the[R2] home[M2]
     saveStoredLibrary(library);
     hideNewSongModal();
     ui.closeSheet('library-sheet');
-    const editing = S.editing;
     loadSongById(id, { autoSave: true });
-    if (editing) SW.score.setEditing(true);
+    if (SW.editBox) SW.editBox.sync();
     ui.toast('Saved as “' + trimmed + '”');
   }
 
@@ -676,10 +675,11 @@ O'er[S1] the[S1] land[D2] -[R2] of[M2] the[F2] free[S2] And[D2] the[R2] home[M2]
     return b;
   }
   /* A quiet line under each title: "4/4 · 100 BPM · 3 lines" (Ostinato
-     Builder's pattern). */
+     Builder's pattern), "· swing 8ths" when it swings (timing.js SWING). */
   function subline(score) {
     const n = (score.lines || []).length;
-    return (score.meter || SW.meters.DEFAULT) + ' · ' + (score.bpm || SW.meters.DEFAULT_BPM) + ' BPM · ' + n + (n === 1 ? ' line' : ' lines');
+    const swing = score.swing === '8' || score.swing === '16' ? ' · swing ' + score.swing + 'ths' : '';
+    return (score.meter || SW.meters.DEFAULT) + ' · ' + (score.bpm || SW.meters.DEFAULT_BPM) + ' BPM' + swing + ' · ' + n + (n === 1 ? ' line' : ' lines');
   }
 
   function openFromLibrary(id) {

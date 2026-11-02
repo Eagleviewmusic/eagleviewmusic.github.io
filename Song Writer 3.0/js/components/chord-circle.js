@@ -30,7 +30,7 @@
    Layout settings allow every chord (a lesson that limits them keeps the
    panel).
 
-   API  SW.chordCircle.html() · relabel(root) · allowed() · names() · setNames(m)
+   API  SW.chordCircle.html() · relabel(root) · allowed() · names() · setNames(m) · stack() (the panel's Everything)
    ========================================================================== */
 (function () {
   'use strict';
@@ -159,5 +159,28 @@
     });
   }
 
-  SW.chordCircle = { html, relabel, allowed, names, setNames, H };
+  /* THE PANEL'S EVERYTHING (2026-10-30, user): the circle stood up and pressed into equal buttons, four
+     across — the home pair on top, each step round the circle a row lower (the flat side on the left,
+     the sharp side on the right; majors outside, their minors inside), the tritone's pair at the bottom:
+            [  C ][ Am ]
+       [ F ][ Dm ][ Em ][ G ]
+       [ B♭][ Gm ][ Bm ][ D ]
+       [ E♭][ Cm ][F♯m][ A ]
+       [ A♭][ Fm ][C♯m][ E ]
+       [ D♭][B♭m ][G♯m][ B ]
+            [ G♭][E♭m ]
+     → rows of 4: { spec, id, home } or null (chord-strip.js draws them) */
+  function stack() {
+    const r = ring();
+    const cell = (p, kind) => {
+      const spec = kind === 'maj' ? p.major : p.minor;
+      return { spec, id: C.toId(spec), home: kind === 'maj' ? p.tonic === 'major' && spec.root === '1' : p.tonic === 'minor' && spec.root === '1' };
+    };
+    const rows = [[null, cell(r[0], 'maj'), cell(r[0], 'min'), null]];
+    for (let st = 1; st <= 5; st++) { const L = r[12 - st], R = r[st]; rows.push([cell(L, 'maj'), cell(L, 'min'), cell(R, 'min'), cell(R, 'maj')]); }
+    rows.push([null, cell(r[6], 'maj'), cell(r[6], 'min'), null]);
+    return rows;
+  }
+
+  SW.chordCircle = { html, relabel, allowed, names, setNames, H, stack };
 })();

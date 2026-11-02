@@ -6,11 +6,12 @@
 
    chords out, keyboard or not — 'accordion': Digital Accordion's split,
      both hands.
-       LEFT, chords: F D S A G R E Q W and 1–5 play the panel's places,
-         ringing while held; Z X C V B held change them — pressed or let
-         go while a chord is held, they strike it again, changed (a
-         trilled suspension). In Edit, while a lane slot glows, the chord
-         is written there (chord-strip.js trigger).
+       LEFT, chords: F D S A G R E Q W and 1–5 play the panel's chords
+         (its places, or the Chord Chart's and Everything's chords that
+         wear those keys), ringing while held (Z X C V B changed them
+         until 2026-10-30, when the panel's buttons went). In Edit, while
+         a lane slot glows, the chord is written there (chord-strip.js
+         trigger).
        RIGHT, melody, by scale step from the tonic on J (Digital
          Accordion's MELODY_HANDS.right):
            J = do   K L ; = re mi fa   U I O P = so la ti do′
@@ -75,7 +76,7 @@
     ':': ';', '<': ',', '>': '.', '?': '/', '_': '-', '+': '=', '{': '[', '}': ']', '"': "'" };
 
   function layout() {
-    if (SW.settings.shows('strip')) return 'accordion';
+    if (SW.settings.panelOut()) return 'accordion';
     if (SW.settings.shows('dock')) return 'flex';
     return 'letters';
   }
@@ -158,13 +159,8 @@
       const place = SW.chords.placeForKey(k);
       if (place) {
         event.preventDefault();
-        // held until the key comes up: Z X C V B meanwhile strike it again, changed
+        // held until the key comes up (the panel's Z X C V B buttons were taken off, 2026-10-30: they no longer change it)
         if (!event.repeat) { chordKeys.add(codeOf(event)); SW.chordStrip.trigger(place, /^[1-5]$/.test(k) ? 'number' : 'key', codeOf(event)); }
-        return true;
-      }
-      if (SW.chords.isModKey(k)) {
-        event.preventDefault();
-        if (!event.repeat) SW.chords.setMod(k.toUpperCase(), true);
         return true;
       }
     }

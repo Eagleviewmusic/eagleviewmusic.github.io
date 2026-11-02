@@ -62,6 +62,8 @@
      SW.timing.linePickup(lineEl)     this line's pick-up in ticks (0: none)
      SW.timing.barsOf(lineEl)         an instrumental line's bars (0: a line of melody)
      SW.timing.tickMs()               milliseconds per tick at the tempo
+     SW.timing.swing(shift, mt?)      the clock's bend for the song's swing (SWING below)
+     SW.timing.swingPlays(mt?)        whether that swing is heard in this meter
    ========================================================================== */
 (function () {
   'use strict';
@@ -87,7 +89,8 @@
     const v = SW.score.isNotated(stack) ? stack.dataset.v : null;
     const value = SW.values.byId(v || SW.values.DEFAULT);
     const rest = notes.length > 0 && notes.every(n => n.classList.contains('rest-note'));
-    const pitches = notes.filter(n => !n.classList.contains('rest-note')).map(n => {
+    // in the key the column is in (KEY CHANGES, js/keys.js)
+    const pitches = M.withKey(SW.keys ? SW.keys.at(stack) : S.key, () => notes.filter(n => !n.classList.contains('rest-note')).map(n => {
       const nc = M.noteClassOf(n) || 'do';
       const acc = SW.score.getAccidentalFromNote(n);
       const sp = M.spellNote(nc, acc);
@@ -99,7 +102,7 @@
         color: M.noteColour(nc) || '#888',
         name: sp.letter + M.prettyAlter(sp.alter)          // B♭, not B
       };
-    });
+    }));
     pitches.sort((a, b) => a.step - b.step);
     return {
       stack, notes, v, value,
@@ -233,6 +236,43 @@
   function tickMs() { return 60000 / (S.bpm || 100) / meter().beatTicks; }
 
   /* ==================================================================
+     SWING (2026-11-01, the user — Setup → Swing: None · 8th · 16th)
+     The song's eighths (8th) or sixteenths (16th) are played in pairs,
+     long then short — a triplet's 2 + 1. Nothing written moves: the
+     staff, the bars and every tick stay straight; only the clock is
+     bent. Each pair's span (a quarter for 8th swing, an eighth for
+     16th) starts where it always did; its first half is stretched over
+     two thirds of it and its second half squeezed into the last third,
+     so the "and" lands two thirds of the way through the beat. The
+     beats never move, so the steady beat and the count-in do not either.
+     Spans are counted on the song's grid (the first line's bar lines —
+     PICK-UP above). In compound time (6/8 9/8 12/8) the eighths already
+     go in threes: 8th swing plays straight there, and 16th swing swings
+     the sixteenths inside each eighth.
+
+       swing(shift, mt)   the bend for a grid `shift` ticks along (song().shift,
+                          a line's own shift, 0 from a beat) in meter mt (else
+                          the song's): { on, at(t), back(x), len(t, d) } —
+                          at: tick t → when it sounds, in straight ticks;
+                          back: the other way; len: how long d ticks from t
+                          last. With no swing, at and back give the tick back.
+       swingPlays(mt)     the song's swing is heard in meter mt (else the song's)
+     ================================================================== */
+  const SWING_SPAN = { '8': 24, '16': 12 };
+  function swingSpan(mt) {
+    const u = SWING_SPAN[S.swing] || 0;
+    return mt.compound && u === 24 ? 0 : u;
+  }
+  function swing(shift, mt) {
+    const U = swingSpan(mt || meter());
+    if (!U) return { on: false, at: t => t, back: x => x, len: (t, d) => d };
+    const k = shift || 0, H = U / 2, L = U * 2 / 3;
+    const at = t => { const p = mod(t + k, U); return t - p + (p < H ? p * 4 / 3 : L + (p - H) * 2 / 3); };
+    const back = x => { const p = mod(x + k, U); return x - p + (p < L ? p * 3 / 4 : H + (p - L) * 3 / 2); };
+    return { on: true, at, back, len: (t, d) => at(t + d) - at(t) };
+  }
+
+  /* ==================================================================
      SPELLING A LENGTH (2.5 — SONG-WRITER-RHYTHM-PLAN.md §5, P1)
      How a stretch of time is written as note values, the way print
      writes it. Used by the staff (a note crossing a bar line is drawn as
@@ -348,7 +388,8 @@
   }
 
   SW.timing = {
-    column, lineEvents, song, tickMs, LETTERS, barsOf,
+    column, lineEvents, song, tickMs, LETTERS, barsOf, swing,
+    swingPlays: mt => swingSpan(mt || meter()) > 0,
     linePickup: line => linePickup(line, meter()),
     spell, spellSpan, barPieces, fillPieces, placeOf
   };

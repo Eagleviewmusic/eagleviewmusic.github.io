@@ -41,6 +41,7 @@
 
    MODEL
      { v: 2, key: 'C', meter: '3/4', bpm: 96,             // both omitted when 4/4 · 100
+       swing: '8',                                         // '8' | '16' (timing.js SWING); omitted when straight
        lines: [ { label: 'A',
                   syllables: [ { text: 'Twin', chord: 'I',
                                  hy: true,                     // the word goes on in the next syllable (WORDS IN SYLLABLES)
@@ -49,7 +50,7 @@
 
    TEXT FORMAT (1.0's, extended; a 1.0 song parses unchanged)
      [Key of C]
-     [Time 3/4]                                            (optional; [Tempo 96] likewise)
+     [Time 3/4]                                            (optional; [Tempo 96] and [Swing 8] likewise)
      [A]
      {I}Twin-[D1] kle[D1:q] {V}twin-[S1,S1:e] kle[S1+M1:h] rest[D1~]
                                                            (a - after the word: it goes on in the next one)
@@ -65,14 +66,14 @@
   const $ = id => document.getElementById(id);
 
   /* ---- elements ----
-     There is no edit ribbon. The hat (#editToggle) beside Play is the
-     editing layer's switch; the tools that act on the selected note are
-     in the floating Edit box (js/components/edit-box.js), which calls the
-     functions below; the section tools are on each line's head. */
+     There is no edit ribbon. Whether the song can be changed (S.editing)
+     is the Edit box's to say since 2026-10-31 (edit-box.js THE RAIL: the
+     box out, or the lock off); the tools that act on the selected note are
+     in the Edit box, which calls the functions below; the section tools
+     are on each line's head. */
   const notationContainer = $('score');
   const stageEl = $('stage');
   const textEditorBtn = $('textEditorBtn');
-  const editToggleBtn = $('editToggle');
   const textEditorText = $('textEditorText');
 
   /* ---- 1.0's editing state ---- */
@@ -98,9 +99,15 @@
      are removed by settings.js, not disabled (Rhythm Poetry's rule 2).
      ------------------------------------------------------------------ */
   function can(what) { return !SW.settings || SW.settings.can(what); }
+  /* the rungs that may be written in the key in effect (Create Key Change: its stretch of real pitch, js/keys.js) */
   function allowedNotes() {
-    return (SW.settings && SW.settings.allowedNotes) ? SW.settings.allowedNotes() : noteOrder;
+    return (SW.settings && SW.settings.allowedNotes) ? SW.settings.allowedNotes(M.keyNow()) : noteOrder;
   }
+  /* KEY CHANGES (js/keys.js): the key a note (or column) is in. Everything
+     done to one note — its colour, names, sound, ↑ ↓, the letter keys, the
+     keyboard — is done inside M.withKey(keyOf(note), …). */
+  const keyOf = el => (SW.keys ? SW.keys.at(el) : S.key);
+  const inKeyOf = (el, fn) => M.withKey(keyOf(el), fn);
 
   /* After every edit: tell the components, then save (the library decides
      whether auto-save lets it through). 1.0 called saveCurrentSongToLibrary
@@ -108,9 +115,45 @@
   function changed(reason) {
     // on the Pitch page a word's syllables sit together (WORDS IN SYLLABLES) — once the typing is done
     if (!currentlyEditingText && !isAdvancingToNext) joinWords();
+    writeBlocksHere();                                  // on Notation a new note is a quarter — part of this edit (NOTATION WRITES ITS BLOCKS)
     SW.bus.emit('score:changed', { reason: reason || 'edit' });
     if (SW.library) SW.library.save();
   }
+
+  /* NOTATION WRITES ITS BLOCKS (2026-10-31, the user). On the Notation page
+     a note whose rhythm is not chosen yet is a QUARTER NOTE (a dotted quarter
+     in 6/8 9/8 12/8 — one beat), never a pitch block: what the Rhythm page
+     makes of it anyway (writeAllBlocks). Written as part of the edit that
+     made it, so it is the same Undo step, and when the page shows blocks — a
+     song brought over from the Pitch page, a song opened here, the lock
+     lifted. A block already counts as one beat, so nothing sounds different.
+     Not while the score is locked or a lesson keeps the rhythm; the Pitch
+     page keeps its blocks. */
+  function onNotation() {
+    const b = document.body.classList;
+    return b.contains('show-staff') && !b.contains('page-rhythm');
+  }
+  function writeBlocksHere() {
+    if (!onNotation() || !S.editing || !can('values')) return 0;
+    const id = SW.meters.byId(S.meter).beatValue;
+    let n = 0;
+    notationContainer.querySelectorAll('.harmony-stack').forEach(st => {
+      if (isNotated(st)) return;
+      applyStackValue(st, id);
+      n++;
+    });
+    return n;
+  }
+  // a song drawn (opened, or Undo's): before the history takes it as it stands (history.js loads after this file)
+  SW.bus.on('score:loaded', () => { writeBlocksHere(); });
+  // the page turned to Notation, or the score unlocked: written, and saved as an edit would be
+  function writeBlocksOnShow() {
+    if (!writeBlocksHere()) return;
+    emitSelection(false);
+    if (SW.library) SW.library.save();
+  }
+  SW.bus.on('view:changed', writeBlocksOnShow);
+  SW.bus.on('mode:changed', writeBlocksOnShow);
 
   /* ================= UTILITY ================= */
   function getAllSyllables() { return notationContainer.querySelectorAll('.syllable'); }
@@ -199,10 +242,11 @@
     addAccidentalToNote(noteElement, accidental || 'natural');
     updateNoteDisplay(noteElement, noteClass);
   }
-  /* the scale's notes on the allowed rungs; the whole eighteen when the
+  /* the scale's notes on the allowed rungs; all twenty-two when the
      range holds none of them (a lesson range built for another scale) */
   function ladder(id) {
-    const l = M.scaleLadder(allowedNotes(), id);
+    const inRange = n => !SW.keys || SW.keys.mode() !== 'change' || SW.keys.inRange(n.midi);
+    const l = M.scaleLadder(allowedNotes(), id).filter(inRange);
     return l.length ? l : M.scaleLadder(noteOrder, id);
   }
 
@@ -231,7 +275,7 @@
   const packPitch = p => p.nc + '|' + p.acc;
   function unpackPitch(str) {
     const [nc, acc] = String(str).split('|');
-    return noteOrder.indexOf(nc) !== -1 ? { nc, acc: acc === 'sharp' || acc === 'flat' ? acc : 'natural' } : null;
+    return M.isRung(nc) ? { nc, acc: acc === 'sharp' || acc === 'flat' ? acc : 'natural' } : null;
   }
   /* What a scale does with a step: its own alteration of it; a step it
      skips lands on its nearest note (the lower of two as near), found from
@@ -254,7 +298,8 @@
   }
   /* After ♯ ♭ (or loading): the block's pitch is the current scale's
      version — kept as a fine-tuning if it is not what the scale would give. */
-  function remember(note) {
+  function remember(note) { inKeyOf(note, () => rememberIn(note)); }
+  function rememberIn(note) {
     const nc = M.noteClassOf(note);
     if (!nc) return;
     const cur = { nc, acc: getAccidentalFromNote(note) };
@@ -274,11 +319,15 @@
   function memoryOf(note) { return { step: stepOf(note), alt: altsOf(note) }; }
   function playPitch(noteElement, noteClass, accidental) {
     if (noteElement.classList.contains('rest-note')) return;
-    const frequency = A.getModifiedFrequency(noteClass, accidental || 'natural', S.key);
+    const frequency = A.getModifiedFrequency(noteClass, accidental || 'natural', keyOf(noteElement));
     if (frequency !== null) A.playNote(frequency);
   }
 
   function handleSolfegeKeyInput(key) {
+    const n = getActiveNote();
+    return n ? inKeyOf(n, () => solfegeKeyIn(key)) : solfegeKeyIn(key);
+  }
+  function solfegeKeyIn(key) {
     if (!S.editing || currentNoteIndex < 0) return false;
     const noteClass = M.solfegeKeyMap[String(key).toLowerCase()];
     if (!noteClass) return false;
@@ -313,9 +362,12 @@
   }
 
   /* 1.0: changeNote. Up and down walk the scale's notes inside the allowed
-     range and wrap round, as 1.0 wrapped over all eighteen. A note outside
+     range and wrap round, as 1.0 wrapped over all its eighteen. A note outside
      the scale steps to the nearest scale note that way. */
   function changeNote(noteElement, direction, playSound) {
+    return inKeyOf(noteElement, () => changeNoteIn(noteElement, direction, playSound));
+  }
+  function changeNoteIn(noteElement, direction, playSound) {
     if (!can('pitch')) return;
     const currentNoteClass = M.noteClassOf(noteElement);
     if (!currentNoteClass) return;
@@ -346,11 +398,14 @@
      the scale takes the usual chromatic name (ra me le te, fi). Returns
      false if no allowed rung can sound it. */
   function setActiveNoteMidi(midi) {
-    if (!S.editing || !can('pitch')) return false;
     const note = getActiveNote();
-    if (!note) return false;
+    return note ? inKeyOf(note, () => setNoteMidiIn(note, midi)) : false;
+  }
+  function setNoteMidiIn(note, midi) {
+    if (!S.editing || !can('pitch')) return false;
+    if (SW.keys && SW.keys.mode() === 'change' && !SW.keys.inRange(midi)) return false;
     const allowed = allowedNotes();
-    const tonic = M.KEY_SIGNATURES_CHROMATIC_INDEX[S.key] || 0;
+    const tonic = M.KEY_SIGNATURES_CHROMATIC_INDEX[M.keyNow()] || 0;
     const rel = ((midi - tonic) % 12 + 12) % 12;
     const sc = M.scaleOf();
     const wanted = (typeof Theory !== 'undefined') ? Theory.parseDegree(Theory.semisToDegree(rel, sc ? sc.degrees : [])) : null;
@@ -408,7 +463,7 @@
     remember(activeNote);                      // this scale's version only
     const noteClass = M.noteClassOf(activeNote);
     if (noteClass && !activeNote.classList.contains('rest-note')) {
-      const frequency = A.getModifiedFrequency(noteClass, S.accidentalMode, S.key);
+      const frequency = A.getModifiedFrequency(noteClass, S.accidentalMode, keyOf(activeNote));
       if (frequency !== null) A.playNote(frequency);
     }
     emitSelection(false);
@@ -434,7 +489,8 @@
      A block's colour is its letter's (1.0's palette); its names are its
      own pitch: the letter spelled with its ♯/♭ (B♭, not B) and solfège
      with Do on the tonic (ra me fi se le te — core.js solfegeOf). */
-  function paintNoteNames(noteElement) {
+  function paintNoteNames(noteElement) { inKeyOf(noteElement, () => paintNamesIn(noteElement)); }
+  function paintNamesIn(noteElement) {
     const noteClass = M.noteClassOf(noteElement);
     if (!noteClass) return;
     const acc = getAccidentalFromNote(noteElement);
@@ -443,7 +499,8 @@
     const solEl = noteElement.querySelector('.solfege-name');
     if (solEl) solEl.textContent = M.solfegeOf(noteClass, acc).toLowerCase();
   }
-  function updateNoteDisplay(noteElement, noteClass) {
+  function updateNoteDisplay(noteElement, noteClass) { inKeyOf(noteElement, () => noteDisplayIn(noteElement, noteClass)); }
+  function noteDisplayIn(noteElement, noteClass) {
     noteClass = noteClass || M.noteClassOf(noteElement);
     if (!noteClass) return;
     const color = M.noteColour(noteClass);
@@ -454,7 +511,25 @@
     paintNoteNames(noteElement);
   }
   function applyNoteColors() {
-    notationContainer.querySelectorAll('.note').forEach(n => updateNoteDisplay(n));
+    if (!SW.keys) { notationContainer.querySelectorAll('.note').forEach(n => noteDisplayIn(n)); return; }
+    SW.keys.eachStack((st, k) => M.withKey(k, () => st.querySelectorAll('.note').forEach(n => noteDisplayIn(n))));
+  }
+  /* KEY CHANGES (js/keys.js): after a key change is made, moved or taken
+     away — every note in its place's key; o.announce: tell the page
+     ('key:changed' — the staff, the chords, the panel …). */
+  function recolour(o) {
+    applyNoteColors();
+    notationContainer.querySelectorAll('.harmony-stack[data-v]').forEach(st => applyStackValue(st, st.dataset.v));
+    if (o && o.announce) SW.bus.emit('key:changed', { key: S.key });
+  }
+  /* A note set to a pitch in a given key (keys.js Remain unchanged): its step and every scale's version start again from it. */
+  function repitch(note, nc, acc, key) {
+    M.withKey(key || keyOf(note), () => {
+      setNotePitch(note, nc, acc);
+      rewrite(note);
+    });
+    const stack = note.closest('.harmony-stack');
+    if (stack) updateHarmonyStackVisuals(stack);
   }
 
   /* ================= SECTIONS =================
@@ -865,7 +940,7 @@
     addAccidentalToNote(noteDiv, accidental || 'natural');     // and names it
     // each scale's version (SCALE MEMORY above): from the song, or copied
     if (memory) {
-      if (memory.step && noteOrder.indexOf(memory.step) !== -1) noteDiv.dataset.step = memory.step;
+      if (memory.step && M.isRung(memory.step)) noteDiv.dataset.step = memory.step;
       const alts = {};
       Object.keys(memory.alt || {}).forEach(id => { if (unpackPitch(memory.alt[id])) alts[id] = memory.alt[id]; });
       setAlts(noteDiv, alts);
@@ -875,7 +950,7 @@
   }
 
   function getNotePitchIndex(noteEl) {
-    return noteOrder.indexOf(M.noteClassOf(noteEl) || 'do');
+    return M.RUNGS.indexOf(M.noteClassOf(noteEl) || 'do');
   }
 
   /* 1.0: several notes on one beat overlap, tallest at the back, and the
@@ -958,7 +1033,7 @@
     if (!Array.isArray(columns) || columns.length === 0) return [{ notes: [spec('do')] }];
     return columns.map(col => {
       if (col && !Array.isArray(col) && Array.isArray(col.notes)) {
-        return { v: col.v, tie: col.tie === true, notes: col.notes.length ? col.notes.map(spec) : [spec('do')] };
+        return { v: col.v, tie: col.tie === true, key: col.key, notes: col.notes.length ? col.notes.map(spec) : [spec('do')] };
       }
       if (Array.isArray(col)) return { notes: col.map(spec) };
       return { notes: [spec(col)] };
@@ -1013,7 +1088,7 @@
     return true;
   }
 
-  /* ---- the song's meter and tempo (stored in the score) ---- */
+  /* ---- the song's meter, tempo and swing (stored in the score) ---- */
   function setMeter(id, quiet) {
     if (!SW.meters.isValid(id) || S.meter === id) return;
     if (!quiet && SW.track) SW.track.followMeter(S.meter, id);   // the chords' rhythms go over to the new meter (track.js)
@@ -1030,6 +1105,15 @@
     S.bpm = b;
     SW.bus.emit('meter:changed', { meter: S.meter, bpm: S.bpm, what: 'tempo' });
     if (!quiet) changed('tempo');
+  }
+  /* The song's swing (timing.js SWING): '' none, '8', '16'. Like the
+     tempo, a change while playing re-times the music. */
+  function setSwing(v, quiet) {
+    const w = v === '8' || v === '16' ? v : '';
+    if (S.swing === w) return;
+    S.swing = w;
+    SW.bus.emit('swing:changed', { swing: w });
+    if (!quiet) changed('swing');
   }
 
   function createNewSyllable(syllableText, columns, chord, hy) {
@@ -1055,6 +1139,7 @@
       updateHarmonyStackVisuals(stack);
       applyStackValue(stack, col.v);
       if (col.tie && col.v) stack.dataset.tie = '1';
+      if (col.key && M.KEYS.indexOf(col.key) !== -1) stack.dataset.key = col.key;   // a key change starts here (js/keys.js)
       notesContainer.appendChild(stack);
     });
     const textDiv = document.createElement('div');
@@ -2005,19 +2090,15 @@
   }
 
   /* ================= MODES & TOGGLES ================= */
-  /* The hat is a toggle again, as in 1.0: one press on, one press off.
-     Its tooltip names what the next press does. */
+  /* The editing layer on or off. Until 2026-10-31 the lock beside Play
+     (the construction hat before that) switched it; now edit-box.js sync()
+     decides — the Edit box out, or the lock off — and calls this. */
   function setEditing(on) {
     on = !!on && can('edit');
     if (S.editing === on) return;
     if (!on) finishTextEdit();
     S.editing = on;
     document.body.classList.toggle('editing', on);
-    if (editToggleBtn) {
-      editToggleBtn.classList.toggle('active', on);
-      editToggleBtn.setAttribute('aria-pressed', String(on));
-      editToggleBtn.title = on ? 'Lock — back to performing' : 'Unlock to edit';
-    }
     notationContainer.querySelectorAll('.line-label').forEach(l => { l.readOnly = !labelEditable(); });
     if (!on) {
       resetAccidentalToggleVisuals();
@@ -2033,19 +2114,20 @@
   }
   function toggleEditMode() { setEditing(!S.editing); }
 
-  function setNames(on) {
-    S.showNames = !!on;
+  /* The note names — Look → Display Note Names since 2026-10-31 (the user;
+     the toolbar's glasses until then, which showed both and forgot them at
+     reload): 'off', 'letter' (over each block, by each head) or 'sol' (in
+     each block, by each head). Remembered as View pref noteNames. */
+  function setNames(mode) {
+    S.names = ['letter', 'sol'].indexOf(mode) === -1 ? 'off' : mode;
+    S.showNames = S.names !== 'off';
     notationContainer.classList.toggle('show-names', S.showNames);
-    document.body.classList.toggle('show-names', S.showNames);
-    const btn = $('nameToggle');
-    if (btn) {
-      btn.classList.toggle('active', S.showNames);
-      btn.setAttribute('aria-pressed', String(S.showNames));
-      btn.title = S.showNames ? 'Hide the note names' : 'Show the note names';
-    }
-    SW.bus.emit('names:changed', { on: S.showNames });
+    const b = document.body;
+    b.classList.toggle('show-names', S.showNames);
+    b.classList.toggle('names-letter', S.names === 'letter');
+    b.classList.toggle('names-sol', S.names === 'sol');
+    SW.bus.emit('names:changed', { on: S.showNames, mode: S.names });
   }
-  function toggleNames() { setNames(!S.showNames); }
 
   /* Section colours: a View choice now (View → On the page), remembered. */
   function setColours(on) {
@@ -2153,7 +2235,7 @@
     if (typeof Theory === 'undefined') return null;
     const steps = {};
     let count = 0, any = false;
-    getAllNotes().forEach(n => {
+    getAllNotes().forEach(n => inKeyOf(n, () => {
       const was = { nc: M.noteClassOf(n), acc: getAccidentalFromNote(n) };
       if (!was.nc) return;
       const now = pitchIn(n, toId);
@@ -2166,7 +2248,7 @@
       count++;
       const label = M.solfegeOf(was.nc, was.acc).toLowerCase() + ' → ' + M.solfegeOf(now.nc, now.acc).toLowerCase();
       steps[label] = (M.noteMidi(was.nc, was.acc) % 12 + 12) % 12;
-    });
+    }));
     if (any) {
       notationContainer.querySelectorAll('.harmony-stack').forEach(updateHarmonyStackVisuals);
       updateAllLineHeights();
@@ -2213,7 +2295,7 @@
     const ev = SW.timing.lineEvents(line).events.find(e => e.stack === stack);
     return ev && ev.tiedIn && ev.tiedIn.size ? ev.tiedIn : null;
   }
-  const struck = (note, held) => !held || !held.has(M.noteMidi(M.noteClassOf(note) || 'do', getAccidentalFromNote(note)));
+  const struck = (note, held) => !held || !held.has(M.noteMidi(M.noteClassOf(note) || 'do', getAccidentalFromNote(note), keyOf(note)));
   function soundColumn(noteElement) {
     const stack = noteElement.closest('.harmony-stack');
     const held = heldIn(stack);
@@ -2513,6 +2595,7 @@
     if (S.scale && S.scale !== 'major') out.scale = S.scale;                  // the chord panel's scale (chords.js)
     if (S.meter !== SW.meters.DEFAULT) out.meter = S.meter;
     if (S.bpm !== SW.meters.DEFAULT_BPM) out.bpm = S.bpm;
+    if (S.swing) out.swing = S.swing;                                        // omitted when straight
     const board = SW.chords ? SW.chords.boardModel() : {};
     if (Object.keys(board).length) out.board = board;                        // re-chorded places on the panel
     if (SW.track) Object.assign(out, SW.track.model());                       // progressions + the chord track (js/track.js), when there are any
@@ -2572,6 +2655,7 @@
     };
     if (isNotated(stack)) col.v = stack.dataset.v;
     if (stack.dataset.tie) col.tie = true;
+    if (stack.dataset.key) col.key = stack.dataset.key;        // a key change starts here (js/keys.js)
     return col;
   }
 
@@ -2603,6 +2687,7 @@
     if (SW.track) SW.track.load(score);                                        // progressions + the chord track
     setMeter(score.meter, true);
     setTempo(score.bpm, true);
+    setSwing(score.swing, true);
     finishTextEdit();
     notationContainer.innerHTML = '';
     currentNoteIndex = -1;
@@ -2651,6 +2736,7 @@
     }
     if (SW.meters.isValid(raw.meter)) out.meter = raw.meter;
     if (raw.bpm !== undefined && raw.bpm !== null) out.bpm = SW.meters.clampBpm(raw.bpm);
+    if (String(raw.swing) === '8' || String(raw.swing) === '16') out.swing = String(raw.swing);
     // a line's pick-up (PICK-UPS): a value shorter than a bar. Until
     // 2026-10-01 `pickup: 1` gave every line a beat — each line that had not
     // had its own taken away (`pickup: false`) keeps it, as a quarter.
@@ -2674,17 +2760,17 @@
         if (typeof s.chord === 'string' && s.chord) syl.chord = s.chord;
         if (s.hy === true) syl.hy = true;
         (Array.isArray(s.cols) ? s.cols : []).forEach((c, ci) => {
-          const notes = (c && Array.isArray(c.notes) ? c.notes : []).filter(n => n && noteOrder.indexOf(n.n) !== -1).map(n => {
+          const notes = (c && Array.isArray(c.notes) ? c.notes : []).filter(n => n && M.isRung(n.n)).map(n => {
             const spec = { n: n.n };
             if (n.acc === 'sharp' || n.acc === 'flat') spec.acc = n.acc;
             if (n.rest) spec.rest = true;
-            if (typeof n.step === 'string' && noteOrder.indexOf(n.step) !== -1 && n.step !== n.n) spec.step = n.step;
+            if (typeof n.step === 'string' && M.isRung(n.step) && n.step !== n.n) spec.step = n.step;
             if (n.alt && typeof n.alt === 'object') {
               const alt = {};
               Object.keys(n.alt).forEach(id => {
                 const a = n.alt[id];
                 if (id === out.scale || typeof Theory === 'undefined' || !Theory.SCALE_BY_ID[id]) return;
-                if (!a || noteOrder.indexOf(a.n) === -1) return;
+                if (!a || !M.isRung(a.n)) return;
                 alt[id] = (a.acc === 'sharp' || a.acc === 'flat') ? { n: a.n, acc: a.acc } : { n: a.n };
               });
               if (Object.keys(alt).length) spec.alt = alt;
@@ -2699,6 +2785,7 @@
           const col = { notes };
           if (c && SW.values.isValid(c.v)) col.v = c.v;
           if (c && c.tie === true && col.v) col.tie = true;
+          if (c && typeof c.key === 'string' && M.KEYS.indexOf(c.key) !== -1) col.key = c.key;   // KEY CHANGES (keys.js)
           syl.cols.push(col);
         });
         if (!syl.cols.length) syl.cols.push({ notes: [{ n: 'do' }] });
@@ -2758,6 +2845,7 @@
     if (score.scale && score.scale !== 'major') head += `[Scale ${score.scale}]\n`;
     if (score.meter !== SW.meters.DEFAULT) head += `[Time ${score.meter}]\n`;
     if (score.bpm !== SW.meters.DEFAULT_BPM) head += `[Tempo ${score.bpm}]\n`;
+    if (score.swing) head += `[Swing ${score.swing}]\n`;
     return head + body.trim();
   }
 
@@ -2806,14 +2894,16 @@
       if (M.KEY_SIGNATURES_CHROMATIC_INDEX[keyMatch[1]] !== undefined) key = keyMatch[1];
       songText = songText.substring(keyMatch[0].length);
     }
-    let meter = SW.meters.DEFAULT, bpm = SW.meters.DEFAULT_BPM, scale = 'major', pickup = 0;
+    let meter = SW.meters.DEFAULT, bpm = SW.meters.DEFAULT_BPM, scale = 'major', pickup = 0, swing = '';
     songText = songText.replace(/^\s*\[Scale ([^\]]+)\]\n?/i, (m, t) => { scale = t.trim(); return ''; });
     songText = songText.replace(/^\s*\[Time ([^\]]+)\]\n?/i, (m, t) => { if (SW.meters.isValid(t.trim())) meter = t.trim(); return ''; });
     songText = songText.replace(/^\s*\[Tempo ([^\]]+)\]\n?/i, (m, t) => { bpm = SW.meters.clampBpm(t); return ''; });
+    songText = songText.replace(/^\s*\[Swing ([^\]]+)\]\n?/i, (m, t) => { const w = parseInt(t, 10); swing = w === 8 || w === 16 ? String(w) : ''; return ''; });
     songText = songText.replace(/^\s*\[Pickup ([^\]]+)\]\n?/i, (m, t) => { pickup = parseInt(t, 10) === 1 ? 1 : 0; return ''; });
     if (songText.trim() && !songText.trim().startsWith('[')) songText = '[New Line]\n' + songText;
 
     const score = { v: 2, key, scale, meter, bpm, pickup, lines: [] };
+    if (swing) score.swing = swing;
     let current = null;
     songText.trim().split('\n').forEach(raw => {
       const lineText = raw.trim();
@@ -2822,7 +2912,7 @@
       if (pk) { if (current && SW.values.isValid(pk[1].trim())) current.pickup = pk[1].trim(); return; }
       const bk = lineText.match(/^\[Bars (\d+)\]$/i);                    // an instrumental line
       if (bk) { if (current && !current.syllables.length) current.bars = parseInt(bk[1], 10); return; }
-      if (lineText.startsWith('[Key of') || /^\[(Time|Tempo|Scale) /i.test(lineText)) return;
+      if (lineText.startsWith('[Key of') || /^\[(Time|Tempo|Scale|Swing) /i.test(lineText)) return;
       const label = lineText.match(/^\[(.*)\]$/);
       if (label) {
         current = { label: label[1] !== 'New Line' ? label[1] : '', syllables: [] };
@@ -3089,8 +3179,6 @@
     // the mousedown a touch sends after a double tap that opened a word would blur it shut
     notationContainer.addEventListener('mousedown', e => { if (performance.now() - wordTapAt < 500) e.preventDefault(); });
 
-    if (editToggleBtn) editToggleBtn.addEventListener('click', () => setEditing(!S.editing));
-
     if (textEditorBtn) textEditorBtn.addEventListener('click', showTextEditorPopup);
     $('cancelTextEditor').addEventListener('click', hideTextEditorPopup);
     $('submitTextEditor').addEventListener('click', handleTextEditorSubmit);
@@ -3111,7 +3199,6 @@
     $('cancelDeleteSectionBtn').addEventListener('click', hideDeleteSectionModal);
     $('confirmDeleteSectionBtn').addEventListener('click', confirmDeleteSection);
 
-    $('nameToggle').addEventListener('click', toggleNames);
     const addLine = $('add-line-btn');
     if (addLine) addLine.addEventListener('click', e => { e.stopPropagation(); appendEmptyLine(); });
 
@@ -3121,7 +3208,7 @@
       if (deleteConfirmationState) resetDeleteConfirmation();
     });
 
-    setNames(false);
+    setNames(SW.settings.view.noteNames);
     updateAllButtonStates();
     // Pitch shows each word whole; Notation and Rhythm its syllables (WORDS IN SYLLABLES)
     SW.bus.on('view:changed', fitWordsToPage);
@@ -3152,9 +3239,9 @@
     // lines and sections
     appendEmptyLine, moveSection, duplicateSection, requestDeleteSection,
     // the song's time
-    setMeter, setTempo,
+    setMeter, setTempo, setSwing,
     // modes
-    setEditing, toggleEditMode, setNames, toggleNames, setColours, toggleColorScheme, changeKey, setScale,
+    setEditing, toggleEditMode, setNames, setColours, recolour, repitch, toggleColorScheme, changeKey, setScale,
     isTyping: () => !!currentlyEditingText,
     finishTextEdit,
     setWordAt,          // a word typed on the Rhythm page

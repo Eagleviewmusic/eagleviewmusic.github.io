@@ -67,7 +67,6 @@
   --font-round: 'Baloo 2', 'Nunito', system-ui, sans-serif;
   --font-block: 'Fredoka', 'Nunito', system-ui, sans-serif;
   --font-signature: 'Noto Serif', Georgia, 'Times New Roman', serif;
-  --ts-digit: 25px;
 
   /* the toolbar's own sizes, grown on a smartboard and shrunk on a short screen */
   --btn-h: 42px;
@@ -75,7 +74,6 @@
   --square: 44px;
   --circle: 30px;
   --step: 50px;
-  --sig-h: 54px;
 
   /* the section heads' round tools — grown for a finger (TOUCH, below) */
   --hb: 24px;
@@ -268,10 +266,11 @@ body.show-dock .preview-bar { bottom: calc(var(--toolbar-real) + var(--dock-h) +
        columns:  [strip] var(--strip-w)   [score] 1fr
        rows:     [main]  1fr              [dock]  auto
 
-   While the hat is on, the Edit box is the left column, both rows
-   tall (the panel's place and the corner under it); with the chords
-   on, the chord panel sits in its foot (#eb-chords, edit-box.js) and
-   the corner is away.
+   While the Edit box is out (body.box-open), it is the left column,
+   both rows tall (the panel's place and the corner under it); the chord
+   panel sits in its Chords pane (#eb-chords, edit-box.js) and the corner
+   is away. Left of it all, the rail (2026-10-31: the box's circle and
+   the lock, edit-box.js THE RAIL) sits in the workspace's padding.
    ============================================================ */
 .workspace {
   flex: 1 1 auto;
@@ -286,15 +285,16 @@ body.show-dock .preview-bar { bottom: calc(var(--toolbar-real) + var(--dock-h) +
 }
 body.show-strip .workspace { grid-template-columns: var(--strip-w) minmax(0, 1fr); }
 body.show-dock .workspace { grid-template-rows: minmax(0, 1fr) auto; }
-body.editing .workspace { grid-template-columns: var(--eb-w) minmax(0, 1fr); }
-body.editing.show-strip .workspace { grid-template-columns: max(var(--eb-w), var(--strip-w)) minmax(0, 1fr); }
+body.box-open .workspace { grid-template-columns: var(--eb-w) minmax(0, 1fr); }
+body.box-open.show-strip .workspace { grid-template-columns: max(var(--eb-w), var(--strip-w)) minmax(0, 1fr); }
+body.has-rail .workspace { padding-left: var(--rail-w); }
 
 .chord-strip { grid-area: strip; min-width: 0; overflow: hidden; display: none; }
 body.show-strip .chord-strip { display: flex; }
 .stage { grid-area: score; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; position: relative; scroll-behavior: auto; }
 .dock-corner { grid-area: corner; display: none; }
 body.show-strip.show-dock .dock-corner { display: flex; }
-body.editing .dock-corner, body.editing.show-strip.show-dock .dock-corner { display: none; }   /* the Edit box has its place */
+body.box-open .dock-corner, body.box-open.show-strip.show-dock .dock-corner { display: none; }   /* the Edit box has its place */
 .keyboard-dock { grid-area: dock; min-width: 0; display: none; }
 
 
@@ -471,7 +471,10 @@ body.light-note:not(.playing):not(.capturing) .note.selected-note { box-shadow: 
 .note.rest-note.selected-note { opacity: .88; }
 body.light-note:not(.playing):not(.capturing) .note.rest-note.selected-note { box-shadow: 0 0 0 2px #fff, 0 0 0 4.5px var(--light, var(--gold)), 0 0 16px 3px var(--light-glow, rgba(255,215,0,.85)) !important; }
 
-/* 1.0's heights, at block size 100% (keep in step with NOTE_HEIGHTS) */
+/* 1.0's heights, at block size 100% (keep in step with NOTE_HEIGHTS);
+   low do and re, ti″ and the top do since 2026-10-31 */
+.do-low  { height: calc(12px  * var(--bs)); }
+.re-low  { height: calc(16px  * var(--bs)); }
 .mi-low  { height: calc(20px  * var(--bs)); }
 .fa-low  { height: calc(25px  * var(--bs)); }
 .so-low  { height: calc(30px  * var(--bs)); }
@@ -490,6 +493,38 @@ body.light-note:not(.playing):not(.capturing) .note.rest-note.selected-note { bo
 .fa-high { height: calc(160px * var(--bs)); }
 .so-high { height: calc(170px * var(--bs)); }
 .la-high { height: calc(180px * var(--bs)); }
+.ti-high { height: calc(190px * var(--bs)); }
+.do-high2 { height: calc(200px * var(--bs)); }
+/* KEY CHANGES' wider rungs (2026-10-31, js/keys.js — Create Key Change's A♭2 … G6): under low do the
+   bars keep narrowing a pixel at a time, over the top do they climb on ten apart (core.js NOTE_HEIGHTS) */
+.do-low2 { height: calc(4px * var(--bs)); }
+.re-low2 { height: calc(5px * var(--bs)); }
+.mi-low2 { height: calc(6px * var(--bs)); }
+.fa-low2 { height: calc(7px * var(--bs)); }
+.so-low2 { height: calc(8px * var(--bs)); }
+.la-low2 { height: calc(9px * var(--bs)); }
+.ti-low2 { height: calc(10px * var(--bs)); }
+.re-high2 { height: calc(210px * var(--bs)); }
+.mi-high2 { height: calc(220px * var(--bs)); }
+.fa-high2 { height: calc(230px * var(--bs)); }
+.so-high2 { height: calc(240px * var(--bs)); }
+.la-high2 { height: calc(250px * var(--bs)); }
+.ti-high2 { height: calc(260px * var(--bs)); }
+
+/* ---- KEY CHANGES (js/keys.js paint): on the blocks, the column where the key changes carries
+   a flag with the new key's name, in its colour, over the column's left edge (::after — a tie's
+   mark has the column's ::before). On a written line the staff writes the new key signature instead. ---- */
+.harmony-stack[data-key-label]::after {
+  content: attr(data-key-label);
+  position: absolute; left: 0; bottom: calc(100% + 24px * var(--bs));
+  transform: translateX(-50%);
+  padding: 1px 6px; border-radius: 6px 6px 6px 0;
+  background: var(--kc, var(--accent)); color: #fff;
+  font: 800 calc(12px * var(--bs)) var(--font); line-height: 1.35; white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,.18);
+  pointer-events: none; z-index: 24;
+}
+.notation-line.has-staff .harmony-stack[data-key-label]::after { display: none; }
 
 .accidental-symbol {
   position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
@@ -509,6 +544,8 @@ body.light-note:not(.playing):not(.capturing) .note.rest-note.selected-note { bo
 }
 .show-names .letter-name, .show-names .solfege-name { opacity: 1; }
 .show-names .harmony-stack.has-multiple-notes .letter-name { display: none !important; }
+/* Look → Display Note Names: Letters (over the block) or Solfège (in it) — the glasses showed both until 2026-10-31 */
+body.names-letter .solfege-name, body.names-sol .letter-name { opacity: 0; }
 
 .text {
   font-family: var(--lyric-font);
@@ -561,7 +598,7 @@ body:not(.show-staff) .value-mark { display: block; }
 /* the Pitch page's Beats off (the Edit box, 2026-10-26): no rhythm marks — the rhythm still plays */
 body.hide-marks:not(.show-staff) .value-mark { display: none; }
 body.hide-marks:not(.show-staff) .harmony-stack.notated[data-tie]::before { display: none; }
-.show-names .value-mark { --vm-h: max(calc(12px * var(--bs)), min(calc(26px * var(--bs)), calc(100% - 27px * var(--bs)))); }
+body.show-names:not(.names-letter) .value-mark { --vm-h: max(calc(12px * var(--bs)), min(calc(26px * var(--bs)), calc(100% - 27px * var(--bs)))); }
 body:not(.show-staff) .harmony-stack.notated:has(.accidental-symbol) .value-mark { left: calc(50% + 4px * var(--bs)); }
 body:not(.show-staff) .harmony-stack.notated .accidental-symbol {
   bottom: calc(4px * var(--bs)); left: calc(50% - 9px * var(--bs));
@@ -697,42 +734,83 @@ body.editing:not(.chords-locked) .chord-slot { cursor: pointer; }
   border-right: 1.5px solid rgba(240,138,0,.32);
   overflow: hidden;
 }
-body.editing .edit-box { display: flex; animation: eb-in .18s ease-out; }
+body.box-open .edit-box { display: flex; animation: eb-in .18s ease-out; }
 @keyframes eb-in { from { opacity: 0; } to { opacity: 1; } }
 .edit-box [hidden] { display: none !important; }
 
 .eb-head {
-  flex: none; display: flex; align-items: center; gap: 7px;
-  height: 40px; padding: 0 9px 0 11px;
+  flex: none; display: flex; align-items: center; gap: 6px;
+  height: var(--eb-head-h); padding: 0 8px 0 9px;
   background: var(--edit-soft); color: var(--edit);
   user-select: none; -webkit-user-select: none;
 }
-.eb-lock { width: 19px; height: 19px; flex: none; color: var(--edit-glow); }
-.eb-title { flex: 1; font-family: var(--font-round); font-size: 16px; font-weight: 700; line-height: 1; }
-/* Undo / Redo (2.5, js/history.js) — in the title bar, always there while the hat is on */
-.eb-undo-pair { display: inline-flex; gap: 2px; flex: none; }
+.eb-title { flex: 1; font-family: var(--font-round); font-size: 16px; font-weight: 700; line-height: 1; padding-left: 2px; }
+/* Piano (2026-10-31): the keyboard under the music, on and off — a toggle beside the Edit · Chords switch */
+.eb-piano {
+  flex: none; height: 28px; display: inline-flex; align-items: center; gap: 4px; padding: 0 8px 0 6px;
+  border-radius: 999px; background: rgba(240,138,0,.12); color: var(--edit);
+  font-size: 12.5px; font-weight: 800; line-height: 1; transition: background .12s, color .12s;
+}
+.eb-piano svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.eb-piano:hover { background: rgba(240,138,0,.22); }
+.eb-piano.on, .eb-piano.on:hover { background: var(--edit); color: #fff; }
+
+/* ---- THE RAIL (2026-10-31, the user's design; edit-box.js THE RAIL) ----
+   At the workspace's left edge, in its padding, from the top of the stage
+   to the toolbar: the box's circle (› / ‹), under it the smaller lock,
+   then Undo / Redo. Its top cell lines up with the box's title. */
+:root { --rail-w: 40px; --eb-head-h: 40px; }
+.eb-rail {
+  position: absolute; left: 0; top: 0; bottom: 0; width: var(--rail-w); z-index: 3;
+  display: none; flex-direction: column; align-items: center; gap: 8px;
+  padding-top: calc((var(--eb-head-h) - var(--fold-d)) / 2);
+  background: var(--surface); border-right: 1px solid var(--hairline);
+  --fold-d: 30px; --lock-d: 24px;
+  user-select: none; -webkit-user-select: none;
+}
+body.has-rail .eb-rail { display: flex; }
+body.box-open .eb-rail { background: linear-gradient(var(--edit-soft) var(--eb-head-h), var(--surface) var(--eb-head-h)); border-right-color: rgba(240,138,0,.22); }
+.eb-fold {
+  width: var(--fold-d); height: var(--fold-d); flex: none; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--edit); color: #fff; box-shadow: 0 2px 0 rgba(0,0,0,.12);
+  transition: transform .12s, background .12s;
+}
+.eb-fold svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; transition: transform .18s; }
+.eb-fold[aria-expanded="true"] svg { transform: scaleX(-1); }
+.eb-fold:hover { background: #E07F00; }
+.eb-fold:active { transform: translateY(1px); box-shadow: 0 1px 0 rgba(0,0,0,.12); }
+.eb-lock-btn {
+  width: var(--lock-d); height: var(--lock-d); flex: none; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--paper-2); color: var(--ink-3); box-shadow: inset 0 0 0 1.5px var(--hairline-2, #DCCFE3);
+  transition: background .12s, color .12s;
+}
+.eb-lock-btn svg { width: 14px; height: 14px; }
+.eb-lock-btn svg path { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
+.eb-lock-btn svg rect { fill: currentColor; }
+.eb-lock-btn .shackle-shut, .eb-lock-btn.on .shackle-open { display: none; }
+.eb-lock-btn.on .shackle-shut { display: inline; }
+.eb-lock-btn:hover { color: var(--ink-2); }
+.eb-lock-btn.on { background: var(--ink-2); color: #fff; box-shadow: none; }
+.eb-rail-rule { width: 20px; height: 1px; flex: none; background: var(--hairline); margin: 2px 0; }
+/* Undo / Redo (2.5, js/history.js) — on the rail since 2026-10-31 (the box's title holds Edit · Chords · Piano) */
 .eb-undo {
-  width: 30px; height: 28px; display: grid; place-items: center; border-radius: 8px;
-  color: var(--edit); background: transparent; transition: background .12s, opacity .12s;
+  width: 30px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 8px;
+  color: var(--ink-2); background: transparent; transition: background .12s, opacity .12s;
 }
 .eb-undo svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-.eb-undo:hover:not(:disabled) { background: rgba(240,138,0,.18); }
+.eb-undo:hover:not(:disabled) { background: var(--edit-soft); color: var(--edit); }
 .eb-undo:disabled { opacity: .3; }
 
 .eb-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; padding: 0 11px 11px; }
-/* the chord panel at the end of the scroll (edit-box.js seatChords): a
-   minor part of editing, so it waits below the tools until scrolled to.
-   It spans the box's full width (out past the body's padding) and has a
-   height of its own, as its rows share the height they are given. */
+/* the chord panel's seat in the box (edit-box.js seatChords): shown only in the Chords pane, to play —
+   the section at the end of the Edit pane's scroll, pencils and all, left 2026-10-30 (user: the Chord
+   Chart and Focus are the better ways to change chords now) */
 .eb-chords { display: none; }
-body.show-strip .eb-chords {
-  flex: none; height: 300px; display: flex;
-  margin: 12px -11px -11px; border-top: 1px solid var(--hairline);
-}
+body.pane-chords .eb-chords { display: flex; }
+body.pane-chords .eb-chords .chord-strip { display: flex; }   /* the pane brings the panel, Display Chord Panel or not (2026-10-31) */
 .eb-chords .chord-strip { flex: 1 1 auto; min-width: 0; border-right: none; padding: 10px 10px 10px 11px; background: transparent; }
-/* the blocks are smaller down here: a small pencil in the corner, clear of the name */
-.eb-chords .cb-edit { width: 16px; height: 16px; top: 2px; right: 2px; border-radius: 5px; }
-.eb-chords .cb-edit svg { width: 10px; height: 10px; }
 .eb-chords .cblock { border-radius: 10px; }
 .eb-section { display: flex; flex-direction: column; gap: 7px; padding: 10px 0 2px; border-top: 1px solid var(--hairline); margin-top: 8px; }
 .eb-section.eb-first { border-top: none; margin-top: 0; }
@@ -763,6 +841,31 @@ body.show-strip .eb-chords {
 .eb-btn:disabled { opacity: .35; }
 .eb-square { flex: 0 0 var(--eb-btn-h); padding: 0; font-size: 20px; font-weight: 900; }
 .eb-wide { grid-column: 1 / -1; }
+/* the Pitch page's Rest (edit-box.js BY PAGE): the rest's picture beside the word */
+.eb-rest-pic { display: inline-flex; align-items: center; height: 17px; }
+.eb-btn .eb-rest-pic svg.engraving { width: auto; height: 17px; }
+/* HARMONY (edit-box.js): once a column holds two notes or more, a circle
+   per note in its colour, low to high, in the Harmony button's place —
+   the picked one full and ringed — and a small + for another */
+.eb-harm-notes {
+  flex: 1 1 0; min-width: 0; height: var(--eb-btn-h);
+  display: flex; align-items: center; justify-content: center; gap: 7px; padding: 0 7px;
+  border-radius: 10px; background: var(--paper-2);
+}
+.eb-harm-note, .eb-harm-add {
+  flex: 0 1 auto; min-width: 0; width: calc(var(--eb-btn-h) - 14px); aspect-ratio: 1; height: auto;
+  border-radius: 50%; padding: 0;
+  transition: transform .12s, opacity .12s, box-shadow .12s;
+}
+.eb-harm-note { background: var(--c); opacity: .72; transform: scale(.86); }
+.eb-harm-note:hover { opacity: .85; }
+.eb-harm-note.on { opacity: 1; transform: none; box-shadow: 0 0 0 2px var(--paper-2), 0 0 0 4px var(--c); }
+.eb-harm-add {
+  display: grid; place-items: center; background: transparent; color: var(--ink-3);
+  box-shadow: inset 0 0 0 1.5px currentColor; font-size: 15px; font-weight: 900; line-height: 1;
+  transform: scale(.86);
+}
+.eb-harm-add:hover { color: var(--edit); }
 /* the pick-up's values (edit-box.js PICK-UP): a row of small chips under
    Pick-up, the lit one what the selected pick-up is worth */
 .eb-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: -2px; }
@@ -801,10 +904,11 @@ body.editing .add-line-row { display: flex; justify-content: center; padding: 2p
 
 /* ============================================================
    CHORD PANEL (chord-strip.js) — Digital Accordion's chord side:
-   the scale's fourteen chords in the Panels shape (rows share the
-   height, F is wide), the set button, the Z X C V B tabs along the
-   bottom. Names are fitted by chord-strip.js (fitLabels); the colours
-   are the root letter's, as the blocks'.
+   the set button's chords — the Chord Chart's or Everything's as equal
+   blocks top down (.strip-tower.down), or the scale's places in the
+   Panels shape (rows share the height, F is wide). The Z X C V B tabs
+   and the title left it 2026-10-30. Names are fitted by chord-strip.js
+   (fitLabels); the colours are the root letter's, as the blocks'.
    ============================================================ */
 .chord-strip {
   flex-direction: column;
@@ -815,7 +919,6 @@ body.editing .add-line-row { display: flex; justify-content: center; padding: 2p
   container-type: inline-size;
 }
 .strip-head { display: flex; align-items: center; gap: 5px; min-height: 24px; }
-.strip-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--chord); }
 /* the two small buttons: names (shows the other way: C while numerals are on, I while letters are) and ♪ notes */
 .head-btn {
   flex: none; width: 24px; height: 24px; border-radius: 7px;
@@ -830,7 +933,6 @@ body.editing .add-line-row { display: flex; justify-content: center; padding: 2p
 .name-btn.letters { font-family: var(--font-signature); font-weight: 900; font-size: 14px; }
 .set-btn { margin-left: auto; }
 .set-short { display: none; }
-@container (max-width: 176px) { .strip-title { display: none; } }
 /* a phone's panel: the set button's short name, the two buttons a touch smaller */
 @container (max-width: 130px) {
   .set-long { display: none; }
@@ -854,6 +956,12 @@ body.editing .add-line-row { display: flex; justify-content: center; padding: 2p
   margin-top: auto;
 }
 .crow { display: flex; gap: 5px; flex: 1 1 0; min-height: 0; max-height: 118px; }
+/* the Chord Chart's and Everything's: top down, every block the same size (a short row filled out with gaps) */
+.strip-tower.down { flex-direction: column; justify-content: flex-end; }   /* down by the keyboard, as the places sit */
+.cblock-pad { flex: 1 1 0; min-width: 0; }
+.strip-tower.nokeys .cb-key { display: none; }                /* Extreme, Everything: the keys work, their letters are not shown */
+.strip-tower.circle .cblock { border-radius: 10px; padding: 2px; }
+.cblock.home { outline: 2.5px solid var(--ink-2); outline-offset: 1.5px; }
 .strip-empty { margin: auto 0; font-size: 12px; font-weight: 700; color: var(--ink-3); text-align: center; line-height: 1.4; }
 .cblock {
   position: relative;
@@ -888,7 +996,8 @@ body.editing .add-line-row { display: flex; justify-content: center; padding: 2p
 .cb-main { line-height: 1; white-space: nowrap; text-align: center; }
 /* ♪ notes: the block stacks its key, its name and its notes (root at the bottom) */
 .cblock.has-tones { flex-direction: column; justify-content: center; gap: 3px; padding: 5px 3px; }
-.cblock.has-tones .cb-key { position: static; margin: 0; }
+.cblock.has-tones .cb-key { display: none; }                 /* ♪ on: the notes, not the keys (2026-10-30) */
+.cblock.no-name .cb-main { display: none; }                   /* too short for both: the notes alone */
 .cblock.has-tones .cb-edit { top: 3px; right: 3px; }
 .cb-tones { display: flex; flex-direction: column; align-items: center; gap: 2px; max-width: 100%; }
 .cb-tones i {
@@ -1298,24 +1407,12 @@ body.show-names .kkey.black .kkey-name { opacity: .95; }
 .play-btn.is-playing .play-icon { display: none; }
 .play-btn.is-playing .stop-icon { display: block; }
 
-/* --- the lock (the construction hat until 2026-10-26): the beat-dot button's place and shape;
-   shut while performing, open while editing --- */
-.lock-toggle {
-  width: var(--square); height: var(--square); flex: none;
-  display: grid; place-items: center;
-  border-radius: var(--r-md); background: var(--paper-2); color: var(--ink-3);
-  transition: background .13s, color .13s, box-shadow .13s;
-}
-.lock-toggle svg { width: 24px; height: 24px; transition: filter .2s; }
-.lock-toggle:hover { background: var(--hairline); }
-.lock-toggle .shackle-open, body.editing .lock-toggle .shackle-shut { display: none; }
-body.editing .lock-toggle .shackle-open { display: inline; }
-body.editing .lock-toggle { background: var(--edit-soft); color: var(--edit-glow); box-shadow: inset 0 0 0 1.5px rgba(255,149,0,.35); }
-body.editing .lock-toggle svg { filter: drop-shadow(0 0 3px #ff9500) drop-shadow(0 0 6px rgba(255,149,0,.55)); }
+/* (The lock beside Play — the construction hat until 2026-10-26 — moved to the Edit box's rail on 2026-10-31: .eb-rail.) */
 
 /* --- the value circles: the Edit box's Rhythm section (rhythm-panel.js) --- */
 .vd-caption { font-size: 12.5px; font-weight: 700; color: var(--edit); line-height: 1.25; min-height: 2.5em; }
-.eb-values .vd-row { display: grid; grid-template-columns: repeat(3, var(--eb-circle)); justify-content: space-between; row-gap: 9px; padding: 2px 3px; }
+.eb-values .vd-row { display: grid; grid-template-columns: repeat(6, 1fr); justify-items: center; row-gap: 9px; padding: 2px 3px; }
+.eb-values .vd-row > .value-choice { grid-column: span 2; }   /* rows of three; a short last row is placed centred (rhythm-panel.js) */
 .value-choice {
   position: relative;
   width: var(--eb-circle); height: var(--eb-circle); flex: none;
@@ -1331,8 +1428,6 @@ body.editing .lock-toggle svg { filter: drop-shadow(0 0 3px #ff9500) drop-shadow
 .value-choice.on { opacity: 1; background: var(--c); color: #fff; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--c); }
 .value-choice.on.is-rest { background: #525b64; }
 .value-choice:disabled { opacity: .3; }
-.value-block .blk-glyph { width: calc(var(--eb-circle) * .36); height: calc(var(--eb-circle) * .56); border-radius: 3px; background: currentColor; }
-.value-block.on .blk-glyph { background: #fff; }
 .eb-values .eb-row { margin-top: 3px; }
 .eb-values .vd-mini svg { width: 14px; height: 14px; }
 .eb-values.no-selection .vd-row { opacity: .45; }
@@ -1353,63 +1448,31 @@ body.editing .lock-toggle svg { filter: drop-shadow(0 0 3px #ff9500) drop-shadow
 .tool-icon { width: 18px; height: 18px; flex: none; }
 .present-btn.tool-btn { background: var(--accent-soft); color: var(--accent); }
 .present-btn.tool-btn:hover, .present-btn.tool-btn:active { background: var(--accent); color: #fff; }
-/* Write is part of the edit layer */
+/* Setup reads back the key, in its colour, and the tempo: C | 100 (2026-11-01). Open, it keeps
+   its colours (an accent ring, not the accent fill) so the key is still read in its own colour. */
+.setup-btn { gap: 8px; padding: 0 13px; }
+.setup-key { font-family: var(--font-signature); font-size: 18px; font-weight: 900; line-height: 1; }
+.setup-sep { width: 1.5px; height: 18px; border-radius: 1px; background: currentColor; opacity: .3; flex: none; }
+.setup-bpm { font-family: var(--font-round); font-size: 16px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.setup-btn.open { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 2px var(--accent); }
+/* Sound/Look: named by its two icons, a slash between them (2026-10-31) */
+.sl-btn { gap: 5px; padding: 0 12px; }
+.sl-slash { width: 1.5px; height: 18px; border-radius: 1px; background: currentColor; opacity: .35; transform: rotate(18deg); flex: none; }
+/* Lyrics (the words window) is part of the edit layer — in the Edit box since 2026-10-31 */
 body:not(.editing) #textEditorBtn { display: none; }
+.eb-btn.eb-lyrics { flex: none; width: 100%; margin-top: 10px; background: var(--edit-soft); color: var(--edit); box-shadow: inset 0 0 0 1.5px rgba(240,138,0,.3); }
+.eb-btn.eb-lyrics:hover:not(:disabled) { background: var(--edit); color: #fff; }
 
-/* --- key + time: the start of a staff, one tile, three targets --- */
-.signature {
-  display: flex; align-items: center; flex: none;
-  height: var(--sig-h); padding: 2px 4px 2px 6px;
-  border-radius: var(--r-md); background: var(--paper-2);
-  transition: background .13s;
-}
-.signature:hover { background: var(--hairline); }
-.sig-key {
-  height: calc(var(--sig-h) - 10px); min-width: 34px; padding: 0 5px; border-radius: 9px;
-  display: inline-flex; align-items: baseline; justify-content: center;
-  font-family: var(--font-signature); font-size: 24px; font-weight: 900; line-height: calc(var(--sig-h) - 10px);
-  color: var(--kc, var(--ink));
-  transition: background .13s, transform .1s;
-}
-.sig-key small { font-size: 16px; margin-left: 1px; }
-.sig-key:hover { background: rgba(0,0,0,.05); transform: scale(1.06); }
-.sig-key.open { background: rgba(0,0,0,.07); }
-.sig-rule { width: 1px; height: 30px; background: var(--hairline-2); margin: 0 3px; flex: none; }
-.time-sig {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
-  min-width: 30px; padding: 0 4px;
-}
-.ts-num {
-  font-family: var(--font-signature);
-  font-weight: 900;
-  font-size: var(--ts-digit);
-  line-height: .78;
-  color: var(--ink);
-  font-variant-numeric: lining-nums tabular-nums;
-  padding: 0 1px;
-  border-radius: 4px;
-  transition: color .13s, background .13s, transform .1s;
-}
-.ts-num:hover { color: var(--accent); background: rgba(0,0,0,.05); transform: scale(1.08); }
-.ts-num:active { transform: scale(.94); }
-.ts-num.inert { cursor: default; }
-.ts-num.inert:hover, .ts-num.inert:active { color: var(--ink); background: none; transform: none; }
-/* a lesson that fixes the meter, the key or the tempo leaves them as plain text */
-.time-sig.fixed .ts-num, .sig-key.fixed { cursor: default; }
-.time-sig.fixed .ts-num:hover, .time-sig.fixed .ts-num:active,
-.sig-key.fixed:hover, .sig-key.fixed:active { color: inherit; background: none; transform: none; }
-.time-sig.fixed .ts-num:hover { color: var(--ink); }
-.signature.all-fixed, .signature.all-fixed:hover { background: transparent; }
 
-/* --- the scale menu beside the key tile (app.js; Digital Accordion's scales) --- */
+/* --- Setup's scale menu (app.js; Digital Accordion's scales) — beside the key tile until 2026-10-31 --- */
 .scale-select {
-  flex: 0 1 auto; min-width: 0; max-width: 136px;
-  height: calc(var(--sig-h) - 10px); padding: 0 26px 0 11px;
+  display: block; width: 100%; min-width: 0;
+  height: 40px; padding: 0 30px 0 12px;
   border-radius: 10px; border: 1.5px solid var(--hairline-2);
   background-color: var(--surface);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239C168E' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 8px center; background-size: 13px 13px;
-  font: 700 13px var(--font); color: var(--ink);
+  background-repeat: no-repeat; background-position: right 10px center; background-size: 14px 14px;
+  font: 700 14px var(--font); color: var(--ink);
   appearance: none; -webkit-appearance: none; cursor: pointer;
   text-overflow: ellipsis; white-space: nowrap;
   transition: border-color .14s, background .14s;
@@ -1421,7 +1484,11 @@ body:not(.editing) #textEditorBtn { display: none; }
 /* a lesson that fixes the key fixes the scale: plain text */
 .scale-select.fixed { border-color: transparent; background-color: transparent; background-image: none; padding-right: 11px; cursor: default; color: var(--ink); opacity: 1; }
 
-/* --- bpm --- */
+/* --- Setup's tempo: − BPM + over a slider (the toolbar's chip until 2026-10-31) --- */
+.tempo-row { display: flex; align-items: center; gap: 9px; }
+.tempo-row .bpm-btn { flex: 1; height: 40px; background: var(--paper-2); }
+.tempo-slide { margin-top: 12px; }
+.tempo-slide .zoom-slider { background: linear-gradient(90deg, var(--accent) 0 var(--fill, 25%), var(--hairline-2) var(--fill, 25%)); }
 .bpm-btn { gap: 4px; }
 .bpm-value { font-family: var(--font-round); font-size: 16px; font-weight: 700; }
 .bpm-unit  { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--ink-3); }
@@ -1438,18 +1505,6 @@ body:not(.editing) #textEditorBtn { display: none; }
 .bpm-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .bpm-btn.fixed, .bpm-btn.fixed:hover, .bpm-btn.fixed:active { background: transparent; cursor: default; }
 
-/* --- the glasses: an icon toggle (soft green tint when on) --- */
-.names-toggle {
-  width: var(--square); height: var(--btn-h); flex: none;
-  display: grid; place-items: center;
-  border-radius: var(--r-md); background: var(--paper-2); color: var(--ink-3);
-  transition: background .13s, color .13s;
-}
-.names-toggle svg { width: 28px; height: 18px; transition: filter .2s; }
-.names-toggle:hover { background: var(--hairline); }
-body.show-names .names-toggle { background: var(--names-soft); color: var(--names); }
-body.show-names .names-toggle svg { filter: drop-shadow(0 0 3px rgba(0,230,90,.55)); }
-
 /* --- the right hand: 1.0's arrows --- */
 .step-pad { display: flex; align-items: center; gap: 6px; }
 .step-btn {
@@ -1462,7 +1517,6 @@ body.show-names .names-toggle svg { filter: drop-shadow(0 0 3px rgba(0,230,90,.5
 .step-btn svg { width: 22px; height: 22px; stroke-width: 3; }
 .step-btn:hover { background: var(--accent-deep); }
 .step-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.13); }
-.step-kicker { font-size: 9.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin-right: 4px; text-align: right; line-height: 1.15; white-space: nowrap; }
 
 /* ============================================================
    POPOVERS (the family's)
@@ -1621,7 +1675,39 @@ body.show-names .names-toggle svg { filter: drop-shadow(0 0 3px rgba(0,230,90,.5
   .kbc-swatches { grid-template-columns: repeat(11, minmax(0, 34px)); }
 }
 
-/* the key popover: thirteen keys in their tonic colours */
+/* ---- the key change window: Transpose · Remain unchanged (js/keys.js) ---- */
+.kc-choices { display: grid; gap: 8px; margin: 14px 0 4px; }
+.kc-choice {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left;
+  padding: 12px 14px; border-radius: var(--r-md); background: var(--paper-2);
+  border: 1.5px solid transparent; transition: background .14s, border-color .14s;
+}
+.kc-choice b { font-size: 15px; color: var(--ink); }
+.kc-choice span { font-size: 13px; color: var(--ink-2); line-height: 1.4; }
+.kc-choice:hover { background: var(--surface); border-color: var(--accent); }
+.kc-choice:first-child { background: var(--accent-soft); }
+.kc-choice:first-child b { color: var(--accent); }
+
+/* ---- SETUP (2026-10-31) ---- */
+/* the six meters, each its two numerals stacked as on the staff */
+.meter-seg .meter-btn { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 2px; font-family: var(--font-signature); font-weight: 900; font-size: 15px; line-height: .9; font-variant-numeric: lining-nums tabular-nums; }
+.meter-seg .meter-btn.compound:first-of-type, .meter-seg .meter-btn:not(.compound) + .meter-btn.compound { margin-left: 6px; }
+/* a lesson's fixed key or meter: plain text */
+.setup-fixed { padding: 4px 2px; font-size: 14px; font-weight: 700; color: var(--ink); }
+.swing-seg .seg-btn:disabled { opacity: .35; cursor: default; }   /* 8th swing in compound time (app.js syncSwing) */
+.setup-fixed:empty { display: none; }
+.setup-switches:not(:empty) { margin-top: 12px; padding-top: 6px; border-top: 1px solid var(--hairline); }
+
+/* ---- SOUND / LOOK: two tabs, on top while the pane scrolls ---- */
+.sl-tabs { position: sticky; top: -14px; z-index: 2; margin: -14px -14px 6px; padding: 10px 14px 8px; border-radius: 0; background: var(--surface); box-shadow: 0 1px 0 var(--hairline); }
+.sl-tabs .seg-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 10px; font-size: 14px; background: var(--paper-2); }
+.sl-tabs .seg-btn + .seg-btn { margin-left: 4px; }
+.sl-tabs .seg-btn svg { width: 17px; height: 17px; flex: none; }
+.sl-tabs .seg-btn.active { background: var(--accent); color: #fff; box-shadow: none; }
+.sl-pane[hidden] { display: none; }
+.sl-pane > .popover-title:first-child { margin-top: 10px; }
+
+/* the key: thirteen keys in their tonic colours (Setup; its own popover until 2026-10-31) */
 .key-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .key-chip {
   height: 40px; border-radius: 10px;
@@ -1633,7 +1719,8 @@ body.show-names .names-toggle svg { filter: drop-shadow(0 0 3px rgba(0,230,90,.5
 .key-chip.active, .key-chip:active { background: var(--kc); color: #fff; }
 
 /* ============================================================
-   THE HOVER GAUGES (BPM, View) — the family's; a mouse only
+   THE HOVER GAUGES — the family's; a mouse only (Song Writer's two, on
+   BPM and View, went with them into Setup and Look on 2026-10-31)
    ============================================================ */
 .hover-gauge {
   position: fixed; z-index: 65; display: none; align-items: center; gap: 12px;
@@ -1816,8 +1903,9 @@ body.show-names .names-toggle svg { filter: drop-shadow(0 0 3px rgba(0,230,90,.5
 .status-msg.error { color: var(--danger); }
 
 /* ---- layout settings ---- */
-.note-range { display: flex; align-items: flex-end; gap: 4px; padding: 10px 6px 6px; margin: 10px 0 8px; border-radius: var(--r-md); background: var(--paper); border: 1px solid var(--hairline); overflow-x: auto; }
-.range-block { flex: 1 1 0; min-width: 22px; display: flex; flex-direction: column; align-items: center; gap: 4px; opacity: .28; transition: opacity .13s; }
+.note-range { display: flex; align-items: flex-end; gap: 3px; padding: 10px 6px 6px; margin: 10px 0 8px; border-radius: var(--r-md); background: var(--paper); border: 1px solid var(--hairline); overflow-x: auto; }
+/* twenty-two rungs since 2026-10-31: a little narrower, so they fit a laptop's sheet without scrolling */
+.range-block { flex: 1 1 0; min-width: 20px; display: flex; flex-direction: column; align-items: center; gap: 4px; opacity: .28; transition: opacity .13s; }
 .range-block.on { opacity: 1; }
 .range-bar { width: 100%; max-width: 26px; height: calc(var(--h) * .42px); border-radius: 5px; background: var(--c); }
 .range-name { font-size: 10.5px; font-weight: 800; color: var(--ink-2); }
@@ -1957,10 +2045,6 @@ body.capturing:not(.capture-colour) .line-label { background: #f2f2f2; }
    ============================================================ */
 
 @media (max-width: 1100px) {
-  .tool-label { display: none; }
-  .scale-select { max-width: 108px; font-size: 12px; padding-left: 9px; }
-  .tool-btn:not(.bpm-btn) { width: var(--square); padding: 0; }
-  .step-kicker { display: none; }
   .tool-group { padding: 0 6px; gap: 6px; }
   .tb-center { gap: 6px; }
   :root { --step: 46px; }
@@ -1971,10 +2055,14 @@ body.capturing:not(.capture-colour) .line-label { background: #f2f2f2; }
   .side-tab { padding: 8px 13px; }
   .side-tab span { display: none; }
 }
-/* Phones: the family's two-row toolbar (Rhythm Poetry's .toolbar-break). */
+/* Phones: one row since 2026-10-31 (Play · Setup · Sound/Look · Options · Present · ‹ ›, icons only);
+   the family's two-row toolbar until then (Rhythm Poetry's .toolbar-break). */
 @media (max-width: 720px) {
-  :root { --topbar-h: 54px; --toolbar-h: 64px; --ts-digit: 20px; --play: 48px; --step: 44px; --sig-h: 46px; --btn-h: 40px; --square: 42px; }
-  .scale-select { max-width: 100px; }
+  :root { --topbar-h: 54px; --toolbar-h: 64px; --play: 48px; --step: 44px; --btn-h: 40px; --square: 42px; }
+  .tool-label { display: none; }
+  .tool-btn:not(.bpm-btn):not(.sl-btn):not(.setup-btn) { width: var(--square); padding: 0; }
+  .sl-btn { padding: 0 9px; }
+  .setup-btn { padding: 0 10px; gap: 6px; }
   .topbar { grid-template-columns: auto 1fr auto; gap: 6px; padding: 0 8px; }
   .side-switch { justify-self: center; padding: 3px; gap: 3px; }
   .side-tab { padding: 7px 10px; }
@@ -1997,16 +2085,10 @@ body.capturing:not(.capture-colour) .line-label { background: #f2f2f2; }
   .cb-edit { width: 20px; height: 20px; }
   .help-hands, .about-grid { grid-template-columns: 1fr; }
 
-  .toolbar-inner { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 7px 6px; padding: 7px 8px; }
+  .toolbar-inner { display: flex; justify-content: center; align-items: center; gap: 6px; padding: 7px 8px; }
   .tb-left { display: none; }
-  .tb-center { display: contents; }
-  .tb-center::after { content: ''; flex-basis: 100%; height: 0; order: 2; }
-  .play-btn, .lock-toggle { order: 0; }
-  .tool-group { border-left: none; padding: 0 2px; }
-  .tg-time { order: 1; }
-  .tg-look { order: 3; }
-  .tg-present { order: 4; }
-  .tb-right { order: 5; }
+  .tb-center { gap: 6px; }
+  .tool-group { border-left: none; padding: 0; gap: 6px; }
 
   .sheet-backdrop { padding: 0; align-items: flex-end; }
   .sheet {
@@ -2022,14 +2104,20 @@ body.capturing:not(.capture-colour) .line-label { background: #f2f2f2; }
   .present-bar { bottom: calc(14px + env(safe-area-inset-bottom)); }
 }
 @media (max-width: 480px) {
-  :root { --strip-w: 122px !important; --circle: 28px; }
+  :root { --strip-w: 122px !important; --circle: 28px; --play: 44px; --step: 40px; --square: 38px; --btn-h: 38px; }
+  .toolbar-inner, .tb-center, .tool-group { gap: 4px; }
+  .sl-btn { padding: 0 7px; gap: 3px; }
+  .setup-btn { padding: 0 7px; gap: 4px; }
+  .setup-key { font-size: 16px; }
+  .setup-bpm { font-size: 14.5px; }
+  .setup-sep { height: 15px; }
   .side-tab { padding: 6px 8px; }
   .song-chip { max-width: 96px; }
 }
 
 /* ---- short screens (Google Sites embeds, a laptop in a browser frame) ---- */
 @media (max-height: 560px) {
-  :root { --topbar-h: 48px; --toolbar-h: 58px; --ts-digit: 19px; --play: 46px; --sig-h: 44px; --step: 42px; --btn-h: 38px; --square: 40px; --circle: 28px; }
+  :root { --topbar-h: 48px; --toolbar-h: 58px; --play: 46px; --step: 42px; --btn-h: 38px; --square: 40px; --circle: 28px; }
   .toolbar-inner { padding: 6px 12px; }
   .notation-container { padding-top: 10px; }
   .edit-box { --eb-btn-h: 32px; --eb-circle: 34px; }
@@ -2038,12 +2126,11 @@ body.capturing:not(.capture-colour) .line-label { background: #f2f2f2; }
 
 /* ---- smartboard ---- */
 @media (min-width: 1500px) {
-  :root { --toolbar-h: 80px; --ts-digit: 32px; --btn-h: 48px; --play: 62px; --square: 50px; --circle: 36px; --step: 58px; --sig-h: 66px; }
+  :root { --toolbar-h: 80px; --btn-h: 48px; --play: 62px; --square: 50px; --circle: 36px; --step: 58px; }
   .tb-center { gap: 10px; }
   .tool-group { gap: 10px; padding: 0 12px; }
   .tool-btn { font-size: 15px; }
   .play-btn svg { width: 26px; height: 26px; }
-  .sig-key { font-size: 30px; min-width: 40px; }
   .side-tab { padding: 11px 26px; font-size: 18px; }
   .step-btn svg { width: 26px; height: 26px; }
 }
@@ -2062,12 +2149,14 @@ body.capturing:not(.capture-colour) .line-label { background: #f2f2f2; }
    ============================================================ */
 @media (hover: none), (pointer: coarse) {
   :root { --hb: 32px; }
-  :root { --eb-w: 204px; }
+  :root { --eb-w: 204px; --rail-w: 46px; --eb-head-h: 46px; }
   .edit-box { --eb-circle: 44px; --eb-btn-h: 42px; }
-  .eb-head { height: 46px; }
+  .eb-rail { --fold-d: 36px; --lock-d: 30px; gap: 10px; }
+  .eb-lock-btn svg { width: 16px; height: 16px; }
+  .eb-undo { width: 36px; height: 34px; }
+  .eb-piano { height: 32px; }
   .head-tool svg { width: 16px; height: 16px; }
   .edit-box .eb-btn.eb-view { height: 32px; padding: 0 11px 0 9px; }
-  .ts-num { padding: 3px 7px; }
   .value-choice::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; }
   body.editing .notation-line:hover .head-tool { display: none; }
   body.editing .notation-line.has-selection .head-tool { display: inline-grid; }
@@ -2075,7 +2164,6 @@ body.capturing:not(.capture-colour) .line-label { background: #f2f2f2; }
   .line-label { height: var(--hb); }
 
   .play-btn:hover:not(:active) { transform: none; box-shadow: 0 3px 0 rgba(0,0,0,.13); }
-  .ts-num:hover:not(:active), .sig-key:hover:not(:active) { transform: none; }
   .eb-btn:hover:not(:active):not(.on):not(:disabled) { background: var(--paper-2); color: var(--ink-2); }
   .eb-chip:hover:not(:active):not(.on):not(:disabled) { background: var(--paper-2); color: var(--ink-2); }
   .value-choice:hover:not(:active) { transform: none; }
@@ -2084,8 +2172,11 @@ body.capturing:not(.capture-colour) .line-label { background: #f2f2f2; }
 }
 /* a phone held upright: the box keeps a finger's targets but gives the song more room */
 @media (max-width: 480px) {
-  :root { --eb-w: 172px; }
+  :root { --eb-w: 172px; --rail-w: 40px; }
   .edit-box { --eb-circle: 40px; --eb-btn-h: 40px; }
+  .eb-rail { --fold-d: 32px; --lock-d: 27px; }
+  .eb-piano span { display: none; }              /* the keys alone say Piano at a phone's width */
+  .eb-piano { padding: 0 7px; }
   .eb-body { padding: 0 8px 10px; }
   .eb-btn { font-size: 11.5px; gap: 4px; padding: 0 4px; }
 }
@@ -2299,8 +2390,7 @@ body.capturing .beat-bar { display: none; }
   .eb-btn.eb-view { font-size: 11px; padding: 0 9px 0 7px; }
 }
 
-/* 2.5 compound time: a two-digit numeral (12/8), the beat strip's three-eighth beats, glyph groups */
-.ts-num.two { letter-spacing: -.06em; }
+/* 2.5 compound time: the beat strip's three-eighth beats, glyph groups */
 .bb-pill.d3 { min-width: 104px; }
 .bb-pill.d6 { min-width: 172px; }
 .bb-glyphs { display: inline-flex; align-items: center; gap: 0; }
@@ -2322,11 +2412,11 @@ body.capturing .beat-bar { display: none; }
 /* 2.5 Edit ↔ Chords: the switch takes the title's place (only with the
    chords out); in Chords the box is the chord panel, full height, to play */
 .eb-pane { flex: 1; min-width: 0; display: inline-flex; padding: 2px; background: rgba(240,138,0,.12); }
+.eb-pane[hidden] { display: none; }
 .eb-pane .seg-btn { flex: 1; min-width: 0; padding: 5px 6px; font-size: 12.5px; font-weight: 800; color: var(--edit); }
 .eb-pane .seg-btn.active { background: var(--surface); color: var(--edit); }
 body.pane-chords .eb-body > :not(#eb-chords) { display: none !important; }
-body.pane-chords.show-strip .eb-chords { flex: 1 1 auto; height: auto; min-height: 0; margin: 0 -11px -11px; border-top: none; }
-.edit-box:has(.eb-pane:not([hidden])) .eb-lock { display: none; }   /* room for the switch */
+body.pane-chords .eb-chords { flex: 1 1 auto; height: auto; min-height: 0; margin: 0 -11px -11px; }
 
 
 /* ============================================================
@@ -2398,8 +2488,9 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 /* ============================================================
    THE CHORD CHART — the Chords window's hub (chord-chart.js, song-wave.js; 2026-10-28,
    ../Song Writer Chords Redesign/ §3.1). Information by design, not small print:
-   colour = the chord's root, the dots = its notes, the badge = how often the song
-   uses it; the wave's upper half the melody, its lower half the chords.
+   colour = the chord's root, the dots = its notes; the wave's upper half the melody,
+   its lower half the chords. 2026-10-30 (user): the wave on top, the cards under it,
+   each with round buttons (Focus, the gold compare toggle, ♪ its rhythm).
    ============================================================ */
 .sheet.prog-sheet { position: relative; }           /* the hub's question sits over the whole window */
 .pw-body.chart { display: block; overflow-y: auto; background: var(--surface); }
@@ -2407,8 +2498,9 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .cc-hub { display: flex; flex-direction: column; min-height: 100%; }
 .cc-shelf {
   display: flex; flex-wrap: wrap; align-items: center; gap: 18px 14px; flex: none;   /* wrapped, never scrolled: a swipe on a card is a drag (touch, the smartboard) */
-  min-height: 121px; padding: 20px 22px 20px;          /* 2026-10-29 (user): the cards a quarter shorter, the shelf with them */
-  background: linear-gradient(var(--paper), var(--surface)); border-bottom: 1px solid var(--hairline);
+  min-height: 121px; padding: 26px 24px 28px;          /* 2026-10-29 (user): the cards a quarter shorter, the shelf with them */
+  row-gap: 34px;                                       /* 2026-10-30: room for the buttons on a card's corners */
+  background: linear-gradient(var(--paper), var(--surface)); border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
   transition: background .15s;
 }
 .cc-shelf.drop { background: var(--accent-soft); }
@@ -2426,12 +2518,8 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .cc-card.out-of-scale { background-image: repeating-linear-gradient(45deg, rgba(0,0,0,.12) 0 7px, transparent 7px 14px); }
 .cc-name { font-size: calc(32px * var(--ns, 1)); font-weight: 600; line-height: 1; white-space: nowrap; }   /* --ns: a long name shrinks (chords.js nameScale) */
 .cc-other { font-family: var(--font); font-size: 14px; font-weight: 900; line-height: 1; opacity: .92; white-space: nowrap; }
-.cc-dots { position: absolute; left: 10px; top: 11px; bottom: 13px; width: 8px; border-radius: 4px; background: rgba(255,255,255,.3); }
+.cc-dots { position: absolute; left: 10px; top: 25px; bottom: 13px; width: 8px; border-radius: 4px; background: rgba(255,255,255,.3); }
 .cc-dots i { position: absolute; left: 0; width: 8px; height: 8px; margin-bottom: -4px; border-radius: 50%; background: var(--cink); }
-.cc-uses {
-  position: absolute; top: -9px; right: -9px; min-width: 28px; height: 28px; padding: 0 7px; border-radius: 14px;
-  background: var(--surface); color: var(--ink); font: 900 14px/28px var(--font); text-align: center; box-shadow: var(--shadow-1);
-}
 .cc-card.sel { outline: 4px solid var(--gold); outline-offset: 3px; }
 .cc-card.flash { animation: cc-flash .6s ease; }
 @keyframes cc-flash { 35% { transform: scale(1.1); } }
@@ -2463,7 +2551,7 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .cc-none { margin: auto; color: var(--ink-3); font-weight: 800; }
 
 /* the wave */
-.cc-mid { padding: 16px 22px 4px; }
+.cc-mid { padding: 14px 22px 14px; }
 .cc-wave { display: grid; grid-template-columns: 100px minmax(0, 1fr) 30px; gap: 16px; }
 .cc-transport { display: flex; flex-direction: column; align-items: center; gap: 9px; padding-top: 30px; }
 .cc-play { width: 62px; height: 62px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; box-shadow: 0 4px 12px rgba(156,22,142,.35); transition: filter .13s, transform .06s; }
@@ -2562,15 +2650,20 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .cc-keep:hover { color: var(--ink); }
 
 @media (max-width: 640px) {
-  .cc-shelf { min-height: 105px; padding: 16px 14px 18px; gap: 22px 12px; }
-  .cc-card .cc-tune { width: 27px; height: 27px; bottom: -18px; }
-  .cc-card .cc-tune svg { width: 15px; height: 15px; }
+  .cc-shelf { min-height: 105px; padding: 22px 16px 24px; gap: 30px 14px; }
+  .cc-card .cc-tune { width: 26px; height: 26px; top: -9px; left: -9px; }
+  .cc-card .cc-tune svg { width: 14px; height: 14px; }
+  .cc-card .cc-gold { width: 18px; height: 18px; top: -5px; left: 20px; }
+  .cc-card .cc-gold::after { width: 8px; height: 8px; }
+  .cc-card .cc-rhy { width: 26px; height: 26px; margin-left: -13px; bottom: -17px; }
+  .cc-card .cc-rhy svg { width: 16px; height: 16px; }
+  .cc-dots { top: 21px; }
   .cc-card { width: 84px; height: 69px; border-radius: 19px; }
   .cc-blank { font-size: 30px; }
   .cc-addbox { width: 40px; height: 40px; }
   .cc-hint { flex-basis: 100%; margin: -4px 0 0; font-size: 13.5px; }
   .cc-name { font-size: calc(27px * var(--ns, 1)); }
-  .cc-mid { padding: 12px 14px 4px; }
+  .cc-mid { padding: 10px 14px 12px; }
   .cc-wave { grid-template-columns: minmax(0, 1fr) 30px; gap: 10px; }
   .cc-wave:not(.folded) .cc-wmain { grid-column: 1 / -1; grid-row: 2; }
   .cc-wave:not(.folded) .cc-fold { grid-column: 2; grid-row: 1; align-self: center; }
@@ -2591,13 +2684,109 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
   .cc-under .strip-mods { flex-basis: 100%; }
 }
 
-/* the selected card's tune button: Focus on its notes */
-.cc-tune {
-  position: absolute; bottom: -19px; left: 50%; transform: translateX(-50%); width: 31px; height: 31px; border-radius: 50%;   /* below the shorter card's names (2026-10-29) */
-  display: grid; place-items: center; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-2); cursor: pointer;
+/* a card's round buttons (2026-10-30, user): Focus in its upper left corner (it was under the selected card), the
+   gold compare toggle beside it (on: it glows — Focus shows that chord beside any other), ♪ its Rhythm at the bottom */
+.cc-cbtn {
+  position: absolute; z-index: 2; border-radius: 50%; display: grid; place-items: center; padding: 0;
+  background: var(--surface); color: var(--ink); box-shadow: var(--shadow-2); cursor: pointer; transition: background .13s, box-shadow .13s, color .13s;
 }
-.cc-tune svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
-.cc-tune:hover { background: var(--paper-2); }
+.cc-cbtn:hover { background: var(--paper-2); }
+.cc-tune { top: -11px; left: -11px; width: 30px; height: 30px; }
+.cc-tune svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.cc-gold { top: -6px; left: 23px; width: 21px; height: 21px; }
+.cc-gold::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--hairline-2); transition: background .13s, box-shadow .13s; }
+.cc-gold:hover::after { background: #E9C44A; }
+.cc-gold.on, .cc-gold.on:hover { background: #FFF5D1; box-shadow: 0 0 0 2px var(--gold), 0 0 14px 4px rgba(245,184,0,.7); }
+.cc-gold.on::after { background: var(--gold); box-shadow: 0 0 6px 1px var(--gold); }
+.cc-rhy { bottom: -19px; left: 50%; margin-left: -15px; width: 30px; height: 30px; }   /* clear of the card's letter name */
+.cc-rhy svg { width: 18px; height: 18px; }
+.pw-body svg.cc-note8 { stroke: none; }
+.cc-note8 ellipse { fill: currentColor; }
+.cc-note8 .st { fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+.cc-rhy.has { color: var(--accent); box-shadow: var(--shadow-2), inset 0 0 0 2px var(--accent-soft); }
+.cc-rhy.on, .cc-rhy.on:hover { background: var(--accent); color: #fff; box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-2); }
+
+/* A CHORD'S RHYTHM (chord-rhythm.js, 2026-10-30, user): under the chart while a card's ♪ is on — This Chord (its
+   colour, a pointer up to its ♪) or All Chords (the accent, a pointer to every ♪); Block Chords · Arpeggios ·
+   Build Your Own */
+.cr-panel { position: relative; container-type: inline-size; margin: 18px 22px 6px; padding: 12px 16px 16px; border-radius: 20px; background: var(--surface); border: 2.5px solid var(--c); box-shadow: 0 6px 18px rgba(43,29,56,.1); }
+.cr-panel.all { border-color: var(--accent); }
+.cr-carets { position: absolute; left: 0; right: 0; top: 0; height: 0; pointer-events: none; }
+.cr-caret { position: absolute; top: -15px; width: 24px; height: 13px; margin-left: -12px; background: var(--c); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.cr-panel.all .cr-caret { background: var(--accent); }
+/* the head: the tabs on the left (on the line under them), This Chord · All Chords, ▶ and × on the right (2026-10-30, user) */
+.cr-head { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 14px; border-bottom: 2px solid var(--hairline); }
+.cr-headr { display: flex; align-items: center; gap: 8px; margin-left: auto; padding-bottom: 7px; }
+.cr-for { font-family: var(--font-round); font-size: 16px; font-weight: 700; color: var(--ink-2); white-space: nowrap; }
+.cr-scope .seg-btn { display: inline-flex; align-items: center; gap: 8px; padding: 6px 13px; }
+.cr-chip { min-width: 30px; height: 26px; padding: 0 8px; border-radius: 8px; background: var(--c); color: var(--cink); font-family: var(--font-block); font-size: 16px; font-weight: 600; line-height: 26px; text-align: center; white-space: nowrap; }
+.cr-hear { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 15px 0 11px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 13.5px; font-weight: 900; }
+.cr-hear:hover { filter: brightness(1.1); }
+.cr-hear svg { width: 15px; height: 15px; fill: currentColor; }
+.cr-close { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--paper-2); color: var(--ink-2); }
+.cr-close:hover { background: var(--hairline); color: var(--ink); }
+.cr-close svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
+.cr-tabs { display: flex; gap: 4px; }
+.cr-tab { padding: 9px 16px 8px; margin-bottom: -2px; border-bottom: 3px solid transparent; font-size: 15px; font-weight: 900; color: var(--ink-3); white-space: nowrap; }
+.cr-tab:hover:not(.on) { color: var(--ink-2); }
+.cr-tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+.cr-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.cr-tile {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; padding: 10px 8px 10px;
+  border-radius: 14px; border: 1.5px solid var(--hairline); background: var(--surface); color: var(--ink); text-align: center;
+  transition: border-color .13s, background .13s, box-shadow .13s;
+}
+.cr-tile:hover { border-color: var(--accent); }
+.cr-tile.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-soft); }
+.cr-on { position: absolute; top: 5px; right: 9px; font-style: normal; font-size: 15px; font-weight: 900; color: var(--accent); }
+.cr-pic { display: flex; align-items: center; justify-content: center; min-height: 48px; max-width: 100%; }
+.cr-pic svg.rhythm-line { display: block; max-width: 100%; height: auto; }
+.cr-pic .rl-line, .cr-pic .rl-bar { opacity: .55; }
+.cr-name { font-size: 13.5px; font-weight: 900; line-height: 1.2; }
+.cr-desc { font-size: 12px; font-weight: 700; line-height: 1.25; color: var(--ink-3); }
+.pw-body svg.cr-apic { width: auto; height: 46px; stroke: none; }
+.cr-apic .cr-arow { stroke: var(--hairline-2); stroke-width: 1; }
+.cr-apic .cr-aline { fill: none; stroke: #C9B6D8; stroke-width: 2; stroke-linejoin: round; }
+.cr-apic .cr-adot { fill: var(--accent); stroke: none; }
+.cr-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.cr-label { font-size: 12.5px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.cr-speed .seg-btn { padding: 6px 12px; font-size: 13px; }
+.cr-build { display: flex; flex-direction: column; gap: 14px; }
+.cr-part { padding: 12px 14px 14px; border-radius: 16px; border: 1.5px solid var(--hairline); transition: border-color .13s, box-shadow .13s; }
+.cr-part.using { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.cr-part-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.cr-part-head b { font-family: var(--font-round); font-size: 17px; font-weight: 700; color: var(--ink); }
+.cr-part-head .cr-speed { margin-left: auto; }
+.cr-using { padding: 3px 9px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
+.cr-hint { margin: 4px 0 6px; font-size: 13px; font-weight: 700; line-height: 1.35; color: var(--ink-3); }
+.cr-part .pw-rbox { padding: 0; border: 0; }
+.cr-grid { display: grid; grid-template-columns: auto repeat(var(--cols), minmax(0, 30px)); justify-content: start; align-items: center; gap: 7px 5px; margin-top: 10px; }
+.cr-gname { padding-right: 8px; font-size: 13px; font-weight: 900; color: var(--nc, var(--ink-3)); text-align: right; white-space: nowrap; }
+.cr-gcount { position: relative; text-align: center; font-size: 12px; font-weight: 900; color: var(--ink-3); }
+.cr-gcount.on-beat { color: var(--ink); }
+.cr-cell { position: relative; width: 100%; aspect-ratio: 1; padding: 0; border-radius: 50%; background: var(--paper-2); box-shadow: inset 0 0 0 2px var(--hairline-2); transition: background .1s, box-shadow .1s; }
+.cr-cell:hover { box-shadow: inset 0 0 0 2.5px var(--nc); }
+.cr-cell.on { background: var(--nc); box-shadow: inset 0 -3px 0 rgba(0,0,0,.18); }
+.cr-cell.beat::before, .cr-gcount.beat::before { content: ''; position: absolute; left: -4px; top: -3px; bottom: -3px; width: 2px; border-radius: 1px; background: var(--hairline-2); }
+.cr-gtools { margin: 14px 0 0; }
+/* narrower panels: the words go first (Rhythm for, Hear it), then the right side takes a row of its own above the tabs */
+@container (max-width: 980px) {
+  .cr-for, .cr-hear span { display: none; }
+  .cr-hear { width: 38px; padding: 0; justify-content: center; }
+}
+@container (max-width: 760px) {
+  .cr-headr { order: -1; flex-basis: 100%; padding-bottom: 4px; }
+  .cr-scope { flex: 1; }
+  .cr-scope .seg-btn { flex: 1; justify-content: center; }
+}
+@media (max-width: 640px) {
+  .cr-panel { margin: 16px 10px 6px; padding: 10px 10px 12px; border-radius: 16px; }
+  .cr-tab { padding: 8px 9px 7px; font-size: 13.5px; }
+  .cr-tiles { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+  .cr-grid { gap: 6px 3px; }
+  .cr-cell.beat::before, .cr-gcount.beat::before { left: -2.5px; width: 1.5px; }
+  .cr-gname { padding-right: 4px; font-size: 11.5px; }
+}
 
 /* ============================================================
    FOCUS — one chord's own notes (chord-focus.js; 2026-10-28, ../Song Writer
@@ -2619,7 +2808,8 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .fx-lock svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; }
 .fx-lock .seg-btn.active svg rect { fill: currentColor; fill-opacity: .15; }
 .fx-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 10px 22px 30px; min-height: 0; }
-.fx-staff { width: min(560px, 100%); height: auto; flex: none; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+.fx-stage { position: relative; flex: none; max-width: 100%; }
+.fx-staff { display: block; width: 100%; height: auto; flex: none; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
 .pw-body svg.fx-staff { stroke: none; }   /* the app's svg[viewbox] { stroke } would outline every shape (it outranks a bare class) */
 .fx-staff.nudge { animation: fx-nudge .28s; }
 @keyframes fx-nudge { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
@@ -2651,10 +2841,40 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .fx-acc { width: 44px; height: 40px; border-radius: 11px; background: var(--paper-2); font-size: 22px; font-weight: 900; color: var(--ink-2); }
 .fx-acc.on { background: var(--edit); color: #fff; }
 .fx-none { margin: auto; color: var(--ink-3); font-weight: 800; }
+/* COMPARING (2026-10-30, user): the gold chords beside the one gone into — each named over its notes (a tap: the
+   one being changed, its band behind it), a dot on a chord changed; Let me Decide asks Save or Save as New for each */
+.fx-comparing { padding: 5px 11px; border-radius: 999px; background: #FFF5D1; box-shadow: inset 0 0 0 1.5px var(--gold); font-size: 12.5px; font-weight: 900; color: #7A5C00; white-space: nowrap; }
+.fx-cols { position: relative; height: 40px; }
+.fx-col {
+  position: absolute; top: 2px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 12px;
+  border-radius: 11px; background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--hairline-2), inset 0 -4px 0 var(--c); white-space: nowrap;
+  transition: background .13s, box-shadow .13s, color .13s;
+}
+.fx-col:hover { box-shadow: inset 0 0 0 2px var(--c), inset 0 -4px 0 var(--c); }
+.fx-col.cur { background: var(--c); color: var(--cink); box-shadow: inset 0 -3px 0 rgba(0,0,0,.16), 0 2px 6px rgba(43,29,56,.18); }
+.fx-col.gold:not(.cur) { box-shadow: inset 0 0 0 2px var(--gold), inset 0 -4px 0 var(--c); }
+.fx-col.sounding { transform: translateX(-50%) scale(1.12); }
+.fx-cname { font-family: var(--font-block); font-size: 19px; font-weight: 600; line-height: 1; }
+.fx-cname.notes { font-family: var(--font); font-size: 13px; font-weight: 900; }
+.fx-cdot { width: 8px; height: 8px; border-radius: 50%; background: var(--edit); box-shadow: 0 0 0 2px #fff; }
+.fx-band { fill: #F7EDF6; }
+.fx-inorder { display: inline-flex; align-items: center; gap: 6px; }
+.fx-inorder svg { width: 15px; height: 15px; fill: currentColor; }
+.cc-ask-card.wide { width: min(600px, 100%); }
+.cc-ask-body { display: flex; flex-direction: column; gap: 10px; margin: -4px 0 18px; }
+.fx-drow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.fx-dchip { min-width: 52px; height: 40px; padding: 0 12px; border-radius: 12px; background: var(--c); color: var(--cink); font-family: var(--font-block); font-size: 21px; font-weight: 600; line-height: 40px; text-align: center; box-shadow: inset 0 -3px 0 rgba(0,0,0,.14); }
+.fx-dseg .seg-btn { padding: 8px 14px; font-size: 14px; }
+.fx-dnew { font-size: 14px; font-weight: 800; color: var(--ink-2); }
+.fx-dsay { margin: 4px 0 0; font-size: 13.5px; font-weight: 700; line-height: 1.4; color: var(--ink-3); }
+.fx-dsay b { color: var(--ink-2); }
 @media (max-width: 640px) {
   .fx-head { padding: 10px 14px; gap: 10px; }
   .fx-big { font-size: 34px; }
   .fx-lock .seg-btn span { display: none; }
+  .fx-comparing { display: none; }
+  .fx-col { height: 30px; padding: 0 8px; }
+  .fx-cname { font-size: 15px; }
   .fx-main { padding: 8px 12px 26px; }
   .fx-keys { height: 76px; }
   .fx-kname { font-size: 9px; }
@@ -2812,6 +3032,8 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .tl-view.z-mid .tl-stretch::after { left: 4px; top: 10px; bottom: 10px; }
 .tl-view.z-mid .tl-stretch.l { left: -8px; }
 .tl-view.z-mid .tl-stretch.r { right: -8px; }
+.tl-view.z-mid .tl-c.narrow .tl-stretch.l { left: -17px; }     /* a chord narrower than its grips (2026-10-30): they sit just outside it */
+.tl-view.z-mid .tl-c.narrow .tl-stretch.r { right: -17px; }
 .tl-view.z-top .tl-ruler, .tl-view.z-top .tl-bn { height: 30px; }
 .tl-view.z-top .tl-bn { padding-left: 5px; font-size: 16px; }
 .tl-view.z-top .tl-secrow { height: 82px; }
@@ -3225,14 +3447,19 @@ button.rp-circle:hover, button.rp-circle:active { transform: scale(1.12); }
 .rp-notes .engraving .rp-glow { stroke: none; pointer-events: none; }         /* the selected note's light (rhythm-page.js glowNote) */
 /* the Rhythm page's Beats off (the Edit box, 2026-10-26): the circles gone, the notation and
    words left — the pills keep their width (the notes sit on the circles' centres) at no height */
-body.rp-no-circles .rhythm-page .rp-circles {
+/* …and the same with the score locked (2026-10-31, the user: circles that cannot change anything
+   are away; edit-box.js sets body.notes-locked — the Edit box's Edit tab brings them back) */
+body.rp-no-circles .rhythm-page .rp-circles,
+body.notes-locked .rhythm-page .rp-circles {
   visibility: hidden; height: 0; min-height: 0; padding-top: 0; padding-bottom: 0;
   border-color: transparent; background: transparent; box-shadow: none; overflow: hidden;
 }
-body.rp-no-circles .rhythm-page .rp-measure { padding-top: 26px; }
+body.rp-no-circles .rhythm-page .rp-measure,
+body.notes-locked .rhythm-page .rp-measure { padding-top: 26px; }
 /* the cycle's first step: the notes in ink (the words and the circles keep their colours) */
 body.rp-mono .rhythm-page .rp-notes .engraving g[data-a] .head { fill: var(--ink); }
-body.rp-no-circles .rhythm-page .rp-notes { margin-top: 0; }
+body.rp-no-circles .rhythm-page .rp-notes,
+body.notes-locked .rhythm-page .rp-notes { margin-top: 0; }
 /* the head inside an ink ring, as on the Notation page; --ring (glyph units) is set per picture */
 .rp-notes .engraving g[data-a] .head { fill: var(--c, var(--ink)); stroke: var(--ink); stroke-width: var(--ring, 20); stroke-linejoin: round; }
 .rp-notes .engraving g.block { opacity: .55; }

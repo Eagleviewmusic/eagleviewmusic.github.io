@@ -71,7 +71,7 @@
       secs.push({ at, end, label, tint: colour[label] });
     });
     const chords = evs.filter(e => e.id && C.isKnown(e.id)).map(e => {
-      const d = C.describeVoiced(e.id, e.voice);                 // a chord with its own notes: named by them
+      const d = M.withKey(SW.keys.atTick(e.at), () => C.describeVoiced(e.id, e.voice));   // a chord with its own notes: named by them; in its bar's key
       return { at: e.at, end: e.end, color: d.color, ink: SW.chordStrip.inkOn(d.color), name: C.nameOf(d) };
     });
     geo = { total, secs, chords, song, g, evs };
@@ -79,10 +79,11 @@
   }
 
   /* ---------------- the recording ----------------
-     What the player plays (player.js schedulePass: the same levels, holds
-     and ties), in seconds — the melody and the chords apart. */
+     What the player plays (player.js schedulePass: the same levels, holds,
+     ties and swing), in seconds — the melody and the chords apart. */
   function notesOf(n) {
     const tickSec = SW.timing.tickMs() / 1000;
+    const sw = SW.timing.swing(n.song.shift || 0, n.song.meter);       // timing.js SWING
     const mel = [], chd = [];
     n.song.lines.forEach(le => le.events.forEach(ev => {
       if (ev.rest) return;
@@ -90,14 +91,14 @@
       ev.pitches.forEach(p => {
         if (ev.tiedIn && ev.tiedIn.has(p.midi) && ev.at !== 0) return;
         const hold = ev.sustain && ev.sustain.get(p.midi) ? ev.sustain.get(p.midi) : ev.ticks;
-        mel.push({ freqs: [M.midiToFreq(p.midi)], at: ev.at * tickSec, hold: hold * tickSec * 0.96, level });
+        mel.push({ freqs: [M.midiToFreq(p.midi)], at: sw.at(ev.at) * tickSec, hold: sw.len(ev.at, hold) * tickSec * 0.96, level });
       });
     }));
     n.evs.forEach(ce => {
       if (!ce.id || !C.isKnown(ce.id)) return;
-      const freqs = C.midis(ce.id, { voice: ce.voice }).map(M.midiToFreq);
-      if (!freqs.length) return;
-      ce.strikes.forEach(st => chd.push({ freqs, at: st.at * tickSec, hold: st.len * tickSec * 0.95 }));
+      const list = M.withKey(SW.keys.atTick(ce.at), () => C.midis(ce.id, { voice: ce.voice }));
+      if (!list.length) return;
+      ce.strikes.forEach(st => chd.push({ freqs: T.strikeNotes(list, st).map(M.midiToFreq), at: sw.at(st.at) * tickSec, hold: sw.len(st.at, T.strikeHold(st)) * tickSec * 0.95 }));   // an arpeggio: its notes one by one
     });
     return { mel, chd, tickSec, seconds: n.total * tickSec + 1.5 };
   }

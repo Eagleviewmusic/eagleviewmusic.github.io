@@ -60,6 +60,23 @@
    there, every strike where it was; the chords on the music then write
    loose chords (applyLoose), never progressions.
 
+   A CARD'S RHYTHM (2026-10-30, user — the Chord Chart's Rhythm section):
+     chart: [ { id: 'k1', chord: 'I', rhythm: 'e e e e e e e e', arp: 'up', by: 'e' } ]
+   `rhythm` one bar ('held', or a rhythm string), `arp` a note order, `by`
+   the speed it was chosen at (q e s). Choosing one writes it to every
+   chord from the card, laid in step with the bar (chartRhythm); a chord
+   put on later from the card in empty time takes it too (putChord). The
+   chords keep their own copies — the Rhythm page can still change one.
+   ARPEGGIOS — a chord (loose) may carry `arp`: a preset ('up', 'down',
+   'updown', 'downup', 'out', 'in', 'alberti', 'oompah', 'bassdown',
+   'random') or { o: [[ranks], …], n } — groups of its notes by rank, low
+   to high, as built on a chord of n notes (another size: the bottom stays
+   the bottom, the top the top, the inner ones count up from the bottom).
+   Its rhythm's strikes take the order in turn, from the chord's start and
+   again from each bar line; each note rings until it is struck again, a
+   silence, or the chord's end. A strike then carries `n` (its ranks) and
+   `ring` (ticks) — strikeNotes(list, st) picks its notes.
+
    THE OLD LANE — a song with lane chords (`syllables[].chord`) and no
    track is read as one stretch of loose chords (`virtual()`), each from
    its word to the next change; the first change to the track writes it
@@ -80,7 +97,8 @@
                        writers, the old Time Line's group writers and Just here went with the old window)
      the chart         chart() · chartEntry(k) · isChartShape() · chartFrom(g?) (what useChart would make) ·
                        useChart() · chartAdd(spec, index?) · chartSet(k, patch) · chartMove(k, index) ·
-                       chartRemove(k, keepSpots)
+                       chartRemove(k, keepSpots) · chartRhythm(ks, spec) · cardSpot(card, at, end, g?) · batch(fn)
+     arpeggios         ARPS · arpOrder(arp, n) · strikeNotes(list, st) · strikeHold(st)
      the Time Line     draftPieces(g?) · draftEvents(list, g?) · soundSig(evs, g?, voices) · applyDraft(list) · flatOps
      selfTest()        pure checks of the rhythm and timing rules
    Event: 'track:changed' { why } (after SW.score.changed('track'))
@@ -190,6 +208,95 @@
     const c = cells(str);
     return c ? rhythmOf(fit(c, n)) : null;
   }
+  /* ARPEGGIOS (2026-10-30): a preset id, or { o: [[ranks], …], n } built on a chord of n notes */
+  const ARPS = ['up', 'down', 'updown', 'downup', 'out', 'in', 'alberti', 'oompah', 'bassdown', 'random'];
+  const BYS = ['q', 'e', 's'];
+  function cleanArp(a) {
+    if (typeof a === 'string') return ARPS.indexOf(a) !== -1 ? a : null;
+    if (!a || typeof a !== 'object' || !Array.isArray(a.o)) return null;
+    const n = Math.round(Number(a.n));
+    if (!(n >= 2 && n <= 8)) return null;
+    const o = a.o.slice(0, 64).map(gr => (Array.isArray(gr) ? Array.from(new Set(gr.map(Number).filter(r => Number.isInteger(r) && r >= 0 && r < n))).sort((x, y) => x - y) : []))
+      .filter(gr => gr.length);
+    return o.length ? { o, n } : null;
+  }
+  /* a rank on a chord of N notes, on one of M: the bottom stays the bottom, the top the top,
+     the inner ones count up from the bottom */
+  function mapRank(r, N, M) {
+    if (N === M) return Math.min(r, M - 1);
+    if (r <= 0) return 0;
+    if (r >= N - 1) return M - 1;
+    if (M <= 2) return r < (N - 1) / 2 ? 0 : M - 1;
+    return Math.max(1, Math.min(M - 2, r));
+  }
+  /* the order a chord of M notes plays an arpeggio in: groups of ranks, in turn ('random': none — picked per strike) */
+  function arpOrder(arp, M) {
+    if (!arp || M < 1) return [];
+    if (typeof arp === 'object') {
+      return arp.o.map(gr => Array.from(new Set(gr.map(r => mapRank(r, arp.n, M)))).sort((x, y) => x - y));
+    }
+    const up = Array.from({ length: M }, (x, i) => i);
+    const one = list => list.map(r => [r]);
+    switch (arp) {
+      case 'up': return one(up);
+      case 'down': return one(up.slice().reverse());
+      case 'updown': return one(M < 3 ? up : up.concat(up.slice(1, -1).reverse()));
+      case 'downup': return one(M < 3 ? up.slice().reverse() : up.slice().reverse().concat(up.slice(1, -1)));
+      case 'out': {                      // from the middle to the ends
+        const out = [], m = (M - 1) / 2;
+        up.slice().sort((a, b) => Math.abs(a - m) - Math.abs(b - m) || a - b).forEach(r => out.push(r));
+        return one(out);
+      }
+      case 'in': {                       // from the ends to the middle
+        const out = [];
+        for (let lo = 0, hi = M - 1; lo <= hi; lo++, hi--) { out.push(lo); if (hi !== lo) out.push(hi); }
+        return one(out);
+      }
+      case 'alberti': return one(M < 3 ? up : [0, M - 1, 1, M - 1]);
+      case 'oompah': return M < 2 ? [up] : [[0], up.slice(1)];
+      case 'bassdown': return one(M < 3 ? up : [0].concat(up.slice(1).reverse()));
+      default: return [];
+    }
+  }
+  /* a strike's notes (an arpeggio's ranks of the chord's list, low to high), and how long it rings */
+  function strikeNotes(list, st) {
+    if (!st || !Array.isArray(st.n)) return list;
+    const sorted = list.slice().sort((a, b) => a - b);
+    return st.n.map(r => sorted[r]).filter(m => m !== undefined);
+  }
+  const strikeHold = st => (st && st.ring) || st.len;
+  /* the strikes of an arpeggio: each its ranks (in turn, from the chord's start and each bar line) and its ring */
+  function arpStrikes(strikes, pc, g, M) {
+    const order = arpOrder(pc.arp, M);
+    const rnd = pc.arp === 'random';
+    if (!rnd && !order.length) return strikes;
+    let idx = 0, from = null, prev = -1;
+    strikes.forEach((st, j) => {
+      const s0 = Math.max(pc.at, g.T(g.barAt(st.at)));
+      if (s0 !== from) { idx = 0; from = s0; }
+      if (rnd) {                                   // the same every time it plays: picked from where it is
+        let x = ((st.at / CELL + 1) * 2654435761 + j * 40503) >>> 0;
+        x ^= x >>> 13; x = Math.imul(x, 1274126177) >>> 0; x ^= x >>> 16;
+        let r = M > 1 ? x % M : 0;
+        if (M > 1 && r === prev) r = (r + 1 + (x >>> 8) % (M - 1)) % M;
+        prev = r;
+        st.n = [r];
+      } else st.n = order[idx % order.length].slice();
+      idx++;
+    });
+    strikes.forEach((st, j) => {
+      let end = pc.end;
+      for (let k = j; k < strikes.length; k++) {
+        const s = strikes[k], nx = strikes[k + 1];
+        if (k > j && s.n.some(r => st.n.indexOf(r) !== -1)) { end = Math.min(end, s.at); break; }
+        const stop = s.at + s.len;
+        if (nx ? stop < nx.at : stop < pc.end) { end = Math.min(end, stop); break; }
+      }
+      st.ring = Math.max(st.len, end - st.at);
+    });
+    return strikes;
+  }
+
   const progBeats = (p, mt) => (p && p.beats) || mt.beats;
   const stepBeats = (st, p, mt) => st.beats || progBeats(p, mt);
   function cycleBeats(p, mt) {
@@ -213,11 +320,13 @@
       const r = cleanRhythm(s.rhythm, toTicks(len, mt.beatTicks) / CELL);
       if (r) st.rhythm = r;
     }
+    const arp = chord !== null ? cleanArp(s.arp) : null;                                   // its notes one by one
+    if (arp) st.arp = arp;
     return st;
   }
   /* the chart: cards with ids k1, k2 … (unique, never reused), each a chord (never "no chord") */
   const K_RE = /^k\d+$/;
-  function cleanChart(raw) {
+  function cleanChart(raw, mt) {
     const out = [], used = new Set();
     (Array.isArray(raw) ? raw : []).forEach(e => {
       if (!e || typeof e !== 'object' || out.length >= CHART_MAX) return;
@@ -229,13 +338,26 @@
       if (voice) o.voice = voice;
       if (typeof e.name === 'string' && e.name.trim()) o.name = e.name.trim().slice(0, NAME_MAX);
       if (e.hidden === true) o.hidden = true;
+      // its rhythm (2026-10-30): one bar, a note order, the speed it was chosen at
+      const r = e.rhythm !== undefined && mt ? cleanRhythm(e.rhythm, mt.barTicks / CELL) : null;
+      if (r) {
+        o.rhythm = r;
+        const arp = cleanArp(e.arp);
+        if (arp && r !== HELD) o.arp = arp;
+        if (BYS.indexOf(e.by) !== -1 && o.arp) o.by = e.by;
+      }
       if (o.id) used.add(o.id);
       out.push(o);
     });
     let n = 1;
     out.forEach(o => { if (o.id) return; while (used.has('k' + n)) n++; o.id = 'k' + n; used.add(o.id); });
     // the key order a card is written in
-    return out.map(o => { const t = { id: o.id, chord: o.chord }; if (o.place) t.place = o.place; if (o.voice) t.voice = o.voice; if (o.name) t.name = o.name; if (o.hidden) t.hidden = true; return t; });
+    return out.map(o => {
+      const t = { id: o.id, chord: o.chord };
+      ['place', 'voice', 'name', 'rhythm', 'arp', 'by'].forEach(f => { if (o[f]) t[f] = o[f]; });
+      if (o.hidden) t.hidden = true;
+      return t;
+    });
   }
   function cleanProg(p, mt, i) {
     if (!p || typeof p !== 'object') return null;
@@ -351,7 +473,7 @@
      calls this once the lines and meter are read). */
   function normalizeInto(raw, out) {
     const mt = meterOf(out.meter);
-    const chart = cleanChart(raw.chart);
+    const chart = cleanChart(raw.chart, mt);
     const progs = [];
     const used = new Set();
     (Array.isArray(raw.progressions) ? raw.progressions : []).forEach((p, i) => {
@@ -519,6 +641,8 @@
   /* The pure expansion (testable without a song): progressions + stretches
      on a grid → events. `chart` (optional): the cards a chord's `k` finds
      its voice on. */
+  // how many notes a chord sounds (an arpeggio's ranks)
+  const notesIn = (id, voice) => (SW.chords && SW.chords.isKnown(id) ? SW.chords.midis(id, { voice }).length : 3);
   function expand(progs, track, g, chart) {
     const byId = {};
     progs.forEach(p => { byId[p.id] = p; });
@@ -558,7 +682,7 @@
             if (e <= a) continue;
             if (s >= z) break;
             const st = p.chords[i];
-            pieces.push({ at: Math.max(s, a), end: Math.min(e, z), from: s, id: st.chord, step: i, pass: n, own: ownCells(st, lens[i]), rhythm: st.rhythm, place: st.place, k: st.k, sv: st.voice });
+            pieces.push({ at: Math.max(s, a), end: Math.min(e, z), from: s, id: st.chord, step: i, pass: n, own: ownCells(st, lens[i]), rhythm: st.rhythm, place: st.place, k: st.k, sv: st.voice, arp: st.arp });
           }
         }
         (r.here || []).forEach((h, hi) => {
@@ -575,7 +699,7 @@
           h.chords.forEach((ch, ci) => {
             const len = toTicks(ch.beats, g.b);
             const at = Math.max(s, c0), e = Math.min(s + len, c1);
-            if (e > at) kept.push({ at, end: e, from: s, id: ch.chord, step: null, pass: null, here: true, hereIndex: hi, hereStep: ci, own: ownCells(ch, len), rhythm: ch.rhythm, place: ch.place, k: ch.k, sv: ch.voice });
+            if (e > at) kept.push({ at, end: e, from: s, id: ch.chord, step: null, pass: null, here: true, hereIndex: hi, hereStep: ci, own: ownCells(ch, len), rhythm: ch.rhythm, place: ch.place, k: ch.k, sv: ch.voice, arp: ch.arp });
             s += len;
           });
           pieces = kept;
@@ -585,7 +709,7 @@
         (r.chords || []).forEach((st, i) => {
           const len = toTicks(st.beats || mt.beats, g.b);
           const e = s + len;
-          if (s < z && e > a) pieces.push({ at: Math.max(s, a), end: Math.min(e, z), from: s, id: st.chord, step: i, pass: 0, own: ownCells(st, len), rhythm: st.rhythm, place: st.place, k: st.k, sv: st.voice });
+          if (s < z && e > a) pieces.push({ at: Math.max(s, a), end: Math.min(e, z), from: s, id: st.chord, step: i, pass: 0, own: ownCells(st, len), rhythm: st.rhythm, place: st.place, k: st.k, sv: st.voice, arp: st.arp });
           s = e;
         });
       }
@@ -596,7 +720,8 @@
           here: !!pc.here, hereIndex: pc.here ? pc.hereIndex : null, hereStep: pc.here ? pc.hereStep : null,
           place: pc.place || null, rhythm: ownSpan(pc),
           k: pc.id && pc.k ? pc.k : null, sv: pc.id && pc.sv ? pc.sv : null, voice: pc.id ? voiceOf(pc) : null,
-          strikes: pc.id ? strikesOf(pc, pattern, origin) : []
+          arp: pc.id && pc.arp ? pc.arp : null,
+          strikes: pc.id ? (pc.arp ? arpStrikes(strikesOf(pc, pattern, origin), pc, g, notesIn(pc.id, voiceOf(pc))) : strikesOf(pc, pattern, origin)) : []
         });
       });
     });
@@ -651,7 +776,9 @@
   }
   /* Every change ends here: one Undo step, saved as edits are. The model
      goes back through normalize, so nothing out of shape is ever kept. */
+  let batching = 0, batched = null;      // batch(fn): its writers' changes, one Undo step
   function commit(why) {
+    if (batching) { batched = batched === 'chart' || why === 'chart' ? 'chart' : why || 'edit'; return; }
     syncHomes(grid());
     S.chart = S.chart.filter(e => !e.hidden || usesOf(e.id));      // a card kept for its spots (chartRemove) goes with the last of them
     const picked = (SW.timing.song().pickup || 0) > 0;          // bar 0 exists only with a first-line pick-up
@@ -661,6 +788,13 @@
     S.track = norm.track || [];
     SW.score.changed(why === 'chart' ? 'chart' : 'track');        // 'chart': the Chord Chart — the player keeps playing (replan)
     SW.bus.emit('track:changed', { why: why || 'edit' });
+  }
+  function batch(fn) {
+    batching++;
+    try { fn(); } finally {
+      batching--;
+      if (!batching && batched) { const w = batched; batched = null; commit(w); }
+    }
   }
   const byIdNow = () => { const m = {}; S.progressions.forEach(p => { m[p.id] = p; }); return m; };
   const findProg = id => S.progressions.find(p => p.id === id) || null;
@@ -712,6 +846,7 @@
       if (e.k) o.k = e.k;
       if (e.sv) o.voice = e.sv;
       if (e.rhythm) o.rhythm = e.rhythm;
+      if (e.arp) o.arp = e.arp;
       return o;
     });
   }
@@ -745,7 +880,7 @@
     const pts = Array.from(edges).sort((a, b) => a - b);
     const find = (L, t) => L.find(pc => pc.at <= t && t < pc.end) || null;
     const say = (pc, s, e) => !pc ? '' : [pc.chord, pc.place || '', pc.k || '', pc.voice ? JSON.stringify(pc.voice) : '', pc.at === s ? 1 : 0,
-      pc.rhythm === HELD ? HELD : pc.rhythm ? pc.rhythm.slice((s - pc.at) / CELL, (e - pc.at) / CELL) : ''].join('|');
+      pc.rhythm === HELD ? HELD : pc.rhythm ? pc.rhythm.slice((s - pc.at) / CELL, (e - pc.at) / CELL) : '', pc.arp ? JSON.stringify(pc.arp) : ''].join('|');
     const out = [];
     for (let i = 0; i + 1 < pts.length; i++) {
       const s = pts[i], e = pts[i + 1];
@@ -794,6 +929,7 @@
         if (p2.k) st.k = p2.k;
         if (p2.voice) st.voice = p2.voice;
         if (p2.rhythm) st.rhythm = p2.rhythm === HELD ? HELD : rhythmOf(p2.rhythm);
+        if (p2.arp) st.arp = p2.arp;
         steps.push(st);
       }
       t = pc.end;
@@ -890,6 +1026,7 @@
       if (e.voice) pc.voice = clone(e.voice);
       const r = bake(e);
       if (r !== HELD) pc.rhythm = r;
+      if (e.arp) pc.arp = e.arp;
       return pc;
     });
     progs.forEach(p => p.chords.forEach(st => { if (st.chord) card(st.chord, st.place, st.voice); }));
@@ -964,6 +1101,7 @@
     if (spec.place) e.place = spec.place;
     if (spec.voice) e.voice = clone(spec.voice);
     if (spec.name) e.name = spec.name;
+    ['rhythm', 'arp', 'by'].forEach(f => { if (spec[f]) e[f] = clone(spec[f]); });     // Save as New: the card's rhythm comes too
     S.chart.splice(chartIndex(index), 0, e);
     if (typeof spot === 'number') {
       const g = grid();
@@ -994,6 +1132,58 @@
       eachChord(st => { if (st.k === k) { if (v) st.voice = clone(v); else delete st.voice; } });
     }
     if ('name' in patch) { if (patch.name) e.name = String(patch.name); else delete e.name; }
+    commit('chart');
+    return true;
+  }
+  /* A CARD'S RHYTHM (2026-10-30): what a chord from it plays over [at, end) — its bar laid in step
+     with the bar ({} held: struck once), and its note order */
+  function cardSpot(card, at, end, g) {
+    g = g || grid();
+    const out = {};
+    if (!card || !card.rhythm) return out;
+    if (card.rhythm !== HELD) {
+      const bar = fit(cells(card.rhythm) || '', g.B / CELL);
+      const lead = mod((at - g.T(g.barAt(at))) / CELL, bar.length);
+      let c = '';
+      for (let j = 0; j < (end - at) / CELL; j++) c += bar[(lead + j) % bar.length] || 'R';
+      c = tidyCells(c);
+      if (c !== 'X' + 'O'.repeat(c.length - 1)) out.rhythm = c;
+    }
+    if (card.arp && card.rhythm !== HELD) out.arp = clone(card.arp);
+    return out;
+  }
+  /* the card a chord put on the music would take (applyLoose's rule): one picked from the same panel key first */
+  function cardFor(step) {
+    if (step.k && chartEntry(step.k)) return chartEntry(step.k);
+    const mine = S.chart.filter(x => !x.hidden && x.chord === step.chord);
+    return mine.find(x => (x.place || '') === (step.place || '')) || mine[0] || null;
+  }
+  /* the cards `ks` play `spec` — { rhythm: 'held' | a bar of cells or a rhythm string, arp?, by? }, or
+     null (none chosen: the chords keep what they play) — and every chord from them, at once. One Undo step. */
+  function chartRhythm(ks, spec) {
+    if (!isChartShape()) toChartShape();
+    const g = grid();
+    const set = new Set((ks || []).filter(k => chartEntry(k)));
+    if (!set.size) return false;
+    let r = null;
+    if (spec && spec.rhythm) r = spec.rhythm === HELD ? HELD : cleanRhythm(/^[XOR]+$/.test(spec.rhythm) ? rhythmOf(spec.rhythm) : spec.rhythm, g.B / CELL);
+    const arp = r && r !== HELD && spec ? cleanArp(spec.arp) : null;
+    S.chart.forEach(e => {
+      if (!set.has(e.id)) return;
+      delete e.rhythm; delete e.arp; delete e.by;
+      if (!r) return;
+      e.rhythm = r;
+      if (arp) { e.arp = clone(arp); if (BYS.indexOf(spec.by) !== -1) e.by = spec.by; }
+    });
+    if (r) {
+      S.track = looseTrack(flat(g).map(pc => {
+        const o = Object.assign({}, pc);
+        if (o.rhythm === HELD) delete o.rhythm;
+        if (!set.has(pc.k)) return o;
+        delete o.rhythm; delete o.arp;
+        return Object.assign(o, cardSpot(chartEntry(pc.k), o.at, o.end, g));
+      }), g);
+    }
     commit('chart');
     return true;
   }
@@ -1041,6 +1231,7 @@
       if (e.sv) pc.voice = clone(e.sv);
       const r = bake(e);
       if (r !== HELD) pc.rhythm = r;
+      if (e.arp) pc.arp = clone(e.arp);
       return pc;
     });
   }
@@ -1055,7 +1246,7 @@
   function soundSig(evs, g, voices) {
     g = g || grid();
     return g.mt.id + '|' + g.p0 + '|' + evs.filter(e => e.id).map(e => [e.at, e.end, e.id, voices && e.voice ? JSON.stringify(e.voice) : '',
-      e.strikes.map(s => s.at + ':' + s.len).join(',')].join('/')).join(';');
+      e.strikes.map(s => s.at + ':' + s.len).join(','), e.arp ? JSON.stringify(e.arp) : ''].join('/')).join(';');
   }
   /* APPLY: the song's chords become the draft's (D15: they keep their bars;
      the melody is untouched) — each with its card's notes and key as they
@@ -1070,6 +1261,7 @@
       if (pc.place) o.place = pc.place;
       if (pc.voice) o.voice = clone(pc.voice);
       if (pc.rhythm && pc.rhythm !== HELD) o.rhythm = pc.rhythm;
+      if (pc.arp) o.arp = clone(pc.arp);
       const e = o.k ? chartEntry(o.k) : null;
       if (e) {
         o.chord = e.chord;
@@ -1111,9 +1303,14 @@
     if (sp.on) {
       pc = Object.assign({}, sp.on, { chord: step.chord });
       if (step.place) pc.place = step.place; else delete pc.place;
+      if (step.k && chartEntry(step.k)) pc.k = step.k; else delete pc.k;
     } else {
       pc = { at: sp.at, end: sp.end, chord: step.chord };
       if (step.place) pc.place = step.place;
+      if (step.k && chartEntry(step.k)) pc.k = step.k;          // a card named (the panel's Chord Chart set): that card
+      // in empty time it plays its card's rhythm, when the card has one (the Chord Chart's Rhythm section)
+      const card = step.chord && step.rhythm === undefined ? cardFor(step) : null;
+      if (card && card.rhythm) Object.assign(pc, cardSpot(card, pc.at, pc.end, g));
     }
     if (step.rhythm !== undefined) { if (step.rhythm) pc.rhythm = step.rhythm; else delete pc.rhythm; }
     writeFlat(step.chord ? layFlat(list, pc) : cutFlat(list, pc.at, pc.end), 'put');
@@ -1330,6 +1527,7 @@
       });
       if (r.chords) wholeBars(r.chords, r.chords.reduce((t, c) => t + (c.beats || 0), 0));
     });
+    S.chart.forEach(e => { if (e.rhythm && e.rhythm !== HELD) e.rhythm = barRhythm(e.rhythm, 1); });   // a card's bar (2026-10-30)
     S.progressions.forEach(p => {
       if (p.rhythm && p.rhythm !== HELD) p.rhythm = barRhythm(p.rhythm, p.bars || 1);
       p.chords.forEach(step);
@@ -1516,9 +1714,10 @@
     eq('one card for it, its key on every spot', [conv.norm.chart, conv.norm.track[0].chords.map(c => c.place || '-')], [[{ id: 'k1', chord: 'I', place: 'f' }, { id: 'k2', chord: 'V' }], ['f', '-', 'f']]);
     eq('a progression placed nowhere still on the chart', chartOf([verse, { id: 'p9', name: 'Z', chords: [{ chord: 'bVII' }] }], expand([verse], [{ prog: 'p1', from: 1, to: 1 }], g4), []).chart.map(e => e.chord), ['I', 'IV', 'V', 'vi', 'bVII']);
     // a new time signature: ta ta ti-ti ta in 4/4 → 12/8 → 4/4 comes back; 4/4 → 3/4 drops the last beat
-    const keep = { p: S.progressions, t: S.track };
+    const keep = { p: S.progressions, t: S.track, c: S.chart };
     S.progressions = [{ id: 'p1', name: 'V', rhythm: 'q q e e q', chords: [{ chord: 'I', rhythm: 'h h' }] }];
     S.track = [];
+    S.chart = [];                                   // the song's own cards stay out of it (a card's bar follows the meter)
     followMeter('4/4', '12/8');
     eq('to 12/8', [S.progressions[0].rhythm, S.progressions[0].chords[0].rhythm], ['q. q. e e e q.', 'h. h.']);
     followMeter('12/8', '4/4');
@@ -1534,6 +1733,23 @@
     eq('and back', JSON.stringify(S.track[0].here.map(h => [h.bar, h.beats, h.chords.map(c => c.beats)])), '[[2,4,[2,2]],[3,4,[4]]]');
     S.progressions = keep.p;
     S.track = keep.t;
+    S.chart = keep.c;
+    // ARPEGGIOS (2026-10-30): the orders, a rank on another size, the strikes' notes and rings
+    eq('arp up 3', arpOrder('up', 3), [[0], [1], [2]]);
+    eq('arp updown 4', arpOrder('updown', 4).map(x => x[0]), [0, 1, 2, 3, 2, 1]);
+    eq('arp out 5', arpOrder('out', 5).map(x => x[0]), [2, 1, 3, 0, 4]);
+    eq('arp in 4', arpOrder('in', 4).map(x => x[0]), [0, 3, 1, 2]);
+    eq('arp alberti', arpOrder('alberti', 3).map(x => x[0]), [0, 2, 1, 2]);
+    eq('arp oompah', arpOrder('oompah', 4), [[0], [1, 2, 3]]);
+    eq('built on 4, played on 3', arpOrder({ o: [[0], [1], [2], [3]], n: 4 }, 3), [[0], [1], [1], [2]]);
+    eq('built on 3, played on 4', arpOrder({ o: [[0], [1], [2]], n: 3 }, 4), [[0], [1], [3]]);
+    eq('clean arp', [cleanArp('up'), cleanArp('sideways'), cleanArp({ o: [[0, 9], [], [1]], n: 3 })], ['up', null, { o: [[0], [1]], n: 3 }]);
+    const arpEv = expand([], [{ from: 1, to: 2, chords: [{ chord: 'I', beats: 4, rhythm: 'e e e e e e e e', arp: 'up' }, { chord: 'V', beats: 2, rhythm: 'q e e', arp: 'down' }] }], g4);
+    const MI = notesIn('I', null);
+    eq('arp strikes', arpEv[0].strikes.map(st => st.n[0]).join(''), Array.from({ length: 8 }, (x, i) => i % MI).join(''));
+    eq('arp rings to the same note again', arpEv[0].strikes.slice(0, 2).map(st => st.ring / 6), [2 * MI, 2 * MI]);
+    eq('arp from the chord start', arpEv[1].strikes.map(st => st.n.length), [1, 1, 1]);
+    eq('strike notes', strikeNotes([67, 60, 64], { n: [0, 2] }), [60, 67]);
     return { ok: !failures.length, failures, checks };
   }
 
@@ -1554,6 +1770,8 @@
     HELD, flat, chordAt, putSpan: tick => putSpan(tick), putChord, moveChord, resizeChord, removeChord, setChord, tidyCells,
     // the Chord Chart (2026-10-28)
     chart: () => S.chart, chartEntry, isChartShape, chartFrom, useChart, chartAdd, chartSet, chartMove, chartRemove, usesOf, bake,
+    // a card's rhythm, arpeggios (2026-10-30)
+    chartRhythm, cardSpot, batch, ARPS, arpOrder, strikeNotes, strikeHold, cleanArp,
     // the Time Line's draft (2026-10-29)
     draftPieces, draftEvents, soundSig, applyDraft,
     flatOps: { cut: cutFlat, lay: layFlat, trim: trimPiece, clip: clipFlat, refit, tidy: tidyCells },

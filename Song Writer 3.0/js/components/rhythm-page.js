@@ -44,7 +44,9 @@
 
   const lines = () => Array.from(document.querySelectorAll('#score .notation-line'));
   const shown = () => !!(SW.settings.view && SW.settings.view.rhythmPage);
-  const live = () => SW.settings.can('values');
+  // the circles take taps while the notes can change: with the score locked they are away
+  // (style.css body.notes-locked) or, in Present, drawn frozen (2026-10-31, the user)
+  const live = () => SW.settings.can('values') && S.editing;
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const bs = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bs')) || 1;
 
@@ -66,13 +68,20 @@
       const sy = model.syllables[o.item.si];
       if (sy && sy.cols[0] === o.item.cols[0] && sy.text && sy.text !== '-') wordAt.set(o.start / CELL, { text: sy.text, hy: !!sy.hy });
     });
-    return { line, model, cs, cells: cs.cells, mt, shiftC, BAR, nBars, wordAt };
+    // the key each column is in (KEY CHANGES, js/keys.js — from the first beat of a trigger's bar):
+    // the model's columns are the line's, in order
+    const keyOfCol = new Map();
+    const els = Array.from(line.querySelectorAll('.harmony-stack'));
+    const cols = [];
+    model.syllables.forEach(sy => sy.cols.forEach(c => cols.push(c)));
+    if (SW.keys && cols.length === els.length) cols.forEach((c, i) => keyOfCol.set(c, SW.keys.at(els[i])));
+    return { line, model, cs, cells: cs.cells, mt, shiftC, BAR, nBars, wordAt, keyOfCol };
   }
-  function colourOf(cell) {
+  function colourOf(cell, keyOfCol) {
     const item = cell && cell.item;
     if (!item) return null;
     const n = item.cols[0].notes.find(x => !x.rest);
-    return (n && SW.music.noteColour(n.n)) || null;
+    return (n && SW.music.noteColour(n.n, keyOfCol && keyOfCol.get(item.cols[0]))) || null;
   }
   /* the cell where a word's own rest begins (a silent item — flow.js CELLS) */
   const silentStart = (cell, c) => !!(cell && cell.silent && cell.item && cell.on && cell.on.start === c * CELL);
@@ -387,7 +396,7 @@
       svg.querySelectorAll('g[data-a]').forEach(g => {
         const a = barC0 + Number(g.dataset.a);
         const cell = d.cells[a];
-        const col = colourOf(cell);
+        const col = colourOf(cell, d.keyOfCol);
         if (col) g.style.setProperty('--c', col);
         if (cell && (cell.t === 'bon' || cell.t === 'bhold')) g.classList.add('block');
       });
@@ -706,7 +715,7 @@
   /* ================= when to redraw ================= */
   let timer = 0;
   function schedule() { clearTimeout(timer); timer = setTimeout(render, 20); }
-  ['score:changed', 'score:loaded', 'view:changed', 'layout:changed', 'meter:changed', 'policy:changed', 'key:changed', 'scale:changed', 'present:changed'].forEach(evt => SW.bus.on(evt, schedule));
+  ['score:changed', 'score:loaded', 'view:changed', 'layout:changed', 'meter:changed', 'policy:changed', 'key:changed', 'scale:changed', 'present:changed', 'mode:changed'].forEach(evt => SW.bus.on(evt, schedule));
   SW.bus.on('score:loaded', () => fine.clear());
   SW.bus.on('selection', mark);
   SW.bus.on('play:changed', mark);

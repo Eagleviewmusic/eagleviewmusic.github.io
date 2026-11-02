@@ -44,6 +44,12 @@
    TIES (timing.js): a tied pitch is struck once and held for the whole
    chain; the notes it is held over into only move the light.
 
+   SWING (timing.js SWING, Setup → Swing): every sound and cue is placed
+   through the run's bend (run.sw) — ticks stay straight, the clock is
+   bent. A change of swing while playing re-times the run, as a change
+   of tempo does (during the count-in too: the music is laid down again
+   from beat one, the clicks left alone).
+
    THE CHORD TRACK can run past the melody (sixty bars of chords under
    three of tune): a run lasts as long as the longer of the two. Past
    the melody there is no word to light; the chords are announced as
@@ -66,7 +72,8 @@
                                 the whole song from its top, false once; once: true — the [a, z] span one
                                 time through; melody / chords / beat — true or false over Sound's own;
                                 countIn: false — straight in; preview: { k, at, voice } — the chords from
-                                card k (and the one at tick `at`) sound with that voice (Focus, unsaved);
+                                card k (and the one at tick `at`) sound with that voice (Focus, unsaved;
+                                a list of them when Focus compares chords, 2026-10-30);
                                 events: the chords to play instead of the song's (an expand() list, or a
                                 function of the grid giving one — the Time Line's draft, 2026-10-29);
                                 song: the song to play instead of SW.timing.song() (an object of its shape,
@@ -214,9 +221,15 @@
   /* Lay one pass down on the clock: [fromTick, toTick) starting at audio
      time `anchor`. Returns when the pass ends. `resumed`: picking the
      music up mid-pass (a change of tempo), so a chord already sounding is
-     not struck again. */
-  function schedulePass(plan, fromTick, toTick, anchor, tickSec, resumed) {
-    const secs = t => (t - fromTick) * tickSec;
+     not struck again. SWING: `anchor` is where fromTick falls on the
+     straight beat grid (the count-in's, the pass before's), so a swung
+     note there sounds a little after it; `clock` (a re-timing) says
+     instead which point of the bent clock `anchor` is. */
+  function schedulePass(plan, fromTick, toTick, anchor, tickSec, resumed, clock) {
+    const sw = run.sw;                          // the swing (timing.js SWING): straight when there is none
+    const c0 = clock === undefined ? fromTick : clock;
+    run.c0 = c0;
+    const secs = t => (sw.at(t) - c0) * tickSec;
     const melody = plan.melody;
     const mt = plan.song.meter;
     const newCues = [];
@@ -225,7 +238,7 @@
     plan.all.forEach(ev => {
       if (ev.at < fromTick || ev.at >= toTick) return;
       const at = anchor + secs(ev.at);
-      const dur = ev.ticks * tickSec;
+      const dur = sw.len(ev.at, ev.ticks) * tickSec;
       const cue = { t: at, ev };
       newCues.push(cue);
       if (ev.rest || !melody) return;
@@ -235,7 +248,7 @@
         // a tie: the pitch is still sounding from the note before (unless
         // the pass starts here), and a tied note sounds for the whole chain
         if (ev.tiedIn && ev.tiedIn.has(p.midi) && ev.at !== fromTick) return;
-        const hold = ev.sustain && ev.sustain.get(p.midi) ? ev.sustain.get(p.midi) * tickSec : dur;
+        const hold = ev.sustain && ev.sustain.get(p.midi) ? sw.len(ev.at, ev.sustain.get(p.midi)) * tickSec : dur;
         sounds.push({ t: at, play: () => {
           const o = SW.audio.tone(M.midiToFreq(p.midi), at, hold * 0.96, level);
           if (o) voices.push({ o, start: at, end: at + hold + 0.1 });
@@ -248,18 +261,23 @@
     // (unless it is a re-timing: then it is still ringing)
     plan.chords.forEach(ce => {
       if (ce.end <= fromTick || ce.at >= toTick) return;
-      const pv = plan.preview && ((plan.preview.k && ce.k === plan.preview.k) || (plan.preview.at !== undefined && ce.at <= plan.preview.at && plan.preview.at < ce.end)) ? plan.preview.voice : null;
-      const list = ce.id && SW.chords.isKnown(ce.id) ? SW.chords.midis(ce.id, { voice: pv || ce.voice }) : [];   // a chord in the song always plays (Layout settings govern building, not hearing); its own notes, when it has them
+      // Focus, unsaved: a chord from card k (or the one at tick `at`) sounds with that voice — several at once when it compares chords
+      const pvs = !plan.preview ? [] : Array.isArray(plan.preview) ? plan.preview : [plan.preview];
+      const pvAt = pvs.find(p => p.at !== undefined && p.at !== null && ce.at <= p.at && p.at < ce.end);
+      const pvK = pvs.find(p => p.k && ce.k === p.k);
+      const pv = (pvAt || pvK) ? (pvAt || pvK).voice : null;
+      // a chord in the song always plays (Layout settings govern building, not hearing); its own notes, when it has them; in its bar's key (KEY CHANGES)
+      const list = ce.id && SW.chords.isKnown(ce.id) ? M.withKey(SW.keys.atTick(ce.at), () => SW.chords.midis(ce.id, { voice: pv || ce.voice })) : [];
       newCues.push({ t: anchor + secs(Math.max(ce.at, fromTick)), chord: list.length ? { id: ce.id, list } : null, track: ce });
       if (!list.length) return;
-      const freqs = list.map(M.midiToFreq);
       ce.strikes.forEach(st => {
-        const sEnd = Math.min(st.at + st.len, toTick);
+        const freqs = SW.track.strikeNotes(list, st).map(M.midiToFreq);        // an arpeggio: its notes one by one, each ringing on (track.js)
+        const sEnd = Math.min(st.at + SW.track.strikeHold(st), toTick);
         if (sEnd <= fromTick || st.at >= toTick) return;
         let s0 = st.at;
         if (s0 < fromTick) { if (resumed) return; s0 = fromTick; }
         const when = anchor + secs(s0);
-        const hold = (sEnd - s0) * tickSec * 0.95;
+        const hold = sw.len(s0, sEnd - s0) * tickSec * 0.95;
         sounds.push({ t: when, play: () => {
           SW.audio.playChordFrequencies(freqs, when, hold).forEach(o => voices.push({ o, start: when, end: when + hold + 0.1 }));
         } });
@@ -380,7 +398,7 @@
     let t = ac.currentTime + START_GAP;
     if (count) t = scheduleCountIn(t, mt.beatTicks * tickSec, count, mt.beats,
       into ? t + (count - Math.ceil(into / mt.beatTicks) + into / mt.beatTicks) * mt.beatTicks * tickSec : 0);
-    run = { plan, tickSec, anchor: t, passFrom: plan.first[0], passTo: plan.first[1], passEnd: 0, opts: opts || null };
+    run = { plan, tickSec, sw: swingOf(plan), anchor: t, passFrom: plan.first[0], passTo: plan.first[1], passEnd: 0, opts: opts || null };
     cues = [];
     cueIndex = 0;
     const end = schedulePass(plan, plan.first[0], plan.first[1], t, tickSec);
@@ -403,7 +421,7 @@
         markSounding(ev.syllable, ev.stack);
       }
       // the keyboard's chord wash and the corner go with the chord panel; without it the chords are only heard
-      if (cue.chord && SW.settings.shows('strip')) SW.chords.announce(cue.chord.id, cue.chord.list, 'track');
+      if (cue.chord && SW.settings.panelOut()) SW.chords.announce(cue.chord.id, cue.chord.list, 'track');
       if (cue.track) SW.bus.emit('track:sounding', { at: cue.track.at, event: cue.track });
       if (cue.melodyEnd) markSounding(null);
       if (cue.bar) SW.bus.emit('track:bar', { bar: cue.bar });
@@ -422,18 +440,30 @@
     if (SW.score.deselect) SW.score.deselect('afterEnd');
   }
 
+  /* the run's bend (timing.js SWING), on the grid of the song it plays */
+  function swingOf(plan) { return SW.timing.swing(plan.song.shift || 0, plan.song.meter); }
+  /* where the music is in a pass `x` seconds after its anchor (ticks) */
+  function tickAfter(x) { return Math.max(run.passFrom, Math.min(run.passTo, run.sw.back(run.c0 + x / run.tickSec))); }
+
   /* A tempo change while playing takes effect from where the music is,
      without starting again or counting in: whatever is sounding rings
      on, and the rest of the pass is laid down again from this exact
-     point (the part of the beat still to go, at the new tempo). */
-  function retime() {
+     point (the part of the beat still to go, at the new tempo). A
+     change of swing does the same — and while counting in it lays the
+     music down again from beat one, leaving the clicks as they are. */
+  function retime(why) {
     if (!S.playing || !run) return;
     const now = ctx().currentTime;
-    if (now < run.anchor) return;                 // still counting in: this run keeps its tempo
+    const counting = now < run.anchor;
+    if (counting && why !== 'swing') return;      // still counting in: this run keeps its tempo
     const plan = run.plan;
-    const tickAt = Math.min(run.passTo, run.passFrom + (now - run.anchor) / run.tickSec);
+    const from = counting ? run.anchor : now;
+    // where the music is: the time on the bent clock (the same under any swing — the beats never move),
+    // and the tick there, read with the bend it was laid down with
+    const clock = run.c0 + (now - run.anchor) / run.tickSec;
+    const tickAt = counting ? run.passFrom : tickAfter(now - run.anchor);
     voices = voices.filter(v => {
-      if (v.start > now) { try { v.o.stop(); } catch (e) {} return false; }
+      if (v.start > now && v.start >= from) { try { v.o.stop(); } catch (e) {} return false; }
       return true;
     });
     pending = [];                                 // what was still to come is planned again at the new tempo
@@ -442,9 +472,11 @@
     cues = cues.filter(c => c.t <= now);
     cueIndex = Math.min(cueIndex, cues.length);
     run.tickSec = SW.timing.tickMs() / 1000;
+    run.sw = swingOf(plan);
     run.passFrom = tickAt;
-    run.anchor = now;
-    planNextPass(plan, schedulePass(plan, tickAt, run.passTo, now, run.tickSec, true));
+    run.anchor = from;
+    // from the count-in's beat, or from this point of the clock (a note the new swing puts just before it sounds at once)
+    planNextPass(plan, schedulePass(plan, tickAt, run.passTo, from, run.tickSec, !counting, counting ? undefined : clock));
   }
 
   function toggle() { if (S.playing) stop(); else play(); }
@@ -464,13 +496,13 @@
     if (!S.playing || !run) return null;
     const now = ctx().currentTime - latency();
     if (now < run.anchor) return run.passFrom;
-    return Math.min(run.passTo, run.passFrom + (now - run.anchor) / run.tickSec);
+    return tickAfter(now - run.anchor);
   }
 
   // any redraw or edit of the song ends a run (the schedule no longer
-  // matches); a change of tempo re-times it instead
+  // matches); a change of tempo or swing re-times it instead
   SW.bus.on('score:changed', d => {
-    if (d && d.reason === 'tempo') retime();
+    if (d && (d.reason === 'tempo' || d.reason === 'swing')) retime(d.reason);
     else if (d && d.reason === 'chart') replan();          // the Chord Chart: the music goes on, with the chart as it is now
     else stop();
   });

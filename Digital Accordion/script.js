@@ -16,7 +16,7 @@ const LIBRARY_KEY = 'key_blocks_library_v1';
 const SCALES_KEY = 'key_blocks_scales_v1';     // the user's own saved scales
 const SANDBOX_KEY = 'key_blocks_sandbox_v1';   // the one scratch scale
 const CURRENT_KEY = 'key_blocks_current_v1';
-const VERSION = 4;                              // 2: T→G (and, briefly, S/D) 2026-09-27; 3: S/D back, number row 2 4 / 1 3 5 (upgradeLayout); 4: Panels shapes by identity, notes' Panels layout 'grid', keys by role, the Digital style retired (2026-09-27)
+const VERSION = 5;                              // 2: T→G (and, briefly, S/D) 2026-09-27; 3: S/D back, number row 2 4 / 1 3 5 (upgradeLayout); 4: Panels shapes by identity, notes' Panels layout 'grid', keys by role, the Digital style retired (2026-09-27); 5: major's 3 and 4 are ii/IV and iii/V (2026-10-28)
 
 /* ---------------- computer keyboard ---------------- */
 const KB_ROWS = [
@@ -512,7 +512,11 @@ function normalizeLayout(src) {
                 1 3 5, each keeping its key.
    Rows move only while they still hold the scale's own chords in the old
    order, so anything the user arranged stays put. The presets re-key the
-   result afterwards; a Custom key map stays on its blocks. */
+   result afterwards; a Custom key map stays on its blocks.
+     before v5  major's number-row 3 and 4 were vii°7/V and V/iii (F♯°7 and
+                B in C); they are ii/IV and iii/V now (Gm and Bm). The old
+                chords become the new ones on the same blocks, so keys, size
+                and board spot stay; a label the user typed stays too. */
 function sameChord(S, id, spec) { const b = typeof id === 'string' && S.blocks[id]; return !!(b && spec && String(b.root) === String(spec.root) && b.q === spec.q); }
 function rowIs(S, row, specs) { return Array.isArray(row) && row.length === specs.length && specs.every((spec, i) => sameChord(S, row[i], spec)); }
 function upgradeTopRows(S, base) {
@@ -524,6 +528,17 @@ function upgradeTopRows(S, base) {
   const [t3, t4] = S.rows[a], [t0, t1, t2] = S.rows[b];
   S.rows[a] = [t1, t3]; S.rows[b] = [t0, t2, t4];
 }
+const REPLACED_TOP = { major: [
+  [{ root: '#4', q: 'dim7', label: 'vii°7/V' }, { root: '5', q: 'min', label: 'ii/IV' }],
+  [{ root: '7', q: 'maj', label: 'V/iii' }, { root: '7', q: 'min', label: 'iii/V' }]
+] };
+function upgradeTopChords(S, base) {
+  (REPLACED_TOP[base] || []).forEach(([from, to]) => Object.values(S.blocks).forEach(b => {
+    if (String(b.root) !== from.root || b.q !== from.q) return;
+    b.root = to.root; b.q = to.q;
+    if (!b.label || b.label === from.label) b.label = to.label;
+  }));
+}
 function upgradeLayout(L, v) {
   const S = L.chords, base = baseOf(L), custom = L.keyPreset === 'custom';
   const remap = MOVE => Object.values(S.blocks).forEach(b => { b.keys = b.keys.map(k => MOVE[k] || k); });
@@ -532,6 +547,7 @@ function upgradeLayout(L, v) {
   const sd = v === 2 ? S.rows.find(r => rowIs(S, r, [c[3], c[1], c[2]])) : null;
   if (sd) { [sd[1], sd[2]] = [sd[2], sd[1]]; if (custom) remap({ s: 'd', d: 's', l: 'k', k: 'l' }); }
   if (v < 3) upgradeTopRows(S, base);
+  if (v < 5) upgradeTopChords(S, base);
 }
 
 function cloneLayout(L) { return JSON.parse(JSON.stringify(L)); }
@@ -1663,6 +1679,7 @@ function setScale(id) {
     layout.melody = cloneLayout(rec.melody);
     layout.chords = cloneLayout(rec.chords);
     if ((Number(rec.v) || 1) < 3) upgradeTopRows(layout.chords, layout.scaleBase);   // saved before the number row became 2 4 / 1 3 5
+    if ((Number(rec.v) || 1) < 5) upgradeTopChords(layout.chords, layout.scaleBase); // saved before major's 3 and 4 became ii/IV and iii/V
   }
   applyKeyPreset(layout, layout.keyPreset === 'custom' ? 'split' : undefined);
   touch(); renderAll();

@@ -46,8 +46,8 @@
     const v = (SW.settings && SW.settings.view) || {};
     const pct = (x, d) => (typeof x === 'number' && x >= 0 && x <= 100 ? x : d) / 100;
     return {
-      melody: E.PRESETS[v.melodySound] ? v.melodySound : 'piano',
-      chords: E.PRESETS[v.chordSound] ? v.chordSound : 'piano',
+      melody: E.PRESETS[v.melodySound] ? v.melodySound : 'epiano',    // settings.js VIEW_DEFAULTS
+      chords: E.PRESETS[v.chordSound] ? v.chordSound : 'marimba',
       melodyVolume: pct(v.melodyVolume, 100),
       chordVolume: pct(v.chordVolume, 100),
       room: pct(v.room, 35)
@@ -84,9 +84,15 @@
     if (typeof tonicChromaticIndex === 'undefined') return null;
     let baseSolfegeLowercase = solfegeWithOctave;
     let octaveShift = 0;
-    if (solfegeWithOctave.endsWith('-low')) {
+    if (solfegeWithOctave.endsWith('-low2')) {                   // KEY CHANGES' wider rungs (2026-10-31): two octaves down
+      baseSolfegeLowercase = solfegeWithOctave.replace('-low2', '');
+      octaveShift = -2;
+    } else if (solfegeWithOctave.endsWith('-low')) {
       baseSolfegeLowercase = solfegeWithOctave.replace('-low', '');
       octaveShift = -1;
+    } else if (solfegeWithOctave.endsWith('-high2')) {          // the top do (2026-10-31): two octaves up
+      baseSolfegeLowercase = solfegeWithOctave.replace('-high2', '');
+      octaveShift = 2;
     } else if (solfegeWithOctave.endsWith('-high')) {
       baseSolfegeLowercase = solfegeWithOctave.replace('-high', '');
       octaveShift = 1;
@@ -103,8 +109,9 @@
     const frequency = C0_HZ * Math.pow(2, targetSemis / SEMITONES_IN_OCTAVE);
     return isNaN(frequency) ? null : frequency;
   }
-  const getFrequencyForNote = (noteClass, key) => calculateFrequency(key || SW.state.key, noteClass, 'natural');
-  const getModifiedFrequency = (baseNote, accidental, key) => calculateFrequency(key || SW.state.key, baseNote, accidental);
+  // no key given: the key in effect (core.js keyNow — KEY CHANGES)
+  const getFrequencyForNote = (noteClass, key) => calculateFrequency(key || M.keyNow(), noteClass, 'natural');
+  const getModifiedFrequency = (baseNote, accidental, key) => calculateFrequency(key || M.keyNow(), baseNote, accidental);
 
   function valid(f) { return f !== null && !isNaN(f) && f > 0; }
 
@@ -163,7 +170,7 @@
     const noteClass = M.noteClassOf(noteElement);
     if (!noteClass) return;
     const accidental = SW.score ? SW.score.getAccidentalFromNote(noteElement) : 'natural';
-    const frequency = getModifiedFrequency(noteClass, accidental, SW.state.key);
+    const frequency = getModifiedFrequency(noteClass, accidental, SW.keys ? SW.keys.at(noteElement) : SW.state.key);   // in its own key
     if (frequency !== null) playNote(frequency);
   }
   function playHarmony(stackOrNote) {

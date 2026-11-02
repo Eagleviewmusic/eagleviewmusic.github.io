@@ -31,8 +31,10 @@
      same way, as a row of the chart inside the line: always there (its
      bars, numbered), its chords when the track shows
 
-   A BEAT AT A TIME (the user's overhaul, 2026-10-27). In Edit the band
-   shows its beats (faint marks), and empty time a dashed +:
+   A BEAT AT A TIME (the user's overhaul, 2026-10-27). In Edit — in the
+   Edit box's Chords pane since 2026-10-30 (the user: in the Edit pane
+   the chords show, but no empty boxes) — the band shows its beats
+   (faint marks), and empty time a dashed +:
    • a tap puts THE CURSOR on the beat under it (an orange mark; the
      chord sounding there is selected and heard). A chord then — the
      panel, its keys — goes on that beat: on a chord's first beat it
@@ -59,6 +61,7 @@
   'use strict';
   const SW = window.SW;
   const S = SW.state;
+  const M = SW.music;
   const T = SW.track;
   const C = SW.chords;
   const score = document.getElementById('score');
@@ -75,7 +78,9 @@
   const esc = C.escapeHtml;
 
   const shown = () => !!(SW.settings && SW.settings.shows('lane'));
-  const canEdit = () => S.editing && SW.settings.can('chords');
+  // the chords on the music are edited in the Edit box's Chords pane only (2026-10-30, the user): in Edit they show, no empty boxes.
+  // Locked or not (2026-10-31, the user): with the lock on, the Chords pane changes the chords and the notes stay put (edit-box.js THE RAIL)
+  const canEdit = () => !S.present && (SW.editBox ? SW.editBox.chordsEditable() : S.editing && SW.settings.can('chords'));
   const view = () => (SW.settings && SW.settings.view) || {};
   const blockScale = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bs')) || 1;
 
@@ -84,8 +89,10 @@
     while (e && e !== ancestor) { x += e.offsetLeft; y += e.offsetTop; e = e.offsetParent; }
     return { x, y };
   }
-  function look(id, voice) {
-    const d = id ? C.describeVoiced(id, voice) : null;            // a chord with its own notes: named by them (D10)
+  // at: the chord's tick — it is named in its bar's key (KEY CHANGES, js/keys.js); none: the key where the selection is
+  function look(id, voice, at) {
+    const inKey = at === undefined || at === null ? null : SW.keys.atTick(at);
+    const d = id ? M.withKey(inKey, () => C.describeVoiced(id, voice)) : null;   // a chord with its own notes: named by them (D10)
     if (!d || !d.known) return { name: id ? String(id) : '', color: '#9487A2', known: false };
     return { name: C.nameOf(d), color: d.color, known: true };
   }
@@ -166,15 +173,15 @@
   function schedule() { clearTimeout(timer); timer = setTimeout(draw, 30); }
 
   /* View → Chord track decides (2026-10-05) — in every workspace, Edit or
-     not. The row takes room only with chords to show, or in Edit with the
-     chord panel out (its + on empty time): a song with no chords looks
+     not. The row takes room only with chords to show, or in the Edit
+     box's Chords pane (its + on empty time): a song with no chords looks
      as it always did. */
   function draw() {
     clearTimeout(timer);
     if (press && press.moved) return;                            // never under a drag: it comes round again when it ends
     const g = shown() ? T.grid() : null;
     const evs = g ? T.events(g) : [];
-    const on = !!g && (evs.length > 0 || (canEdit() && !S.present && SW.settings.shows('strip')));
+    const on = !!g && (evs.length > 0 || (canEdit() && !S.present));
     // the chord row takes (or gives back) a row above every word: the staff was drawn without it
     if (document.body.classList.contains('show-ctrack') !== on && SW.staff && SW.staff.schedule) SW.staff.schedule();
     document.body.classList.toggle('show-ctrack', on);
@@ -339,7 +346,7 @@
 
   /* one chord bar (the track over a line, or a bar of the chart) */
   function barHtml(e, ctx, o) {
-    const l = look(e.id, e.voice);
+    const l = look(e.id, e.voice, e.at);
     const cls = ['cbar'];
     if (!e.id) cls.push('nochord');
     if (!l.known && e.id) cls.push('unknown');
@@ -494,7 +501,7 @@
     return T.events().find(e => e.id && e.at <= tick && tick < e.end) || null;
   }
   function hear(e) {
-    if (e && e.id && C.isKnown(e.id)) C.play(e.id, 'track', { voice: e.voice });
+    if (e && e.id && C.isKnown(e.id)) M.withKey(SW.keys.atTick(e.at), () => C.play(e.id, 'track', { voice: e.voice }));
   }
   function playAtTick(tick) { hear(eventAt(tick)); }
   /* Edit: the cursor on the beat at a tick (the chord there heard) */
@@ -507,10 +514,11 @@
 
   /* a chord key (or a block on the panel) with the cursor out: that chord on its beat */
   const takesChord = () => !!S.chordSel && canEdit() && shown();
-  function put(id, place) {
+  function put(id, place, k) {
     if (!takesChord()) return false;
     const step = { chord: id };
     if (place) step.place = place;
+    if (k) step.k = k;                       // a Chord Chart card from the panel: that card (its notes), 2026-10-30
     T.putChord(S.chordSel.at, step);
     return true;
   }
@@ -600,7 +608,7 @@
     else { z = press.end; a = Math.min(press.end - least, beatRound(t, g)); }
     press.target = { a, z, copy: press.kind === 'move' && e.altKey };
     ghost(a, z, press.chord, press.target.copy);
-    const name = look(press.chord).name;
+    const name = look(press.chord, null, a).name;
     const beats = Math.round((z - a) / g.b * 100) / 100;
     tip(e, name + (press.target.copy ? ' — a copy' : '') + ' · ' + where(a, g) + ' · ' + beats + (beats === 1 ? ' beat' : ' beats'), press.target.copy);
   }
@@ -696,7 +704,7 @@
     document.querySelectorAll('.ct-ghost').forEach(x => x.remove());
   }
   function ghost(a, z, id, copy) {
-    const l = look(id);
+    const l = look(id, null, a);
     const style = '--c:' + l.color + ';--cs:' + SW.ui.tint(l.color, 0.3);
     const label = id ? C.labelHTML(l.name) : '';
     let named = false;
@@ -748,7 +756,7 @@
     const sp = T.putSpan(beatFloor(t, g));
     document.body.classList.add('ct-dragging');
     ghost(sp.at, sp.end, step.chord, false);
-    tip({ clientX: x, clientY: y }, look(step.chord).name + (sp.on ? ' — in place of ' + look(sp.on.chord).name : '') + ' · ' + where(sp.at, g));
+    tip({ clientX: x, clientY: y }, look(step.chord, null, sp.at).name + (sp.on ? ' — in place of ' + look(sp.on.chord, null, sp.on.at).name : '') + ' · ' + where(sp.at, g));
     return true;
   }
   function dropAt(x, y, step) {
@@ -815,11 +823,14 @@
   SW.bus.on('staff:drawn', schedule);
   ['score:changed', 'score:loaded', 'track:changed', 'view:changed', 'layout:changed', 'names:changed', 'chords:changed',
    'policy:changed', 'key:changed', 'scale:changed', 'meter:changed'].forEach(evt => SW.bus.on(evt, schedule));
-  SW.bus.on('mode:changed', d => { if (!d.editing && S.chordSel) { S.chordSel = null; SW.bus.emit('chordsel:changed', { sel: null }); } schedule(); });
+  SW.bus.on('mode:changed', () => { if (!canEdit() && S.chordSel) { S.chordSel = null; SW.bus.emit('chordsel:changed', { sel: null }); } schedule(); });
   SW.bus.on('score:loaded', () => { S.chordSel = null; });
+  SW.bus.on('editpane:changed', d => { if (d.pane !== 'chords' && S.chordSel) { S.chordSel = null; SW.bus.emit('chordsel:changed', { sel: null }); } schedule(); });
+  // the lock going on in the Chords pane: the cursor goes with the boxes
+  SW.bus.on('view:changed', () => { if (S.chordSel && !canEdit()) { S.chordSel = null; SW.bus.emit('chordsel:changed', { sel: null }); } });
   window.addEventListener('resize', schedule);
   if (SW.settings && SW.settings.view) folded = !!SW.settings.view.chartFolded;
 
-  SW.ctrack = { draw, schedule, select, selected, selectedTick, takesChord, put, keyDown, selectAtTick, playAtTick, capture, dropOver, dropAt, dropCancel };
+  SW.ctrack = { draw, schedule, select, selected, selectedTick, takesChord, put, editable: canEdit, keyDown, selectAtTick, playAtTick, capture, dropOver, dropAt, dropCancel };
   schedule();
 })();

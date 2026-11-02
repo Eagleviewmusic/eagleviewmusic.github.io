@@ -6,7 +6,7 @@
    Made by ../Digital Accordion Packing Lab/standard-from-file.mjs from the builder's export.
 
    chords: by the key the chord answers to in the split preset — the tower's reading order
-           F G R A S D Q W E 2 4 1 3 5 (in major: I ii iii vi IV V V/vi IV/IV V/V iv V/iii ♭VI vii°7/V V/ii);
+           F G R A S D Q W E 2 4 1 3 5 (in major: I ii iii vi IV V V/vi IV/IV V/V iv iii/V ♭VI ii/IV V/ii);
            the same fourteen places hold every scale's own fourteen chords. The Z X C V B tabs
            lie along the bottom.
    melody: by scale step (0 = the tonic) and octave: '2,-1' is the third step an octave down.

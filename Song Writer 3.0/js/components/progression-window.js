@@ -110,7 +110,12 @@
   if (tabsEl) tabsEl.addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) setTab(b.dataset.tab); });
 
   /* ↶ ↷: Focus undoes its notes, the Time Line its draft, the chart the song */
-  const undoer = () => (tab === 'focus' ? SW.chordFocus : tab === 'song' ? SW.chordTimeline : SW.history);
+  // the song's own steps keep the melody while the notes are locked (history.js forChords)
+  const songUndo = {
+    canUndo: () => SW.history.canUndo(SW.history.forChords()), canRedo: () => SW.history.canRedo(SW.history.forChords()),
+    undo: () => SW.history.undo(SW.history.forChords()), redo: () => SW.history.redo(SW.history.forChords())
+  };
+  const undoer = () => (tab === 'focus' ? SW.chordFocus : tab === 'song' ? SW.chordTimeline : songUndo);
   function syncUndo() {
     const H = undoer();
     if (!H) return;

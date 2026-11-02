@@ -23,6 +23,8 @@
      { title, key, scale, meter, bpm, beatTicks, barTicks,
        pickupTicks,       ticks from 0 to the first downbeat (0: none)
        totalTicks,        the longer of the melody and the chord track
+       swing,             '' | '8' | '16' — already in every `at` and `ticks` below
+                          (timing.js SWING: they are where the player sounds them)
        melody: [{ midi, at, ticks, level }],        every pitch struck; a tie once, held for the chain
        chords: [{ midis, at, ticks, level, name, id }],   every chord strike
        sounds: { melody, chords, melodyVolume, chordVolume, room } }   SW.audio.mix()
@@ -63,6 +65,7 @@
     const events = g ? SW.track.events(g) : [];
     const total = Math.max(song.total, events.end || 0);
     const from = 0;
+    const sw = SW.timing.swing(song.shift || 0, mt);          // the swing, as the player bends its clock
 
     const melody = [];
     song.lines.forEach(le => le.events.forEach(ev => {
@@ -72,7 +75,7 @@
         // a tie: the pitch is still sounding from the note before, held for the whole chain
         if (ev.tiedIn && ev.tiedIn.has(p.midi) && ev.at !== from) return;
         const hold = ev.sustain && ev.sustain.get(p.midi) ? ev.sustain.get(p.midi) : ev.ticks;
-        melody.push({ midi: p.midi, at: ev.at, ticks: hold * MELODY_HOLD, level });
+        melody.push({ midi: p.midi, at: sw.at(ev.at), ticks: sw.len(ev.at, hold) * MELODY_HOLD, level });
       });
     }));
 
@@ -83,10 +86,10 @@
       if (!list.length) return;
       const name = chordName(ce.id);
       ce.strikes.forEach(st => {
-        const sEnd = Math.min(st.at + st.len, total);
+        const sEnd = Math.min(st.at + SW.track.strikeHold(st), total);          // an arpeggio's note rings on (track.js)
         if (sEnd <= from || st.at >= total) return;
         const s0 = Math.max(st.at, from);
-        chords.push({ midis: list.slice(), at: s0, ticks: (sEnd - s0) * CHORD_HOLD, level: SW.audio.CHORD_LEVEL, name, id: ce.id });
+        chords.push({ midis: SW.track.strikeNotes(list, st), at: sw.at(s0), ticks: sw.len(s0, sEnd - s0) * CHORD_HOLD, level: SW.audio.CHORD_LEVEL, name, id: ce.id });
       });
     });
 
@@ -100,6 +103,7 @@
       barTicks: mt.barTicks,
       pickupTicks: song.pickup || 0,
       totalTicks: total,
+      swing: sw.on ? S.swing : '',
       melody,
       chords,
       sounds: Object.assign({}, SW.audio.mix())

@@ -18,11 +18,17 @@
      • 100 steps per song
 
    Keys: ⌘Z / Ctrl-Z undo, ⇧⌘Z / Ctrl-Y redo (app.js). Buttons: the Edit
-   box title bar (edit-box.js).
+   box's rail (edit-box.js; its title bar until 2026-10-31).
+
+   KEEP THE MELODY (2026-10-31): with the score locked, the Edit box's
+   Chords tab still changes chords, and its Undo / Redo may only take back
+   a step whose melody — the lines' notes and words, without their chords
+   or the chords-only lines (`bars`) — is the one on screen. A step's
+   melody is worked out once, when first asked (melodyOf).
 
    API
-     SW.history.undo() / redo()        true when something changed
-     SW.history.canUndo() / canRedo()
+     SW.history.undo(o) / redo(o)      true when something changed; o.keepMelody: only a chords-only step
+     SW.history.canUndo(o) / canRedo(o)
      SW.history.reset()                this song becomes the first step
      SW.history.hold(fn)               fn redraws the song as part of an edit (no fresh history)
    Event: 'history:changed' { canUndo, canRedo }
@@ -48,6 +54,22 @@
   function snap(reason) {
     return { json: JSON.stringify(SW.score.read()), sel: selIndex(), reason: reason || 'edit', at: Date.now() };
   }
+  function melodyOf(step) {
+    if (step.mel === undefined) {
+      try {
+        const lines = (JSON.parse(step.json).lines || []).filter(l => !l.bars).map(l => {
+          if (!Array.isArray(l.syllables)) return l;
+          return Object.assign({}, l, { syllables: l.syllables.map(sy => { const c = Object.assign({}, sy); delete c.chord; return c; }) });
+        });
+        step.mel = JSON.stringify(lines);
+      } catch (e) { step.mel = step.json; }
+    }
+    return step.mel;
+  }
+  const keeps = (o, step) => !(o && o.keepMelody) || melodyOf(step) === melodyOf(current);
+  function canUndo(o) { return past.length > 0 && !!current && keeps(o, past[past.length - 1]); }
+  function canRedo(o) { return future.length > 0 && !!current && keeps(o, future[future.length - 1]); }
+
   function announce() {
     SW.bus.emit('history:changed', { canUndo: past.length > 0, canRedo: future.length > 0 });
   }
@@ -90,8 +112,8 @@
     }
   }
 
-  function undo() {
-    if (!past.length || !current) return false;
+  function undo(o) {
+    if (!canUndo(o)) return false;
     if (SW.score.isTyping()) SW.score.finishTextEdit();
     future.push(current);
     current = past.pop();
@@ -99,8 +121,8 @@
     announce();
     return true;
   }
-  function redo() {
-    if (!future.length || !current) return false;
+  function redo(o) {
+    if (!canRedo(o)) return false;
     if (SW.score.isTyping()) SW.score.finishTextEdit();
     past.push(current);
     current = future.pop();
@@ -119,10 +141,13 @@
     try { fn(); } finally { holding = was; }
   }
 
+  /* the Chords window's Undo / Redo (progression-window.js, chord-timeline.js): it changes chords
+     whatever the lock, so while the notes are locked its song steps keep the melody */
+  const forChords = () => (SW.state.editing ? undefined : { keepMelody: true });
+
   SW.history = {
-    undo, redo, reset, hold,
+    undo, redo, reset, hold, forChords,
     isRestoring: () => restoring || holding,
-    canUndo: () => past.length > 0,
-    canRedo: () => future.length > 0
+    canUndo, canRedo
   };
 })();

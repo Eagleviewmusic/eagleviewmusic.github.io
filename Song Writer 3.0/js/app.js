@@ -1,8 +1,9 @@
 /* ==========================================================================
    Song Writer — app.js
    --------------------------------------------------------------------------
-   Start-up order and the controls that belong to no one module: the
-   toolbar's key + time tile and BPM chip, Play and the step pad, Present
+   Start-up order and the controls that belong to no one module: Setup
+   (the key, the time signature, the scale, the tempo — the toolbar's tile,
+   menu and BPM chip until 2026-10-31), Play and the step pad, Present
    mode, and the keyboard.
 
    THE KEYBOARD, both hands (1.0's keys are all kept):
@@ -40,22 +41,56 @@
   const ui = SW.ui;
   const $ = id => document.getElementById(id);
 
-  /* ---------------- the key (the tile's letter) ---------------- */
+  /* ==================================================================
+     SETUP (2026-10-31, the user): one popover from the toolbar's Setup
+     for what the song is set up in — the key, the time signature, the
+     scale, the tempo, its swing (2026-11-01), and whether Play starts
+     with a count-in (that
+     switch is settings.js's, with the other sounds). Each stays open as
+     it is changed, so a song is set up in one visit. A lesson that fixes
+     the key, the meter or the tempo leaves it as plain text here (you
+     have to be able to read them to play the song). The button reads back
+     the key, in its colour, and the tempo — C | 100 (2026-11-01, the user;
+     a metronome and "Setup" until then); its tooltip reads back the rest.
+     ================================================================== */
+  const setupBtn = $('setup-btn');
+  // the key where the selection is (KEY CHANGES, js/keys.js) — the song's opening key in a song that never changes key
+  function keyName() { return M.displayKey(M.spelledKey(SW.keys.here())); }
+  function syncSetupBtn() {
+    if (!setupBtn) return;
+    const sc = SW.chords.scale();
+    const name = keyName();
+    $('setup-key').textContent = name;
+    $('setup-key').style.color = M.keySignatureColors[M.spelledKey(SW.keys.here())] || '';
+    $('setup-bpm').textContent = S.bpm;
+    setupBtn.setAttribute('aria-label', 'Setup — key of ' + name + ', ' + S.bpm + ' BPM');
+    setupBtn.title = 'Setup — ' + name + (sc ? ' ' + sc.name : '') + ' · ' + S.meter + ' · ' + S.bpm + ' BPM' +
+      (S.swing && SW.timing.swingPlays() ? ' · swing ' + S.swing + 'ths' : '');
+  }
+
+  /* ---------------- the key ---------------- */
   function buildKeyGrid() {
     const grid = $('key-grid');
+    const fixed = !SW.settings.can('key');
+    grid.classList.toggle('policy-off', fixed);
+    $('key-fixed').classList.toggle('policy-off', !fixed);
+    $('key-fixed').textContent = fixed ? keyName() + ' — the key stays as written in this lesson' : '';
     grid.innerHTML = '';
+    $('setup-key-title').textContent = keyTitle();
+    if (fixed) return;
     // named as this scale spells it (D♭ is offered as C♯ in minor); where
     // F♯ and G♭ come out as one name, one chip — the chosen key's if it is one
+    const now = SW.keys.here();
     const keys = SW.settings.allowedKeys();
     const byName = {};
     keys.forEach(k => {
       const n = M.spelledKey(k);
-      if (!byName[n] || k === S.key) byName[n] = k;
+      if (!byName[n] || k === now) byName[n] = k;
     });
     keys.filter(k => byName[M.spelledKey(k)] === k).forEach(k => {
       const b = document.createElement('button');
       const shown = M.spelledKey(k);
-      b.className = 'key-chip' + (k === S.key ? ' active' : '');
+      b.className = 'key-chip' + (k === now ? ' active' : '');
       b.dataset.key = k;
       b.textContent = M.displayKey(shown);
       b.title = 'Key of ' + M.displayKey(shown);
@@ -63,24 +98,27 @@
       grid.appendChild(b);
     });
   }
-  ui.registerPopover('keySignatureDisplay', 'key-popover', buildKeyGrid, {
-    guard: () => {
-      if (SW.settings.can('key')) return true;
-      ui.toast('The key stays as written in this lesson');
-      return false;
-    }
-  });
+  /* the Key heading says what a chip will do (KEY CHANGES, js/keys.js): where
+     Create Key Change would start the new key, or which stretch Transpose moves */
+  function keyTitle() {
+    const sel = SW.score.getActiveNote();
+    const stack = sel ? sel.closest('.harmony-stack') : null;
+    const first = document.querySelector('#score .harmony-stack');
+    const from = st => (st === first ? 'from the start' : 'from bar ' + SW.keys.startBar(st));
+    if (SW.keys.mode() === 'change') return stack ? 'Key — new key ' + from(SW.keys.barStart(stack)) : 'Key — select a note first';
+    if (!SW.keys.changes().length) return 'Key';
+    if (!stack) return 'Key — the whole song';
+    const r = SW.keys.regionOf(stack);
+    return 'Key — ' + (r.start ? from(r.start) : 'from the start') + (r.end ? ' to bar ' + (SW.keys.startBar(r.end) - 1) : '');
+  }
   $('key-grid').addEventListener('click', e => {
     const b = e.target.closest('.key-chip');
-    if (!b) return;
-    if (b.dataset.key !== S.key) {
-      SW.score.changeKey(b.dataset.key);
-      SW.score.changed('key');
-    }
-    ui.closeAllPopovers();
+    if (!b || !SW.settings.can('key')) return;
+    SW.keys.choose(b.dataset.key);                // Transpose, or Create Key Change (Look) — the pop-up may ask first
+    if ($('setup-popover').classList.contains('show')) buildKeyGrid();
   });
 
-  /* ---------------- the scale: the menu beside the key ----------------
+  /* ---------------- the scale: the menu under the time signature ----------------
      Digital Accordion's scales (lib/theory.js), grouped as its menu is.
      The scale is the song's (score.scale): it decides the chords the
      panel offers and the notes the keyboard colours; the melody's
@@ -121,53 +159,56 @@
     SW.bus.on('policy:changed', syncScale);
   }
 
-  /* ---------------- the meter: the two numerals ----------------
-     The top numeral: how many in a bar, 4 → 3 → 2 → 4 (the family's
-     gesture), or in compound time 12 → 9 → 6 → 12. The bottom numeral
-     (2.5): the kind of beat — /4 a quarter, /8 a dotted quarter of three
-     eighths — keeping the number of beats: 4/4 ↔ 12/8, 3/4 ↔ 9/8,
-     2/4 ↔ 6/8. Nothing written is changed by either (blocks count one
-     beat of the new kind; notes keep their values and the bar lines
-     fall where they fall). */
-  const METER_CYCLE = { simple: ['4/4', '3/4', '2/4'], compound: ['12/8', '9/8', '6/8'] };
-  function syncTile() {
-    const m = SW.meters.byId(S.meter);
-    $('ts-top').textContent = m.top;
-    $('ts-bottom').textContent = m.bottom;
-    $('ts-top').classList.toggle('two', String(m.top).length > 1);
-    $('ts-top').setAttribute('aria-label', m.compound ? m.beats + ' dotted-quarter beats in a bar (' + m.top + ' eighths)' : m.top + ' beats in a bar');
-    $('ts-bottom').setAttribute('aria-label', m.compound ? 'The beat is a dotted quarter note' : 'The beat is a quarter note');
+  /* ---------------- the time signature ----------------
+     The six meters, each as its two numerals, in a row: 2/4 3/4 4/4 and
+     the compound 6/8 9/8 12/8 — the beat a dotted quarter of three
+     eighths, the number of beats kept by its twin (4/4 ↔ 12/8 …). Until
+     2026-10-31 the toolbar's tile: tap the top numeral for 4 → 3 → 2, the
+     bottom one for the other family. Nothing written is changed (blocks
+     count one beat of the new kind; notes keep their values and the bar
+     lines fall where they fall). */
+  function syncMeter() {
+    const seg = $('meter-seg');
+    if (!seg.children.length) {
+      SW.meters.LIST.forEach(m => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'seg-btn meter-btn' + (m.compound ? ' compound' : '');
+        b.dataset.meter = m.id;
+        b.setAttribute('role', 'radio');
+        b.setAttribute('aria-label', m.id);
+        b.title = m.compound ? m.id + ' — ' + m.beats + ' beats of three eighths' : m.id + ' — ' + m.beats + ' quarter-note beats';
+        b.innerHTML = '<span class="ms-top">' + m.top + '</span><span class="ms-bot">' + m.bottom + '</span>';
+        seg.appendChild(b);
+      });
+    }
+    seg.querySelectorAll('.meter-btn').forEach(b => {
+      const on = b.dataset.meter === S.meter;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-checked', String(on));
+    });
     const fixed = !SW.settings.can('meter');
-    $('ts-top').title = fixed ? '' : 'Tap to change the meter (' + m.id + ')';
-    $('ts-bottom').title = fixed ? '' : m.compound
-      ? 'Tap for ' + SW.meters.twin(m.id) + ' — back to quarter-note beats'
-      : 'Tap for ' + SW.meters.twin(m.id) + ' — beats of three eighths';
-    if (!$('bpm-button').querySelector('.bpm-input')) $('bpm-value').textContent = S.bpm;
+    seg.classList.toggle('policy-off', fixed);
+    $('meter-fixed').classList.toggle('policy-off', !fixed);
+    $('meter-fixed').textContent = fixed ? S.meter + ' — the time signature stays as written in this lesson' : '';
   }
-  $('ts-top').addEventListener('click', e => {
-    e.stopPropagation();
-    if (!SW.settings.can('meter')) return;
-    const cycle = METER_CYCLE[SW.meters.byId(S.meter).compound ? 'compound' : 'simple'];
-    const i = cycle.indexOf(S.meter);
-    SW.score.setMeter(cycle[(i + 1) % cycle.length]);
-    syncTile();
-  });
-  $('ts-bottom').addEventListener('click', e => {
-    e.stopPropagation();
-    if (!SW.settings.can('meter')) return;
-    const to = SW.meters.twin(S.meter);
-    SW.score.setMeter(to);
-    syncTile();
-    ui.toast(SW.meters.byId(to).compound ? to + ' — each beat is a dotted quarter: three eighths' : to + ' — each beat is a quarter note');
+  $('meter-seg').addEventListener('click', e => {
+    const b = e.target.closest('.meter-btn');
+    if (!b || b.dataset.meter === S.meter || !SW.settings.can('meter')) return;
+    const was = SW.meters.byId(S.meter), to = SW.meters.byId(b.dataset.meter);
+    SW.score.setMeter(to.id);
+    syncSetup();
+    if (was.compound !== to.compound) ui.toast(to.compound ? to.id + ' — each beat is a dotted quarter: three eighths' : to.id + ' — each beat is a quarter note');
   });
 
-  /* ---------------- the tempo: the BPM chip ----------------
-     Rhythm Poetry's typed tempo, built to survive a smart board: a tap in
-     the box is also a click on the chip around it, an on-screen
-     keyboard's Done often never leaves the box, and the hover slider
-     could open under the same tap. So a number is taken as soon as it is
-     a real tempo, the box closes on Enter, on blur or on a tap anywhere
-     else, and closing only ever happens once. */
+  /* ---------------- the tempo: − BPM + and a slider ----------------
+     The BPM chip is Rhythm Poetry's typed tempo, built to survive a smart
+     board: a tap in the box is also a click on the chip around it, and an
+     on-screen keyboard's Done often never leaves the box. So a number is
+     taken as soon as it is a real tempo, the box closes on Enter, on blur
+     or on a tap anywhere else, and closing only ever happens once. − and +
+     move it a beat a minute; the slider (the toolbar's hover gauge until
+     2026-10-31) any way at all — inside a lesson's range. */
   const bpmButton = $('bpm-button');
   const bpmValue = $('bpm-value');
   const bpmUnit = bpmButton.querySelector('.bpm-unit');
@@ -180,7 +221,6 @@
   bpmButton.addEventListener('click', () => {
     if (!SW.settings.can('tempo')) return;
     if (bpmButton.querySelector('.bpm-input')) return;     // already typing
-    $('bpm-gauge-wrap').classList.remove('show');
     const before = S.bpm;
     const r = SW.settings.tempoRange();
     const input = document.createElement('input');
@@ -223,21 +263,68 @@
     // after this tap has finished, so the tap that opened the box cannot close it
     setTimeout(() => document.addEventListener('pointerdown', onOutside, true), 0);
   });
-  // a mouse resting on the chip: the tempo slider, over what typing allows
-  ui.setupHoverGauge({
-    trigger: bpmButton,
-    wrap: $('bpm-gauge-wrap'),
-    slider: $('bpm-gauge'),
-    label: $('bpm-gauge-label'),
-    getValue: () => S.bpm,
-    getRange: () => SW.settings.tempoRange(),
-    format: v => v + ' BPM',
-    isDisabled: () => !SW.settings.can('tempo') || !!bpmButton.querySelector('.bpm-input'),
-    onInput: v => { SW.score.setTempo(v); bpmValue.textContent = S.bpm; }
+  const bpmSlider = $('bpm-slider');
+  const nudgeTempo = d => { if (SW.settings.can('tempo')) SW.score.setTempo(S.bpm + d); };
+  $('bpm-down').addEventListener('click', () => nudgeTempo(-1));
+  $('bpm-up').addEventListener('click', () => nudgeTempo(1));
+  bpmSlider.addEventListener('input', () => { if (SW.settings.can('tempo')) SW.score.setTempo(parseInt(bpmSlider.value, 10)); });
+  bpmSlider.addEventListener('keydown', e => e.stopPropagation());   // its arrows move it, not the song
+  function syncTempo() {
+    const fixed = !SW.settings.can('tempo');
+    const r = SW.settings.tempoRange();
+    bpmButton.classList.toggle('fixed', fixed);
+    bpmButton.title = fixed ? 'The tempo stays as written in this lesson' : 'Tap to type a tempo';
+    if (!bpmButton.querySelector('.bpm-input')) bpmValue.textContent = S.bpm;
+    showHide($('bpm-down'), !fixed);
+    showHide($('bpm-up'), !fixed);
+    showHide($('tempo-slide'), !fixed);
+    $('bpm-down').disabled = S.bpm <= r[0];
+    $('bpm-up').disabled = S.bpm >= r[1];
+    bpmSlider.min = r[0];
+    bpmSlider.max = r[1];
+    bpmSlider.value = S.bpm;
+    bpmSlider.style.setProperty('--fill', ((S.bpm - r[0]) / Math.max(1, r[1] - r[0]) * 100).toFixed(1) + '%');
+  }
+  function showHide(el, on) { if (el) el.classList.toggle('policy-off', !on); }
+
+  /* ---------------- swing: None · 8th · 16th ----------------
+     How the song is played, never how it is written (timing.js SWING);
+     saved with the song, as the tempo is, and fixed with it by a lesson
+     that fixes the tempo. In compound time the eighths already go in
+     threes, so 8th is greyed there (the song keeps it for 2/4–4/4). */
+  const SWING_NAMES = { '': 'None', '8': '8th', '16': '16th' };
+  function syncSwing() {
+    const fixed = !SW.settings.can('tempo');
+    const compound = SW.meters.byId(S.meter).compound;
+    const seg = $('swing-seg');
+    seg.querySelectorAll('.seg-btn').forEach(b => {
+      const on = b.dataset.swing === S.swing;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-checked', String(on));
+      b.disabled = compound && b.dataset.swing === '8';
+    });
+    seg.title = compound ? S.meter + ' already swings its eighths in threes — 8th swing plays straight here' : '';
+    showHide(seg, !fixed);
+    showHide($('swing-fixed'), fixed);
+    $('swing-fixed').textContent = fixed ? 'Swing: ' + SWING_NAMES[S.swing] + ' — as written in this lesson' : '';
+  }
+  $('swing-seg').addEventListener('click', e => {
+    const b = e.target.closest('.seg-btn');
+    if (!b || b.disabled || !SW.settings.can('tempo')) return;
+    SW.score.setSwing(b.dataset.swing);
   });
-  SW.bus.on('meter:changed', syncTile);
-  SW.bus.on('score:loaded', syncTile);
-  SW.bus.on('policy:changed', syncTile);
+
+  function syncSetup() {
+    if ($('setup-popover').classList.contains('show')) buildKeyGrid();
+    syncMeter();
+    syncScale();
+    syncTempo();
+    syncSwing();
+    syncSetupBtn();
+  }
+  ui.registerPopover('setup-btn', 'setup-popover', () => { buildKeyGrid(); syncSetup(); SW.settings.syncSoundControls(); });
+  ['meter:changed', 'swing:changed', 'score:loaded', 'policy:changed', 'key:changed', 'keyhere:changed', 'selection', 'scale:changed', 'layout:changed', 'view:changed']
+    .forEach(evt => SW.bus.on(evt, syncSetup));
 
   /* ---------------- Play, the step pad ---------------- */
   const playBtn = $('playBtn');
@@ -286,7 +373,6 @@
     if (S.present === on) return;
     S.present = on;
     if (on) {
-      SW.score.setEditing(false);
       ui.closeAllPopovers();
       document.querySelectorAll('.sheet-backdrop.show').forEach(sh => ui.closeSheet(sh.id));
     }
@@ -304,7 +390,8 @@
       if (!current && S.present) setPresent(false);
     });
   });
-  // the hat cannot go on in Present (it has no toolbar to show it)
+  // Present is never for editing: the Edit box and the editing layer go while it is up
+  // (edit-box.js sync, on present:changed), and anything that turns editing on ends it
   SW.bus.on('mode:changed', d => { if (d.editing && S.present) setPresent(false); });
 
   /* ---------------- About and How this works ---------------- */
@@ -337,13 +424,13 @@
     if (isPopupOpen() || SW.score.isTyping()) return;
     const t = event.target;
     if (t && (t.classList && t.classList.contains('line-label') || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
-    // Undo / Redo (history.js): ⌘Z · ⇧⌘Z (Ctrl-Z · Ctrl-Y / Ctrl-⇧Z)
+    // Undo / Redo (history.js): ⌘Z · ⇧⌘Z (Ctrl-Z · Ctrl-Y / Ctrl-⇧Z) — as the rail's buttons: with the
+    // score locked, none; in the locked Chords tab, only a step that leaves the melody (edit-box.js undoRedo)
     if ((event.metaKey || event.ctrlKey) && !event.altKey && SW.history) {
       const k = event.key.toLowerCase();
       if (k === 'z' || k === 'y') {
         event.preventDefault();
-        if (S.playing) SW.player.stop();
-        if (k === 'y' || event.shiftKey) SW.history.redo(); else SW.history.undo();
+        SW.editBox.undoRedo(k === 'y' || event.shiftKey);
         return;
       }
     }
@@ -416,15 +503,14 @@
     SW.score.changeKey(S.key);
     SW.library.boot();
     SW.settings.applyPolicyToShell();
+    SW.editBox.init();          // the rail: the Edit box out or away, the lock — and from them, editing
     SW.chordStrip.render();
     SW.lane.render();
     SW.rhythm.render();
     SW.dock.render();
     SW.dock.align();
-    syncTile();
-    syncScale();
+    syncSetup();
     SW.staff.render();
-    SW.bus.on('layout:changed', () => { if ($('key-popover').classList.contains('show')) buildKeyGrid(); });
     // fonts change widths; re-seat the keyboard once they have arrived
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => SW.dock.align());
   }

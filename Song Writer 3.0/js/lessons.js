@@ -50,7 +50,7 @@
 
   const SHELL_SWITCHES = [
     { key: 'sound',      name: 'Sound options',      desc: 'Melody, chords, steady beat, count-in and what happens at the end' },
-    { key: 'view',       name: 'View options',       desc: 'Fonts, sizes, section colours and the staff' },
+    { key: 'view',       name: 'Look options',       desc: 'Sizes, fonts, lights, section colours, the chords and the note names — and the lock and the stage in Options' },   // 'view': View's key until 2026-10-31
     { key: 'strip',      name: 'Chords',             desc: 'The Digital Accordion chords, the chord progressions and the chord track (the Chords tab)' },
     { key: 'dock',       name: 'Keyboard',           desc: 'The keyboard under the song (the Keyboard tab)' },
     { key: 'sections',   name: 'Section tools',      desc: 'Moving, copying and deleting lines' },
@@ -278,7 +278,7 @@
   const TEMPO_NOTES = {
     any: 'They can set any tempo, 30–300 BPM.',
     range: 'They can set a tempo between these two. A song saved outside them starts at the nearest.',
-    locked: 'Each exercise plays at the tempo it was saved with; the BPM shows as plain text.'
+    locked: 'Each exercise plays at the tempo and swing it was saved with; they show as plain text.'
   };
   function renderStructure() {
     const list = $('lesson-structure');

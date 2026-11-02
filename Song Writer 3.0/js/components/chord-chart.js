@@ -4,21 +4,32 @@
    Phase 2 of ../Song Writer Chords Redesign/ (README §3.1, D2–D8). The
    song's chords, chosen to fit it, top to bottom:
 
-     THE CHART   the song's chords as big cards (track.js THE CHORD CHART):
-                 colour = its root, the dots = its notes, low to high, the
-                 badge = how many times the song uses it (none: not yet)
      THE WAVE    the song as it sounds (song-wave.js): play it, loop it,
-                 jump about in it — and press any chord over it
+                 jump about in it — and press any chord over it (on top,
+                 its controls and all, the chart under it — 2026-10-30, user)
+     THE CHART   the song's chords as big cards (track.js THE CHORD CHART):
+                 colour = its root, the dots = its notes, low to high
+                 (the badge of how often the song used it went, 2026-10-30)
+     RHYTHM      under the chart while a card's ♪ is on (chord-rhythm.js,
+                 2026-10-30): how that chord — or every chord — plays
      THE BOARD   every chord: the circle of fifths in blocks (chord-circle.js,
                  2026-10-29 — all 24 majors and minors round the song's key,
                  the default) or the panel's blocks (Circle · Panel, under
                  it); keys and Z X C V B held as on the panel; a dot on a
                  block whose chord is on the chart
 
-     • a card: pressed, its chord rings (as long as it is held); a tap
+     • a card: nothing sounds as it is pressed — let go quickly (a tap) it
+       plays once; held down it plays its rhythm (the one chosen in its
+       Rhythm section — none, or Held: it rings), round and round until it
+       is let go (2026-10-30, user: an arpeggio never starts as a block
+       chord); a tap
        selects it (gold), ← → walk the cards; a double-tap, its tune button
-       (on the selected card) or Enter opens FOCUS on it — its own notes
-       (chord-focus.js), its name then following them; dragged along the chart it
+       (its upper left corner, on every card — 2026-10-30) or Enter opens
+       FOCUS on it — its own notes (chord-focus.js), its name then
+       following them. Beside the tune button a small round toggle glows
+       gold when on: Focus on any chord then shows every gold chord beside
+       it, to compare and voice-lead them (kept while the song is open).
+       The round ♪ under a card opens its Rhythm section; dragged along the chart it
        moves there; dragged off it (down, away), it leaves the chart —
        a chord the song uses asks first: take it out of the song too, or
        keep those spots (D5)
@@ -45,7 +56,7 @@
        here: then it goes over to the new shape, one Undo step with that
        change, every strike where it was)
    Listen only (a lesson): play, loop, jump, press chords — nothing moves.
-   API  SW.chordChart.render(body) · keyDown(e) · closed() · count() · select(k) · ask({ title, buttons })
+   API  SW.chordChart.render(body) · keyDown(e) · closed() · count() · select(k) · ask({ title, buttons, html? }) · golds()
    ========================================================================== */
 (function () {
   'use strict';
@@ -65,6 +76,7 @@
   let selK = null;              // the card selected
   let shown = null;             // { cards, uses } as last drawn
   let flashK = null, flashAt = 0;   // a card just put on (or found there): it flashes, through a redraw
+  const gold = new Set();       // cards whose gold toggle is on: Focus shows them beside the chord in it (2026-10-30)
   const readOnly = () => !SW.settings.can('chords');
   const active = () => SW.progWin && SW.progWin.isOpen() && SW.progWin.tab() === 'chart';
 
@@ -96,9 +108,27 @@
       '<span class="cc-dots" aria-hidden="true">' + dots + '</span>' +
       '<span class="cc-name" style="--ns:' + C.nameScale(C.nameOf(d)) + '">' + C.labelHTML(C.nameOf(d)) + '</span>' +
       '<span class="cc-other">' + C.labelHTML(C.otherNameOf(d)) + '</span>' +
-      (n ? '<span class="cc-uses" title="In the song ' + n + (n > 1 ? ' times' : ' time') + '">' + n + '</span>' : '') +
-      (selK === e.id && !readOnly() ? '<button type="button" class="cc-tune" data-tune="' + e.id + '" title="Its notes (Enter)" aria-label="Its notes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.5"/><circle cx="10" cy="17" r="2.5"/></svg></button>' : '') +
+      (readOnly() ? '' : cardButtons(e, d)) +
     '</div>';
+  }
+  /* a card's round buttons (2026-10-30, user): Focus (upper left), its gold toggle beside it, ♪ its Rhythm (bottom centre) */
+  const ICON_TUNE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.5"/><circle cx="10" cy="17" r="2.5"/></svg>';
+  const ICON_EIGHTH = '<svg viewBox="0 0 24 24" aria-hidden="true" class="cc-note8"><ellipse cx="8.6" cy="17.6" rx="4.1" ry="3.1" transform="rotate(-22 8.6 17.6)"/><path class="st" d="M12.2 16.6V3.6c.6 2.6 2.6 4 4.4 5.2 1.6 1.1 2.4 2.6 1.7 5"/></svg>';
+  function cardButtons(e, d) {
+    const g = gold.has(e.id);
+    const rOn = SW.chordRhythm && SW.chordRhythm.lit(e.id);
+    const has = !!e.rhythm;
+    return '<button type="button" class="cc-cbtn cc-tune" data-tune="' + e.id + '" title="Its notes — Focus (Enter)" aria-label="Its notes">' + ICON_TUNE + '</button>' +
+      '<button type="button" class="cc-cbtn cc-gold' + (g ? ' on' : '') + '" data-gold="' + e.id + '" aria-pressed="' + g + '" title="' +
+        (g ? 'Shown beside any chord in Focus — tap to stop' : 'Show this chord beside any chord in Focus, to compare them') + '" aria-label="Compare in Focus"></button>' +
+      '<button type="button" class="cc-cbtn cc-rhy' + (rOn ? ' on' : '') + (has ? ' has' : '') + '" data-rhy="' + e.id + '" aria-pressed="' + !!rOn + '" title="' +
+        (rOn ? 'Close its rhythm' : 'Its rhythm — block chords, arpeggios, or your own') + '" aria-label="Its rhythm">' + ICON_EIGHTH + '</button>';
+  }
+  /* the gold cards, in the chart's order */
+  function golds() {
+    const ids = new Set(chartNow().cards.map(e => e.id));
+    [...gold].forEach(k => { if (!ids.has(k)) gold.delete(k); });
+    return chartNow().cards.filter(e => gold.has(e.id)).map(e => e.id);
   }
   /* Focus on a card (its notes) — Save brings you back here */
   function focusCard(k) {
@@ -161,14 +191,16 @@
         '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>' +
         (shown.cards.length ? '' : '<p class="cc-hint">Drag your favorite chords onto the Chord Chart</p>'));      // the user's words (2026-10-29); gone once a chord is on
     body.innerHTML = '<div class="cc-hub' + (ro ? ' ro' : '') + '">' +
-      '<div class="cc-shelf" id="cc-shelf">' + (shelf || '<p class="cc-none">No chords yet</p>') + '</div>' +
       '<div class="cc-mid">' + SW.songWave.html() + '</div>' +
+      '<div class="cc-shelf" id="cc-shelf">' + (shelf || '<p class="cc-none">No chords yet</p>') + '</div>' +
+      (SW.chordRhythm && !ro ? SW.chordRhythm.html(shown.cards) : '') +
       '<div class="cc-play-area">' + boardHtml() + '</div>' +
     '</div>';
     SW.chordStrip.fitLabels(body.querySelector('.cc-board'));
     markBoard();
     relight();
     SW.songWave.attach(body.querySelector('.cc-wave'));
+    if (SW.chordRhythm && !ro) SW.chordRhythm.attach(body);
   }
   /* a dot on a block whose chord (as the held buttons make it now) is on the chart */
   function markBoard() {
@@ -249,15 +281,28 @@
   }
 
   /* ---------------- sound ---------------- */
-  const holds = new Map();      // holder → { voice } a card · { held, els } a block, a circle block or a key held down
+  const holds = new Map();      // holder → { card, list, timer, voice, loop } a card · { held, els } a block, a circle block or a key held down
+  const HOLD_MS = 380;          // a card pressed this long is held: its rhythm plays
+  /* A CARD PRESSED (2026-10-30, user): nothing sounds on the way down. Let go quickly (a tap) and it plays once,
+     as a chord; held down, it plays the rhythm chosen for it (its Rhythm section) round and round until it is
+     let go — an arpeggio's first sound is its first note, never the block chord. None chosen, or Held: held
+     down, it rings. A drag sounds nothing. */
   function holdCard(k, holder) {
     const e = chartNow().cards.find(x => x.id === k);
     if (!e) return;
     release(holder);
     const list = C.midis(e.chord, { voice: e.voice });
     if (!list.length) return;
-    holds.set(holder, { voice: SW.audio.holdChord(list.map(SW.music.midiToFreq)) });
-    C.announce(e.chord, list, 'chart');
+    const h = { card: e, list };
+    h.timer = setTimeout(() => {
+      if (holds.get(holder) !== h) return;
+      h.timer = 0;
+      const lp = e.rhythm && e.rhythm !== T.HELD && SW.chordRhythm ? SW.chordRhythm.loop(e) : null;
+      if (lp) h.loop = lp;
+      else h.voice = SW.audio.holdChord(list.map(SW.music.midiToFreq));   // it rings while held
+      C.announce(e.chord, list, 'chart');
+    }, HOLD_MS);
+    holds.set(holder, h);
   }
   function holdPlace(place, holder) {
     if (C.offered().indexOf(place) === -1) {
@@ -297,11 +342,18 @@
       h.els.forEach(b => b.classList.add('is-on'));
     });
   }
-  function release(holder) {
+  /* `tap`: a card let go before it was held — it plays now, once */
+  function release(holder, tap) {
     const h = holds.get(holder);
     if (!h) return;
     holds.delete(holder);
+    clearTimeout(h.timer);
+    if (tap && h.timer && h.list) {
+      SW.audio.playChordFrequencies(h.list.map(SW.music.midiToFreq));
+      C.announce(h.card.chord, h.list, 'chart');
+    }
     if (h.voice) h.voice.release();
+    if (h.loop) h.loop.stop();
     if (h.held) C.releaseHold(holder);
     (h.els || []).forEach(b => { if (![...holds.values()].some(x => x.els && x.els.indexOf(b) !== -1)) b.classList.remove('is-on'); });
   }
@@ -334,7 +386,7 @@
       press = { kind: 'circle', chord: cb.dataset.chord, x: e.clientX, y: e.clientY, el: cb, moved: false, id: e.pointerId, holder };
       return;
     }
-    if (e.target.closest('.cc-tune')) return;                   // its button: a click opens Focus
+    if (e.target.closest('.cc-cbtn')) return;                   // its round buttons: a click (Focus, gold, rhythm)
     const card = e.target.closest('.cc-card[data-k]');
     if (card) {
       e.preventDefault();
@@ -387,7 +439,7 @@
     if (!press || e.pointerId !== press.id) return;
     const p = press;
     press = null;
-    release(p.holder);
+    release(p.holder, p.kind === 'card' && !p.moved && !cancelled);       // a card tapped: it sounds as it is let go
     if (p.ghost) p.ghost.remove();
     showGap(undefined);
     if (shelfEl()) shelfEl().classList.remove('drop');
@@ -424,6 +476,17 @@
     if (t.closest('.cc-addbox')) { extra++; armed = true; SW.progWin.render(); return; }
     const tune = t.closest('.cc-tune');
     if (tune) { focusCard(tune.dataset.tune); return; }
+    const gd = t.closest('.cc-gold');
+    if (gd) {
+      const k = gd.dataset.gold, on = !gold.has(k);
+      if (on) gold.add(k); else gold.delete(k);
+      gd.classList.toggle('on', on);
+      gd.setAttribute('aria-pressed', on);
+      gd.title = on ? 'Shown beside any chord in Focus — tap to stop' : 'Show this chord beside any chord in Focus, to compare them';
+      return;
+    }
+    const rh = t.closest('.cc-rhy');
+    if (rh) { if (SW.chordRhythm) SW.chordRhythm.toggle(rh.dataset.rhy); return; }
     if (t.closest('.cc-more')) { armed = false; moreChords(); return; }
     const nm = t.closest('[data-cnames]');
     if (nm) { SW.chordCircle.setNames(nm.dataset.cnames); SW.progWin.render(); return; }
@@ -484,13 +547,18 @@
     closeAsk();
     askEl = document.createElement('div');
     askEl.className = 'cc-ask';
-    askEl.innerHTML = '<div class="cc-ask-card" role="alertdialog" aria-modal="true"><h3>' + o.title + '</h3>' +
+    askEl.innerHTML = '<div class="cc-ask-card' + (o.wide ? ' wide' : '') + '" role="alertdialog" aria-modal="true"><h3>' + o.title + '</h3>' +
+      (o.body ? '<div class="cc-ask-body">' + o.body + '</div>' : '') +      // its own choices (Focus's Let me Decide): o.onClick handles them
       '<div class="cc-ask-btns">' + o.buttons.map((b, i) => '<button type="button" class="btn' + (b.primary ? ' btn-primary' : '') + '" data-ask="' + i + '">' + esc(b.label) + '</button>').join('') + '</div>' +
       '<button type="button" class="cc-keep" data-ask="keep">Keep editing</button></div>';
     askEl.addEventListener('click', e => {
       const b = e.target.closest('[data-ask]');
-      if (!b && e.target !== askEl) return;
-      const pick = b && b.dataset.ask !== 'keep' ? o.buttons[Number(b.dataset.ask)] : null;
+      if (!b) {
+        if (e.target === askEl) closeAsk();
+        else if (o.onClick) o.onClick(e, askEl);
+        return;
+      }
+      const pick = b.dataset.ask !== 'keep' ? o.buttons[Number(b.dataset.ask)] : null;
       closeAsk();
       if (pick) pick.act();
     });
@@ -515,12 +583,12 @@
   const latches = () => active() && SW.progWin.onTop();
 
   // another song: the four boxes again, none extra
-  SW.bus.on('song:opened', () => { extra = 0; armed = false; });
+  SW.bus.on('song:opened', () => { extra = 0; armed = false; gold.clear(); });
 
   /* a card chosen from elsewhere (Focus saved it): selected, and it flashes */
   function select(k) { selK = k; flash(k); }
 
   const asking = () => !!askEl;
 
-  SW.chordChart = { render, keyDown, closed, count, select, ask, asking, chartNow, cardHtml, starterHtml, starters, latches };
+  SW.chordChart = { render, keyDown, closed, count, select, ask, asking, chartNow, cardHtml, starterHtml, starters, latches, golds };
 })();
