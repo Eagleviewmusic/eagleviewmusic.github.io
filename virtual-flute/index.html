@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Virtual Flute</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+      background: white;
+      width: 100vw;
+      min-height: 100vh;
+    }
+    body {
+      min-height: 100vh;
+      min-width: 100vw;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .app-center-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+      min-width: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .scaling-outer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform-origin: center center;
+    }
+    /* Three rows: the staff, the flute, the notes */
+    .scaling-wrapper {
+      width: 1100px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    #staff {
+      width: 1100px;
+      height: 170px;
+      display: block;
+    }
+    #flute {
+      width: 1100px;
+      height: 216px;
+      display: block;
+    }
+
+    /* The notes, laid out like a piano: low B at the left, sharps and flats on top between the letters */
+    .note-pad {
+      position: relative;
+      width: 1058px;
+      height: 94px;
+      margin-top: 4px;
+    }
+    .note-btn {
+      position: absolute;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 0;
+      border: 1px solid rgba(0, 0, 0, 0.28);
+      border-radius: 7px;
+      box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+      font-family: inherit;
+      font-weight: bold;
+      cursor: pointer;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      transition: transform 0.08s ease, filter 0.08s ease;
+    }
+    .note-btn.natural {
+      top: 30px;
+      width: 44px;
+      height: 64px;
+      font-size: 19px;
+      justify-content: flex-end;
+      padding-bottom: 5px;
+    }
+    .note-btn.sharp {
+      top: 0;
+      width: 36px;
+      height: 44px;
+      z-index: 1;
+    }
+    .note-btn .names {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      line-height: 1;
+    }
+    .note-btn.sharp .names b { font-size: 13px; }
+    .note-btn.sharp .names small { font-size: 9.5px; opacity: 0.8; margin-top: 1px; }
+    .note-btn .acc { margin-left: -0.1em; }
+    .note-btn .key {
+      font: 10.5px monospace;
+      opacity: 0.6;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .note-btn.natural .key { margin-top: 2px; }
+    .note-btn.selected {
+      outline: 3px solid #1f2937;
+      outline-offset: 1px;
+      z-index: 2;
+    }
+    .note-btn.active {
+      transform: scale(1.08);
+      filter: brightness(1.12);
+      z-index: 3;
+    }
+    .note-btn:focus { outline: none; }
+    .note-btn:focus-visible { outline: 3px solid #2563eb; outline-offset: 1px; }
+    .note-btn.selected:focus-visible { outline-color: #1f2937; }
+    @media (hover: none) and (pointer: coarse) {
+      .note-btn .key { display: none; }
+    }
+
+    /* First notes: eleven big buttons in one row */
+    .note-pad.first {
+      width: 1012px;
+      height: 70px;
+    }
+    .note-btn.scale-note {
+      top: 0;
+      width: 86px;
+      height: 70px;
+      font-size: 24px;
+      justify-content: center;
+      padding-bottom: 0;
+    }
+    .note-btn.scale-note .names b { font-size: 22px; }
+    .note-btn.scale-note .names small { font-size: 12px; }
+
+    .tip-area {
+      width: 1000px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      text-align: center;
+      font-size: 12.5px;
+      line-height: 1.3;
+      color: #374151;
+    }
+    .tip-area .hint { color: #9ca3af; }
+    .alt-btn {
+      font: 700 12px/1 sans-serif;
+      padding: 6px 11px;
+      border-radius: 9999px;
+      border: 1.5px solid #3b6ea8;
+      background: #eaf2fb;
+      color: #1f4d80;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .alt-btn:hover { background: #d7e6f7; }
+
+    /* ----- settings ----- */
+    #app-header { box-sizing: border-box; }
+    .gear-btn {
+      position: absolute;
+      top: 50%;
+      right: 10px;
+      transform: translateY(-50%);
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(30, 41, 59, 0.88);
+      color: #f1f5f9;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .gear-btn:hover, .gear-btn[aria-expanded="true"] { background: #334155; color: #74B9FF; }
+    .gear-btn svg { width: 19px; height: 19px; }
+
+    .settings-panel {
+      position: fixed;
+      top: 44px;
+      right: 0;
+      bottom: 0;
+      width: min(360px, 100vw);
+      z-index: 9998;
+      box-sizing: border-box;
+      padding: 12px 16px 28px;
+      overflow-y: auto;
+      background: #ffffff;
+      border-left: 1px solid #e5e7eb;
+      box-shadow: -6px 0 24px rgba(0, 0, 0, 0.15);
+      font: 14px/1.4 system-ui, -apple-system, sans-serif;
+      color: #1f2937;
+      visibility: hidden;
+      transform: translateX(105%);
+      transition: transform 0.2s ease, visibility 0s 0.2s;
+    }
+    .settings-panel.open {
+      visibility: visible;
+      transform: none;
+      transition: transform 0.2s ease;
+    }
+    .sp-head { display: flex; align-items: center; justify-content: space-between; }
+    .sp-head h2 { margin: 0; font: normal 24px 'Lobster', cursive; color: #3b6ea8; }
+    .sp-close { border: 0; background: none; padding: 2px 6px; font-size: 28px; line-height: 1; color: #6b7280; cursor: pointer; }
+    .sp-section { margin-top: 16px; }
+    .sp-section h3 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #6b7280;
+    }
+    .sp-group {
+      margin: 18px 0 4px;
+      padding-top: 10px;
+      border-top: 1px solid #f3f4f6;
+      font-weight: 800;
+      font-size: 13px;
+      color: #1f4d80;
+    }
+    .view-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .view-choice button {
+      padding: 10px;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      background: #ffffff;
+      font: inherit;
+      text-align: left;
+      color: inherit;
+      cursor: pointer;
+    }
+    .view-choice button b { display: block; font-size: 15px; }
+    .view-choice button small { display: block; margin-top: 2px; font-size: 12px; color: #6b7280; }
+    .view-choice button[aria-checked="true"] { border-color: #3b6ea8; background: #eaf2fb; }
+    .sp-row { margin: 12px 0; }
+    .sp-row.off { opacity: 0.45; }
+    .sp-label { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 13.5px; }
+    .sp-value { font-weight: 600; color: #1f4d80; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .sp-row input[type="range"] { width: 100%; margin: 6px 0 1px; accent-color: #3b6ea8; }
+    .sp-ends { display: flex; justify-content: space-between; font-size: 11px; color: #9ca3af; }
+    .sp-hint { margin-top: 3px; font-size: 11.5px; color: #6b7280; }
+    .seg { display: flex; margin-top: 6px; border: 1.5px solid #d1d5db; border-radius: 9px; overflow: hidden; }
+    .seg button {
+      flex: 1;
+      padding: 7px 4px;
+      border: 0;
+      border-left: 1px solid #e5e7eb;
+      background: #ffffff;
+      font: 600 13px system-ui, -apple-system, sans-serif;
+      color: #374151;
+      cursor: pointer;
+    }
+    .seg button:first-child { border-left: 0; }
+    .seg button[aria-checked="true"] { background: #3b6ea8; color: #ffffff; }
+    .sp-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .sp-btn {
+      padding: 7px 13px;
+      border-radius: 9999px;
+      border: 1.5px solid #3b6ea8;
+      background: #eaf2fb;
+      font: 700 13px system-ui, -apple-system, sans-serif;
+      color: #1f4d80;
+      cursor: pointer;
+    }
+    .sp-btn:hover { background: #d7e6f7; }
+    .sp-btn.primary { background: #3b6ea8; color: #ffffff; }
+    .sp-btn.primary:hover { background: #2f5c8f; }
+  </style>
+
+<!-- Eagle View Music: the way back to the hub. Hidden when the app is embedded in a frame (a Google Site, an LMS). -->
+<style>
+  .back-home-btn{position:fixed;top:12px;left:12px;z-index:10000;display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:9999px;background:rgba(30,41,59,.88);color:#f1f5f9;border:1px solid rgba(255,255,255,.22);font:600 13px/1 Montserrat,system-ui,-apple-system,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25);backdrop-filter:blur(6px);transition:background .2s,color .2s}
+  .back-home-btn:hover{background:#334155;color:#74B9FF}
+  .back-home-btn.in-bar{position:absolute;top:50%;left:10px;transform:translateY(-50%);box-shadow:none}
+  @media (max-width:640px){.back-home-btn .back-label{display:none}}
+  .in-iframe .back-home-btn{display:none!important}
+</style>
+<script>try{if(window.self!==window.top)document.documentElement.classList.add('in-iframe')}catch(e){document.documentElement.classList.add('in-iframe')}</script>
+  <!-- EVM visit counter: one anonymous count each time an app is opened. What is sent, and what never is: /what-we-count.html -->
+  <script>
+    (function () {
+      var off = false;
+      try { off = localStorage.getItem('skipgc') === 't'; } catch (e) {}
+      if (location.hash === '#toggle-goatcounter') {   // the teacher's own browsers opt out here (and back in)
+        try { off ? localStorage.removeItem('skipgc') : localStorage.setItem('skipgc', 't'); } catch (e) {}
+        alert(off ? 'Visits from this browser will be counted again.' : 'Visits from this browser will no longer be counted.');
+        return;
+      }
+      if (off || navigator.webdriver) return;
+      if (navigator.globalPrivacyControl || navigator.doNotTrack === '1' || window.doNotTrack === '1') return;   // the visitor asked not to be counted
+      if (!/(^|\.)eagleviewmusic\.com$/.test(location.hostname)) return;   // testing, or a copy on another site
+      try { if (window.top !== window && parent.location.host) return; } catch (e) {}   // framed by another of our apps (the Music Stand), which counts itself
+      try {
+        var p = decodeURIComponent(location.pathname).replace(/index\.html$/, '');
+        var r = document.referrer.split(/[?#]/)[0];   // where the visit came from, never the rest of a link
+        var u = 'https://eagleviewmusic.goatcounter.com/count?p=' + encodeURIComponent(p) +
+          (r ? '&r=' + encodeURIComponent(r) : '') + '&s=' + screen.width + '&rnd=' + Math.random().toString(36).slice(2, 7);
+        if (!(navigator.sendBeacon && navigator.sendBeacon(u))) new Image().src = u;
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+<!-- ===== App Header Start ===== -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lobster&display=swap" rel="stylesheet">
+
+<div id="app-header" style="position: fixed; top: 0; left: 0; right: 0; width: 100%; z-index: 9999; background-color: #3b6ea8; padding: 5px 10px; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+    <a href="../index.html" class="back-home-btn in-bar" title="Back to Eagle View Music" aria-label="Back to Eagle View Music"><span class="back-arrow">←</span><span class="back-label">Eagle View Music</span></a>
+    <a href="../index.html" rel="noopener noreferrer" style="text-decoration: none; color: white;">
+        <h1 style="font-family: 'Lobster', cursive; margin: 0; font-size: clamp(16px, 5vw, 24px); white-space: nowrap; font-weight: normal;">
+          Virtual Flute
+        </h1>
+    </a>
+    <button type="button" class="gear-btn" id="settingsBtn" title="Settings" aria-label="Settings" aria-expanded="false" aria-controls="settingsPanel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+</div>
+<!-- ===== App Header End ===== -->
+  <div class="app-center-container">
+    <div class="scaling-outer" id="scaling-outer">
+      <div class="scaling-wrapper" id="scaling-wrapper">
+        <svg id="staff" viewBox="0 0 1100 170" role="img" aria-label="Staff"></svg>
+        <svg id="flute" viewBox="0 0 1120 220" role="img" aria-label="Flute"></svg>
+        <div class="note-pad" id="notePad"></div>
+        <div class="tip-area" id="tipArea" aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
+  <aside class="settings-panel" id="settingsPanel" role="dialog" aria-label="Settings">
+    <div class="sp-head">
+      <h2>Settings</h2>
+      <button type="button" class="sp-close" id="settingsClose" aria-label="Close settings">×</button>
+    </div>
+    <div class="sp-section">
+      <h3>Notes to show</h3>
+      <div class="view-choice" role="radiogroup" aria-label="Notes to show">
+        <button type="button" role="radio" data-view="first"><b>First notes</b><small>F to high B♭, the B♭ scale, keys 1 to 0</small></button>
+        <button type="button" role="radio" data-view="chromatic"><b>Every note</b><small>Low B to top C, with every sharp and flat</small></button>
+      </div>
+    </div>
+    <div class="sp-section">
+      <h3>Sound</h3>
+      <div class="sp-actions">
+        <button type="button" class="sp-btn primary" id="tuneBtn">▶ Try it: Hot Cross Buns</button>
+        <button type="button" class="sp-btn" id="resetSoundBtn">Reset sound</button>
+      </div>
+      <div id="soundControls"></div>
+    </div>
+  </aside>
+  <script src="flute-synth.js"></script>
+  <script>
+    // Fingerings for the Boehm flute (closed G♯, B foot) from the Woodwind Fingering Guide's basic
+    // chart, low B to top C. Each one reads: thumb, left-hand fingers, right-hand fingers, then any
+    // other keys:
+    //   T   thumb on the B key        Tb  thumb on the B♭ lever        -   thumb off
+    //   123 fingers 1 2 3 of that hand down, - up
+    //   G#  G♯ lever (left little finger)        Eb  E♭ key (right little finger)
+    //   C# C B  the low C♯, C and B keys (right little finger)        giz  the gizmo (B foot)
+    //   D D#  the two trill keys (right hand)        BbL  the B♭ lever beside the right index finger
+    // A second fingering is one of the guide's alternates.
+    const CHART = [
+      ['B3',  'T 123 123 B'],
+      ['C4',  'T 123 123 C'],
+      ['C#4', 'T 123 123 C#'],
+      ['D4',  'T 123 123'],
+      ['D#4', 'T 123 123 Eb'],
+      ['E4',  'T 123 12- Eb'],
+      ['F4',  'T 123 1-- Eb'],
+      ['F#4', 'T 123 --3 Eb'],
+      ['G4',  'T 123 --- Eb'],
+      ['G#4', 'T 123 --- G# Eb'],
+      ['A4',  'T 12- --- Eb'],
+      ['A#4', 'T 1-- 1-- Eb', 'Tb 1-- --- Eb', 'T 1-- --- BbL Eb'],
+      ['B4',  'T 1-- --- Eb'],
+      ['C5',  '- 1-- --- Eb'],
+      ['C#5', '- --- --- Eb'],
+      ['D5',  'T -23 123'],
+      ['D#5', 'T -23 123 Eb'],
+      ['E5',  'T 123 12- Eb'],
+      ['F5',  'T 123 1-- Eb'],
+      ['F#5', 'T 123 --3 Eb'],
+      ['G5',  'T 123 --- Eb'],
+      ['G#5', 'T 123 --- G# Eb'],
+      ['A5',  'T 12- --- Eb'],
+      ['A#5', 'T 1-- 1-- Eb', 'Tb 1-- --- Eb', 'T 1-- --- BbL Eb'],
+      ['B5',  'T 1-- --- Eb'],
+      ['C6',  '- 1-- --- Eb'],
+      ['C#6', '- --- --- Eb'],
+      ['D6',  'T -23 --- Eb'],
+      ['D#6', 'T 123 123 G# Eb'],
+      ['E6',  'T 12- 12- Eb'],
+      ['F6',  'T 1-3 1-- Eb'],
+      ['F#6', 'T 1-3 --3 Eb'],
+      ['G6',  '- 123 --- Eb'],
+      ['G#6', '- -23 --- G# Eb'],
+      ['A6',  'T -2- 1-- Eb'],
+      ['A#6', 'T --- 1-- D'],
+      ['B6',  'T 1-3 --- D#'],
+      ['C7',  '- 123 1-- G# giz'],
+    ];
+
+    // Computer keys (by position, so they work on any keyboard layout): the bottom row plays the
+    // first octave, the top row the second, and Shift moves either row up an octave.
+    const KEY_CODES = {
+      KeyA: 'B3',
+      KeyZ: 'C4', KeyS: 'C#4', KeyX: 'D4', KeyD: 'D#4', KeyC: 'E4', KeyV: 'F4', KeyG: 'F#4',
+      KeyB: 'G4', KeyH: 'G#4', KeyN: 'A4', KeyJ: 'A#4', KeyM: 'B4',
+      KeyQ: 'C5', Digit2: 'C#5', KeyW: 'D5', Digit3: 'D#5', KeyE: 'E5', KeyR: 'F5', Digit5: 'F#5',
+      KeyT: 'G5', Digit6: 'G#5', KeyY: 'A5', Digit7: 'A#5', KeyU: 'B5',
+      KeyI: 'C6', Digit9: 'C#6', KeyO: 'D6', Digit0: 'D#6', KeyP: 'E6', BracketLeft: 'F6', Equal: 'F#6', BracketRight: 'G6',
+      Comma: 'C5', KeyL: 'C#5', Period: 'D5', Semicolon: 'D#5', Slash: 'E5',   // the bottom row carries on too
+    };
+    const KEY_LABELS = {
+      KeyA: 'a', KeyZ: 'z', KeyS: 's', KeyX: 'x', KeyD: 'd', KeyC: 'c', KeyV: 'v', KeyG: 'g', KeyB: 'b', KeyH: 'h',
+      KeyN: 'n', KeyJ: 'j', KeyM: 'm', Comma: ',', KeyL: 'l', Period: '.', Semicolon: ';', Slash: '/',
+      KeyQ: 'q', Digit2: '2', KeyW: 'w', Digit3: '3', KeyE: 'e', KeyR: 'r', Digit5: '5', KeyT: 't', Digit6: '6',
+      KeyY: 'y', Digit7: '7', KeyU: 'u', KeyI: 'i', Digit9: '9', KeyO: 'o', Digit0: '0', KeyP: 'p',
+      BracketLeft: '[', Equal: '=', BracketRight: ']',
+    };
+
+    const LETTER_COLORS = {
+      C: '#FF3B30', D: '#FF8A00', E: '#FFF200', F: '#34C759',
+      G: '#30C0C6', A: '#007AFF', B: '#AF52DE'
+    };
+    const LETTERS = 'CDEFGAB';
+    // Sharps and flats: the name most band music uses first, then the other name
+    const ACCIDENTAL_NAMES = {
+      C: ['C♯', 'D♭'], D: ['E♭', 'D♯'], F: ['F♯', 'G♭'], G: ['A♭', 'G♯'], A: ['B♭', 'A♯']
+    };
+
+    const notes = CHART.map(([pitch, ...fingerings]) => {
+      const letter = pitch[0];
+      const sharp = pitch[1] === '#';
+      const octave = Number(pitch.slice(-1));
+      const upper = LETTERS[(LETTERS.indexOf(letter) + 1) % 7];
+      const name = sharp ? ACCIDENTAL_NAMES[letter][0] : letter;
+      return {
+        pitch, fingerings: fingerings.map(parseFingering), sharp, octave,
+        name, otherName: sharp ? ACCIDENTAL_NAMES[letter][1] : '',
+        // Where it sits on the staff: the letter of its first name (E♭ on E's line), in steps from C4
+        step: (octave - 4) * 7 + LETTERS.indexOf(name[0]),
+        accidental: name[1] || '',
+        // A sharp's colour runs from the letter below it to the letter above it
+        color: LETTER_COLORS[letter],
+        upperColor: sharp ? LETTER_COLORS[upper] : LETTER_COLORS[letter],
+      };
+    });
+    const notesByPitch = Object.fromEntries(notes.map(n => [n.pitch, n]));
+
+    // The first-notes view: the B♭ scale and the notes just under it, on the number keys
+    const FIRST = ['F4', 'G4', 'A4', 'A#4', 'C5', 'D5', 'D#5', 'F5', 'G5', 'A5', 'A#5'];
+    const FIRST_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus'];
+    const FIRST_LABELS = '1234567890-';
+
+    function parseFingering(code) {
+      const [thumb, left, right, ...extra] = code.split(/\s+/);
+      const keys = new Set();
+      if (thumb === 'T') keys.add('T');
+      if (thumb === 'Tb') keys.add('Tb');
+      [...left].forEach(c => { if (c !== '-') keys.add('L' + c); });
+      [...right].forEach(c => { if (c !== '-') keys.add('R' + c); });
+      extra.forEach(k => keys.add({ 'G#': 'Gs', 'C#': 'Cs', 'D#': 'trDs', 'D': 'trD' }[k] || k));
+      return keys;
+    }
+
+    // ----- saved settings (this browser only) -----
+    const STORE_KEY = 'virtual-flute-settings';
+    function loadSettings() {
+      try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; }
+    }
+    function saveSettings() {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify({ version: 1, view, sound: soundSettings })); } catch (e) { /* private window */ }
+    }
+    const saved = loadSettings();
+    let view = saved.view === 'first' ? 'first' : 'chromatic';
+    let keyMap = {};   // e.code -> pitch, for the view on screen
+
+    // Which fingering each note shows, when it has more than one (kept while the page is open)
+    const chosenFingering = {};
+    let shownNote = null;
+
+    // ----- colours -----
+    function hexToRgb(hex) {
+      const n = parseInt(hex.slice(1), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    function rgbToHex(rgb) {
+      return '#' + rgb.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+    }
+    function mix(a, b, t) {
+      const ra = hexToRgb(a), rb = hexToRgb(b);
+      return rgbToHex(ra.map((v, i) => v + (rb[i] - v) * t));
+    }
+    function darken(hex, amount) {
+      return rgbToHex(hexToRgb(hex).map(v => v * (1 - amount)));
+    }
+    function luminance(hex) {
+      const [r, g, b] = hexToRgb(hex).map(v => {
+        v /= 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+    function textColorOn(hex) {
+      return luminance(hex) > 0.3 ? '#1f2937' : '#ffffff';
+    }
+    function noteMid(note) {
+      return note.sharp ? mix(note.color, note.upperColor, 0.5) : note.color;
+    }
+
+    // ----- the note buttons -----
+    const notePad = document.getElementById('notePad');
+
+    // Pulls ♯ / ♭ in against the letter (their fallback font leaves a gap)
+    function accidentalHtml(name) {
+      return `${name[0]}<span class="acc">${name[1]}</span>`;
+    }
+    const COL = 46;   // one letter's width, gap included
+
+    function addNoteButton(note, label, kind, left) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'note-btn ' + kind;
+      btn.dataset.pitch = note.pitch;
+      btn.style.left = left + 'px';
+      btn.setAttribute('aria-label', note.sharp
+        ? `${note.name} / ${note.otherName} (${note.pitch.replace('#', '♯')})`
+        : note.pitch);
+      btn.title = label ? `Press ${label.toUpperCase()} to play ${note.sharp ? note.name + ' / ' + note.otherName : note.name}` : note.name;
+      if (note.sharp) {
+        btn.style.background = `linear-gradient(to right, ${note.color}, ${note.upperColor})`;
+        btn.style.color = textColorOn(noteMid(note));
+      } else {
+        btn.style.background = note.color;
+        btn.style.color = textColorOn(note.color);
+      }
+      const names = note.sharp
+        ? `<b>${accidentalHtml(note.name)}</b><small>${accidentalHtml(note.otherName)}</small>`
+        : note.name;
+      btn.innerHTML = `<span class="names">${names}</span>` + (label ? `<span class="key">${label}</span>` : '');
+
+      btn.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        press(note);
+      });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(type =>
+        btn.addEventListener(type, () => release(note)));
+      // Enter or Space on a focused button plays a short note
+      btn.addEventListener('click', e => {
+        if (e.detail !== 0) return;
+        press(note);
+        setTimeout(() => release(note), 400);
+      });
+      btn.addEventListener('contextmenu', e => e.preventDefault());
+      notePad.appendChild(btn);
+    }
+
+    // The label shown on a note's button: its first key, or ⇧ plus the key an octave below
+    function chromaticLabel(pitch) {
+      const code = Object.keys(KEY_CODES).find(c => KEY_CODES[c] === pitch);
+      if (code) return KEY_LABELS[code];
+      const below = pitch.slice(0, -1) + (Number(pitch.slice(-1)) - 1);
+      const lower = Object.keys(KEY_CODES).find(c => KEY_CODES[c] === below);
+      return lower ? '⇧' + KEY_LABELS[lower] : '';
+    }
+
+    function buildNotePad() {
+      notePad.innerHTML = '';
+      notePad.className = 'note-pad ' + view;
+      keyMap = {};
+      if (view === 'first') {
+        FIRST.forEach((pitch, i) => {
+          addNoteButton(notesByPitch[pitch], FIRST_LABELS[i], 'scale-note', i * 92);
+          keyMap[FIRST_CODES[i]] = pitch;
+        });
+      } else {
+        let naturalIndex = -1;
+        notes.forEach(note => {
+          if (note.sharp) {
+            // Sits over the line between the letter below and the letter above
+            addNoteButton(note, chromaticLabel(note.pitch), 'sharp', (naturalIndex + 1) * COL - 18 - 1);
+          } else {
+            naturalIndex++;
+            addNoteButton(note, chromaticLabel(note.pitch), 'natural', naturalIndex * COL);
+          }
+        });
+        Object.assign(keyMap, KEY_CODES);
+      }
+    }
+
+    // ----- drawing the flute -----
+    // A Boehm flute with a closed G♯ and a B foot, seen the way the fingering charts show it: head
+    // joint at the left, foot at the right, the key cups along the tube, the levers the little
+    // fingers and the right hand's side keys work above it, the thumb keys (really on the back)
+    // below it. Everything is placed from real measurements: millimetres from the centre of the
+    // embouchure hole, a 20 mm tube, and tone holes spaced the way the notes are (each semitone
+    // lower is a little farther down the tube).
+    const MM = 1.5;                                   // px per mm
+    const px = d => Math.round((80 + MM * d) * 2) / 2; // d = mm from the embouchure hole
+    const AXIS = 118;              // the tube's centre line
+    const TUBE = 15;               // half its width (20 mm)
+    const CUP = 14;                // a cup's radius (18 mm)
+    const ROD = AXIS - TUBE - 8;   // the rod the keys turn on, along the top edge
+    const EDGE = '#555b62';
+
+    // Tone holes along the tube, named the way flute makers name them: by the note that sounds when
+    // the hole is the highest one open. A finger's own cup sits on one hole; links close others.
+    //   open at rest, on the front
+    const OPEN_CUPS = {
+      Cs:  { mm: 213, finger: '1' },     // C♯ hole: left 1
+      Bb:  { mm: 258.6 },                // B hole: the B♭ cup (left 2, right 1, thumb B♭ or the B♭ lever)
+      As:  { mm: 283.5, finger: '2' },   // A♯ hole: left 2
+      A:   { mm: 310, finger: '3' },     // A hole: left 3
+      G:   { mm: 372 },                  // G hole: any right-hand finger (the F♯ mechanism)
+      Fs:  { mm: 398, finger: '1' },     // F♯ hole: right 1
+      F:   { mm: 432, finger: '2' },     // F hole: right 2
+      E:   { mm: 467, finger: '3' },     // E hole: right 3
+      D:   { mm: 544 },                  // D hole, on the foot: the C♯ key
+      CsF: { mm: 586 },                  // C♯ hole: the C roller
+      CF:  { mm: 630 },                  // C hole: the B roller, or the gizmo
+    };
+    //   closed at rest; their keys open them
+    const CLOSED_CUPS = {
+      trDs: { mm: 240, r: 7.5, back: true },   // the two trill holes, on the far side near the top of the body
+      trD:  { mm: 252, r: 7.5, back: true },
+      Gs:   { mm: 338, r: 11.5, back: true },  // G♯ hole, on the far side
+      Ds:   { mm: 504 },                       // D♯ hole, the first on the foot: the E♭ key
+    };
+    const THUMB_MM = 235;   // the C hole, under the thumb on the back
+
+    // The levers and touch pieces: x and width in mm, drawn above the tube (or below for the thumb)
+    const LEVERS = {
+      Tb:   { mm: 214, w: 18, h: 16, below: true, noArm: true, cap: 'thumb B♭', finger: 'T' },   // its lever runs along the back
+      T:    { mm: 236, w: 30, h: 20, below: true, cap: 'thumb B', finger: 'T', capDy: 11 },
+      Gs:   { mm: 318, w: 16, h: 30, cap: 'G♯', finger: '4' },
+      BbL:  { mm: 383, w: 8, h: 22, cap: 'B♭ lever' },
+      trD:  { mm: 413, w: 8, h: 22, cap: 'D trill' },
+      trDs: { mm: 448, w: 8, h: 22, cap: 'D♯ trill' },
+      Eb:   { mm: 491, w: 20, h: 32, cap: 'E♭', finger: '4' },
+      Cs:   { mm: 516, w: 14, h: 24, cap: 'C♯' },
+      C:    { mm: 533, w: 8, h: 26, cap: 'C', roller: true },
+      B:    { mm: 544, w: 8, h: 26, cap: 'B', roller: true },
+      giz:  { mm: 554, w: 5.5, h: 18, cap: 'gizmo', capUp: true, capDx: 10 },
+    };
+
+    // What a fingering does to the cups, the way the mechanism links them
+    function cupStates(keys) {
+      const closed = new Set(), opened = new Set();
+      const has = k => keys.has(k);
+      if (has('L1')) closed.add('Cs');
+      if (has('L2')) { closed.add('As'); closed.add('Bb'); }
+      if (has('L3')) closed.add('A');
+      if (has('R1')) { closed.add('Fs'); closed.add('G'); closed.add('Bb'); }   // "1 and 1" B♭
+      if (has('R2')) { closed.add('F'); closed.add('G'); }
+      if (has('R3')) { closed.add('E'); closed.add('G'); }
+      if (has('Tb') || has('BbL')) closed.add('Bb');
+      if (has('Cs')) closed.add('D');
+      if (has('C')) { closed.add('D'); closed.add('CsF'); }
+      if (has('B')) { closed.add('D'); closed.add('CsF'); closed.add('CF'); }
+      if (has('giz')) closed.add('CF');
+      if (has('Gs')) opened.add('Gs');
+      if (has('Eb')) opened.add('Ds');
+      if (has('trD')) opened.add('trD');
+      if (has('trDs')) opened.add('trDs');
+      return { closed, opened, thumb: has('T') || has('Tb') };
+    }
+
+    function tubeRect(x1, x2, r, fill, rx) {
+      return `<rect fill="${fill}" x="${x1}" y="${AXIS - r}" width="${x2 - x1}" height="${2 * r}" rx="${rx || 0}" />`;
+    }
+
+    function fluteBody() {
+      const headEnd = px(165), barrelEnd = px(195), bodyEnd = px(480), footStart = px(492), footEnd = px(677);
+      const posts = [200, 222, 247, 272, 297, 322, 355, 387, 418, 452, 475, 498, 527, 568, 609, 652].map(px);
+      return `
+        <defs>
+          <linearGradient id="tube" x1="0" y1="${AXIS - TUBE}" x2="0" y2="${AXIS + TUBE}" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#cfd3d8" /><stop offset="0.18" stop-color="#ffffff" />
+            <stop offset="0.42" stop-color="#e2e5e9" /><stop offset="0.72" stop-color="#8f959c" />
+            <stop offset="0.9" stop-color="#6f757c" /><stop offset="1" stop-color="#a3a8ae" />
+          </linearGradient>
+          <linearGradient id="ring" x1="0" y1="${AXIS - TUBE - 2}" x2="0" y2="${AXIS + TUBE + 2}" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#b9bec4" /><stop offset="0.2" stop-color="#ffffff" />
+            <stop offset="0.5" stop-color="#d0d4d8" /><stop offset="0.8" stop-color="#737980" /><stop offset="1" stop-color="#8e949a" />
+          </linearGradient>
+          <linearGradient id="rod" x1="0" y1="${ROD - 3}" x2="0" y2="${ROD + 3}" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#f2f3f5" /><stop offset="0.5" stop-color="#b6bbc1" /><stop offset="1" stop-color="#6b7178" />
+          </linearGradient>
+          <radialGradient id="cup" cx="0.4" cy="0.35" r="0.72">
+            <stop offset="0" stop-color="#ffffff" /><stop offset="0.6" stop-color="#d3d7db" /><stop offset="1" stop-color="#858b92" />
+          </radialGradient>
+          <radialGradient id="dome" cx="0.42" cy="0.38" r="0.7">
+            <stop offset="0" stop-color="#ffffff" /><stop offset="0.7" stop-color="#e3e6ea" /><stop offset="1" stop-color="#a9aeb4" />
+          </radialGradient>
+          <linearGradient id="lever" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#f6f7f8" /><stop offset="0.5" stop-color="#d6dade" /><stop offset="1" stop-color="#9ea4aa" />
+          </linearGradient>
+          <linearGradient id="plate" x1="0" y1="${AXIS - 20}" x2="0" y2="${AXIS + 20}" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#d9dde1" /><stop offset="0.25" stop-color="#ffffff" />
+            <stop offset="0.6" stop-color="#c9cdd2" /><stop offset="1" stop-color="#7d838a" />
+          </linearGradient>
+        </defs>
+        <g stroke="${EDGE}" stroke-width="1.2" stroke-linejoin="round">
+          <!-- head joint: the tube tapers toward the crown; the lip plate sits on its riser -->
+          <path fill="url(#tube)" d="M44,${AXIS - 13.2} L${headEnd},${AXIS - TUBE} L${headEnd},${AXIS + TUBE} L44,${AXIS + 13.2} Z" />
+          <rect fill="url(#ring)" x="20" y="${AXIS - 16.5}" width="27" height="33" rx="6" />
+          <line x1="42" y1="${AXIS - 16}" x2="42" y2="${AXIS + 16}" stroke="rgba(0,0,0,0.35)" stroke-width="1" />
+          <path fill="url(#plate)" d="M${px(-26)},${AXIS} C${px(-26)},${AXIS - 14} ${px(-14)},${AXIS - 19.5} ${px(0)},${AXIS - 19.5}
+            C${px(14)},${AXIS - 19.5} ${px(26)},${AXIS - 14} ${px(26)},${AXIS} C${px(26)},${AXIS + 14} ${px(14)},${AXIS + 19.5} ${px(0)},${AXIS + 19.5}
+            C${px(-14)},${AXIS + 19.5} ${px(-26)},${AXIS + 14} ${px(-26)},${AXIS} Z" />
+          <ellipse fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1" cx="${px(0)}" cy="${AXIS - 2}" rx="30" ry="13" />
+          <rect fill="#1d2023" stroke="#b7bcc2" stroke-width="1.6" x="${px(0) - 9}" y="${AXIS - 8}" width="18" height="16" rx="6" />
+          <!-- the barrel: the socket the head joint slides into -->
+          ${tubeRect(headEnd - 1, barrelEnd, TUBE + 1.8, 'url(#ring)', 2.5)}
+          <line x1="${headEnd + 5}" y1="${AXIS - TUBE - 1}" x2="${headEnd + 5}" y2="${AXIS + TUBE + 1}" stroke="rgba(0,0,0,0.3)" stroke-width="1" />
+          <line x1="${barrelEnd - 5}" y1="${AXIS - TUBE - 1}" x2="${barrelEnd - 5}" y2="${AXIS + TUBE + 1}" stroke="rgba(0,0,0,0.3)" stroke-width="1" />
+          <!-- body, with its lower ring -->
+          ${tubeRect(barrelEnd, bodyEnd, TUBE, 'url(#tube)')}
+          ${tubeRect(bodyEnd - 5, bodyEnd, TUBE + 0.8, 'url(#ring)', 1.5)}
+          <!-- foot joint (B foot): its socket over the body's tenon, then the tube to the open end -->
+          ${tubeRect(bodyEnd, footStart, TUBE + 1.8, 'url(#ring)', 2.5)}
+          ${tubeRect(footStart, footEnd, TUBE, 'url(#tube)')}
+          ${tubeRect(footEnd - 7, footEnd, TUBE + 0.8, 'url(#ring)', 1.5)}
+        </g>
+        <!-- ribs along the tube, the posts on them, and the rods the keys turn on -->
+        <g stroke="${EDGE}" stroke-width="0.8">
+          <rect fill="#9aa0a6" x="${barrelEnd + 4}" y="${AXIS - TUBE - 1}" width="${bodyEnd - barrelEnd - 8}" height="3" rx="1" />
+          <rect fill="#9aa0a6" x="${footStart + 4}" y="${AXIS - TUBE - 1}" width="${footEnd - footStart - 16}" height="3" rx="1" />
+          ${posts.map(x => `<rect fill="#aeb3b9" x="${x - 2.5}" y="${ROD - 1}" width="5" height="${AXIS - TUBE - ROD + 1}" rx="1" />`).join('')}
+          <rect fill="url(#rod)" x="${barrelEnd + 6}" y="${ROD - 2.8}" width="${bodyEnd - barrelEnd - 12}" height="5.6" rx="2.8" />
+          <rect fill="url(#rod)" x="${footStart + 6}" y="${ROD - 2.8}" width="${footEnd - footStart - 20}" height="5.6" rx="2.8" />
+        </g>
+        <g font-family="Arial, Helvetica, sans-serif" font-weight="bold" text-anchor="middle" font-size="15">
+          <text x="${(px(213) + px(310)) / 2}" y="22" fill="#9900cc">Left hand</text>
+          <text x="${(px(372) + px(467)) / 2}" y="22" fill="#009900">Right hand</text>
+        </g>`;
+    }
+
+    // The arm from the rod down to a cup
+    function armMarkup(x, cy, r) {
+      return `<rect fill="#aeb3b9" stroke="${EDGE}" stroke-width="0.7" x="${x - 2}" y="${ROD}" width="4" height="${cy - r - ROD + 3}" rx="1.5" />`;
+    }
+
+    // A cup on its hole (silver, or the note's colour while a finger holds it there), or lifted off it
+    function cupMarkup(c, isClosed, paint, label) {
+      const x = px(c.mm), r = c.r || CUP;
+      const y = c.back ? AXIS - TUBE - 2 : AXIS;    // far-side cups show above the tube
+      let out = '';
+      if (isClosed) {
+        out += `<circle cx="${x}" cy="${y + 1.5}" r="${r}" fill="rgba(0,0,0,0.25)" />`;   // its shadow on the tube
+        out += `<circle cx="${x}" cy="${y}" r="${r}" fill="${paint ? paint.fill : 'url(#cup)'}" stroke="${paint ? paint.edge : EDGE}" stroke-width="${paint ? 2 : 1.2}" />`;
+        out += paint
+          ? `<circle cx="${x}" cy="${y}" r="${r * 0.68}" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="1" />`
+          : `<circle cx="${x}" cy="${y}" r="${r * 0.68}" fill="url(#dome)" stroke="rgba(0,0,0,0.16)" stroke-width="0.8" />
+             <ellipse cx="${x - r * 0.28}" cy="${y - r * 0.3}" rx="${r * 0.24}" ry="${r * 0.13}" fill="#ffffff" opacity="0.8" />`;
+        if (label) out += `<text x="${x}" y="${y + r * 0.38}" font-family="Arial, Helvetica, sans-serif" font-weight="bold"
+          font-size="${r * 1.05}" text-anchor="middle" fill="${paint ? paint.text : '#6b7280'}">${label}</text>`;
+      } else {
+        // lifted off its hole, swinging up on the rod: the hole shows under its lower edge
+        out += `<circle cx="${x}" cy="${y}" r="${r * 0.8}" fill="#2b2e33" stroke="#9aa0a6" stroke-width="1.2" />`;
+        out += `<ellipse cx="${x}" cy="${y - 5}" rx="${r}" ry="${r * 0.84}" fill="url(#cup)" stroke="${EDGE}" stroke-width="1.2" />
+          <ellipse cx="${x}" cy="${y - 5.5}" rx="${r * 0.68}" ry="${r * 0.56}" fill="url(#dome)" stroke="rgba(0,0,0,0.16)" stroke-width="0.8" />
+          <ellipse cx="${x - r * 0.28}" cy="${y - 5 - r * 0.3}" rx="${r * 0.24}" ry="${r * 0.11}" fill="#ffffff" opacity="0.8" />`;
+      }
+      return out;
+    }
+
+    function leverMarkup(l, pressed, paint) {
+      const w = l.w * MM, h = l.h, x = px(l.mm) - w / 2;
+      const y = l.below ? AXIS + TUBE + 21 : ROD - 3 - h;
+      const fill = pressed ? paint.fill : 'url(#lever)';
+      const edge = pressed ? paint.edge : EDGE;
+      let out = '';
+      if (l.below && !l.noArm) {
+        // the arm from under the tube to the touch piece
+        out += `<rect fill="#aeb3b9" stroke="${EDGE}" stroke-width="0.7" x="${x + w / 2 - 2}" y="${AXIS + TUBE - 2}" width="4" height="${y - AXIS - TUBE + 4}" rx="1.5" />`;
+      } else if (!l.below && !l.roller) {
+        out += `<rect fill="#aeb3b9" stroke="${EDGE}" stroke-width="0.7" x="${x + w / 2 - 2}" y="${y + h - 2}" width="4" height="${ROD - y - h + 4}" rx="1.5" />`;
+      }
+      out += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${l.roller ? w / 2 : Math.min(w, h) * 0.38}" fill="${fill}" stroke="${edge}" stroke-width="${pressed ? 2 : 1.1}" />`;
+      if (l.roller) {
+        out += [0.25, 0.42, 0.58, 0.75].map(t => `<line x1="${x + 1.5}" y1="${y + h * t}" x2="${x + w - 1.5}" y2="${y + h * t}" stroke="rgba(0,0,0,0.3)" stroke-width="0.9" />`).join('');
+      } else if (!pressed) {
+        out += `<rect x="${x + 2}" y="${y + 2}" width="${Math.max(2, w * 0.3)}" height="${h - 4}" rx="1.5" fill="#ffffff" opacity="0.55" />`;
+      }
+      const capY = (l.below ? y + h + 12 : (l.capUp ? y - 16 : y - 5)) + (l.capDy || 0);
+      out += `<text x="${x + w / 2 + (l.capDx || 0)}" y="${capY}" font-family="Arial, Helvetica, sans-serif" font-size="9" text-anchor="middle" fill="#6b7280">${l.cap}</text>`;
+      if (pressed && l.finger) {
+        out += `<text x="${x + w / 2}" y="${y + h / 2 + 4.5}" font-family="Arial, Helvetica, sans-serif" font-weight="bold"
+          font-size="12" text-anchor="middle" fill="${paint.text}">${l.finger}</text>`;
+      }
+      return out;
+    }
+
+    function drawFlute(note, keys) {
+      const svg = document.getElementById('flute');
+      keys = keys || new Set();
+      const { closed, opened, thumb } = cupStates(keys);
+      let out = '';
+      // The note's colour on every key that is down for it
+      let paint = null;
+      if (note) {
+        const mid = noteMid(note);
+        paint = { fill: note.color, edge: darken(mid, 0.62), text: textColorOn(mid) };
+        if (note.sharp) {
+          // One blend along the flute: the lower letter's colour toward the head, the upper's toward the foot
+          out += `<defs><linearGradient id="noteFill" gradientUnits="userSpaceOnUse" x1="${px(200)}" y1="0" x2="${px(640)}" y2="0">
+            <stop offset="0" stop-color="${note.color}" /><stop offset="1" stop-color="${note.upperColor}" /></linearGradient></defs>`;
+          paint.fill = 'url(#noteFill)';
+        }
+      }
+      // The thumb's cup is on the back: only its lower edge shows under the tube
+      out += `<circle cx="${px(THUMB_MM)}" cy="${AXIS + 7}" r="${CUP}" fill="${thumb && paint ? paint.fill : '#8d939a'}" stroke="${thumb && paint ? paint.edge : EDGE}" stroke-width="1.2" />`;
+      out += fluteBody();
+      // Arms, then the cups along the tube
+      Object.values(OPEN_CUPS).forEach(c => { out += armMarkup(px(c.mm), AXIS, CUP); });
+      out += armMarkup(px(CLOSED_CUPS.Ds.mm), AXIS, CUP);
+      Object.entries(CLOSED_CUPS).forEach(([id, c]) => {
+        out += cupMarkup(c, !opened.has(id), null, '');
+      });
+      Object.entries(OPEN_CUPS).forEach(([id, c]) => {
+        const down = closed.has(id);
+        out += cupMarkup(c, down, down ? paint : null, c.finger || '');
+      });
+      // Finger numbers under the cups the fingers press
+      out += '<g font-family="Arial, Helvetica, sans-serif" font-size="10" text-anchor="middle" fill="#6b7280">';
+      Object.values(OPEN_CUPS).filter(c => c.finger).forEach(c => {
+        out += `<text x="${px(c.mm)}" y="${AXIS + TUBE + 14}">${c.finger}</text>`;
+      });
+      out += '</g>';
+      // Levers and touch pieces
+      Object.entries(LEVERS).forEach(([id, l]) => {
+        out += leverMarkup(l, keys.has(id), paint);
+      });
+      svg.innerHTML = out;
+      svg.setAttribute('aria-label', note ? `Fingering for ${note.name}` : 'Flute');
+    }
+
+    // ----- drawing the staff -----
+    // Leland music glyphs (SIL Open Font Licence), 360 units to a staff space
+    const GLYPHS = {
+      gClef: 'M 809 30 C 809 132 768 238 665 279 C 635 107 596 -122 586 -186 C 716 -186 809 -98 809 30 Z M 605 297 C 576 302 549 305 521 305 C 315 305 140 161 140 -56 C 140 -232 264 -389 390 -498 C 415 -520 438 -540 459 -562 C 472 -484 482 -416 492 -357 C 361 -318 272 -180 272 -45 C 272 56 351 194 467 194 C 478 194 491 189 491 176 C 491 163 477 156 459 144 C 403 109 372 72 372 1 C 372 -86 436 -157 521 -177 Z M 478 -1184 C 491 -1241 557 -1392 632 -1392 C 654 -1392 688 -1322 688 -1223 C 688 -1073 577 -960 478 -863 C 469 -920 462 -976 462 -1037 C 462 -1090 467 -1139 478 -1184 Z M 176 739 C 176 834 249 959 444 959 C 511 959 570 942 622 910 C 700 855 720 760 720 670 C 720 613 711 549 697 467 C 693 438 684 395 675 338 C 816 292 922 145 922 -3 C 922 -220 768 -367 557 -367 C 543 -454 528 -539 516 -619 C 668 -779 773 -959 773 -1188 C 773 -1319 733 -1426 710 -1477 C 675 -1551 634 -1601 608 -1601 C 598 -1601 553 -1584 505 -1528 C 413 -1418 387 -1234 387 -1113 C 387 -1035 395 -965 419 -804 C 418 -802 343 -726 312 -701 C 181 -579 0 -405 0 -117 C 0 153 235 364 503 364 C 544 364 583 360 616 354 C 644 492 660 593 660 670 C 660 819 583 899 438 899 C 403 899 373 891 370 891 C 369 890 366 888 366 887 C 366 884 369 883 373 881 C 441 871 508 814 508 721 C 508 644 449 562 341 562 C 240 562 176 644 176 739 Z',
+      noteheadBlack: 'M 0 60 C 0 122 45 192 161 192 C 311 192 468 69 468 -58 C 468 -143 396 -190 307 -190 C 167 -190 0 -72 0 60 Z',
+      sharp: 'M 336 -151 C 344 -153 351 -163 351 -171 L 351 -256 C 351 -268 343 -276 331 -276 C 330 -276 330 -276 328 -276 L 281 -266 L 281 -481 L 240 -481 L 240 -258 L 112 -232 L 112 -435 L 72 -435 L 72 -223 L 16 -212 C 7 -210 0 -200 0 -192 L 0 -189 L 0 -105 L 0 -108 C 0 -96 9 -88 20 -88 C 22 -88 23 -88 24 -88 L 72 -98 L 72 140 L 16 151 C 7 153 0 163 0 171 L 0 255 C 0 266 9 275 20 275 C 22 275 23 275 24 275 L 72 265 L 72 480 L 112 480 L 112 256 L 240 230 L 240 433 L 281 433 L 281 222 L 336 212 C 344 210 351 200 351 192 L 351 107 C 351 95 343 86 331 86 C 330 86 330 86 328 86 L 281 96 L 281 -141 Z M 112 -107 L 240 -132 L 240 105 L 112 132 Z',
+      flat: 'M 289 -114 C 281 -170 246 -223 173 -223 C 101 -223 59 -179 52 -170 L 58 -632 C 58 -644 49 -652 37 -652 L 20 -652 C 9 -652 0 -644 0 -632 L 7 233 C 7 245 16 253 27 253 C 30 253 36 252 39 251 C 45 248 138 202 216 114 C 271 52 292 -19 292 -78 C 292 -91 291 -102 289 -114 Z M 190 -58 C 190 -36 184 30 148 85 C 124 122 75 161 48 183 L 52 -98 C 55 -111 76 -153 134 -153 C 186 -153 190 -104 190 -73 C 190 -66 190 -62 190 -58 Z',
+    };
+    const SS = 12;                       // one staff space
+    const GS = SS / 360;                 // glyph units -> px
+    const STAFF_LEFT = 300, STAFF_RIGHT = 800;
+    const BOTTOM_LINE = 132;             // E4's line
+    const yOfStep = step => BOTTOM_LINE - (step - 2) * (SS / 2);   // step: C4 = 0, D4 = 1 ...
+
+    function drawStaff(note) {
+      const svg = document.getElementById('staff');
+      let out = '<g stroke="#1f2937" stroke-width="1.1">';
+      for (let i = 0; i < 5; i++) {
+        const y = BOTTOM_LINE - i * SS;
+        out += `<line x1="${STAFF_LEFT}" y1="${y}" x2="${STAFF_RIGHT}" y2="${y}" />`;
+      }
+      out += `<line x1="${STAFF_LEFT}" y1="${BOTTOM_LINE - 4 * SS}" x2="${STAFF_LEFT}" y2="${BOTTOM_LINE}" stroke-width="1.4" />`;
+      out += `<line x1="${STAFF_RIGHT}" y1="${BOTTOM_LINE - 4 * SS}" x2="${STAFF_RIGHT}" y2="${BOTTOM_LINE}" stroke-width="1.4" />`;
+      out += '</g>';
+      out += `<path fill="#1f2937" transform="translate(${STAFF_LEFT + 12} ${yOfStep(4)}) scale(${GS})" d="${GLYPHS.gClef}" />`;
+      if (note) {
+        const x = (STAFF_LEFT + STAFF_RIGHT) / 2 + 20, y = yOfStep(note.step);
+        const headW = 468 * GS;
+        // Ledger lines, out from the staff as far as the note
+        out += '<g stroke="#1f2937" stroke-width="1.1">';
+        for (let s = 12; s <= note.step; s += 2) out += `<line x1="${x - headW / 2 - 6}" y1="${yOfStep(s)}" x2="${x + headW / 2 + 6}" y2="${yOfStep(s)}" />`;
+        for (let s = 0; s >= note.step; s -= 2) out += `<line x1="${x - headW / 2 - 6}" y1="${yOfStep(s)}" x2="${x + headW / 2 + 6}" y2="${yOfStep(s)}" />`;
+        out += '</g>';
+        const mid = noteMid(note);
+        const fill = note.sharp
+          ? `url(#staffFill)` : note.color;
+        if (note.sharp) {
+          out += `<defs><linearGradient id="staffFill" gradientUnits="userSpaceOnUse" x1="${x - headW / 2}" y1="0" x2="${x + headW / 2}" y2="0">
+            <stop offset="0" stop-color="${note.color}" /><stop offset="1" stop-color="${note.upperColor}" /></linearGradient></defs>`;
+        }
+        // Stem up below the middle line, down from it
+        const stemUp = note.step < 6;
+        const stemX = stemUp ? x + headW / 2 - 0.8 : x - headW / 2 + 0.8;
+        out += `<line x1="${stemX}" y1="${y}" x2="${stemX}" y2="${stemUp ? y - 3.5 * SS : y + 3.5 * SS}" stroke="#1f2937" stroke-width="1.5" />`;
+        out += `<path fill="${fill}" stroke="${darken(mid, 0.62)}" stroke-width="${1 / GS * 0.9}" transform="translate(${x - headW / 2} ${y}) scale(${GS})" d="${GLYPHS.noteheadBlack}" />`;
+        if (note.accidental) {
+          const g = note.accidental === '♯' ? 'sharp' : 'flat';
+          const w = (g === 'sharp' ? 351 : 292) * GS;
+          out += `<path fill="#1f2937" transform="translate(${x - headW / 2 - w - 5} ${y}) scale(${GS})" d="${GLYPHS[g]}" />`;
+        }
+        // The note's name beside it
+        const label = note.sharp ? `${note.name}  ·  ${note.otherName}` : note.name;
+        const bw = note.sharp ? 86 : 40;
+        out += `<rect x="${x + 36}" y="${y - 13}" width="${bw}" height="26" rx="7" fill="${fill}" stroke="${darken(mid, 0.62)}" stroke-width="1.5" />
+          <text x="${x + 36 + bw / 2}" y="${y + 6}" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="16"
+          text-anchor="middle" fill="${textColorOn(mid)}">${label}</text>`;
+      }
+      svg.innerHTML = out;
+    }
+
+    // ----- what's shown under the notes -----
+    const tipArea = document.getElementById('tipArea');
+
+    function showTips(note) {
+      if (!note) {
+        tipArea.innerHTML = '<span class="hint">Press a note to see how to play it. Hold Shift to play the computer keys an octave higher.</span>';
+        return;
+      }
+      const which = chosenFingering[note.pitch] || 0;
+      const keys = note.fingerings[which];
+      const tips = [];
+      if (keys.has('Tb')) tips.push('<b>Thumb B♭:</b> the thumb slides up onto the B♭ lever. Use it when the music has no B naturals.');
+      if (keys.has('BbL')) tips.push('<b>B♭ lever:</b> the right index finger presses the side lever above its key.');
+      if (keys.has('R1') && keys.has('L1') && !keys.has('L2') && note.pitch.startsWith('A#')) tips.push('<b>1 and 1:</b> the first finger of each hand.');
+      if (keys.has('trD')) tips.push('<b>D trill key:</b> the right middle finger presses the small key between its key and the first.');
+      if (keys.has('trDs')) tips.push('<b>D♯ trill key:</b> the right ring finger presses the small key between its key and the middle finger\'s.');
+      if (keys.has('giz')) tips.push('<b>Gizmo:</b> the right little finger closes just the low B cup (B foot only). On a C foot, leave it out.');
+      if (keys.has('C') || keys.has('B') || keys.has('Cs')) tips.push('<b>Right little finger</b> on the foot keys, and <b>off</b> the E♭ key.');
+      if (/^D[45]$/.test(note.pitch)) tips.push('The E♭ key stays <b>up</b> for D.');
+      let html = tips.map(t => `<div>${t}</div>`).join('');
+      if (note.fingerings.length > 1) {
+        html += `<button type="button" class="alt-btn" id="altBtn">⇄ Other fingering (${which + 1} of ${note.fingerings.length})</button>`;
+      }
+      tipArea.innerHTML = html;
+    }
+
+    tipArea.addEventListener('click', e => {
+      if (!e.target.closest('#altBtn') || !shownNote) return;
+      const count = shownNote.fingerings.length;
+      chosenFingering[shownNote.pitch] = ((chosenFingering[shownNote.pitch] || 0) + 1) % count;
+      showNote(shownNote);
+    });
+
+    function showNote(note) {
+      shownNote = note;
+      drawFlute(note, note ? note.fingerings[chosenFingering[note.pitch] || 0] : null);
+      drawStaff(note);
+      showTips(note);
+      document.querySelectorAll('.note-btn.selected').forEach(b => b.classList.remove('selected'));
+      if (note) buttonFor(note.pitch)?.classList.add('selected');
+    }
+
+    function buttonFor(pitch) {
+      return notePad.querySelector(`.note-btn[data-pitch='${pitch}']`);
+    }
+
+    // ----- sound -----
+    // flute-synth.js: the Virtual Recorder's synth (a physical model of an air jet and a pipe)
+    // with a flute added: low B to top C, sounding as written.
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+    const SOUND_DEFAULTS = Object.assign({}, window.RecorderSynth ? RecorderSynth.DEFAULTS : {}, {
+      engine: 'waveguide',
+      timbre: 'silver',
+      size: 'flute',
+      writtenPitch: false,
+      mono: true,          // one note at a time; going from one note to the next slurs
+      breath: 0.7,
+      noise: 0.45,         // a flute is airier than a recorder
+      vibrato: 0.4,
+      vibratoDelay: 0.3,
+      glide: 0.04,
+    });
+
+    const pct = v => Math.round(v * 100) + '%';
+    const ms = v => Math.round(v * 1000) + ' ms';
+    const SOUND_CHOICES = [
+      { key: 'engine', label: 'Sound model', options: [
+        ['waveguide', 'Waveguide', 'A physical model of the air and the tube. The most natural.'],
+        ['spectral', 'Spectral', "Built from a flute's overtones."],
+        ['fm', 'FM', 'A bright, simple electronic sound.'],
+      ] },
+      { key: 'timbre', label: 'Flute', options: [
+        ['silver', 'Silver', 'Clear and bright, like a silver flute.'],
+        ['woodflute', 'Wooden', 'Darker and softer, like a wooden flute.'],
+      ] },
+      { key: 'mono', label: 'One note at a time', options: [
+        [true, 'On', 'Like a real flute. Going from one held key to the next slurs.'],
+        [false, 'Off', 'Hold several keys to play several notes at once.'],
+      ] },
+    ];
+    const SOUND_SLIDERS = [
+      { group: 'Breath and tone' },
+      { key: 'volume', label: 'Volume', min: 0, max: 1.5, step: 0.05, show: pct },
+      { key: 'breath', label: 'Breath', min: 0.1, max: 1, step: 0.01, show: pct, ends: ['Gentle', 'Strong'],
+        hint: 'Like a real flute: gentle is softer and a little flat, strong is louder, brighter and a little sharp.' },
+      { key: 'attack', label: 'Tonguing', min: 0.005, max: 0.12, step: 0.005, show: ms, ends: ['"Tu" (crisp)', '"Du" (soft)'] },
+      { key: 'chiff', label: 'Chiff', min: 0, max: 1, step: 0.01, show: pct,
+        hint: 'The little puff of air at the start of each note.' },
+      { key: 'noise', label: 'Breath noise', min: 0, max: 1, step: 0.01, show: pct,
+        hint: 'Air you can hear along with the tone.' },
+      { group: 'Vibrato' },
+      { key: 'vibrato', label: 'Vibrato', min: 0, max: 1, step: 0.01, show: pct, ends: ['None', 'Lots'] },
+      { key: 'vibratoRate', label: 'Vibrato speed', min: 2, max: 9, step: 0.1, show: v => v.toFixed(1) + ' per second' },
+      { key: 'vibratoDelay', label: 'Vibrato starts after', min: 0, max: 1, step: 0.05, show: v => v.toFixed(2) + ' s' },
+      { group: 'Room and feel' },
+      { key: 'reverb', label: 'Room', min: 0, max: 1, step: 0.01, show: pct, ends: ['Dry', 'Big room'] },
+      { key: 'drift', label: 'Wobble', min: 0, max: 1, step: 0.01, show: pct,
+        hint: 'Slow, tiny changes in pitch, like a real player.' },
+      { key: 'release', label: 'Note ending', min: 0.02, max: 0.5, step: 0.01, show: ms, ends: ['Short', 'Long'] },
+      { key: 'glide', label: 'Slur speed', min: 0.005, max: 0.2, step: 0.005, show: ms, onlyIf: s => s.mono,
+        hint: 'How quickly one note slides into the next. Needs "One note at a time".' },
+      { key: 'pitchFollow', label: 'Pitch follows breath', min: 0, max: 1, step: 0.01, show: pct,
+        onlyIf: s => s.engine !== 'waveguide', hint: 'Stronger breath bends the pitch up. The Waveguide does this by itself.' },
+    ];
+
+    // Saved values are only used when they are still one of the choices or inside a slider's range
+    const soundSettings = Object.assign({}, SOUND_DEFAULTS);
+    const savedSound = Object.assign({}, saved.sound);
+    SOUND_CHOICES.forEach(c => {
+      if (c.options.some(o => o[0] === savedSound[c.key])) soundSettings[c.key] = savedSound[c.key];
+    });
+    SOUND_SLIDERS.forEach(s => {
+      const v = savedSound[s.key];
+      if (s.key && typeof v === 'number' && v >= s.min && v <= s.max) soundSettings[s.key] = v;
+    });
+
+    let synth = null;
+    const synthReady = window.RecorderSynth
+      ? RecorderSynth.create(audioCtx, soundSettings).then(s => { s.connect(audioCtx.destination); synth = s; })
+      : new Promise(() => console.warn('[Virtual Flute] flute-synth.js is missing, so there is no sound'));
+    const heldNotes = new Map();   // pitch -> the note number the synth was given for it
+
+    // 'C#4' -> 61
+    function pitchToMidi(pitch) {
+      const semitones = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+      const [, letter, sharp, octave] = pitch.match(/^([A-G])(#?)(\d)$/);
+      return (Number(octave) + 1) * 12 + semitones[letter] + (sharp ? 1 : 0);
+    }
+
+    // How sharp each sound plays at the default breath, in cents, measured at B3 F4 B4 F5 B5 F6 C7
+    // with vibrato and wobble off. Each note is sent that much lower.
+    const TUNING_AT = [59, 65, 71, 77, 83, 89, 96];
+    const TUNING = {
+      'waveguide/silver':    [3, 2, 1.5, 1, 1.5, 3, 5.5],
+      'waveguide/woodflute': [5.5, 4, 3.5, 3.5, 4.5, 6, 12],
+    };
+    const OTHER_MODELS_SHARP = 2;   // Spectral and FM: 2 cents everywhere
+
+    function synthNote(pitch) {
+      const midi = pitchToMidi(pitch);
+      const row = TUNING[`${soundSettings.engine}/${soundSettings.timbre}`];
+      let sharp = OTHER_MODELS_SHARP;
+      if (row) {
+        let i = TUNING_AT.findIndex((m, k) => k + 1 < TUNING_AT.length && midi <= TUNING_AT[k + 1]);
+        if (i < 0) i = TUNING_AT.length - 2;
+        const t = Math.min(1, Math.max(0, (midi - TUNING_AT[i]) / (TUNING_AT[i + 1] - TUNING_AT[i])));
+        sharp = row[i] + (row[i + 1] - row[i]) * t;
+      }
+      return midi - sharp / 100;
+    }
+
+    function startNote(pitch) {
+      if (heldNotes.has(pitch)) return;
+      const n = synthNote(pitch);
+      heldNotes.set(pitch, n);
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      synthReady.then(() => synth.noteOn(n));
+    }
+
+    function stopNote(pitch) {
+      if (!heldNotes.has(pitch)) return;
+      const n = heldNotes.get(pitch);
+      heldNotes.delete(pitch);
+      synthReady.then(() => synth.noteOff(n));
+    }
+
+    function press(note) {
+      startNote(note.pitch);
+      showNote(note);
+      buttonFor(note.pitch)?.classList.add('active');
+    }
+
+    function release(note) {
+      stopNote(note.pitch);
+      buttonFor(note.pitch)?.classList.remove('active');
+    }
+
+    // ----- keys -----
+    const codesDown = {};   // e.code -> the pitch it started, so Shift can change mid-hold without stranding a note
+
+    function pitchForCode(code, shift) {
+      let pitch = keyMap[code];
+      if (!pitch) return null;
+      if (shift && view === 'chromatic') {
+        const up = pitch.slice(0, -1) + (Number(pitch.slice(-1)) + 1);
+        if (notesByPitch[up]) pitch = up;
+      }
+      return pitch;
+    }
+
+    window.addEventListener('keydown', e => {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'Escape') return closeSettings();
+      if (e.target.closest && e.target.closest('input, textarea')) return;
+      const pitch = pitchForCode(e.code, e.shiftKey);
+      if (!pitch) return;
+      e.preventDefault();
+      codesDown[e.code] = pitch;
+      press(notesByPitch[pitch]);
+    });
+
+    window.addEventListener('keyup', e => {
+      const pitch = codesDown[e.code];
+      if (!pitch) return;
+      delete codesDown[e.code];
+      release(notesByPitch[pitch]);
+    });
+
+    function releaseAll() {
+      Object.keys(codesDown).forEach(c => delete codesDown[c]);
+      notes.forEach(release);
+    }
+
+    // Let go of every note if the page loses focus mid-note
+    window.addEventListener('blur', releaseAll);
+
+    // Clicking anywhere else puts the flute back to rest (and closes the settings)
+    document.body.addEventListener('pointerdown', e => {
+      if (e.target.closest('.settings-panel, #app-header')) return;
+      if (!e.target.closest('.note-btn')) closeSettings();
+      if (!e.target.closest('.note-btn, .alt-btn')) showNote(null);
+    });
+
+    // ----- the settings panel -----
+    const settingsPanel = document.getElementById('settingsPanel');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const soundControls = document.getElementById('soundControls');
+
+    function openSettings() {
+      settingsPanel.classList.add('open');
+      settingsBtn.setAttribute('aria-expanded', 'true');
+    }
+    function closeSettings() {
+      settingsPanel.classList.remove('open');
+      settingsBtn.setAttribute('aria-expanded', 'false');
+    }
+    settingsBtn.addEventListener('click', () =>
+      settingsPanel.classList.contains('open') ? closeSettings() : openSettings());
+    document.getElementById('settingsClose').addEventListener('click', closeSettings);
+
+    function setView(v) {
+      if (v === view) return;
+      releaseAll();
+      view = v;
+      saveSettings();
+      buildNotePad();
+      showNote(shownNote && buttonFor(shownNote.pitch) ? shownNote : null);
+      refreshViewChoice();
+      updateScale();
+    }
+    function refreshViewChoice() {
+      settingsPanel.querySelectorAll('[data-view]').forEach(b =>
+        b.setAttribute('aria-checked', String(b.dataset.view === view)));
+    }
+    settingsPanel.querySelectorAll('[data-view]').forEach(b =>
+      b.addEventListener('click', () => setView(b.dataset.view)));
+
+    function setSound(key, value) {
+      soundSettings[key] = value;
+      saveSettings();
+      if (synth) synth.set(key, value);   // takes effect on the next note (volume and room right away)
+      refreshSoundControls();
+    }
+
+    function buildSoundControls() {
+      let html = '';
+      SOUND_CHOICES.forEach(c => {
+        html += `<div class="sp-row" data-row="${c.key}"><div class="sp-label">${c.label}</div>
+          <div class="seg" role="radiogroup" aria-label="${c.label}">` +
+          c.options.map(([value, label], i) =>
+            `<button type="button" role="radio" data-choice="${c.key}" data-index="${i}">${label}</button>`).join('') +
+          `</div><div class="sp-hint" data-hint="${c.key}"></div></div>`;
+      });
+      SOUND_SLIDERS.forEach(s => {
+        if (s.group) { html += `<div class="sp-group">${s.group}</div>`; return; }
+        html += `<div class="sp-row" data-row="${s.key}">
+          <label class="sp-label" for="sl-${s.key}">${s.label}<span class="sp-value" data-value="${s.key}"></span></label>
+          <input type="range" id="sl-${s.key}" data-slider="${s.key}" min="${s.min}" max="${s.max}" step="${s.step}">` +
+          (s.ends ? `<div class="sp-ends"><span>${s.ends[0]}</span><span>${s.ends[1]}</span></div>` : '') +
+          (s.hint ? `<div class="sp-hint">${s.hint}</div>` : '') + '</div>';
+      });
+      soundControls.innerHTML = html;
+
+      soundControls.querySelectorAll('[data-choice]').forEach(b => b.addEventListener('click', () => {
+        const c = SOUND_CHOICES.find(c => c.key === b.dataset.choice);
+        setSound(c.key, c.options[b.dataset.index][0]);
+      }));
+      soundControls.querySelectorAll('[data-slider]').forEach(input => input.addEventListener('input', () =>
+        setSound(input.dataset.slider, Number(input.value))));
+    }
+
+    function refreshSoundControls() {
+      SOUND_CHOICES.forEach(c => {
+        const current = c.options.find(o => o[0] === soundSettings[c.key]);
+        soundControls.querySelectorAll(`[data-choice="${c.key}"]`).forEach(b =>
+          b.setAttribute('aria-checked', String(c.options[b.dataset.index] === current)));
+        soundControls.querySelector(`[data-hint="${c.key}"]`).textContent = current ? current[2] : '';
+      });
+      SOUND_SLIDERS.forEach(s => {
+        if (s.group) return;
+        const v = soundSettings[s.key];
+        soundControls.querySelector(`[data-slider="${s.key}"]`).value = v;
+        soundControls.querySelector(`[data-value="${s.key}"]`).textContent = s.show(v);
+        soundControls.querySelector(`[data-row="${s.key}"]`).classList.toggle('off', !!s.onlyIf && !s.onlyIf(soundSettings));
+      });
+    }
+
+    document.getElementById('resetSoundBtn').addEventListener('click', () => {
+      Object.assign(soundSettings, SOUND_DEFAULTS);
+      saveSettings();
+      if (synth) Object.keys(SOUND_DEFAULTS).forEach(k => synth.set(k, SOUND_DEFAULTS[k]));
+      refreshSoundControls();
+    });
+
+    // A short tune to hear the settings: Hot Cross Buns in B♭, in beats
+    const TEST_TUNE = [
+      ['D5', 1], ['C5', 1], ['A#4', 2], ['D5', 1], ['C5', 1], ['A#4', 2],
+      ['A#4', 0.5], ['A#4', 0.5], ['A#4', 0.5], ['A#4', 0.5], ['C5', 0.5], ['C5', 0.5], ['C5', 0.5], ['C5', 0.5],
+      ['D5', 1], ['C5', 1], ['A#4', 2],
+    ];
+    const BEAT = 0.42;   // seconds
+    const tuneBtn = document.getElementById('tuneBtn');
+    const tuneLabel = tuneBtn.textContent;
+    let tuneTimers = [];
+
+    function stopTune() {
+      tuneTimers.forEach(clearTimeout);
+      tuneTimers = [];
+      releaseAll();
+      tuneBtn.textContent = tuneLabel;
+    }
+    function playTune() {
+      stopTune();
+      tuneBtn.textContent = '■ Stop';
+      let at = 0;
+      TEST_TUNE.forEach(([pitch, beats]) => {
+        const note = notesByPitch[pitch];
+        const start = at * BEAT * 1000, end = (at + beats * 0.85) * BEAT * 1000;   // a little gap to re-tongue
+        tuneTimers.push(setTimeout(() => press(note), start), setTimeout(() => release(note), end));
+        at += beats;
+      });
+      tuneTimers.push(setTimeout(stopTune, at * BEAT * 1000 + 100));
+    }
+    tuneBtn.addEventListener('click', () => tuneTimers.length ? stopTune() : playTune());
+
+    buildSoundControls();
+    refreshSoundControls();
+    refreshViewChoice();
+    buildNotePad();
+    showNote(null);
+
+    // Responsive scaling: shrink (or grow) the whole app proportionally to fit the window
+    function updateScale() {
+      const outer = document.getElementById('scaling-outer');
+      const wrapper = document.getElementById('scaling-wrapper');
+      const header = document.getElementById('app-header');
+      const container = document.querySelector('.app-center-container');
+      const headerHeight = header ? header.offsetHeight : 0;
+      if (container) container.style.paddingTop = headerHeight + 'px';
+      document.getElementById('settingsPanel').style.top = headerHeight + 'px';
+
+      const designHeight = wrapper.offsetHeight || 540;
+      const designWidth = wrapper.offsetWidth || 1100;
+      const availableHeight = window.innerHeight - headerHeight - 16;
+      const availableWidth = window.innerWidth - 16;
+      const scale = Math.min(availableHeight / designHeight, availableWidth / designWidth);
+      outer.style.transform = `scale(${Math.max(0.1, scale)})`;
+    }
+    window.addEventListener('resize', updateScale);
+    window.addEventListener('load', updateScale);
+    updateScale();
+  </script>
+</body>
+</html>
