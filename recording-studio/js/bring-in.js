@@ -6,11 +6,12 @@
    screen, in a guest mode that cannot write its storage (README.md,
    "Bringing songs in"):
      Ostinato Builder 2.0   ?embed=music-stand   window.MusicStandBridge
-     Song Writer 3.0        ?embed=studio        window.SongWriterStudio
+     Song Writer 3.5        ?embed=studio        window.SongWriterStudio
    The music is copied (D6): the track keeps where it came from, not a link.
 
    An ostinato becomes one track of hits, repeated; a song becomes a melody
-   track and a chords track. Beats are the app's own beats — a 6/8 ostinato
+   track and a chords track — a song in PARTS (Song Writer 3.5, up to four
+   lines of music) a track for each part, with its own sound and volume. Beats are the app's own beats — a 6/8 ostinato
    counts dotted quarters, as the studio does in 6/8.
    ========================================================================== */
 (() => {
@@ -22,7 +23,7 @@
       blurb: 'An ostinato’s rhythms, on its own percussion — a loop: drag its end out for as many bars as you like.'
     },
     song: {
-      name: 'Song Writer', url: '../Song%20Writer%203.0/index.html?embed=studio', bridge: 'SongWriterStudio',
+      name: 'Song Writer', url: '../Song%20Writer%203.5/index.html?embed=studio', bridge: 'SongWriterStudio',
       blurb: 'A song’s melody and its chords, each on a track of its own.'
     }
   };
@@ -184,6 +185,9 @@
     const passBars = barsOfPass();
     const choosePart = key === 'ostinato' && m.parts && m.parts.length > 1;
     const hasMelody = key === 'song' && m.melody && m.melody.length > 0;
+    /* Song Writer 3.5's PARTS: each part on a track of its own. One part —
+       or a Song Writer that sends none — comes in as the melody, as before. */
+    const songParts = key === 'song' && Array.isArray(m.parts) && m.parts.length > 1 ? m.parts : null;
     const hasChords = key === 'song' && m.chords && m.chords.length > 0;
     title.textContent = m.title || 'Untitled';
     body.innerHTML = `
@@ -199,7 +203,10 @@
         </div>
         ${key === 'song' ? `
           <div class="opt-checks">
-            <label class="check"><input type="checkbox" id="bi-melody" ${hasMelody ? 'checked' : 'disabled'}><span>The melody, on a track${hasMelody ? '' : ' (this song has none)'}</span></label>
+            ${songParts ? songParts.map((p, i) => {
+              const has = p.notes && p.notes.length > 0;
+              return `<label class="check"><input type="checkbox" class="bi-part" data-part="${i}" ${has ? 'checked' : 'disabled'}><span>${esc(p.name || 'Part ' + (i + 1))}, on a track${has ? '' : ' (it has no notes)'}</span></label>`;
+            }).join('') : `<label class="check"><input type="checkbox" id="bi-melody" ${hasMelody ? 'checked' : 'disabled'}><span>The melody, on a track${hasMelody ? '' : ' (this song has none)'}</span></label>`}
             <label class="check"><input type="checkbox" id="bi-chords" ${hasChords ? 'checked' : 'disabled'}><span>The chords, on a track${hasChords ? '' : ' (this song has none)'}</span></label>
           </div>` : ''}
         <label class="check"><input type="checkbox" id="bi-time" ${empty && known ? 'checked' : ''} ${known ? '' : 'disabled'}><span>Use its tempo (${m.bpm} bpm)${sameTime ? '' : ` and time (${esc(m.meter)})`}</span></label>
@@ -250,16 +257,27 @@
         const bt = m.beatTicks;
         const beat = t => offset + (t - (m.pickupTicks || 0)) / bt;
         const s = m.sounds || {};
-        if (el('bi-melody').checked && hasMelody) {
+        const noteOf = (n, sound, volume) => ({ m: n.midi, b: beat(n.at), d: Math.max(0.05, n.ticks / bt), s: sound, v: songLevel(n.level, volume) });
+        if (songParts) {
+          body.querySelectorAll('.bi-part').forEach(box => {
+            const p = songParts[Number(box.dataset.part)];
+            if (!box.checked || !p || !p.notes || !p.notes.length) return;
+            // the part's own sound (Song Writer sends Sound → Melody's when it has none), at its share of the melody's volume
+            const vol = (s.melodyVolume == null ? 1 : s.melodyVolume) * (p.volume == null ? 100 : p.volume) / 100;
+            const label = p.name || 'Part ' + (Number(box.dataset.part) + 1);
+            tracks.push({ kind: 'melody', from: { ...from, part: label },
+              notes: p.notes.map(n => noteOf(n, p.sound || s.melody || 'piano', vol)) });
+          });
+        } else if (el('bi-melody').checked && hasMelody) {
           tracks.push({ kind: 'melody', from: { ...from, part: 'melody' },
-            notes: m.melody.map(n => ({ m: n.midi, b: beat(n.at), d: Math.max(0.05, n.ticks / bt), s: s.melody || 'piano', v: songLevel(n.level, s.melodyVolume) })) });
+            notes: m.melody.map(n => noteOf(n, s.melody || 'piano', s.melodyVolume)) });
         }
         if (el('bi-chords').checked && hasChords) {
           const notes = [];
           m.chords.forEach(c => c.midis.forEach(mm => notes.push({ m: mm, b: beat(c.at), d: Math.max(0.05, c.ticks / bt), s: s.chords || 'piano', v: chordLevel(c.level, c.midis.length, s.chordVolume) })));
           tracks.push({ kind: 'chords', from: { ...from, part: 'chords' }, notes });
         }
-        if (!tracks.length) { note.textContent = 'Choose the melody, the chords, or both.'; return; }
+        if (!tracks.length) { note.textContent = songParts ? 'Choose a part, the chords, or both.' : 'Choose the melody, the chords, or both.'; return; }
       }
       const placed = Studio.bringIn(tracks, {
         label: 'bringing in ' + (m.title || 'a song'),
@@ -269,7 +287,9 @@
       });
       if (!placed) { note.textContent = `There is no room: ${tracks.length === 1 ? 'a track is' : tracks.length + ' tracks are'} needed and the project has ${Studio.MAX_TRACKS}. Clear or remove one first.`; return; }
       Studio.closeSheet('bring-sheet');
-      Studio.toast(`${m.title || 'It'} is on track${placed.length > 1 ? 's ' + placed.map(i => i + 1).join(' and ') : ' ' + (placed[0] + 1)}. Undo takes it out again.`);
+      const nums = placed.map(i => i + 1);
+      const list = nums.length > 1 ? nums.slice(0, -1).join(', ') + ' and ' + nums[nums.length - 1] : String(nums[0]);
+      Studio.toast(`${m.title || 'It'} is on track${nums.length > 1 ? 's' : ''} ${list}. Undo takes it out again.`);
     });
   }
 

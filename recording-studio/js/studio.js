@@ -265,7 +265,7 @@
     }
     if (src.from && typeof src.from === 'object') {
       t.from = { app: String(src.from.app || ''), title: String(src.from.title || '').slice(0, 80), id: src.from.id ? String(src.from.id) : '' };
-      if (src.from.part) t.from.part = String(src.from.part);
+      if (src.from.part) t.from.part = String(src.from.part).slice(0, 40);
     }
     if (!hasContent(t) && !(t.kind && !KINDS[t.kind].play)) { t.kind = null; t.from = null; }
     return t;
@@ -942,6 +942,9 @@
 
   function trackName(tr) {
     if (tr.name) return tr.name;
+    /* a Song Writer part (from.part = its name; 'melody' for a one-part song) is named
+       part first, so a narrow track column still tells Part 1 from Part 2 */
+    if (tr.from && tr.from.title && tr.kind === 'melody' && tr.from.part && tr.from.part !== 'melody') return tr.from.part + ' · ' + tr.from.title;
     if (tr.from && tr.from.title) return tr.from.title + (tr.kind === 'melody' ? ' · melody' : tr.kind === 'chords' ? ' · chords' : '');
     if (tr.kind && hasContent(tr)) return KINDS[tr.kind].label;
     return 'Empty';
