@@ -1,7 +1,7 @@
 {
   "format": "evm-index",
   "formatVersion": 1,
-  "generatedAt": "2026-10-14T00:51:43.425Z",
+  "generatedAt": "2026-11-04T19:42:32.068Z",
   "items": [
     {
       "app": "music-stand",
@@ -91,6 +91,15 @@
       "title": "Ging Gang Goolie",
       "updatedAt": 1790651857605,
       "path": "song-writer--song_1790651857604_4g5o.json",
+      "book": "More songs"
+    },
+    {
+      "app": "song-writer",
+      "kind": "song",
+      "id": "song_1793820253449_evny",
+      "title": "Ho Ho Watanay",
+      "updatedAt": 1793821150919,
+      "path": "song-writer--song_1793820253449_evny.json",
       "book": "More songs"
     },
     {
