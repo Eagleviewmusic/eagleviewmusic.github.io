@@ -1,0 +1,1167 @@
+{
+  "format": "evm-item",
+  "formatVersion": 1,
+  "app": "song-writer",
+  "kind": "song",
+  "id": "song_1793820253449_evny",
+  "title": "Ho Ho Watanay",
+  "createdAt": 1793820253451,
+  "updatedAt": 1793821150919,
+  "book": "More songs",
+  "data": {
+    "score": {
+      "v": 2,
+      "key": "E",
+      "scale": "minor",
+      "bpm": 60,
+      "lines": [
+        {
+          "label": "A",
+          "syllables": [
+            {
+              "text": "Ho",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Ho",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "Wa",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ],
+              "hy": true
+            },
+            {
+              "text": "ta",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ],
+              "hy": true
+            },
+            {
+              "text": "nay",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Ho",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Ho",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "Wa",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ],
+              "hy": true
+            },
+            {
+              "text": "ta",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ],
+              "hy": true
+            },
+            {
+              "text": "nay",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Ho",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Ho",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "Wa",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ],
+              "hy": true
+            },
+            {
+              "text": "ta",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti-low",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ],
+              "hy": true
+            },
+            {
+              "text": "nay",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti-low",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "Ki",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ],
+              "hy": true
+            },
+            {
+              "text": "yo",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ],
+              "hy": true
+            },
+            {
+              "text": "ke",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ],
+              "hy": true
+            },
+            {
+              "text": "na,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "Ki",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ],
+              "hy": true
+            },
+            {
+              "text": "yo",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ],
+              "hy": true
+            },
+            {
+              "text": "ke",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ],
+              "hy": true
+            },
+            {
+              "text": "na",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "label": "",
+          "syllables": [
+            {
+              "text": "Oh,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Oh",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "so"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "lit",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ],
+              "hy": true
+            },
+            {
+              "text": "tle",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "one,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Oh,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Oh",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "lit",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ],
+              "hy": true
+            },
+            {
+              "text": "tle",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "one,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Oh,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            },
+            {
+              "text": "Oh",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "mi",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                },
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "lit",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ],
+              "hy": true
+            },
+            {
+              "text": "tle",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti-low",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "one",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "ti-low",
+                      "acc": "flat"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "Now",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "go",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "to",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "sleep,",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "now",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "go",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "fa"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "to",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "e"
+                }
+              ]
+            },
+            {
+              "text": "sleep",
+              "cols": [
+                {
+                  "notes": [
+                    {
+                      "n": "do"
+                    }
+                  ],
+                  "v": "q"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "parts": [
+        {},
+        {
+          "sound": "marimba",
+          "lines": [
+            {
+              "syllables": [
+                {
+                  "text": "E",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "do"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "B",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "so"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "E",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "do"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "B",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "so"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "E",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "do"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "A",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "fa"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "E",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "do"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "A",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "fa"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "E",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "do"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "G",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "mi",
+                          "acc": "flat"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "E",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "do"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "G",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "mi",
+                          "acc": "flat"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "D",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "ti-low",
+                          "acc": "flat"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "A",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "fa"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "D",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "ti-low",
+                          "acc": "flat"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "A",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "fa"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "syllables": [
+                {
+                  "text": "E",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "do"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "B",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "so"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "E",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "do"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "B",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "so"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "E",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "do"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "A",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "fa"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "E",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "do"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "A",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "fa"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "E",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "do"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "G",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "mi",
+                          "acc": "flat"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "E",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "do"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "G",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "mi",
+                          "acc": "flat"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "D",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "ti-low",
+                          "acc": "flat"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "A",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "fa"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "D",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "ti-low",
+                          "acc": "flat"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                },
+                {
+                  "text": "A",
+                  "cols": [
+                    {
+                      "notes": [
+                        {
+                          "n": "fa"
+                        }
+                      ],
+                      "v": "q"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "layout": {
+      "v": 1,
+      "notes": null,
+      "accidentals": true,
+      "rests": true,
+      "harmony": true,
+      "connected": true,
+      "chords": null,
+      "values": null,
+      "keys": null,
+      "scaleMorph": true,
+      "chordBend": true,
+      "show": {
+        "sectionTitles": true,
+        "keycaps": true,
+        "barNumbers": true
+      },
+      "locked": false
+    }
+  }
+}
