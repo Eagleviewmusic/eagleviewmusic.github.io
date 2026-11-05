@@ -187,6 +187,7 @@
     let html = '';
     const lastRow = bases.length % 3 || 3, lastFrom = bases.length - lastRow;
     const preview = dotPending && (!notated || restPending);      // the circles show what a tap will write
+    const lastRest = !!stack && allRest && !restPending && !!SW.flow && SW.flow.restAtEnd(stack);
     bases.forEach((b, i) => {
       const plain = V.withDot(b, false) || V.withDot(b, true);
       const shown = preview && dotOffered(b) ? V.withDot(b, true) : plain;
@@ -195,7 +196,8 @@
       const col = i >= lastFrom ? ';grid-column:' + (2 * (i - lastFrom) + 4 - lastRow) + ' / span 2' : '';
       html += '<button class="value-choice' + (on ? ' on' : '') + (on && allRest ? ' is-rest' : '') + (restPending ? ' rest-preview' : '') + '" data-base="' + b + '" style="--c:' + V.colour(plain) + col +
         '" title="' + (restPending ? restName + ' — goes in after this note'
-          : V.byId(plain).name + (on ? ' — tap again for a rest' : notated ? '' : ' — writes this block on the staff')) +
+          : lastRest ? V.byId(on ? cur : shown).name + ' — goes in here, in place of this rest'
+          : V.byId(plain).name + (on ? (allRest ? ' — tap for a note' : ' — tap again for a rest') : notated ? '' : ' — writes this block on the staff')) +
         '" aria-label="' + (restPending ? restName : V.byId(plain).name) + '"' + (stack ? '' : ' disabled') + '>' +
         SW.engrave.value(on ? cur : shown, { height: glyphH, rest: (on && allRest) || restPending }) + '</button>';
     });
@@ -268,13 +270,16 @@
   /* Write (or rewrite) the selected column — the circles' way (flow.js
      THE EDIT BOX, 2026-10-26): the column takes its length and the beats
      after it stay where they are; the melody pours. A block that is
-     written steps the selection on to the next column, silently. */
-  function setValue(v) {
+     written steps the selection on to the next column, silently. A value
+     circle on the line's last rest puts a note of that value in right
+     there (flow.js noteOnRest, 2026-11-04); `keepRest` (Dotted, the [ ]
+     keys, which shape what is there) writes it as the rest it is. */
+  function setValue(v, keepRest) {
     const { stack } = activeStack();
     if (!stack || !S.editing || !SW.settings.can('values') || !SW.flow) return;
     if (SW.settings.allowedValues().indexOf(v) === -1) return;
     const wasBlock = !SW.score.isNotated(stack);
-    const changedIt = SW.flow.writeValue(stack, v);
+    const changedIt = (!keepRest && SW.flow.noteOnRest(stack, v)) || SW.flow.writeValue(stack, v);
     const now = SW.score.getActiveNote();                                  // the line was drawn anew: the note again
     if (now && !now.classList.contains('rest-note')) SW.score.soundNote(now);   // silent on a tie's held note
     const st = now && now.closest('.harmony-stack');
@@ -307,12 +312,12 @@
       const beatV = SW.meters.beat().value;                 // a quarter, or a dotted quarter in 6/8
       let q = vals.indexOf(beatV) !== -1 ? beatV : vals.indexOf('q') !== -1 ? 'q' : vals[Math.floor(vals.length / 2)];
       if (q && dotPending) { q = withWaitingDot(V.byId(q).base) || q; dotPending = false; }
-      if (q) setValue(q);
+      if (q) setValue(q, true);
       return;
     }
     const at = vals.indexOf(SW.score.getStackValue(stack));
     const next = vals[Math.max(0, Math.min(vals.length - 1, (at === -1 ? vals.indexOf('q') : at) + dir))];
-    if (next) setValue(next);
+    if (next) setValue(next, true);
   }
 
   row.addEventListener('click', e => {
@@ -339,6 +344,8 @@
       return;
     }
     if (notated && cur.base === base) {
+      // the lit circle on the line's last rest: a note right there, its own length
+      if (SW.score.noteOnSelectedRest()) { render(); return; }
       // RP's EASY rule: the lit one again makes the same-length rest
       if (SW.settings.can('rest')) SW.score.toggleRestOnCurrentNote();
       else SW.ui.toast('Rests are switched off in Layout settings');
@@ -351,7 +358,8 @@
       dotPending = false;
       if (!id) SW.ui.toast('There is no dotted ' + V.byId(V.withDot(base, false)).name.toLowerCase() + ' — written plain');
     }
-    const dotted = notated && cur.dotted && dotOffered(base);
+    // a note going in on the last rest does not take the rest's dot
+    const dotted = notated && cur.dotted && dotOffered(base) && !SW.flow.restAtEnd(stack);
     setValue(id || V.withDot(base, dotted) || V.withDot(base, false) || V.withDot(base, true));
   });
   /* The waiting dot on `base`, if that value has a dotted form on offer. */
@@ -365,7 +373,7 @@
     const cur = V.byId(SW.score.getStackValue(stack));
     if (SW.score.isNotated(stack) && dotOffered(cur.base)) {
       const flip = V.withDot(cur.base, !cur.dotted);
-      if (flip) setValue(flip);
+      if (flip) setValue(flip, true);
       return;
     }
     dotPending = !dotPending;                  // a block: the dot waits for the value

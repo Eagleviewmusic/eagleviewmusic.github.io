@@ -52,20 +52,24 @@ line (DOM)  --readLine-->  lineModel  --F.cellsOf-->  cells[]   (one per sixteen
   rest, and holds after it go silent); yellow → a new note starts; grey → a
   note that is held to the end of its beat. A block beat is written as it was
   (a quarter / dotted quarter) and then the tap applies, so one tap does both.
-* **The melody never grows** (flow.js R2, 2026-10-26 — the user: taps made ties
-  over bar lines no tap could undo, and the Pitch page filled with notes nobody
-  wrote). A new note needs a pitch, and the page has only the line's own: an
-  onset the melody cannot fill is silence — a rest where something follows it,
-  nothing at the line's end. So a yellow circle inside the line's **last** note
-  ends that note there (the rest of its time goes grey); a grey circle **right
-  after** the last note lengthens it to the end of its beat (the extra time
-  belongs to the note before — the user, 2026-10-25); any other grey circle past
-  the melody does nothing, and a toast says every note is placed — add one in
-  Edit. Silence runs together (two rests that each began are one), and the
+* **A note needs no word** (flow.js R2, 2026-11-04 — the user: "lets allow notes
+  to be added even when there are no words to place under them"). A circle makes
+  what it shows: an onset past the melody's last pitch is a new note, the pitch
+  before it on a `-` syllable of its own, ready for a word. So a grey circle past
+  the last note, or a yellow one inside it, starts a note; tapped again it goes
+  (at a beat's start to silence, off the beat back into the note before). A
+  wordless note goes when its own time has gone or when it only repeats the pitch
+  before it, so a circle tapped twice gives the line back; a note with a word, or
+  its own pitch elsewhere in the line, waits at the end, and takes its time back
+  when a tap makes room (THE WAITING NOTES). × on a bar takes its wordless notes
+  with it. Silence runs together (two rests that each began are one), and the
   silence after the last note inside its bar is never written (whole empty bars
-  from + stay). Until 10-26 such an onset made a hollow **ghost** note (10-01)
-  or tied the note before into it (10-25); both are gone, and a saved ghost
-  reads as the rest it stood in for.
+  from + stay). A lesson that locks the melody or the words keeps the rule of
+  10-26: an onset the melody cannot fill is silence, a yellow circle inside the
+  last note ends it, a grey one right after it lengthens it, and any other says
+  every note is placed. History: a hollow **ghost** note (10-01), a tie from the
+  note before (10-25), silence for everyone (10-26: taps made ties no tap could
+  undo); a saved ghost still reads as the rest it stood in for.
 * **A word's own rest** (a word rested in Edit) is a grey circle with a ring,
   its word under it, and reads `R` in the notation box; a tap on that circle
   makes the word sound again (`score.unrestColumn`, one Undo step). Its later

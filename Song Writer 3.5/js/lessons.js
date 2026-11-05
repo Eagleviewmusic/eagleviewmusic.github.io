@@ -202,6 +202,13 @@
       ui.toast('This lesson link came through incomplete, so the lesson can’t open — it was probably cut short. Make a new link and copy all of it.', 10000);
       return null;                                // library.js opens the sandbox
     }
+    /* A song link in the address is what was asked for: it opens, and ends
+       the lesson this tab had open (2026-11-04). Until then a lesson opened
+       on one page of a site took over every song link on its later pages. */
+    if (ui.linkParam('song')) {
+      try { sessionStorage.removeItem(OPEN_LESSON_KEY); } catch (e) {}
+      return null;
+    }
     return reopenFromSession();
   }
 

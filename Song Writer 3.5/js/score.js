@@ -390,6 +390,7 @@
     rewrite(activeNote);
     syncAccidentalToggle(activeNote);
     playPitch(activeNote, noteClass, acc);
+    if (restTakesPitch(activeNote)) return true;           // its line was drawn anew
     const harmonyStack = activeNote.closest('.harmony-stack');
     if (harmonyStack) updateHarmonyStackVisuals(harmonyStack);
     const idx = Array.from(getAllNotes()).indexOf(activeNote);
@@ -398,6 +399,27 @@
     emitSelection(false);
     changed('pitch');
     return true;
+  }
+
+  /* A pitch given to a rest — a letter key, the keyboard, ↑ ↓ — asks for a
+     note right there (2026-11-04; until then the rest only kept the pitch,
+     and nothing showed). On the line's last rest it becomes a note of its
+     own (flow.js noteOnRest): true, the line was drawn anew and the edit is
+     made. With music after it the column simply sounds, as the lit circle
+     makes it: false, the caller goes on as for any note. */
+  function restTakesPitch(note) {
+    if (!note.classList.contains('rest-note')) return false;
+    const stack = note.closest('.harmony-stack');
+    if (SW.flow && SW.flow.noteOnRest(stack, null, 'rest')) return true;
+    if (!can('rest')) return false;
+    const notes = Array.from(stack.querySelectorAll('.note'));
+    const rests = notes.filter(n => n.classList.contains('rest-note'));
+    (rests.length === notes.length ? rests : [note]).forEach(n => {
+      n.classList.remove('rest-note');
+      updateNoteDisplay(n, M.noteClassOf(n) || 'do');
+    });
+    if (stack.dataset.v) applyStackValue(stack, stack.dataset.v);
+    return false;
   }
 
   /* 1.0: changeNote. Up and down walk the scale's notes inside the allowed
@@ -420,6 +442,10 @@
     setNotePitch(noteElement, next.nc, next.acc);
     rewrite(noteElement);
     syncAccidentalToggle(noteElement);
+    if (restTakesPitch(noteElement)) {                     // its line was drawn anew
+      if (playSound !== false) playPitch(getActiveNote(), next.nc, next.acc);
+      return;
+    }
     const harmonyStack = noteElement.closest('.harmony-stack');
     if (harmonyStack) updateHarmonyStackVisuals(harmonyStack);
     const idx = Array.from(getAllNotes()).indexOf(noteElement);
@@ -469,6 +495,7 @@
     setNotePitch(note, found.nc, found.acc);
     rewrite(note);
     syncAccidentalToggle(note);
+    if (restTakesPitch(note)) return true;                 // its line was drawn anew
     const stack = note.closest('.harmony-stack');
     if (stack) updateHarmonyStackVisuals(stack);
     emitSelection(false);
@@ -1205,7 +1232,21 @@
     // a whole word on the Pitch page counts its syllable's notes, not the word's
     const held = isJoined(parentSyllable) ? pieceOfStack(activeNote.closest('.harmony-stack')).stacks.length : parentSyllable.querySelectorAll('.note').length;
     if (held >= 8) {
-      SW.ui.toast('Eight connected notes is the most one syllable can hold');
+      // a full syllable is no reason to stop: the note goes on with a "-" of its own
+      if (!can('structure')) {
+        SW.ui.toast('Eight connected notes is the most one syllable can hold');
+        return;
+      }
+      const stackNow = activeNote.closest('.harmony-stack');
+      const own = createNewSyllable('-', [{
+        v: stackNow ? stackNow.dataset.v : undefined,
+        notes: [{ n: M.noteClassOf(activeNote) || 'do', acc: getAccidentalFromNote(activeNote) }]
+      }]);
+      if (parentSyllable.dataset.hy && !isJoined(parentSyllable)) own.dataset.hy = '1';
+      parentSyllable.insertAdjacentElement('afterend', own);
+      updateLineHeight(parentSyllable.closest('.notation-line'));
+      setNoteAsActive(own.querySelector('.note'), true);
+      changed('syllable');
       return;
     }
     let notesContainer = parentSyllable.querySelector('.notes-container');
@@ -1218,7 +1259,8 @@
     const currentStack = activeNote.closest('.harmony-stack');
     const newStack = document.createElement('div');
     newStack.className = 'harmony-stack';
-    const newNote = createNoteElement(M.noteClassOf(activeNote) || 'do', getAccidentalFromNote(activeNote), activeNote.classList.contains('rest-note'), memoryOf(activeNote));
+    // always a note, on a rest too: the pitch the rest kept (until 2026-11-04 a rest copied itself)
+    const newNote = createNoteElement(M.noteClassOf(activeNote) || 'do', getAccidentalFromNote(activeNote), false, memoryOf(activeNote));
     newStack.appendChild(newNote);
     applyStackValue(newStack, currentStack ? currentStack.dataset.v : null);
     if (currentStack && currentStack.parentNode === notesContainer) currentStack.insertAdjacentElement('afterend', newStack);
@@ -1439,6 +1481,17 @@
     setNoteAsActive(rests[0], false);
     soundNote(rests[0]);
     changed('rest');
+    return true;
+  }
+  /* The selected rest, when it is the line's last (flow.js noteOnRest),
+     becomes a note where it stands. False: it is not one, nothing changed. */
+  function noteOnSelectedRest() {
+    if (!S.editing || !SW.flow) return false;
+    const note = getActiveNote();
+    if (!note || !note.classList.contains('rest-note')) return false;
+    if (!SW.flow.noteOnRest(note.closest('.harmony-stack'))) return false;
+    const now = getActiveNote();
+    if (now) soundNote(now);
     return true;
   }
   /* 2.5: a REST put in after the selected column (note, rest or block),
@@ -3178,7 +3231,13 @@
      notes, one a syllable, and the words after it keep theirs. When the
      number of words changed, syllables land in order as before (so wa ter
      → wa-ter just joins them); extra words get a new note (do), fewer
-     drop the notes at the end of the line. */
+     drop the notes at the end of the line. A NOTE WITH NO WORD YET
+     (2026-11-04, made by a rhythm, or a "-") is there for a word: on those
+     each syllable takes its own note, in order, and a line of words that
+     runs out leaves the rest as they are — no word was taken from them
+     (typing a lone "-" among the words says you are counting them: then
+     the ones you left out go, as words do). A "-" holding only a rest is
+     passed by, so words land on notes. */
   function wordsToScore(text, model, part) {
     const score = normalizeScore(model || readScore());
     const rows = wordParagraphs(text);
@@ -3192,20 +3251,39 @@
       const oldWords = wordsOfLine(old.syllables).map(w => w.slice());
       const flatNew = [].concat(...neu);
       let syllables = [];
-      if (neu.length === oldWords.length) {
+      const blank = w => w.every(sy => !sy.text || sy.text === '-');
+      const hasBlank = oldWords.some(blank);
+      let typed = null;                                                    // the text's own syllables, when others stand among them
+      if (neu.length === oldWords.length && !(hasBlank && flatNew.length !== neu.length)) {
         neu.forEach((pieces, k) => { syllables = syllables.concat(dealWord(oldWords[k], pieces)); });
       } else if (flatNew.length === old.syllables.length) {
         syllables = flatNew.map((p, j) => Object.assign({}, old.syllables[j], { text: p }));
       } else {
-        neu.forEach((pieces, k) => {
-          syllables = syllables.concat(oldWords[k] ? dealWord(oldWords[k], pieces) : pieces.map(p => ({ text: p, cols: [{ notes: [{ n: 'do' }] }] })));
+        typed = [];
+        let w = 0;                                                         // the next old word
+        const fresh = p => ({ text: p, cols: [{ notes: [{ n: 'do' }] }] });
+        const sounds = word => word.some(sy => sy.cols.some(c => c.notes.some(n => !n.rest)));
+        const passRests = () => { while (oldWords[w] && blank(oldWords[w]) && !sounds(oldWords[w])) syllables.push(...oldWords[w++]); };
+        const put = made => { syllables.push(...made); typed.push(...made); };
+        neu.forEach(pieces => {
+          passRests();
+          const word = oldWords[w];
+          if (word && !blank(word)) { put(dealWord(word, pieces)); w++; return; }
+          pieces.forEach(p => {
+            passRests();
+            const on = oldWords[w];
+            if (on && blank(on)) { put(dealWord(on, [p])); w++; }
+            else put([fresh(p)]);
+          });
         });
+        if (flatNew.indexOf('-') === -1) oldWords.slice(w).filter(blank).forEach(word => syllables.push(...word));
       }
       // the hyphens are the ones typed now
+      const inOrder = typed || syllables;
       let at = 0;
       neu.forEach((pieces, k) => {
         pieces.forEach((p, j) => {
-          const sy = syllables[at++];
+          const sy = inOrder[at++];
           if (!sy) return;
           delete sy.hy;
           if (j < pieces.length - 1 || (k === neu.length - 1 && parsed.open)) sy.hy = true;
@@ -3226,7 +3304,7 @@
      back onto the notes; or 1.0's whole song text with its brackets, for
      copying and pasting whole songs (DECISIONS D14). */
   const WORDS_SUB = {
-    words: 'Leave an empty line between the lines of the song — lines of text with no gap between them stay together in one line of music. Each syllable gets a note: a hyphen between the syllables of a word (twin-kle, twin-kle), a space between words. The notes stay where they are and the words land on them in order. Extra words get a new note; words you delete take their note with them.',
+    words: 'Leave an empty line between the lines of the song — lines of text with no gap between them stay together in one line of music. Each syllable gets a note: a hyphen between the syllables of a word (twin-kle, twin-kle), a space between words. The notes stay where they are and the words land on them in order. Extra words get a new note; words you delete take their note with them; notes with no word yet stay until you give them one.',
     notes: 'The whole song as text, the way Song Writer 1.0 wrote it: each word with its notes in brackets — Twin[D1] kle[D1:q] — and {I} for a chord. Copy it to keep or send; paste one in and Set to the notes replaces the song.'
   };
   function fillTextEditor(view) {
@@ -3333,7 +3411,7 @@
     handleSolfegeKeyInput, handleDeleteClick, isDeleteArmed, setActiveNoteMidi,
     getAccidentalFromNote, getStackValue, isNotated, applyStackValue,
     notateAll, writeAllBlocks, clearAllValues, notateLine, clearLineValues, selectNextStack,
-    toggleRestOnCurrentNote, insertRestAfterCurrent, unrestColumn,
+    toggleRestOnCurrentNote, insertRestAfterCurrent, unrestColumn, noteOnSelectedRest,
     // the Edit box's note, syllable and word tools (edit-box.js)
     handleAccidentalClick, duplicateCurrentNote, removeCurrentConnectedNote, deleteCurrentNote, deleteNoteState,
     addHarmonyNote, removeHarmonyNote, connectedState, harmonyState,

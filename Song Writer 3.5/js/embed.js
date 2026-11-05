@@ -1,6 +1,11 @@
 /* ==========================================================================
    Song Writer — embed.js
    --------------------------------------------------------------------------
+   The first script on the page, so nothing after it ever sees the real
+   localStorage when it is swapped here. It is swapped in two cases; on any
+   other page it stays as it is. It also says, for js/library.js, whether
+   this page sits inside someone else's site (EMBEDDED ELSEWHERE, below).
+
    INSIDE THE RECORDING STUDIO (?embed=studio)
 
    The Recording Studio (../Recording Studio/, README "Bringing songs in")
@@ -13,21 +18,57 @@
    Ostinato Builder's guard for the Music Stand, copied (the block at the
    top of Ostinato Builder 2.0/script.js): rather than guard every write,
    localStorage itself is swapped for a layer that reads through to the
-   real thing and keeps every write in memory. This is the first script
-   on the page, so nothing after it ever sees the real object.
+   real thing and keeps every write in memory.
 
-   Not framed, or no ?embed=studio: nothing happens at all.
+   WHEN THE BROWSER REFUSES STORAGE (2026-11-04, the user's report)
+
+   A page embedded in another site (a Google Site) can be refused storage
+   altogether: touching localStorage throws, as it does where third-party
+   storage is blocked, or in a sandboxed frame. The app kept its songs only
+   there, so a song link was filed into a library that forgot it at once,
+   and the sandbox too: the app ran with an empty page ("Library · Untitled")
+   and the song could not be opened. So the same layer goes in: everything
+   works for as long as the page is open, and js/library.js says so when
+   there is something to keep. Storage that is only FULL still reads, and
+   is not swapped (js/library.js saveStoredLibrary holds on to that case).
+
+   EMBEDDED ELSEWHERE (2026-11-04, the user)
+
+   window.EVM_EMBEDDED_ELSEWHERE: a frame whose top page is another site's,
+   a Google Site. There a song link is opened to be read, on every visit,
+   lesson after lesson, so js/library.js keeps nothing of it. A frame inside
+   our own site (the Recording Studio's) is not this: the browser lets it
+   read the top page's address, and only then.
    ========================================================================== */
 (function () {
+  window.EVM_EMBEDDED_ELSEWHERE = (function () {
+    if (window.self === window.top) return false;
+    try { void window.top.location.origin; return false; }   // readable: the top page is ours
+    catch (e) { return true; }                               // another site's: the browser will not say
+  })();
+
+  function refused() {
+    try {
+      const s = window.localStorage;                    // a refused page throws here
+      if (!s) return true;
+      s.setItem('evm_storage_probe', '1');
+      s.removeItem('evm_storage_probe');
+      return false;
+    } catch (e) {
+      return !/quota/i.test((e && e.name) || '');       // full: it can still be read
+    }
+  }
+
   let embedded = false;
   try {
     embedded = new URLSearchParams(window.location.search).get('embed') === 'studio'
       && window.parent !== window;
   } catch (e) {}
-  if (!embedded) return;
+  const refusedNow = !embedded && refused();
+  if (!embedded && !refusedNow) return;
 
   let real = null;
-  try { real = window.localStorage; } catch (e) {}     // storage blocked: everything stays in memory
+  if (embedded) { try { real = window.localStorage; } catch (e) {} }    // storage blocked: everything stays in memory
   const writes = new Map();             // key -> value, or null once removed
   const layer = {
     getItem(k) {
@@ -48,6 +89,7 @@
   /* If the swap did not take, this is not a safe guest: run as the plain
      app, and the studio finds no bridge (SongWriterStudio) and says so. */
   if (window.localStorage !== layer) return;
+  if (refusedNow) { window.EVM_STORAGE_MEMORY = true; return; }
   window.EVM_STUDIO_EMBED = {
     /* Drop what this frame wrote for a key, so the next read is the real,
        current value — the studio's song picker wants the live library. */

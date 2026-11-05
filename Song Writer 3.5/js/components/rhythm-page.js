@@ -50,7 +50,7 @@
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const bs = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bs')) || 1;
 
-  const NO_NOTE_MSG = 'Every note of this line is placed — to go on, add a note in Edit (+ Note)';
+  const NO_NOTE_MSG = 'Every note of this line is placed — this lesson keeps to the notes it has';
   const CHAIN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>';
 
   /* ================= reading a line ================= */
@@ -757,8 +757,8 @@
     const line = lines()[li];
     return line ? lineData(line) : null;
   }
-  function pour(d, cells, focus) {
-    const changedIt = F.applyCells(d.line, cells, focus);
+  function pour(d, cells, focus, opts) {
+    const changedIt = F.applyCells(d.line, cells, focus, opts);
     const note = SW.score.getActiveNote();
     if (changedIt && note && !note.classList.contains('rest-note')) SW.score.soundNote(note);
     if (!changedIt) render();
@@ -974,7 +974,7 @@
       const wasBlock = cell.t === 'bon' || cell.t === 'bhold';
       let next = F.tapSlot(cells, c, span, c0, c1);
       if (wasBlock && c === c0) next = F.tapSlot(next, c, span, c0, c1);     // written, then the tap itself: one tap does both
-      // silence tapped past the melody's last note, with nothing to lengthen: no note can start (flow.js R2)
+      // a lesson that locks the notes: silence past the melody's last note, with nothing to lengthen (flow.js R2)
       if (SILENCE[cell.t] && next.every((x, i) => x.t === cells[i].t)) { SW.ui.toast(NO_NOTE_MSG); return; }
       pour(d, next, c);
       return;
@@ -985,7 +985,7 @@
       if (b.classList.contains('rp-add')) pour(d, insertBar(cells, Math.max(0, at + d.BAR), d.BAR), Math.max(0, at + d.BAR));
       else {
         if (d.nBars <= 1 && k === 0 && !cells.some(c => c.item)) { SW.ui.toast('This is the line\'s only bar — delete the line in Edit instead'); return; }
-        pour(d, deleteBar(cells, at, d.BAR), Math.max(0, at));
+        pour(d, deleteBar(cells, at, d.BAR), Math.max(0, at), { dropIn: [Math.max(0, at) * CELL, (at + d.BAR) * CELL] });
       }
     }
   });

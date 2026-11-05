@@ -54,12 +54,20 @@
      auto-save toggle reads "Save my copy" and opens Save as…; the copy is
      the student's own, with derivedFrom pointing back at the shared one.
      Its row in the Songs sheet carries a "Shared" tag and has no Rename.
+   • EMBEDDED IN ANOTHER SITE (a Google Site, js/embed.js) a song link is
+     not filed at all (2026-11-04, the user: the embedded library filled up
+     with every past lesson, and these pages are there to be read). The link
+     holds the whole song, so it opens from the link and stays for that visit
+     only (`visiting`); the page never saves it. Link copies left from before
+     are cleared there (clearLinkCopies). Save my copy still saves, and so
+     does everything else. In a page of its own, nothing here applies.
    • The Teacher Library shelf (lib/evm-shelf.js) files songs the same way,
      marked with the `book` they were taken out in. They are listed under
      their book, above the student's own songs, and leave when the book is
      put back. A Save my copy of one is the student's own and stays.
-   • A blank song (no words, or nothing but New's "Start Here") is never
-     filed from a link or a file.
+   • A blank song (nothing but New's "Start Here", or no words and no music
+     to speak of: fewer than two notes, no chords) is never filed from a link
+     or a file. A song of notes with no words is a song (2026-11-04).
    • Files follow the same rule (EVM.file): songs keep their ids, so
      importing the same file twice adds nothing. Sandbox links are
      unchanged: they overwrite this person's sandbox.
@@ -170,16 +178,24 @@
     return newSongKey;
   }
 
-  /* Blank: no real words anywhere (every syllable is '-' or empty), or
-     nothing but what New starts with — "Start Here" on D1 D1. */
+  /* Blank: nothing but what New starts with — "Start Here" on D1 D1 — or no
+     real words (every syllable is '-' or empty) and no music either: fewer
+     than two notes that sound, and no chords. A melody or a rhythm with no
+     words is a song (2026-11-04: until then its link said "an empty song"
+     and opened the sandbox). */
   function isBlankSong(n) {
     const lines = n && n.score ? [].concat(...SW.parts.everyLine(n.score)) : [];     // every part's (PARTS)
     const words = lines.some(l => (l.syllables || []).some(s => {
       const t = String((s && s.text) || '').trim();
       return t !== '' && t !== '-';
     }));
-    if (!words) return true;
-    return EVM.stableStringify(n.score) === templateKey();
+    if (words) return EVM.stableStringify(n.score) === templateKey();
+    if (lines.some(l => l.bars) || (n.score && (n.score.track || []).length)) return false;
+    let sounding = 0;
+    lines.forEach(l => (l.syllables || []).forEach(s => (s.cols || []).forEach(c => {
+      if ((c.notes || []).some(x => !x.rest)) sounding++;
+    })));
+    return sounding < 2;
   }
 
   const fileOpts = received => ({
@@ -273,30 +289,87 @@ O'er[S1] the[S1] land[D2] -[R2] of[M2] the[F2] free[S2] And[D2] the[R2] home[M2]
     return n;
   }
 
+  /* The library the browser would not take, because its storage is full
+     (2026-11-04). What was just filed must still open — a song link used
+     to end on the sandbox, the song forgotten as soon as it was filed — so
+     it is kept for this visit, and the next save that fits lets it go.
+     (Storage refused altogether is js/embed.js.) */
+  let heldLibrary = null;
+  /* EMBEDDED IN ANOTHER SITE: this visit's song from a link, id → record as
+     JSON. getStoredLibrary shows it with the others, so it opens, lists and
+     deletes as a shared song does; saveStoredLibrary leaves it out. */
+  const visiting = {};
+  let booted = false;
+  let saidMemory = false;
+  /* Refused storage (js/embed.js): nothing outlives the page, which matters
+     once there is something to keep — so it is said then, once, and not to
+     someone who has only opened a link to look at a song. */
+  function sayNotKept() {
+    if (!window.EVM_STORAGE_MEMORY || !booted || saidMemory) return;
+    saidMemory = true;
+    ui.toast('This browser is not letting Song Writer save inside this page, so your work lasts until the page closes. Open Song Writer in its own tab to keep songs.', 9000);
+  }
   function getStoredLibrary() {
-    let library = null;
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) library = JSON.parse(stored);
-    } catch (e) {
-      console.error('Error loading library from localStorage:', e);
+    let library = heldLibrary ? JSON.parse(heldLibrary) : null;
+    if (!library) {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) library = JSON.parse(stored);
+      } catch (e) {
+        console.error('Error loading library from localStorage:', e);
+      }
     }
     if (!library || typeof library !== 'object' || Object.keys(library).length === 0) {
       library = defaultLibrary();
       const moved = migrateFromV1(library);
-      saveStoredLibrary(library);
+      writeLibrary(library);
       if (moved) setTimeout(() => ui.toast(`Brought across ${moved} song${moved > 1 ? 's' : ''} from Song Writer 1.0`), 400);
     }
+    Object.keys(visiting).forEach(id => { library[id] = JSON.parse(visiting[id]); });
     return library;
   }
 
-  function saveStoredLibrary(library) {
+  function writeLibrary(library) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
+      heldLibrary = null;
     } catch (e) {
       console.error('Error saving library to localStorage:', e);
+      heldLibrary = JSON.stringify(library);
       ui.toast('Could not save — the browser storage is full or blocked');
     }
+  }
+  function saveStoredLibrary(library) {
+    sayNotKept();
+    const out = Object.assign({}, library);
+    Object.keys(visiting).forEach(id => {
+      const rec = library[id];
+      if (!rec || !rec.received) delete visiting[id];    // deleted here, or no longer a link's copy
+      else { visiting[id] = JSON.stringify(rec); delete out[id]; }
+    });
+    writeLibrary(out);
+  }
+  /* The link copies an embedded page has piled up (EMBEDDED IN ANOTHER SITE):
+     each one reopens from its own link. This app's library and the older
+     versions', which all share the frame's storage (each new version copied
+     the last one's, core.js carryOver). Only what came from a link: songs
+     from the Teacher Library's books, a lesson's exercises (a student's work
+     is in them) and the person's own songs all stay. */
+  function clearLinkCopies() {
+    if (!window.EVM_EMBEDDED_ELSEWHERE || window.EVM_STUDIO_EMBED) return;
+    [STORAGE_KEY, 'song_writer_30_library_v1', 'song_writer_25_library_v1', 'song_writer_2_library_v1'].forEach(key => {
+      try {
+        const lib = JSON.parse(localStorage.getItem(key) || 'null');
+        if (!lib || typeof lib !== 'object') return;
+        const copies = Object.keys(lib).filter(id => {
+          const r = lib[id];
+          return r && r.received && !r.book && String(id).indexOf('lesson_') !== 0;
+        });
+        if (!copies.length) return;
+        copies.forEach(id => { delete lib[id]; });
+        localStorage.setItem(key, JSON.stringify(lib));
+      } catch (e) { /* unreadable or refused: left as it is */ }
+    });
   }
 
   /* Every list in the app goes through here — which is what keeps the
@@ -998,8 +1071,15 @@ O'er[S1] the[S1] land[D2] -[R2] of[M2] the[F2] free[S2] And[D2] the[R2] home[M2]
       result = { action: 'sandbox', id };
     } else {
       result = EVM.file(library, incomingSong(data, 'Shared Song'), fileOpts(true));
+      /* Embedded in another site it is here for this visit, not filed. (A copy
+         that was already here, the person's own, a book's, stays what it is.) */
+      const rec = result.id ? library[result.id] : null;
+      if (window.EVM_EMBEDDED_ELSEWHERE && !window.EVM_STUDIO_EMBED && rec && rec.received && !rec.book
+          && (result.action === 'added' || result.action === 'updated')) {
+        visiting[result.id] = JSON.stringify(rec);
+      }
     }
-    if (result.id) saveStoredLibrary(library);
+    if (result.id && !visiting[result.id]) saveStoredLibrary(library);      // (a visiting song writes nothing)
     if (data.layout && SW.settings) SW.settings.applyLayoutSnapshot(data.layout, !!data.layoutLocked);
     clearLinkFromAddress();
     return result;
@@ -1209,9 +1289,11 @@ O'er[S1] the[S1] land[D2] -[R2] of[M2] the[F2] free[S2] And[D2] the[R2] home[M2]
 
   /* ---------------- boot ---------------- */
   function boot() {
+    clearLinkCopies();
     upgradeDefaults();
     openFirstSong();
     startShelf();
+    booted = true;
   }
 
   function openFirstSong() {
@@ -1237,7 +1319,10 @@ O'er[S1] the[S1] land[D2] -[R2] of[M2] the[F2] free[S2] And[D2] the[R2] home[M2]
         kept: 'Opened “' + t + '” — you already have a newer version',
         blank: 'That link holds an empty song, so nothing was added'
       }[filed.action];
-      if (said) ui.toast(said);
+      // (nothing is added to a library that will not outlive the page: js/embed.js, or storage that is
+      // full; and an embedded page says nothing of its library at all: its song opening is all that happened)
+      if (said && !((window.EVM_STORAGE_MEMORY || heldLibrary) && filed.action === 'added')
+          && !(window.EVM_EMBEDDED_ELSEWHERE && filed.action !== 'blank')) ui.toast(said);
       if (filed.id && loadSongById(filed.id)) return;
     }
     /* A link that cannot be read says so — and any link that does not

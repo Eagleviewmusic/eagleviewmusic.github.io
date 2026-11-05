@@ -341,8 +341,8 @@
         if (stack && SW.score.unrestColumn(stack)) { render(); return; }
       }
       const next = F.tapSlot(cells, c, span, Math.max(0, c0), c1);
-      // silence tapped past the melody's last note, with nothing to lengthen: no note can start (flow.js R2)
-      if (SILENCE[cell.t] && next.every((x, i) => x.t === cells[i].t)) { SW.ui.toast('Every note of this line is placed — to go on, add a note in Edit (+ Note)'); return; }
+      // a lesson that locks the notes: silence past the melody's last note, with nothing to lengthen (flow.js R2)
+      if (SILENCE[cell.t] && next.every((x, i) => x.t === cells[i].t)) { SW.ui.toast('Every note of this line is placed — this lesson keeps to the notes it has'); return; }
       pourCells(ctx, next, c);
     }
   });

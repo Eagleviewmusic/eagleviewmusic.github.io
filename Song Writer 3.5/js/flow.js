@@ -29,19 +29,29 @@
      R1  no word is deleted: only gaps and wordless "-" syllables are
          ever made or removed; every item is kept (at worst it waits at
          the line's end as a block)
-     R2  THE MELODY NEVER GROWS (2026-10-26, the user): no rhythm tool
-         makes a note. An onset the melody has no pitch left for is
-         silence — a rest where something follows it, nothing at all at
-         the line's end (the line ends with its last note; the staff
-         finishes the bar with drawn rests). Until then such an onset made
-         a GHOST note (2026-10-01: the pitch before, hollow and dashed) or
-         TIED the note before into it (2026-10-25): both grew the song with
-         notes nobody wrote, one yellow circle tapped in beat 1 turned the
-         line's last note into a tied half note, and the tie made the
-         circles unanswerable — a tap that split the held note was tied
-         straight back together, so the note looked locked. A song saved
-         with ghosts reads them as the silence they stood in for
-         (score.js normalizeScore).
+     R2  A NOTE NEEDS NO WORD (2026-11-04, the user: "lets allow notes to
+         be added even when there are no words to place under them"). The
+         circles' gestures (Rhythm page, beat strip) make what they show:
+         a sounding onset past the melody's last pitch is a NEW NOTE — an
+         ordinary note, the pitch before it, on a "-" syllable of its own,
+         ready for a word. It can be taken away as it came: a wordless note
+         at the end of the stream goes when its own place in time has gone,
+         or when it only repeats the pitch before it (so a circle tapped
+         twice gives the line back). A note with a word, or a pitch of its
+         own somewhere else in the line, still waits at the end as a block
+         (R1). Not every tool grows: the Edit box's value circles and Tie
+         keep to the notes there are — a note made shorter leaves silence,
+         and a block onset never grows (a block waiting at the line's end
+         is not a rhythm anyone tapped). A lesson that locks the melody or
+         the words (settings.can('structure')) keeps the old rule from
+         here on: an onset with no pitch is silence.
+         History: 2026-10-01 a GHOST note (the pitch before, hollow and
+         dashed); 2026-10-25 a TIE from the note before, which made the
+         circles unanswerable (a tap that split the held note was tied
+         straight back together, so it looked locked); 2026-10-26 THE
+         MELODY NEVER GROWS, silence — which left nowhere to go when the
+         words ran out. A song saved with ghosts still reads them as the
+         silence they stood in for (score.js normalizeScore).
      R3  the flow stays inside the line
      R6  every tool is one changed() — one Undo step
      R8  the stream moves by identity: an item is the same column objects
@@ -58,18 +68,22 @@
      • a rest onset: the gap that was there before (same place and
        length), or a new wordless rest column on the word before it (D3) —
        at the line's start, a "-" syllable of its own.
-     • a sounding onset with no item left is silence (R2): a rest where
-       something follows it, nothing at the line's end.
-     • items with no onset left wait at the line's end as blocks (R1).
+     • a sounding onset with no item left: with opts.grow a new wordless
+       note (R2); else silence — a rest where something follows it, nothing
+       at the line's end.
+     • items with no onset left wait at the line's end as blocks (R1) —
+       with opts.shed, those that are only wordless repeats, or whose own
+       time has gone, go instead (R2).
 
    API
      SW.flow.stream(lineModel) · onsets(lineModel)
-     SW.flow.pour(lineModel, onsets)    → { model, firstCol: Map(item → n) }
-     SW.flow.apply(line, onsets, focusItem, reason)   pour into the page
+     SW.flow.pour(lineModel, onsets, fixed, opts)  → { model, firstCol: Map(item → n), fresh: [n] }
+     SW.flow.apply(line, onsets, focusItem, reason, fixed, opts)   pour into the page
      SW.flow.itemAt(line, stack)        the stream item holding a column
      SW.flow.fillState() / fillBar()    the selected note to the bar line
      SW.flow.writeValue / tie / untie / insertRest   the Edit box's rhythm
                                         tools, as cell gestures (below)
+     SW.flow.restAtEnd / noteOnRest     a note put in on the line's last rest
      SW.flow.tap                        Tap it in (below)
      SW.flow.selfTest()                 the contract, on every line on screen
    ========================================================================== */
@@ -94,6 +108,8 @@
   function allowed() {
     return SW.settings && SW.settings.allowedValues ? SW.settings.allowedValues() : null;
   }
+  /* may a rhythm gesture make a new note? (R2; a lesson can lock that) */
+  const canGrow = () => !SW.settings || !SW.settings.can || SW.settings.can('structure');
 
   /* ================= THE STREAM ================= */
   /* the same sounding pitches (a tie holds only what both columns share — timing.js TIES) */
@@ -138,39 +154,65 @@
   }
 
   /* ================= POUR ================= */
-  function pour(lineModel, ons, fixed) {
+  function pour(lineModel, ons, fixed, opts) {
+    const o = opts || {};
     const st = stream(lineModel);
     const syls = lineModel.syllables || [];
+    /* Does this item carry anything that must not be lost: a word (or a
+       lane chord), a word's rest, a key change? */
+    const carries = it => it.rest || !!it.cols[0].key
+      || (syls[it.si].cols[0] === it.cols[0] && worded(syls[it.si]));
+    // the × on a bar: the wordless notes that stood in it go with it
+    if (o.dropIn) {
+      st.items = st.items.filter(it => carries(it) || it.start < o.dropIn[0] || it.start >= o.dropIn[1]);
+    }
     const mt = meter();
     const shift = shiftOf(lineModel);
     const ok = allowed();
     const emitted = [];                       // { si, col }
     const firstCol = new Map();               // item → index of its first column in the line
+    const fresh = [];                         // the new notes (R2): the index of each one's first column
     let k = 0;
     let lastSi = null;                        // the syllable written into last ('lead' at the start)
     let lastPitch = null;                     // the last column with a pitch, for the rests' kept pitch
     const used = new Set();
 
-    // R2: the melody never grows. The sounding onsets past its last item are
-    // silence; at the line's end they are not written at all — the line ends
-    // with its last note, and the bar is finished with drawn rests.
+    // a tap that makes room gives the notes waiting at the line's end their
+    // time back (applyCells, THE WAITING NOTES): those onsets were only theirs
+    let owed = o.owed || 0;
+    if (owed) {
+      ons = ons.slice();
+      let sounds = ons.filter(on => !on.rest).length;
+      for (let j = ons.length - 1; j >= 0 && owed > 0 && sounds > st.items.length; j--) {
+        if (ons[j].rest) continue;
+        ons.splice(j, 1);
+        sounds--;
+        owed--;
+      }
+    }
+    // R2: a sounding onset past the melody's last item is a new note when
+    // the gesture may grow it (never a block, nor a word's own rest). Else it
+    // is silence, and at the line's end it is not written at all: the line
+    // ends with its last note, and the bar is finished with drawn rests.
     let sounding = 0;
     ons = ons.map(on => {
       if (on.rest) return on;
       if (sounding < st.items.length) { sounding++; return on; }
+      if (o.grow && !on.block && !on.silent) return on;
       return Object.assign({}, on, { rest: true, over: true });
     });
     while (ons.length && ons[ons.length - 1].over) ons.pop();
 
     const emit = (si, col) => { emitted.push({ si, col }); lastSi = si; if (!isRestCol(col)) lastPitch = col; };
-    const rank = si => si === 'lead' ? -1 : si;
+    const isNew = si => typeof si === 'string' && si !== 'lead';   // a new note's own "-" syllable
+    const rank = si => si === 'lead' ? -1 : isNew(si) ? Infinity : si;
     // may a column go back into syllable si without breaking the order of the words?
     const canUse = si => {
       if (si === lastSi) return true;
       if (lastSi !== null && rank(si) < rank(lastSi)) return false;
       return k >= st.items.length || st.items[k].si >= si;
     };
-    const pitchSource = () => lastPitch || (st.items.find(it => !it.rest) || { cols: [{ notes: [{ n: 'do' }] }] }).cols[0];
+    const pitchSource = () => lastPitch || (st.items.find(it => !it.rest) || st.gaps[0] && { cols: [st.gaps[0].col] } || { cols: [{ notes: [{ n: 'do' }] }] }).cols[0];
     const restNotes = () => pitchSource().notes.map(n => { const m = clone(n); m.rest = true; delete m.alt; delete m.step; return m; });
     // a stretch of time written as values (tied when a sound takes more than one)
     const spelled = (on, rest) => SW.timing.spell(on.ticks, on.start + shift, mt, rest, ok);
@@ -216,11 +258,38 @@
           });
         }
       }
-      // (every sounding onset past the items became a rest above — R2)
+      else {
+        // R2: past the melody a new note, the pitch before it, with no word yet.
+        // A tie left on the note before would swallow its attack: the same pitch
+        const src = pitchSource().notes;
+        const sounds = src.filter(n => !n.rest);
+        const notes = (sounds.length ? sounds : src).map(n => { const m = clone(n); delete m.rest; return m; });
+        const end = emitted[emitted.length - 1];
+        if (end && end.col.tie) {
+          const c = Object.assign({}, end.col);
+          delete c.tie;
+          emitted[emitted.length - 1] = { si: end.si, col: c };
+        }
+        const si = 'new' + fresh.length;
+        fresh.push(emitted.length);
+        const ids = spelled(on, false);
+        ids.forEach((id, j) => {
+          const c = { v: id, notes: clone(notes) };
+          if (j < ids.length - 1) c.tie = true;
+          emit(si, c);
+        });
+      }
     });
-    // the melody outran the onsets: what is left waits as blocks
+    // the melody outran the onsets: what is left waits as blocks — or, when
+    // it is a wordless note with nothing to keep (R2), goes
+    const noSlot = it => !ons.some(on => !on.rest && on.start === it.start);
+    const repeats = (it, before) => !!before && !before.rest && sameNotes(it.cols[0], before.cols[before.cols.length - 1]);
+    let waiting = owed;
     while (k < st.items.length) {
+      const before = st.items[k - 1];
       const it = st.items[k++];
+      if (o.shed && !carries(it) && (noSlot(it) || repeats(it, before))) continue;
+      waiting++;
       firstCol.set(it, emitted.length);
       const c = clone(it.cols[0]);
       delete c.v; delete c.tie;
@@ -232,14 +301,14 @@
     let cur = null, curSi = undefined;
     emitted.forEach(({ si, col }) => {
       if (si !== curSi) {
-        cur = si === 'lead' ? { text: '-', cols: [] } : Object.assign({}, syls[si], { cols: [] });
+        cur = (si === 'lead' || isNew(si)) ? { text: '-', cols: [] } : Object.assign({}, syls[si], { cols: [] });
         out.push(cur);
         curSi = si;
       }
       cur.cols.push(col);
     });
     const model = Object.assign({}, lineModel, { syllables: out });
-    return { model, firstCol, stream: st };
+    return { model, firstCol, fresh, waiting, stream: st };
   }
 
   /* ================= INTO THE PAGE ================= */
@@ -271,17 +340,27 @@
   /* Pour new onsets into a line on the page, put the selection on the
      item asked for (or where it was), and make it one edit. `fixed`
      ({ index, cols }): that item's columns written as given when its
-     onset is as long as they are. */
-  function apply(line, ons, focusIndex, reason, fixed) {
+     onset is as long as they are. `opts`: pour's. A focusIndex past the
+     stream means the new notes, in order. */
+  let lastPoured = null;
+  function apply(line, ons, focusIndex, reason, fixed, opts) {
     const model = SW.score.readLine(line);
-    const res = pour(model, ons, fixed);
+    const res = pour(model, ons, fixed, opts);
+    lastPoured = res;
     const before = JSON.stringify(model.syllables);
     const after = JSON.stringify(res.model.syllables);
     if (before === after) return false;
     SW.score.replaceLine(line, res.model);
     const items = res.stream.items;
-    const it = items[Math.max(0, Math.min(items.length - 1, focusIndex || 0))];
-    const n = it && res.firstCol.has(it) ? res.firstCol.get(it) : 0;
+    const f = focusIndex || 0;
+    let n = 0;
+    if (f >= items.length && res.fresh.length) n = res.fresh[Math.min(f - items.length, res.fresh.length - 1)];
+    else {
+      // (an item that went — R2 — leaves the selection on the nearest one before it)
+      for (let j = Math.max(0, Math.min(items.length - 1, f)); j >= 0; j--) {
+        if (res.firstCol.has(items[j])) { n = res.firstCol.get(items[j]); break; }
+      }
+    }
     const stack = stacksOf(line)[n] || stacksOf(line)[0];
     const note = stack && stack.querySelector('.note');
     if (note) SW.score.setNoteAsActive(note, false);
@@ -404,6 +483,60 @@
     const cells = lay(ed.cells, ed.s + ed.own, V.byId(v).ticks / CELL, 'rest', false, ed.cells[ed.s]);
     if (!pourEdit(ed, cells, 'rest', null, true)) return false;
     selectAt(ed.line, ed.n + 1);
+    return true;
+  }
+
+  /* ================= A NOTE ON THE LAST REST (2026-11-04) =================
+     A rest with no note after it in its line is room the song has not
+     used yet, not a rest anyone is keeping: a note can go in right there
+     — a value circle, the lit circle, a letter key, the keyboard, ↑ ↓, or
+     the + (rhythm-panel.js, score.js). The rest becomes a note on a "-"
+     syllable of its own (so a word can land on it), at the pitch the rest
+     kept, as long as `v` (its own length when none is given; a rest that
+     was longer leaves the time after it silent again, a shorter one takes
+     what it needs from the silence after it). Nothing before it moves:
+     no word is poured, as the note is the stream's new last item. One
+     changed(). A rest with music after it is a different thing (it holds
+     the notes after it apart): restAtEnd is false, and these leave it to
+     the caller. */
+  function restAtEnd(stack) {
+    if (!S.editing || !canGrow()) return false;
+    const ed = cellEdit(stack);
+    return !!(ed && ed.gap && !ed.st.items.some(it => it.start > ed.gap.start));
+  }
+  function noteOnRest(stack, v, reason) {
+    if (!restAtEnd(stack)) return false;
+    const line = lineEl(stack);
+    const model = SW.score.readLine(line);
+    const at = flatAt(model, stacksOf(line).indexOf(stack));
+    if (!at) return false;
+    const sy = model.syllables[at.si];
+    const col = sy.cols[at.ci];
+    col.notes.forEach(n => { delete n.rest; });
+    // a new attack: no tie runs into it
+    const flat = [].concat(...model.syllables.map(y => y.cols));
+    const prev = flat[flat.indexOf(col) - 1];
+    if (prev) delete prev.tie;
+    if (at.ci > 0) {
+      const own = { text: '-', cols: sy.cols.splice(at.ci) };
+      if (sy.hy) own.hy = true;                      // inside a word it is a syllable of that word, as + is
+      model.syllables.splice(at.si + 1, 0, own);
+    }
+    const cs = cellsOf(model);
+    const cells = cs.cells.slice();
+    const item = cs.st.items.find(it => it.cols[0] === col);
+    if (!item) return false;
+    if (v && V.isValid(v)) {
+      const s = item.start / CELL;
+      lay(cells, s, V.byId(v).ticks / CELL, 'sound', false, cells[s]);
+    }
+    const res = pour(model, onsetsFromCells(cells, { bar: meter().barTicks, shift: cs.shift }));
+    SW.score.replaceLine(line, res.model);
+    const poured = res.stream.items.find(it => it.cols[0] === col);
+    const now = stacksOf(line)[poured && res.firstCol.has(poured) ? res.firstCol.get(poured) : 0];
+    const note = now && now.querySelector('.note');
+    if (note) SW.score.setNoteAsActive(note, false);
+    SW.score.changed(reason || 'value');
     return true;
   }
 
@@ -815,7 +948,7 @@
   }
   /* Does a note of the melody start at cell i or after it — is there a
      pitch left for a note started at i? (R2: when not, a tap on silence
-     cannot start one.) */
+     makes a new note; where a lesson locks the notes it cannot start one.) */
   function noteLeft(cells, i) {
     return cells.some((c, j) => j >= i && c.item && c.on && c.on.start === j * CELL);
   }
@@ -846,12 +979,11 @@
       }
     } else if (t === 'hold') {
       setT(cells, i, 'on');                                       // a new note: the next pitch comes in
-    } else if (!noteLeft(cells, i)) {
-      // past the melody's last note no note can start (R2). Right after
-      // that note, the time is the note's: it goes on through the slot
-      // to the end of its beat (the user, 2026-10-25: the extra time
-      // belongs to the note before). Elsewhere nothing changes, and the
-      // page says why.
+    } else if (!canGrow() && !noteLeft(cells, i)) {
+      // a lesson that locks the notes: past the melody's last note no note
+      // can start (R2). Right after that note, the time is the note's: it
+      // goes on through the slot to the end of its beat (the user,
+      // 2026-10-25). Elsewhere nothing changes, and the page says why.
       if (!(i > 0 && SOUND[cells[i - 1].t])) return cells;
       let j = i;
       for (; j < b1 && (cells[j].t === 'rest' || cells[j].t === 'reston' || cells[j].t === 'fill'); j++) setT(cells, j, 'hold');
@@ -932,9 +1064,27 @@
     if (after < cells.length && cells[after].t === 'bhold') writeBlockAt(cells, after);
     return cells;
   }
+  /* THE WAITING NOTES. A circle tapped off pushes the line's last notes on
+     (R1): a note with a word or its own pitch waits past where the line
+     ended. Tap that circle on again and the onset it waits on is one onset
+     too many — taken for a new note (R2), the tap would leave a stray at
+     the end of the line instead of giving back what was there. So the page
+     remembers how many notes are waiting, for as long as nothing else has
+     changed the line, and a tap that makes room takes that time back. A
+     tap past the waiting notes is a new note as ever. (The page writes a
+     block when it draws it, so the key leaves out the waiting notes' values.) */
+  let waiting = null;                         // { line, n, key }
+  function waitKey(model, n) {
+    const tail = new Set();
+    stream(model).items.slice(-n).forEach(it => it.cols.forEach(c => tail.add(c)));
+    return JSON.stringify(model.syllables.map(sy => [sy.text, sy.chord, sy.hy, sy.cols.map(c => tail.has(c) ? c.notes : c)]));
+  }
   /* Pour cells into a line on the page; the selection goes to the note
-     that now starts at cell `focus` (or the one sounding there). */
-  function applyCells(line, cells, focus) {
+     that now starts at cell `focus` (or the one sounding there). A tapped
+     rhythm makes the notes it shows and takes them away again (R2);
+     opts.dropIn [from, to) (ticks, the × on a bar): the wordless notes
+     that stood there go with it, and nothing new is made. */
+  function applyCells(line, cells, focus, opts) {
     const model0 = SW.score.readLine(line);
     const ons = onsetsFromCells(cells, { bar: meter().barTicks, shift: shiftOf(model0) });
     let k = 0;
@@ -945,7 +1095,19 @@
     const st = stream(model0);
     const at = ons.find(o => o.start === (focus || 0) * CELL);
     if (!(at && !at.rest)) k = Math.max(0, k - 1);
-    return apply(line, ons, Math.min(k, st.items.length - 1), 'rhythm');
+    const dropIn = opts && opts.dropIn;
+    const grow = canGrow();
+    const held = waiting && waiting.line === line && waiting.key === waitKey(model0, waiting.n) ? waiting.n : 0;
+    const lastStart = st.items.length ? st.items[st.items.length - 1].start : 0;
+    const owed = grow && !dropIn && (focus || 0) * CELL <= lastStart ? held : 0;
+    // (taken back, the note the tap made is an old one: the stream has room for it)
+    const did = apply(line, ons, grow && !dropIn && !owed ? k : Math.min(k, st.items.length - 1), 'rhythm', null,
+      { grow: grow && !dropIn, shed: grow, dropIn: grow ? dropIn : null, owed });
+    if (did) {
+      const n = grow && !dropIn ? lastPoured.waiting + (held - owed) : 0;
+      waiting = n > 0 ? { line, n, key: waitKey(SW.score.readLine(line), n) } : null;
+    }
+    return did;
   }
   /* the page's column (harmony-stack) for a column object of `model`, the
      model the line was last read as */
@@ -1123,7 +1285,7 @@
 
   SW.flow = {
     stream, onsets, pour, apply, itemAt, fillState, fillBar, tap, selfTest, shiftOf,
-    setLength, writeValue, tie, untie, insertRest,
+    setLength, writeValue, tie, untie, insertRest, restAtEnd, noteOnRest, canGrow,
     CELL, cellsOf, onsetsFromCells, noteLeft, tapSlot, joined, canJoin, toggleJoin, coarsen, needsSixteenths, writePattern, applyCells, stackAt,
     piecesOf, realize, stepPiece, pendingPiece: () => pending
   };

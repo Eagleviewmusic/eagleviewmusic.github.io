@@ -17,7 +17,11 @@
    + = + Note Only (duplicateCurrentNote): a note after it on the same
    syllable, with no word of its own — a double-tap under it gives it one
    (score.js wordUnderColumn). Where a lesson leaves connected notes out
-   but words in, + adds a syllable instead (+ Note/Syllable).
+   but words in, + adds a syllable instead (+ Note/Syllable). On a rest
+   with no note after it in its line, + puts the note in right there, the
+   rest's own place and length (2026-11-04; flow.js noteOnRest); on any
+   other rest, a note after it. A syllable with eight notes is no wall:
+   the next one has a "-" of its own (score.js duplicateCurrentNote).
 
    On a written line (2026-10-26, the user: on the word's whole box they
    were far from the note, and a tap meant for a note above or beside it
@@ -83,6 +87,7 @@
     if (!b) return;
     SW.ui.closeAllPopovers();
     if (b === del) SW.score.deleteCurrentNote();
+    else if (SW.score.noteOnSelectedRest()) return;
     else if (addMode() === 'note') SW.score.duplicateCurrentNote();
     else if (addMode() === 'syllable') SW.score.addSyllableAfterCurrent();
   });
@@ -146,8 +151,10 @@
     add.style.left = ax.toFixed(1) + 'px';
     add.style.top = ay.toFixed(1) + 'px';
     label(del, st.whole ? 'Delete this note and its word' : 'Delete this note');
-    const full = mode === 'note' && !SW.score.connectedState().canAdd;
-    label(add, mode === 'syllable' ? 'Add a note after this one, with a syllable of its own'
+    const full = mode === 'note' && !SW.score.connectedState().canAdd && !can('structure');
+    const onRest = note.classList.contains('rest-note');
+    label(add, onRest && SW.flow.restAtEnd(stack) ? 'Put a note here, in place of this rest'
+      : mode === 'syllable' ? 'Add a note after this one, with a syllable of its own'
       : full ? 'This syllable has as many notes as it can hold' : 'Add a note after this one');
     add.classList.toggle('is-full', full);
   }
