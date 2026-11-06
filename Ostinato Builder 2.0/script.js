@@ -7149,6 +7149,8 @@
   }
 
   function decodeSong(encoded) {
+    // a short link: read before the app opened anything (SHORT LINKS, below)
+    if (String(encoded).charAt(0) === '~') return unpackedLinks[encoded] || null;
     try {
       const binary = atob(encoded);
       const bytes = new Uint8Array(binary.length);
@@ -7156,6 +7158,79 @@
       return JSON.parse(new TextDecoder().decode(bytes));
     } catch (e) {
       return null;
+    }
+  }
+
+  /* SHORT LINKS (2026-11-05), the way Song Writer makes them. A piece's
+     JSON in plain base64 is mostly the same few words again and again
+     ("slots", "cells", false, false…), so even a one-bar piece ran to
+     3,700 characters and four sections of sixteen bars to 50,000. Now it
+     is deflated first (the browser's own CompressionStream) and written in
+     base64url after a '~': #song=~… and #lesson=~…, about a sixth as long,
+     and a twentieth on a big piece. Nothing about the piece is left out or
+     rewritten, so it opens exactly as it was.
+
+     Links without the '~' are read as before, and a browser that cannot
+     deflate still makes those.
+
+     Deflating runs asynchronously: packSong(record) → a promise of the
+     text to put after `song=`. unpackLinks() reads the address's short
+     links before anything is opened (GO, at the bottom), so decodeSong
+     stays synchronous. */
+  const unpackedLinks = {};
+  const canPack = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+
+  async function streamBytes(bytes, stream) {
+    return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+  }
+
+  function toBase64Url(bytes) {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function fromBase64Url(text) {
+    let b = text.replace(/-/g, '+').replace(/_/g, '/');
+    while (b.length % 4) b += '=';
+    const binary = atob(b);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  async function packSong(record) {
+    if (canPack) {
+      try {
+        const bytes = new TextEncoder().encode(JSON.stringify(record));
+        return '~' + toBase64Url(await streamBytes(bytes, new CompressionStream('deflate')));
+      } catch (e) { /* the long form below still works */ }
+    }
+    return encodeURIComponent(encodeSong(record));
+  }
+
+  // every song or lesson in the address that is a short link: hash, then query
+  function shortLinksInAddress() {
+    const found = [];
+    [window.location.hash, window.location.search].forEach(part => {
+      const params = new URLSearchParams(part.replace(/^[#?]/, ''));
+      ['song', 'lesson'].forEach(k => {
+        const v = params.get(k);
+        if (v && v.charAt(0) === '~') found.push(v);
+      });
+    });
+    return found;
+  }
+
+  async function unpackLinks() {
+    for (const v of shortLinksInAddress()) {
+      if (!canPack) continue;
+      try {
+        const bytes = await streamBytes(fromBase64Url(v.slice(1)), new DecompressionStream('deflate'));
+        unpackedLinks[v] = JSON.parse(new TextDecoder().decode(bytes));
+      } catch (e) {
+        console.error('Could not read link data:', e);   // cut short, most likely: decodeSong gives null
+      }
     }
   }
 
@@ -7196,10 +7271,11 @@
        address too long for it (GitHub Pages refuses past ~8 KB with
        "URI too long", and the app never loads). ?song= links still open. */
     const base = window.location.origin + window.location.pathname;
-    const link = base + '#song=' + encodeURIComponent(encodeSong(record));
+    const link = packSong(record).then(packed => base + '#song=' + packed);   // SHORT LINKS
 
-    shareLinkInput.value = link;
+    shareLinkInput.value = '';
     shareRow.hidden = false;
+    link.then(address => { shareLinkInput.value = address; });
 
     /* A file:// page has no origin worth sending, and the link would be
        useless to anyone else. Say so rather than handing over something
@@ -7209,7 +7285,7 @@
       shareStatus.className = 'status-msg error';
     } else {
       shareStatus.className = 'status-msg';
-      copyLink();
+      copyLink(link);
     }
   });
 
@@ -7241,9 +7317,25 @@
     }
   }
 
-  function copyLink() {
-    if (!shareLinkInput.value) return;
-    writeToClipboard(shareLinkInput.value).then(ok => {
+  /* The same, for a short link still being packed: the clipboard is asked
+     inside the click, with the text to follow, because Safari refuses a
+     copy made after the click is over. Where that is not possible, the
+     text is copied once it is ready. */
+  async function writeToClipboardLater(promisedText) {
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      try {
+        const blob = promisedText.then(text => new Blob([text], { type: 'text/plain' }));
+        await navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
+        return true;
+      } catch (err) { /* fall through to the plain copy */ }
+    }
+    return writeToClipboard(await promisedText);
+  }
+
+  // `packing`: the link's promise, when it has only just been asked for
+  function copyLink(packing) {
+    if (!packing && !shareLinkInput.value) return;
+    (packing ? writeToClipboardLater(packing) : writeToClipboard(shareLinkInput.value)).then(ok => {
       if (ok) {
         copyLinkLabel.textContent = 'Copied';
         shareStatus.textContent = 'Link copied to your clipboard.';
@@ -7257,7 +7349,7 @@
       }
     });
   }
-  document.getElementById('copy-link-btn').addEventListener('click', copyLink);
+  document.getElementById('copy-link-btn').addEventListener('click', () => copyLink());
 
   /* ---- backup files ---- */
 
@@ -8699,9 +8791,11 @@
 
   if (lessonPreviewBtn) lessonPreviewBtn.addEventListener('click', startPreview);
 
+  // `link`: a promise of the address, still being packed (SHORT LINKS)
   function offerLink(link, input, row, textEl, feedbackEl) {
-    if (input) input.value = link;
+    if (input) input.value = '';
     if (row) row.hidden = false;
+    link.then(address => { if (input) input.value = address; });
     if (window.location.protocol === 'file:') {
       if (feedbackEl) {
         feedbackEl.textContent = 'This page is open from a folder, so the link only works on this computer.';
@@ -8709,7 +8803,7 @@
       }
       return;
     }
-    writeToClipboard(link).then(ok => {
+    writeToClipboardLater(link).then(ok => {
       if (ok) {
         if (textEl) textEl.textContent = 'Copied';
         if (feedbackEl) {
@@ -8740,9 +8834,8 @@
       /* In the hash, not the query: the payload carries whole ostinatos
          and has no business being sent to a server, or landing in its
          logs on the way past. */
-      const encoded = encodeSong(buildLessonPayload());
-      const link = window.location.origin + window.location.pathname
-        + '#lesson=' + encodeURIComponent(encoded);
+      const base = window.location.origin + window.location.pathname;
+      const link = packSong(buildLessonPayload()).then(packed => base + '#lesson=' + packed);
       offerLink(link, lessonLinkInput, lessonLinkRow, lessonLinkCopyText, lessonLinkFeedback);
     });
   }
@@ -9382,45 +9475,52 @@
      can even see. Then a shared song, which also beats whatever was open
      last — following a link is a deliberate act, and it files the piece
      in the library on the way in. */
-  let openedFromLesson = false;
-  /* Embedded in the Music Stand there is no link to read — the Music Stand sends the song. */
-  const lessonPayload = EMBEDDED ? null : checkUrlForLesson();
-  if (lessonPayload) {
-    const landing = openLesson(lessonPayload);
-    if (landing) openedFromLesson = openSong(landing);
-    if (!openedFromLesson) toast('That lesson link could not be read');
-  }
-  if (!openedFromLesson && (EMBEDDED || !offerSharedSong())) restoreLastSong();
-  /* A song or lesson link pasted into the address bar of the app already
-     open changes only the hash, which loads nothing: start again, so it is
-     read (leaving saves the work, as it always does). */
-  if (!EMBEDDED) window.addEventListener('hashchange', () => {
-    if (/[#&](song|lesson)=/.test(window.location.hash)) window.location.reload();
-  });
-
-  applyPolicyToShell();
-
-  /* The Teacher Library shelf: books out are kept in step every visit
-     (new ostinatos arrive, put-back and deleted ones leave). Not in the
-     Music Stand, which must not write this app's library, and not in a
-     lesson. */
-  if (window.EVMShelf) {
-    EVMShelf.init({
-      app: 'ostinato-builder',
-      disabled: EMBEDDED || !!lessonMeta,
-      load: getStoredLibrary,
-      save: saveStoredLibrary,
-      incoming: rec => normalizeSong(Object.assign({}, rec, { id: rec.id || 'incoming' })),
-      key: songKey,
-      changed: shelfChanged,
-      openSong: id => {
-        flushAutosave();
-        openSong(id);
-        closeSheet(librarySheet);
-      }
+  function openFromAddress() {
+    let openedFromLesson = false;
+    /* Embedded in the Music Stand there is no link to read — the Music Stand sends the song. */
+    const lessonPayload = EMBEDDED ? null : checkUrlForLesson();
+    if (lessonPayload) {
+      const landing = openLesson(lessonPayload);
+      if (landing) openedFromLesson = openSong(landing);
+      if (!openedFromLesson) toast('That lesson link could not be read');
+    }
+    if (!openedFromLesson && (EMBEDDED || !offerSharedSong())) restoreLastSong();
+    /* A song or lesson link pasted into the address bar of the app already
+       open changes only the hash, which loads nothing: start again, so it is
+       read (leaving saves the work, as it always does). */
+    if (!EMBEDDED) window.addEventListener('hashchange', () => {
+      if (/[#&](song|lesson)=/.test(window.location.hash)) window.location.reload();
     });
-    EVMShelf.sync();
+
+    applyPolicyToShell();
+
+    /* The Teacher Library shelf: books out are kept in step every visit
+       (new ostinatos arrive, put-back and deleted ones leave). Not in the
+       Music Stand, which must not write this app's library, and not in a
+       lesson. */
+    if (window.EVMShelf) {
+      EVMShelf.init({
+        app: 'ostinato-builder',
+        disabled: EMBEDDED || !!lessonMeta,
+        load: getStoredLibrary,
+        save: saveStoredLibrary,
+        incoming: rec => normalizeSong(Object.assign({}, rec, { id: rec.id || 'incoming' })),
+        key: songKey,
+        changed: shelfChanged,
+        openSong: id => {
+          flushAutosave();
+          openSong(id);
+          closeSheet(librarySheet);
+        }
+      });
+      EVMShelf.sync();
+    }
   }
+  /* A short link is unpacked first, which takes a moment and cannot be
+     waited for here (SHORT LINKS); anything else opens straight away, as it
+     always has. */
+  if (!EMBEDDED && shortLinksInAddress().length) unpackLinks().then(openFromAddress, openFromAddress);
+  else openFromAddress();
 
   /* The artwork loads after the first layout; a beat's width does not
      depend on it, but the fit does, so settle again once it is in. */

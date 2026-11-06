@@ -51,7 +51,7 @@
   };
 })();
 
-(function() {
+(async function() {
   // Shared library rules (ids, updatedAt, the import rule): lib/evm-library.js
   const EVM = window.EVMLibrary;
   const container = document.getElementById('poem');
@@ -1498,6 +1498,21 @@
         return false;
       }
     }
+  }
+
+  /* The same, for a short link still being packed: the clipboard is asked
+     inside the click, with the text to follow, because Safari refuses a
+     copy made after the click is over. Where that is not possible, the
+     text is copied once it is ready. */
+  async function copyToClipboardLater(promisedText) {
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      try {
+        const blob = promisedText.then(text => new Blob([text], { type: 'text/plain' }));
+        await navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
+        return true;
+      } catch (err) { /* fall through to the plain copy */ }
+    }
+    return copyToClipboard(await promisedText);
   }
 
   // Copy canvas to clipboard
@@ -4255,6 +4270,8 @@
   }
 
   function decodeSongFromUrl(base64Str) {
+    // a short link: read before the app opened anything (SHORT LINKS, below)
+    if (String(base64Str).charAt(0) === '~') return unpackedLinks[base64Str] || null;
     try {
       const binary = atob(base64Str);
       const bytes = new Uint8Array(binary.length);
@@ -4269,14 +4286,85 @@
     }
   }
 
+  /* SHORT LINKS (2026-11-05), the way Song Writer and Ostinato Builder make
+     them. A song's JSON in plain base64 says the same few words again and
+     again, and repeats the whole of the partner song on the other side. Now
+     it is deflated first (the browser's own CompressionStream) and written
+     in base64url after a '~': #song=~… and #lesson=~…. Nothing about the
+     song is left out or rewritten, so it opens exactly as it was.
+
+     Links without the '~' are read as before, and a browser that cannot
+     deflate still makes those.
+
+     Deflating runs asynchronously: packSong(data) → a promise of the text
+     to put after `song=`. unpackLinks() reads the address's short links
+     before anything is opened (INITIALIZATION, at the bottom), so
+     decodeSongFromUrl stays synchronous. */
+  const unpackedLinks = {};
+  const canPack = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+
+  async function streamBytes(bytes, stream) {
+    return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+  }
+
+  function toBase64Url(bytes) {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function fromBase64Url(text) {
+    let b = text.replace(/-/g, '+').replace(/_/g, '/');
+    while (b.length % 4) b += '=';
+    const binary = atob(b);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  async function packSong(data) {
+    if (canPack) {
+      try {
+        const bytes = new TextEncoder().encode(JSON.stringify(data));
+        return '~' + toBase64Url(await streamBytes(bytes, new CompressionStream('deflate')));
+      } catch (e) { /* the long form below still works */ }
+    }
+    return encodeURIComponent(encodeSongToUrl(data));
+  }
+
+  // every song or lesson in the address that is a short link: hash, then query
+  function shortLinksInAddress() {
+    const found = [];
+    [window.location.hash, window.location.search].forEach(part => {
+      const params = new URLSearchParams(part.replace(/^[#?]/, ''));
+      ['song', 'lesson'].forEach(k => {
+        const v = params.get(k);
+        if (v && v.charAt(0) === '~') found.push(v);
+      });
+    });
+    return found;
+  }
+
+  async function unpackLinks() {
+    for (const v of shortLinksInAddress()) {
+      if (!canPack) continue;
+      try {
+        const bytes = await streamBytes(fromBase64Url(v.slice(1)), new DecompressionStream('deflate'));
+        unpackedLinks[v] = JSON.parse(new TextDecoder().decode(bytes));
+      } catch (e) {
+        console.error('Could not read link data:', e);   // cut short, most likely: decodeSongFromUrl gives null
+      }
+    }
+  }
+
+  // A promise of the address (SHORT LINKS).
   function generateShareLink(songData) {
     /* In the HASH (#song=, 2026-09-28), as lesson links are: the part
        after # never reaches the server, so a long piece cannot make the
        address too long for it (GitHub Pages refuses past ~8 KB with
        "URI too long", and the app never loads). ?song= links still open. */
-    const encoded = encodeSongToUrl(songData);
     const baseUrl = window.location.origin + window.location.pathname;
-    return `${baseUrl}#song=${encodeURIComponent(encoded)}`;
+    return packSong(songData).then(packed => `${baseUrl}#song=${packed}`);
   }
 
   /* Through copyToClipboard(), not navigator.clipboard directly. Served
@@ -4358,10 +4446,11 @@
     if (partner) songData.partner = partner;
 
     const link = generateShareLink(songData);
-    if (shareLinkInput) shareLinkInput.value = link;
+    if (shareLinkInput) shareLinkInput.value = '';
     if (shareLinkContainer) shareLinkContainer.hidden = false;
+    link.then(address => { if (shareLinkInput) shareLinkInput.value = address; });
 
-    copyToClipboard(link).then(ok => {
+    copyToClipboardLater(link).then(ok => {
       if (ok) {
         if (copyShareLinkBtnText) copyShareLinkBtnText.textContent = 'Copied';
         if (shareLinkFeedback) shareLinkFeedback.textContent = 'Link copied to your clipboard.';
@@ -9299,10 +9388,12 @@
 
   if (lessonPreviewBtn) lessonPreviewBtn.addEventListener('click', startPreview);
 
+  // `link`: a promise of the address, still being packed (SHORT LINKS)
   function offerLink(link, input, row, textEl, feedbackEl) {
-    if (input) input.value = link;
+    if (input) input.value = '';
     if (row) row.hidden = false;
-    copyToClipboard(link).then(ok => {
+    link.then(address => { if (input) input.value = address; });
+    copyToClipboardLater(link).then(ok => {
       if (ok) {
         if (textEl) textEl.textContent = 'Copied';
         if (feedbackEl) feedbackEl.textContent = 'Link copied to your clipboard.';
@@ -9326,9 +9417,8 @@
 
       /* In the hash, not the query: the payload carries whole songs and has
          no business being sent to a server, or landing in its logs. */
-      const encoded = encodeSongToUrl(buildLessonPayload());
-      const link = window.location.origin + window.location.pathname
-        + '#lesson=' + encodeURIComponent(encoded);
+      const base = window.location.origin + window.location.pathname;
+      const link = packSong(buildLessonPayload()).then(packed => base + '#lesson=' + packed);
       offerLink(link, lessonLinkInput, lessonLinkRow, lessonLinkCopyText, lessonLinkFeedback);
     });
   }
@@ -9765,6 +9855,11 @@
   }
 
   // --- INITIALIZATION ---
+  /* A short link is unpacked first, which takes a moment (SHORT LINKS);
+     anything else carries straight on, as it always has. This is why the
+     function around all of this is async. */
+  if (!EMBEDDED && shortLinksInAddress().length) await unpackLinks();
+
   /* A lesson link wins over everything else: it is the reason the page was
      opened at all, and it decides which songs the rest of this can see.
      Embedded in the Music Stand there is no link to read — the Music Stand sends the song. */
@@ -9870,6 +9965,10 @@
       blank: 'That link holds an empty song, so nothing was added'
     }[sharedFiled.action];
     if (said) toast(said);
+  } else if (!EMBEDDED && !lessonPayload && /[#?&](song|lesson)=/.test(window.location.hash + window.location.search)) {
+    /* A link that could not be read, cut short most likely: say so, rather
+       than quietly opening what was open last as if it were the link. */
+    toast('That link could not be read');
   }
   applyPolicyToShell();
 
@@ -9918,7 +10017,9 @@
   }
 
   // SVGs decode after the first paint, so refit once they have real dimensions.
-  window.addEventListener('load', () => requestAnimationFrame(applyZoom));
+  // (Waiting for a short link can mean the page has already finished loading.)
+  if (document.readyState === 'complete') requestAnimationFrame(applyZoom);
+  else window.addEventListener('load', () => requestAnimationFrame(applyZoom));
 
 
   window.addEventListener('beforeunload', () => saveCurrentSongToLibrary());

@@ -29,7 +29,7 @@
    change a library or a setting in either app.
    ============================================================ */
 
-(function () {
+(async function () {
   'use strict';
 
   /* ==================================================================
@@ -2630,6 +2630,40 @@
     return btoa(bin);
   }
 
+  /* A short link (#pair=~… and the apps' #song=~…, since 2026-11-05): the
+     JSON deflated, in base64url after a '~'. A browser that cannot deflate
+     still makes the long form. */
+  async function packLink(value) {
+    try {
+      const bytes = new TextEncoder().encode(JSON.stringify(value));
+      const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate'));
+      const out = new Uint8Array(await new Response(stream).arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < out.length; i++) bin += String.fromCharCode(out[i]);
+      return '~' + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    } catch (e) {
+      return encodeURIComponent(encodeBase64Json(value));
+    }
+  }
+
+  /* And reading one. Anything without the '~' is plain base64. Asynchronous
+     either way, since inflating is. */
+  async function readLinkData(str) {
+    const text = String(str).trim();
+    if (text.charAt(0) !== '~') return decodeBase64Json(text);
+    try {
+      let b = text.slice(1).replace(/-/g, '+').replace(/_/g, '/');
+      while (b.length % 4) b += '=';
+      const bin = atob(b);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+      return JSON.parse(new TextDecoder().decode(await new Response(stream).arrayBuffer()));
+    } catch (e) {
+      return null;
+    }
+  }
+
   /* Which side a payload belongs to is read from its shape, not from the
      address it came from: an ostinato has tracks, a poem or rhythm has a
      poetry or rhythm state. Either app's link can be pasted anywhere. */
@@ -2646,7 +2680,7 @@
     return { error: 'That link opened, but it is not a poem or an ostinato.' };
   }
 
-  function parseLink(text) {
+  async function parseLink(text) {
     const raw = String(text || '').trim();
     if (!raw) return { error: 'Paste a link first.' };
     let url = null;
@@ -2655,12 +2689,12 @@
       const sources = [url.searchParams, new URLSearchParams(url.hash.replace(/^#/, ''))];
       for (const params of sources) {
         for (const key of ['pair', 'song', 'lesson']) {
-          if (params.has(key)) return classify(key, key === 'lesson' ? {} : decodeBase64Json(params.get(key)));
+          if (params.has(key)) return classify(key, key === 'lesson' ? {} : await readLinkData(params.get(key)));
         }
       }
       return { error: 'That link has no song in it. Make the link from the app’s Share & backup sheet.' };
     }
-    const data = decodeBase64Json(raw);
+    const data = await readLinkData(raw);
     return data ? classify('song', data) : { error: 'That doesn’t look like a share link.' };
   }
 
@@ -2673,8 +2707,8 @@
     return ok;
   }
 
-  $('link-open').addEventListener('click', () => {
-    const parsed = parseLink($('link-input').value);
+  $('link-open').addEventListener('click', async () => {
+    const parsed = await parseLink($('link-input').value);
     const status = $('link-status');
     if (parsed.error) {
       status.textContent = parsed.error;
@@ -2689,14 +2723,14 @@
 
   /* A link pasted anywhere on the page, outside a text field, goes
      straight to the side it belongs to. */
-  document.addEventListener('paste', e => {
+  document.addEventListener('paste', async e => {
     const t = e.target;
     if (t && t.matches && t.matches('input, textarea')) return;
     const text = e.clipboardData && e.clipboardData.getData('text');
     if (!text || !/song=|pair=/.test(text)) return;
-    const parsed = parseLink(text);
-    if (parsed.error) { toast(parsed.error); return; }
     e.preventDefault();
+    const parsed = await parseLink(text);
+    if (parsed.error) { toast(parsed.error); return; }
     if (openParsed(parsed)) toast('Opened from the link');
   });
 
@@ -3380,9 +3414,10 @@
     /* In the HASH (#pair=, 2026-09-28): an arrangement holds two whole
        pieces, and as ?pair= a big one made an address too long for the
        server (GitHub Pages refuses past ~8 KB), so the stand never loaded.
-       The part after # never leaves the browser. ?pair= links still open. */
-    return window.location.origin + window.location.pathname
-      + '#pair=' + encodeURIComponent(encodeBase64Json(payload));
+       The part after # never leaves the browser. ?pair= links still open.
+       A promise of the address, since packing it is asynchronous (packLink). */
+    const base = window.location.origin + window.location.pathname;
+    return packLink(payload).then(packed => base + '#pair=' + packed);
   }
 
   /* From a link, pasted or followed. Filed first — "make sure this is
@@ -3451,8 +3486,9 @@
   $('share-make').addEventListener('click', () => {
     const link = makeShareLink();
     if (!link) return;
-    $('share-link').value = link;
-    copyText(link).then(ok => {
+    $('share-link').value = '';
+    link.then(address => { $('share-link').value = address; });
+    copyTextLater(link).then(ok => {
       $('share-status').textContent = ok ? 'Link copied to your clipboard.' : 'Select the link and copy it.';
       $('share-status').className = 'status-msg ' + (ok ? 'ok' : '');
       if (!ok) { $('share-link').focus(); $('share-link').select(); }
@@ -3680,6 +3716,21 @@
     }
   }
 
+  /* The same, for a short link still being packed: the clipboard is asked
+     inside the click, with the text to follow, because Safari refuses a
+     copy made after the click is over. Where that is not possible, the
+     text is copied once it is ready. */
+  async function copyTextLater(promisedText) {
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      try {
+        const blob = promisedText.then(text => new Blob([text], { type: 'text/plain' }));
+        await navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
+        return true;
+      } catch (e) { /* fall through to the plain copy */ }
+    }
+    return copyText(await promisedText);
+  }
+
 
   /* ==================================================================
      PRESENT MODE
@@ -3846,7 +3897,8 @@
     const inHash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     const params = inHash.has('pair') ? inHash : new URLSearchParams(window.location.search);
     if (params.has('pair')) {
-      linkPair = decodeBase64Json(params.get('pair'));
+      // the one wait in starting up, and why the function around all this is async
+      linkPair = await readLinkData(params.get('pair'));
       window.history.replaceState(null, document.title, window.location.pathname);
       if (!linkPair) toast('That arrangement link could not be read');
     }

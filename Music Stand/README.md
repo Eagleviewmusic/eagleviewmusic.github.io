@@ -129,6 +129,9 @@ in Rhythm Poetry and Ostinato Builder:
   song links are `#song=` too). The part after `#` never reaches the server, so a
   big arrangement cannot make the address too long for GitHub Pages (~8 KB, "URI
   too long"). `?pair=` / `?song=` links made before still open.
+  Since 2026-11-05 links are short (`#pair=~…` here, `#song=~…` in Rhythm Poetry and
+  Ostinato Builder: the JSON deflated, in base64url after the `~`); all of them open
+  here, and so do the long ones made before.
 - **Links never pile up.** A `#pair=` link is filed before it is opened
   (`EVMLibrary.file`): the same link again finds the arrangement already here; a
   newer version of it (same id, later `updatedAt`) replaces the old one; a link
