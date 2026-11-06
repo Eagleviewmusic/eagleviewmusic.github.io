@@ -1137,6 +1137,7 @@ const scaleSelector = document.getElementById('scale-select');
 const keyNameBtn = document.getElementById('key-name');
 const focusBtn = document.getElementById('focus-btn');
 const layoutBtn = document.getElementById('layout-btn');
+const namesBtn = document.getElementById('names-btn');
 const volumeRange = document.getElementById('volume-range');
 const volumeValue = document.getElementById('volume-value');
 const roomRange = document.getElementById('room-range');
@@ -1149,6 +1150,15 @@ const BASE_LEVEL = 0.8;
 // Settings words <-> the toggle-state indexes the piano code reads
 const COLOR_MODES = ['off', 'always', 'played'];              // toggleStates.color
 const NAME_MODES = ['none', 'scale', 'white', 'all', 'black']; // toggleStates.names
+// The quick row's button: each press moves down this list, then round again.
+const NAME_CYCLE = [
+  { mode: 'none', label: 'Key Names' },
+  { mode: 'scale', label: 'Scale Keys' },
+  { mode: 'white', label: 'White Keys' },
+  { mode: 'black', label: 'Black Keys' },
+  { mode: 'all', label: 'All Keys' }
+];
+const nameStep = () => NAME_CYCLE.findIndex(c => c.mode === NAME_MODES[currentToggleStates.names]);
 
 function redraw() { drawKeyboard(currentOctaves); }
 
@@ -1179,11 +1189,11 @@ function renderChrome() {
   layoutBtn.textContent = chromatic ? 'Chromatic' : 'Flex';
   layoutBtn.classList.toggle('is-chromatic', chromatic);
   document.body.classList.toggle('chromatic', chromatic);
+  namesBtn.textContent = NAME_CYCLE[nameStep()].label;
 
   const check = (name, value) => { const r = document.querySelector(`input[name="${name}"][value="${value}"]`); if (r) r.checked = true; };
   check('layout', chromatic ? 'chromatic' : 'flex');
   check('colors', COLOR_MODES[currentToggleStates.color]);
-  check('names', NAME_MODES[currentToggleStates.names]);
   check('theme', currentTheme());
   volumeRange.value = Math.round(volume * 100);
   volumeValue.textContent = Math.round(volume * 100) + '%';
@@ -1243,15 +1253,16 @@ focusBtn.addEventListener('click', () => {
 
 layoutBtn.addEventListener('click', () => setLayoutMode(currentToggleStates.layout === 't-blue' ? 'flex' : 'chromatic'));
 
+namesBtn.addEventListener('click', () => {
+  currentToggleStates.names = NAME_MODES.indexOf(NAME_CYCLE[(nameStep() + 1) % NAME_CYCLE.length].mode);
+  redraw();
+  renderChrome();
+});
+
 // Settings
 document.querySelectorAll('input[name="layout"]').forEach(r => r.addEventListener('change', () => setLayoutMode(r.value)));
 document.querySelectorAll('input[name="colors"]').forEach(r => r.addEventListener('change', () => {
   currentToggleStates.color = COLOR_MODES.indexOf(r.value);
-  redraw();
-  renderChrome();
-}));
-document.querySelectorAll('input[name="names"]').forEach(r => r.addEventListener('change', () => {
-  currentToggleStates.names = NAME_MODES.indexOf(r.value);
   redraw();
   renderChrome();
 }));

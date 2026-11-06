@@ -35,6 +35,7 @@ const InstControls = (() => {
         { type: 'select', sel: '#sound-select', label: 'Sound' },
         { type: 'button', sel: '#focus-btn', toggle: true },
         { type: 'button', sel: '#layout-btn' },
+        { type: 'button', sel: '#names-btn' },
         { type: 'gear', sel: '#settings-btn' }
       ]
     },

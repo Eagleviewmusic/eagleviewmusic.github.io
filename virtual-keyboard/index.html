@@ -102,6 +102,7 @@
   <button class="quick-btn" id="focus-btn" type="button" aria-pressed="false" title="Focus: only the notes of the scale can be played">Focus</button>
   <button class="quick-btn layout-btn" id="layout-btn" type="button" title="Switch the computer keys between Flex and Chromatic (explained in Settings)">Flex</button>
   <button class="quick-btn rec-toggle" id="recorder-btn" type="button" aria-pressed="false" aria-controls="recorder" title="The four-track recorder">Record</button>
+  <button class="quick-btn names-btn" id="names-btn" type="button">Key Names</button>
 </div>
 
 <!-- ================= INSTRUMENT ================= -->
@@ -234,17 +235,6 @@
           <output id="room-value" for="room-range">35%</output>
         </div>
         <p class="panel-note">How much the room echoes: 0% is dry, like playing outside; higher sounds like a bigger hall. Let go of the slider to hear it.</p>
-      </section>
-
-      <section class="panel-section">
-        <h3>Note names on the piano</h3>
-        <div class="chip-row" role="radiogroup" aria-label="Note names on the piano">
-          <label class="chip"><input type="radio" name="names" value="none"><span>None</span></label>
-          <label class="chip"><input type="radio" name="names" value="scale"><span>Notes in the scale</span></label>
-          <label class="chip"><input type="radio" name="names" value="white"><span>White keys</span></label>
-          <label class="chip"><input type="radio" name="names" value="black"><span>Black keys</span></label>
-          <label class="chip"><input type="radio" name="names" value="all"><span>All keys</span></label>
-        </div>
       </section>
 
       <section class="panel-section">

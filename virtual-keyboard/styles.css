@@ -178,10 +178,12 @@ kbd {
   margin-right: 7px; vertical-align: 1px; background: #34C759;
 }
 .layout-btn.is-chromatic::before { background: #007AFF; }
+.names-btn { min-width: 104px; } /* the row stays still as the words change */
 
 /* the Keys view needs only Flex / Chromatic here, and Focus once it is Chromatic */
 body.keys-view .oct-seg,
 body.keys-view .sound-select,
+body.keys-view .names-btn,
 body.keys-view:not(.chromatic) #focus-btn { display: none; }
 body.keys-view #focus-btn { order: 1; }
 
