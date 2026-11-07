@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Vocal Booth</title>
-<meta name="description" content="Record a clean vocal line in your browser and export it as a WAV file. Your recordings are never uploaded.">
+<meta name="description" content="Record a clean vocal line in your browser and export it as an MP3. Your recordings are never uploaded.">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -78,7 +78,7 @@
     </button>
     <button id="export" class="btn primary" type="button">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 11l4.5 4.5 4.5-4.5M5 20h14"/></svg>
-      Export WAV
+      Export MP3
     </button>
   </div>
 </header>
@@ -156,7 +156,7 @@
     <div id="empty" hidden>
       <ol>
         <li><b>1</b><span><button id="empty-mic" class="linkish" type="button">Check your mic</button></span></li>
-        <li><b>2</b><span><button id="empty-file" class="linkish" type="button">Add your accompaniment</button> (or drop the MP3 here)</span></li>
+        <li><b>2</b><span><button id="empty-file" class="linkish" type="button">Add your accompaniment</button> <span class="drop-hint">(or drop the MP3 here)</span></span></li>
         <li><b>3</b><span>Put your headphones on and press <em>Record</em></span></li>
       </ol>
     </div>
@@ -165,9 +165,9 @@
 </main>
 
 <footer class="foot">
-  <span id="foot-status">Saved on this computer as you go. Your recordings are never uploaded.</span>
+  <span id="foot-status">Saved on this <span class="device-word">computer</span> as you go. Your recordings are never uploaded.</span>
   <span id="foot-rate"></span>
-  <button id="start-over" class="linkish quiet" type="button">Start over</button>
+  <button id="delete-all" class="linkish quiet" type="button" title="Delete every track and recording from this browser">Delete All</button>
 </footer>
 
 <div id="toasts" aria-live="polite"></div>
@@ -220,7 +220,7 @@
 
     <p class="mc-foot"><span id="mc-output"></span> <span id="mc-delay"></span></p>
 
-    <p class="fold-note" data-key="mc-tips">Sing about a hand’s width from the microphone, a little off to the side. Leave one ear uncovered so you can hear yourself. This app can’t change your microphone’s hardware level, so if it’s too loud or too quiet, move, or change the input volume in your computer’s sound settings. It adds no effects and doesn’t clean up your sound, so a quiet room makes the biggest difference.</p>
+    <p class="fold-note" data-key="mc-tips">Sing about a hand’s width from the microphone, a little off to the side. Leave one ear uncovered so you can hear yourself. <span id="mc-level-tip">This app can’t change your microphone’s hardware level, so if it’s too loud or too quiet, move, or change the input volume in your computer’s sound settings.</span> It adds no effects and doesn’t clean up your sound, so a quiet room makes the biggest difference.</p>
   </div>
   <div class="sheet-foot">
     <button id="mc-done" class="btn primary" type="button">Done</button>
@@ -230,7 +230,7 @@
 <!-- ================= EXPORT ================= -->
 <dialog id="dlg-export" class="sheet">
   <div class="sheet-head">
-    <h2 tabindex="-1" autofocus>Export WAV</h2>
+    <h2 tabindex="-1" autofocus>Export MP3</h2>
     <button id="ex-close" class="x" type="button" aria-label="Close">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
@@ -242,8 +242,8 @@
     </label>
     <fieldset id="ex-mode" class="ex-mode">
       <legend class="sr">How to export</legend>
-      <label class="choice"><input type="radio" name="ex-mode" id="ex-each" checked><span><b>Each track as its own WAV</b></span></label>
-      <label class="choice"><input type="radio" name="ex-mode" id="ex-all"><span><b>All together as one WAV</b></span></label>
+      <label class="choice"><input type="radio" name="ex-mode" id="ex-each" checked><span><b>Each track as its own MP3</b></span></label>
+      <label class="choice"><input type="radio" name="ex-mode" id="ex-all"><span><b>All together as one MP3</b></span></label>
     </fieldset>
     <div id="ex-tracks" class="ex-tracks"></div>
     <p class="fold-note" data-key="ex-tips"><span id="ex-len"></span> Each track’s volume is included, and muted clips stay silent.</p>
@@ -256,6 +256,8 @@
   </div>
 </dialog>
 
+<!-- vendor/lame.min.js is lamejs, the MP3 encoder (see vendor/LAME-NOTICE.txt). -->
+<script src="vendor/lame.min.js"></script>
 <script src="js/store.js"></script>
 <script src="js/project.js"></script>
 <script src="js/engine.js"></script>

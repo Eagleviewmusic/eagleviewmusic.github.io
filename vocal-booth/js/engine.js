@@ -17,6 +17,20 @@
   'use strict';
   const VB = window.VB;
   const P = VB.Project, Store = VB.Store;
+
+  /* What the singer is holding. A phone or tablet has no input level to turn, and
+     its operating system (not the page) picks some of the microphone's behaviour. */
+  VB.device = (function () {
+    const ua = navigator.userAgent || '';
+    const touchMac = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;   // an iPad asking for the desktop site
+    let d;
+    if (/iPhone|iPod/.test(ua)) d = { kind: 'phone', ios: true, android: false };
+    else if (/iPad/.test(ua) || touchMac) d = { kind: 'tablet', ios: true, android: false };
+    else if (/Android/.test(ua)) d = { kind: /Mobile/.test(ua) ? 'phone' : 'tablet', ios: false, android: true };
+    else d = { kind: 'computer', ios: false, android: false };
+    d.mobile = d.kind !== 'computer';
+    return d;
+  })();
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const say = (m, k) => { if (VB.say) VB.say(m, k); };
   const DELAY_KEY = 'vocal_booth_delay_v1';
@@ -44,6 +58,14 @@
     const opts = { latencyHint: 'interactive' };
     if (rate) opts.sampleRate = rate;
     const ctx = new Ctx(opts);
+    // Started at once, while the tap that made it still counts: iPhones and iPads
+    // only let sound start from a tap, and the module load below is not one.
+    try { ctx.resume(); } catch (e) {}
+    // A clock that stops mid-take (a phone call, an alarm) stops the take, rather than
+    // leaving a gap in it that nobody hears until later.
+    ctx.addEventListener('statechange', () => {
+      if (E.ctx === ctx && ctx.state !== 'running' && ctx.state !== 'closed') interrupted();
+    });
     await ctx.audioWorklet.addModule('js/capture-worklet.js');
     E.ctx = ctx;
     E.master = ctx.createGain();
@@ -63,27 +85,58 @@
   const hasNothing = () => !P.sources.size;
   const goodRate = r => (r === 44100 || r === 48000 ? r : 48000);
 
-  function audit(track, s) {
+  /* A Bluetooth name. "Headset" alone is not enough: Android calls a wired one
+     "Wired headset" and its own earpiece "Headset earpiece", and an iPhone calls
+     wired EarPods "Headset Microphone". */
+  const isBluetooth = label => /bluetooth|hands-?free|airpods|buds|beats|\bbt\b|hfp/i.test(label || '') ||
+    (/headset/i.test(label || '') && !/wired headset|headset earpiece|headset microphone/i.test(label || ''));
+  E.isBluetooth = isBluetooth;
+
+  function bluetoothWords() {
+    const dev = VB.device;
+    return dev.mobile
+      ? 'Bluetooth headphones are being used. While the microphone is on, a ' + dev.kind + ' switches them to phone-call quality, for your voice and the music alike. Use wired headphones, or turn Bluetooth off.'
+      : 'This looks like a Bluetooth microphone, which is phone quality. A wired or USB microphone, or even your computer’s built-in one, will sound far better.';
+  }
+
+  function audit(track, s, inputs) {
     const out = [];
     if (s.echoCancellation) out.push('Echo cancellation is on. This browser would not turn it off, so held notes may cut out.');
     if (s.noiseSuppression) out.push('Noise suppression is on. This browser would not turn it off, so your tone may come out dull or wobbly.');
     if (s.autoGainControl) out.push('Automatic volume is on. This browser would not turn it off, so your level may swell and sag.');
     if (s.voiceIsolation) out.push('Voice isolation is on, which can thin out your tone. Turn it off in your computer’s microphone settings.');
-    if (/bluetooth|hands-?free|airpods|headset|buds|\bbt\b|hfp/i.test(track.label || '')) {
-      out.push('This looks like a Bluetooth microphone, which is phone quality. A wired or USB microphone, or even your computer’s built-in one, will sound far better.');
+    // A microphone under 32 kHz is a phone call's: on an iPhone that is how Bluetooth headphones show.
+    const callRate = s.sampleRate && s.sampleRate < 32000;
+    // Android opens Bluetooth headphones whenever they are connected, even for "Default",
+    // unless something wired or USB is plugged in too.
+    const label = track.label || '';
+    const names = (inputs || []).map(d => d.label || '');
+    const androidBt = VB.device.android && !/speakerphone|wired|usb/i.test(label) &&
+      names.some(n => /bluetooth/i.test(n)) && !names.some(n => /wired headset|usb/i.test(n));
+    if (isBluetooth(label) || androidBt) out.push(bluetoothWords());
+    else if (callRate) {
+      out.push('This microphone is working at phone-call quality (' + Math.round(s.sampleRate / 1000) + ' kHz), which usually means Bluetooth headphones. ' +
+        (VB.device.mobile ? 'Use wired headphones, or turn Bluetooth off.' : 'A wired or USB microphone will sound far better.'));
     }
     return out;
+  }
+
+  /* iPhone and iPad: say up front that this page plays and records. The sound then
+     starts at its proper level, and keeps going if the screen locks mid-take. */
+  function audioSession(type) {
+    try { if (VB.device.ios && navigator.audioSession) navigator.audioSession.type = type; } catch (e) {}
   }
 
   function dropMic() {
     const m = E.mic;
     if (!m) return;
     E.mic = null;
-    try { m.track.onended = null; } catch (e) {}
+    try { m.track.onended = null; m.track.onmute = null; } catch (e) {}
     try { m.stream.getTracks().forEach(t => t.stop()); } catch (e) {}
     try { m.src.disconnect(); m.node.disconnect(); m.silent.disconnect(); } catch (e) {}
     E.level.peak = E.level.rms = 0;
     E.log.length = 0;
+    audioSession('auto');
   }
   E.closeMic = function () {
     if (E.state === 'recording') return;
@@ -97,7 +150,12 @@
   E.asking = () => !!opening;
   E.openMic = function (deviceId) {
     if (opening) return opening;
-    opening = openMicNow(deviceId).finally(() => { opening = null; if (E.onstate) E.onstate(); });
+    opening = openMicNow(deviceId).finally(() => {
+      opening = null;
+      // no microphone after all: an iPhone left set to record plays through its earpiece
+      if (!E.mic) audioSession('auto');
+      if (E.onstate) E.onstate();
+    });
     if (E.onstate) E.onstate();
     return opening;
   };
@@ -108,10 +166,15 @@
       const err = new Error('nomic'); err.name = 'NoApi'; throw err;
     }
     dropMic();
+    /* No sample rate is asked for: an iPhone would convert to it, and hide the rate the
+       microphone really runs at (which is how Bluetooth's call quality shows). The context
+       follows the microphone instead, below. On an iPhone or iPad, echo cancellation off
+       is what switches off Apple's voice processing (auto volume and noise removal with it). */
     const audio = {
       echoCancellation: { ideal: false }, noiseSuppression: { ideal: false }, autoGainControl: { ideal: false },
-      voiceIsolation: { ideal: false }, channelCount: { ideal: 2 }, sampleRate: { ideal: P.data.rate || 48000 }
+      voiceIsolation: { ideal: false }, channelCount: { ideal: 2 }
     };
+    audioSession('play-and-record');
     let stream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: deviceId ? Object.assign({ deviceId: { exact: deviceId } }, audio) : audio, video: false });
@@ -127,8 +190,11 @@
     if (hasNothing() && settings.sampleRate && goodRate(settings.sampleRate) !== E.ctx.sampleRate) {
       P.data.rate = 0;
       await buildCtx(goodRate(settings.sampleRate));
-      try { await E.ctx.resume(); } catch (e) {}
     }
+    // A page that is using the microphone may start its sound without a tap, so this
+    // also wakes a context that an iPhone kept asleep.
+    // Never waited on for long: a browser that refuses may leave the promise hanging.
+    if (E.ctx.state !== 'running') { try { await Promise.race([E.ctx.resume(), sleep(500)]); } catch (e) {} }
     if (E.onstate) E.onstate();
 
     let src;
@@ -158,11 +224,13 @@
     silent.connect(E.ctx.destination);
     node.port.onmessage = onCapture;
 
-    E.mic = {
-      stream, track, settings, src, node, silent,
+    let inputs = [];
+    try { inputs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); } catch (e) {}
+    const mic = E.mic = {
+      stream, track, settings, src, node, silent, inputs,
       label: track.label || 'Microphone',
       deviceId: settings.deviceId || deviceId || '',
-      problems: audit(track, settings)
+      problems: audit(track, settings, inputs)
     };
     track.onended = () => {
       if (E.state === 'recording') {
@@ -172,6 +240,20 @@
       dropMic();
       if (E.onstate) E.onstate();
     };
+    // A phone mutes the microphone for a call, an alarm or Siri: the take would only gather silence.
+    track.onmute = () => {
+      if (E.state === 'recording' && VB.device.mobile) interrupted();
+    };
+    // An iPhone shares one microphone setup between pages and apps, and says when another changes it.
+    try {
+      track.addEventListener('configurationchange', () => {
+        if (E.mic !== mic) return;
+        mic.settings = track.getSettings ? track.getSettings() : {};
+        mic.problems = audit(track, mic.settings, mic.inputs);
+        if (mic.problems.length && E.state === 'recording') say(mic.problems[0], 'warn');
+        if (E.onstate) E.onstate();
+      });
+    } catch (e) {}
     E.level.clipped = false;
     if (E.onstate) E.onstate();
     return E.mic;
@@ -226,11 +308,32 @@
   }
   function endCapture(s) {
     return new Promise(res => {
-      s.done = res;
+      let over = false;
+      const finish = () => {
+        if (over) return;
+        over = true;
+        if (E.cap === s) E.cap = null;
+        res();
+      };
+      s.done = finish;
       if (E.mic) E.mic.node.port.postMessage({ cmd: 'stop', id: s.id });
-      else { E.cap = null; res(); }
+      else finish();
+      // A stopped clock cannot answer: what has arrived is kept (rows are already saved).
+      setTimeout(finish, 1500);
     });
   }
+
+  function interrupted() {
+    if (E.state !== 'recording') return;
+    say('Recording stopped because the sound was interrupted (a call, an alarm, or another app). Your take is saved.', 'warn');
+    E.stop();
+  }
+
+  // The screen lock is let go while the page is hidden; take it again on the way back.
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible' || E.state !== 'recording' || !navigator.wakeLock) return;
+    try { E.wake = await navigator.wakeLock.request('screen'); } catch (e) {}
+  });
 
   const concat = (list, n) => {
     const out = new Float32Array(n);

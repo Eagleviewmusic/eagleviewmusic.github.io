@@ -45,10 +45,12 @@
     box.textContent = text || '';
   }
 
+  let shownProblems = '';
   function showProblems() {
     const ul = $('mc-problems');
     ul.innerHTML = '';
     const list = E.mic ? E.mic.problems : [];
+    shownProblems = list.join('|');
     ul.hidden = !list.length;
     for (const p of list) {
       const li = document.createElement('li');
@@ -116,17 +118,27 @@
     for (const r of E.log) if (now - r.t < 5000 && r.peak > loud) loud = r.peak;
     const d = db(loud);
     let word, kind;
-    if (E.asking()) { word = 'Your browser is asking to use the microphone. Look near the address bar and choose Allow.'; kind = 'warn'; }
+    // a phone or tablet has no input volume to turn: moving is the only advice there
+    const tooLoud = VB.device.mobile
+      ? 'Too loud: that distorted. Move further from the microphone.'
+      : 'Too loud: that distorted. Move back, or turn the input volume down in your computer’s sound settings.';
+    const tooQuiet = VB.device.mobile
+      ? 'Too quiet. Move closer to the microphone.'
+      : 'Too quiet. Move closer, or turn the input volume up in your computer’s sound settings.';
+    if (E.asking()) { word = VB.device.mobile ? 'Your browser is asking to use the microphone. Choose Allow.' : 'Your browser is asking to use the microphone. Look near the address bar and choose Allow.'; kind = 'warn'; }
     else if (!E.mic) { word = 'The microphone is off.'; kind = ''; }
-    else if (E.level.clipped && d > -1) { word = 'Too loud: that distorted. Move back, or turn the input volume down in your computer’s sound settings.'; kind = 'bad'; }
+    else if (E.level.clipped && d > -1) { word = tooLoud; kind = 'bad'; }
     else if (d < -50) { word = 'Sing the loudest part of your song.'; kind = ''; }
-    else if (d < -30) { word = 'Too quiet. Move closer, or turn the input volume up in your computer’s sound settings.'; kind = 'bad'; }
+    else if (d < -30) { word = tooQuiet; kind = 'bad'; }
     else if (d < -18) { word = 'A little quiet, but it will work. Closer would be better.'; kind = 'warn'; }
     else if (d <= -6) { word = 'Great level. Your loudest notes have room.'; kind = 'good'; }
     else if (d < -0.5) { word = 'A little loud. Back up a bit so your biggest notes have room.'; kind = 'warn'; }
-    else { word = 'Too loud: that distorted. Move back, or turn the input volume down in your computer’s sound settings.'; kind = 'bad'; }
+    else { word = tooLoud; kind = 'bad'; }
     if (v.textContent !== word) v.textContent = word;
     v.dataset.kind = kind;
+    // the microphone's setup can change underneath (an iPhone says so): keep the list current
+    const probs = E.mic ? E.mic.problems.join('|') : '';
+    if (probs !== shownProblems) showProblems();
 
     // the room: the quietest quarter second lately
     let quiet = null;

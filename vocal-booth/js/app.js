@@ -208,7 +208,7 @@
     $('add-file').disabled = rec;
     $('export').disabled = rec || !P.data.clips.length;
     $('mic-check').disabled = rec;
-    $('start-over').disabled = rec;
+    $('delete-all').disabled = rec;
     $('to-start').disabled = rec;
     $('play').disabled = rec || !P.data.clips.length;
   };
@@ -221,7 +221,7 @@
     $('play').setAttribute('aria-label', playing ? 'Stop' : 'Play');
     $('mic-name').textContent = E.mic ? E.mic.label.replace(/^Default\s*-\s*/i, '') : 'Microphone off';
     $('level').classList.toggle('off', !E.mic);
-    $('foot-rate').textContent = P.data.rate || E.ctx ? (E.rate() / 1000).toLocaleString() + ' kHz · 24-bit WAV' : '';
+    $('foot-rate').textContent = P.data.rate || E.ctx ? 'Recording at ' + (E.rate() / 1000).toLocaleString() + ' kHz' : '';
     const showEmpty = !P.data.clips.length && !E.take;
     $('empty').hidden = !showEmpty;
     $('mic-check').classList.toggle('nudge', !VB.MicCheck.checkedBefore() && !E.mic);
@@ -338,13 +338,14 @@
     cover(null);
   }
 
-  async function startOver() {
-    if (!confirm('Start over? This deletes every track and recording from this browser. Files you already exported are safe.')) return;
+  async function deleteAll() {
+    if (!confirm('Delete all? This deletes every track and recording from this browser, and it can’t be undone. Files you already exported are safe.')) return;
     if (E.state !== 'stopped') await E.stop();
     await Store.clearAll();
     P.reset();
     T.userZoomed = false;
     A.refreshAll();
+    VB.say('Everything was deleted from this browser.');
   }
 
   /* -------- Keys -------- */
@@ -565,7 +566,7 @@
     $('add-file').addEventListener('click', pick);
     $('empty-file').addEventListener('click', pick);
     input.addEventListener('change', () => { addFiles(input.files); input.value = ''; });
-    $('start-over').addEventListener('click', startOver);
+    $('delete-all').addEventListener('click', deleteAll);
     document.addEventListener('keydown', onKey);
     // A clicked button must not keep the focus, or Space would press it again.
     document.addEventListener('click', e => {
@@ -602,7 +603,19 @@
     foldNotes();
   }
 
+  /* A phone or tablet: its own words, before the notes are folded. */
+  function deviceWords() {
+    const dev = VB.device;
+    if (!dev.mobile) return;
+    for (const w of document.querySelectorAll('.device-word')) w.textContent = dev.kind;
+    $('mc-level-tip').textContent = 'This app can’t change your microphone’s level, and a ' + dev.kind +
+      ' has no setting for it, so if it’s too loud or too quiet, move closer or further away. Use wired headphones:' +
+      ' Bluetooth ones (AirPods and the like) drop to phone-call quality while the microphone is on.';
+    if (dev.kind === 'phone') for (const h of document.querySelectorAll('.drop-hint')) h.hidden = true;
+  }
+
   async function boot() {
+    deviceWords();
     wire();
     VB.Export.mount();
     VB.MicCheck.mount();
@@ -633,8 +646,8 @@
       T.placeHead();
     };
     Store.onfail = () => {
-      VB.say('This computer ran out of room to save, so export soon: your work is only safe while this tab stays open.', 'warn');
-      $('foot-status').textContent = 'Not saving: out of room on this computer. Export soon.';
+      VB.say('This ' + VB.device.kind + ' ran out of room to save, so export soon: your work is only safe while this tab stays open.', 'warn');
+      $('foot-status').textContent = 'Not saving: out of room on this ' + VB.device.kind + '. Export soon.';
     };
 
     if (!(await oneTabOnly())) {

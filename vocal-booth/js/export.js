@@ -1,8 +1,9 @@
 /* ==========================================================================
    Vocal Booth — export.js
-   WAV files, 24-bit, at the rate the project ran at. Mixed sample by sample
-   from the same plan playback uses, with no resampling and no limiter: a take
-   on a track at 0 dB comes out exactly as it went in.
+   MP3 files, at the rate the project ran at, so that dozens of them stay easy
+   to send. Recordings are kept uncompressed until this point. They are mixed
+   sample by sample from the same plan playback uses, with no resampling and no
+   limiter, and encoded once.
 
    Every file starts at 0:00 and runs to the end of the project, so a stack of
    files drops straight into line in any other program.
@@ -12,7 +13,12 @@
   const VB = window.VB;
   const P = VB.Project;
   const X = VB.Export = {};
-  const tick = () => new Promise(r => setTimeout(r, 0));
+  /* A pause for the page to breathe. Not a timer: those slow to a crawl in a tab
+     in the background, and a singer may well switch away during an export. */
+  const pipe = new MessageChannel();
+  const waiting = [];
+  pipe.port1.onmessage = () => { const r = waiting.shift(); if (r) r(); };
+  const tick = () => new Promise(r => { waiting.push(r); pipe.port2.postMessage(0); });
 
   X.channelsFor = function (trackIds) {
     for (const id of trackIds) {
@@ -64,48 +70,64 @@
     return { channels: out, peak };
   };
 
-  function header(frames, chs, rate) {
-    const size = frames * chs * 3;
-    const b = new ArrayBuffer(44);
-    const v = new DataView(b);
-    const text = (at, s) => { for (let i = 0; i < s.length; i++) v.setUint8(at + i, s.charCodeAt(i)); };
-    text(0, 'RIFF'); v.setUint32(4, 36 + size, true); text(8, 'WAVE');
-    text(12, 'fmt '); v.setUint32(16, 16, true);
-    v.setUint16(20, 1, true);                 // PCM
-    v.setUint16(22, chs, true);
-    v.setUint32(24, rate, true);
-    v.setUint32(28, rate * chs * 3, true);
-    v.setUint16(32, chs * 3, true);
-    v.setUint16(34, 24, true);
-    text(36, 'data'); v.setUint32(40, size, true);
-    return b;
+  /* MP3 pushes its audio later: the encoder and decoder together add this many
+     samples at the start, and this encoder writes no header to say so. So that a
+     file still lands on the beat when it is dropped into another program, the same
+     number of samples is left off the front. Measured in tools/test.mjs. */
+  const CODEC_DELAY = 1105;
+
+  /* CBR, so every program reads the same length. A voice is mono, so 192 kbps is
+     plenty and nothing above 18 kHz or so is lost; the stereo rate only ever applies
+     when a stereo file (the accompaniment) is included. */
+  X.MONO_KBPS = 192;
+  X.STEREO_KBPS = 320;
+
+  async function toRate(channels, from, to) {
+    const ctx = new OfflineAudioContext(channels.length, Math.ceil(channels[0].length * to / from), to);
+    const b = new AudioBuffer({ numberOfChannels: channels.length, length: channels[0].length, sampleRate: from });
+    channels.forEach((d, c) => b.copyToChannel(d, c));
+    const n = ctx.createBufferSource();
+    n.buffer = b;
+    n.connect(ctx.destination);
+    n.start();
+    const r = await ctx.startRendering();
+    return channels.map((d, c) => r.getChannelData(c));
   }
 
-  /* 24-bit. `factor` only ever turns the whole file down, and only when it
-     would otherwise go over full scale. */
-  X.wav = async function (channels, rate, factor) {
-    const chs = channels.length, frames = channels[0].length;
-    const parts = [header(frames, chs, rate)];
-    const BLOCK = Math.max(1024, rate);
-    const f = factor == null ? 1 : factor;
-    for (let at = 0; at < frames; at += BLOCK) {
-      const count = Math.min(BLOCK, frames - at);
-      const bytes = new Uint8Array(count * chs * 3);
-      let o = 0;
-      for (let i = 0; i < count; i++) {
-        for (let c = 0; c < chs; c++) {
-          let v = channels[c][at + i] * f;
-          v = v > 1 ? 1 : v < -1 ? -1 : v;
-          const s = Math.round(v * 8388607);
-          bytes[o++] = s & 255;
-          bytes[o++] = (s >> 8) & 255;
-          bytes[o++] = (s >> 16) & 255;
-        }
-      }
-      parts.push(bytes);
-      await tick();
+  /* `factor` only ever turns the whole file down, and only when it is too hot. */
+  X.mp3 = async function (channels, rate, factor) {
+    if (typeof lamejs === 'undefined') throw new Error('the MP3 maker did not load. Reload the page and try again.');
+    if (rate !== 44100 && rate !== 48000) {    // only a browser that forces an odd microphone rate gets here
+      channels = await toRate(channels, rate, 48000);
+      rate = 48000;
     }
-    return new Blob(parts, { type: 'audio/wav' });
+    const chs = channels.length;
+    const enc = new lamejs.Mp3Encoder(chs, rate, chs > 1 ? X.STEREO_KBPS : X.MONO_KBPS);
+    const BLOCK = 1152;
+    const f = factor == null ? 1 : factor;
+    const a = new Int16Array(BLOCK), b = chs > 1 ? new Int16Array(BLOCK) : null;
+    const fill = (from, to, at, n) => {
+      for (let i = 0; i < n; i++) {
+        const v = from[at + i] * f;
+        to[i] = Math.round((v > 1 ? 1 : v < -1 ? -1 : v) * 32767);
+      }
+    };
+    const parts = [];
+    const total = channels[0].length;
+    let blocks = 0;
+    for (let at = CODEC_DELAY; at < total; at += BLOCK) {
+      const n = Math.min(BLOCK, total - at);
+      fill(channels[0], a, at, n);
+      if (b) fill(channels[1], b, at, n);
+      const out = n === BLOCK
+        ? (b ? enc.encodeBuffer(a, b) : enc.encodeBuffer(a))
+        : (b ? enc.encodeBuffer(a.subarray(0, n), b.subarray(0, n)) : enc.encodeBuffer(a.subarray(0, n)));
+      if (out.length) parts.push(new Uint8Array(out));
+      if (++blocks % 64 === 0) await tick();
+    }
+    const end = enc.flush();
+    if (end.length) parts.push(new Uint8Array(end));
+    return new Blob(parts, { type: 'audio/mpeg' });
   };
 
   /* -------- The window -------- */
@@ -153,7 +175,7 @@
     list.hidden = one;
     $('ex-each').checked = true;
     $('ex-len').textContent = 'Each file starts at 0:00 and runs ' + mmss(P.end()) + ', the length of the whole project, so everything lines up when it is put together.';
-    $('ex-format').textContent = '24-bit WAV · ' + VB.Engine.rate().toLocaleString() + ' Hz';
+    $('ex-format').textContent = 'MP3 · ' + X.MONO_KBPS + ' kbps mono, ' + X.STEREO_KBPS + ' kbps stereo · ' + VB.Engine.rate().toLocaleString() + ' Hz';
     $('ex-results').hidden = true;
     $('ex-results').innerHTML = '';
     $('ex-go').hidden = false;
@@ -164,6 +186,9 @@
   };
 
   function save(blob, name) {
+    // An iPhone or iPad may open an MP3 in a player tab instead of saving it; a file of
+    // no particular kind is always saved. The name still ends in .mp3.
+    if (VB.device.ios) blob = new Blob([blob], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     lastUrls.push(url);
     const a = document.createElement('a');
@@ -174,20 +199,24 @@
     a.remove();
   }
 
-  /* The audio work without the window, also what the tests run. */
-  X.render = async function (mode, ids, baseName, onStep) {
+  /* The audio work without the window, also what the tests run. A decoded MP3 can
+     land a little above the level that went in, so a very hot file is turned down
+     to leave it room. */
+  const CEILING = 0.944;   // −0.5 dB
+  X.render = async function (mode, ids, baseName, onStep, encoder) {
+    const encode = encoder || X.mp3;
     const rate = VB.Engine.rate();
     const prefix = clean(baseName) ? clean(baseName) + ' - ' : '';
     const files = [];
     const one = async (trackIds, title) => {
       const { channels, peak } = await X.mix(trackIds);
       let factor = 1, turned = 0;
-      if (peak > 0.9999) {
-        factor = 0.9999 / peak;
+      if (peak > CEILING) {
+        factor = CEILING / peak;
         turned = -20 * Math.log10(factor);
       }
-      const blob = await X.wav(channels, rate, factor);
-      files.push({ name: prefix + (clean(title) || 'Track') + '.wav', blob, chs: channels.length, turned });
+      const blob = await encode(channels, rate, factor);
+      files.push({ name: prefix + (clean(title) || 'Track') + '.mp3', blob, chs: channels.length, turned });
     };
     if (mode === 'each') {
       let k = 0;
@@ -211,7 +240,11 @@
     const boxes = [...$('ex-tracks').querySelectorAll('input:checked')];
     const tracks = exportable();
     const ids = tracks.length === 1 ? [tracks[0].id] : boxes.map(b => b.value);
-    if (!ids.length) { VB.say('Tick at least one track.', 'warn'); return; }
+    if (!ids.length) {       // said here: a message on the page would sit dimmed behind this window
+      $('ex-progress').hidden = false;
+      $('ex-progress').textContent = 'Tick at least one track.';
+      return;
+    }
     const base = $('ex-name').value;
     try { localStorage.setItem(NAME_KEY, base); } catch (e) {}
     const mode = $('ex-all').checked && ids.length > 1 ? 'all' : 'each';
@@ -245,6 +278,27 @@
       ? 'Your ' + files.length + ' files are downloading. If your browser asks, allow it to download more than one file.'
       : 'Your file is downloading.';
     box.append(head);
+    /* A phone or tablet: Share sends the files on (Messages, Mail, AirDrop, Files…).
+       It must come from a tap of its own, so it cannot run by itself after the encode. */
+    const shareOf = list => {
+      if (!VB.device.mobile || !navigator.share || !navigator.canShare) return null;
+      const items = list.map(f => new File([f.blob], f.name, { type: 'audio/mpeg' }));
+      try { if (!navigator.canShare({ files: items })) return null; } catch (e) { return null; }
+      return async () => {
+        try { await navigator.share({ files: items }); } catch (err) {
+          if (err && err.name !== 'AbortError') VB.say('That couldn’t be shared (' + (err.name || 'error') + '). Use Save again instead.', 'warn');
+        }
+      };
+    };
+    const all = files.length > 1 ? shareOf(files) : null;
+    if (all) {
+      const btn = document.createElement('button');
+      btn.className = 'btn primary ex-share-all';
+      btn.type = 'button';
+      btn.textContent = 'Share all ' + files.length;
+      btn.addEventListener('click', all);
+      box.append(btn);
+    }
     for (const f of files) {
       const row = document.createElement('div');
       row.className = 'ex-file';
@@ -260,14 +314,25 @@
       again.textContent = 'Save again';
       again.addEventListener('click', () => save(f.blob, f.name));
       row.append(name, size, again);
+      const one = shareOf([f]);
+      if (one) {
+        const share = document.createElement('button');
+        share.className = 'btn small';
+        share.type = 'button';
+        share.textContent = 'Share';
+        share.addEventListener('click', one);
+        row.append(share);
+      }
       box.append(row);
       if (f.turned) {
         const note = document.createElement('p');
         note.className = 'ex-note';
-        note.textContent = 'This one would have gone over full volume, so the whole file was turned down ' + f.turned.toFixed(1) + ' dB. Nothing else about it changed.';
+        note.textContent = 'This one was very loud, so the whole file was turned down ' + f.turned.toFixed(1) + ' dB to keep it from distorting. Nothing else about it changed.';
         box.append(note);
       }
     }
+    if (all) head.textContent += ' To send them straight on, press Share all.';
+    else if (box.querySelector('.ex-file .btn + .btn')) head.textContent += ' To send it straight on, press Share.';
     box.hidden = false;
     for (let i = 0; i < files.length; i++) {
       save(files[i].blob, files[i].name);
