@@ -406,7 +406,7 @@
   }
   // a voice take's end, in beats at the tempo now (takes keep their own speed)
   const regionEnd = g => g.b + g.d / (60 / P.tempo);
-  const listOf = tr => { const e = engineOf(tr); return e === 'hits' ? tr.hits : e === 'audio' ? tr.regions : tr.notes; };
+  const listOf = tr => { const e = engineOf(tr); return e === 'hits' ? tr.hits : e === 'audio' ? Voices.joined(tr.regions, 60 / P.tempo) : tr.notes; };
   const clipIds = tracks => [...new Set(tracks.flatMap(t => t.regions.map(g => g.c)))];
   const isDownbeat = b => ((b % barBeats()) + barBeats()) % barBeats() === 0;
   const anyContent = () => P.tracks.some(hasContent);
@@ -445,9 +445,10 @@
     renderTiming();
   }
 
+  let wokenCtx = null;      // (the context can change: voice.js runs it at the microphone's or the takes' rate)
   function wakeAudio() {
     const ctx = Audio.ensure();
-    if (!audioWoken) { audioWoken = true; Audio.setReverb(P.room); }
+    if (wokenCtx !== ctx) { wokenCtx = ctx; audioWoken = true; Audio.setReverb(P.room); }
     return ctx;
   }
   // When the input behind a call happened, on the audio clock.
@@ -468,7 +469,7 @@
     g.gain.exponentialRampToValueAtTime(peak, t + 0.002);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
     o.connect(g);
-    g.connect(window.StudioBus ? StudioBus.out(ctx) : ctx.destination);
+    g.connect(ctx.destination);
     o.start(t);
     o.stop(t + 0.09);
     o.onended = () => { try { o.disconnect(); g.disconnect(); } catch (e) {} };
@@ -485,8 +486,9 @@
 
   async function startRun(recording) {
     if (recording && FROM_FILE) { toast('Recording needs the studio opened with “Open the Recording Studio” (see the red note at the top).'); return; }
+    if (StudioVoice.testing) { toast('The microphone test is still going. It ends by itself in a moment.'); return; }
     const token = ++runToken;
-    const ctx = wakeAudio();
+    let ctx = wakeAudio();
     let from = R.pos;
     if (!recording) {
       if (!anyContent()) { toast('Nothing recorded yet. Pick a track and press ● to record.'); return; }
@@ -507,9 +509,10 @@
       if (token === runToken) { R.state = 'idle'; renderTransport(); toast('The microphone is not on — see the Voice panel below.'); }
       return;
     }
-    const ids = clipIds(P.tracks);
-    if (ids.length) await StudioVoice.load(ids);
+    // the clock at the takes' own rate, so they play back untouched
+    await StudioVoice.matchRate();
     if (token !== runToken) return;
+    ctx = wakeAudio();
     if (count) EVMCountIn.open(count, barBeats());
     const ok = await EVMCountIn.prime(ctx, { warm: count ? 0.35 : 0.12 });
     if (token !== runToken) return;
@@ -518,6 +521,13 @@
       R.state = 'idle';
       renderTransport();
       toast('The sound did not start. Click the page, then try again.');
+      return;
+    }
+    if (recording && R.inst === 'voice' && !StudioVoice.on) {     // unplugged while the sound was waking
+      EVMCountIn.close();
+      R.state = 'idle';
+      renderTransport();
+      toast('The microphone is not on — see the Voice panel below.');
       return;
     }
     const spb = 60 / P.tempo;
@@ -539,9 +549,8 @@
       timer: 0, raf: 0, drawn: 0
     };
     if (recording && R.inst === 'voice') {
-      run.capture = StudioVoice.startCapture();
       run.vdelay = StudioVoice.delaySec();
-      if (count) run.capture.countSpan = { from: anchor - count * spb, to: anchor - 0.03 };   // the speakers alone: the bleed is measured there
+      run.capture = StudioVoice.startCapture({ id: newId('c'), project: P.id, track: P.tracks[run.armed].id, from, anchor, spb, vdelay: run.vdelay });
     }
     applyLevels();
     if (count) {
@@ -713,10 +722,10 @@
       if (next >= 0) setTimeout(() => toast(`Recorded. Pick track ${next + 1} to play another part over it.`), 600);
     }
   }
-  /* A voice take: the microphone's sound from where Play began (or from a
-     pick-up sung in the count-in) to Stop, moved back by the voice delay —
-     the round trip out of the speakers and into the microphone. Kept as a
-     clip of its own; the track gets a region of it, by the same tape rules. */
+  /* A voice take: the microphone's sound, whole, count-in and all. The track hears
+     the part from where Play began (or from a pick-up sung in the count-in) to Stop,
+     moved earlier by the voice delay, by the same tape rules. Nothing is done to the
+     sound. A take stays as it was even when it is quiet: the words say what to change. */
   let voiceSaving = false;
   async function keepVoiceTake(r) {
     const c = r.capture;
@@ -725,63 +734,71 @@
     const tr = P.tracks[r.armed];
     voiceSaving = true;
     try {
-      const res = await StudioVoice.endCapture(c, stopT);
-      if (!res || !res.data.length || !tr) return;
-      if (res.peak < 0.002) { toast('The microphone was silent, so nothing was kept. Check the meter in the Voice panel moves when you sing.'); return; }
-      // Where the take sits: by its own bleed when the speakers were heard in it
-      // (the round trip measured on this very take, so the backing in it lands
-      // on the beat with the real tracks), else by the lined-up figure.
-      const found = res.ref ? StudioVoice.measureDelay(res) : null;
-      const vd = found ? found.sec : r.vdelay;
-      const bleedDb = StudioVoice.bleedOf(res, vd);
+      const res = await StudioVoice.endCapture(c);
+      if (!res) return;
+      const vd = r.vdelay;
       const tFrom = r.anchor + vd;                  // where beat `from` is in the take
-      // The speakers' sound, taken back out: the studio knows what it sent (res.ref)
-      // and, once the microphone is lined up, how the room returns it.
-      let data = res.data, removedDb = null, removalFail = null, notLinedUp = false;
-      if (res.ref && StudioVoice.removalReady()) {
-        let out = null;
-        try { out = await StudioVoice.removeBacking(res, found ? found.sec : null); } catch (e) { console.error(e); }
-        if (out && (out.erle == null || (out.erle >= 6 && out.median > -1))) { data = out.clean; removedDb = out.erle == null ? null : Math.round(out.erle); }
-        else if (out) removalFail = Math.round(out.erle);
-      } else if (res.ref && !StudioVoice.echoFilter() && StudioVoice.removalWanted()) notLinedUp = true;
-      const pick = StudioVoice.pickupOnset(Object.assign({}, res, { data }), tFrom);
+      const pick = StudioVoice.pickupOnset(res, tFrom);
       const startT = Math.max(res.t0, pick != null ? pick : tFrom);
       const endT = Math.min(stopT, res.t0 + res.data.length / res.rate);
-      if (endT - startT < 0.05) return;            // stopped in the count-in
+      if (!tr || endT - startT < 0.05) { await StudioVoice.discard(res); return; }   // stopped in the count-in
+      const stored = await StudioVoice.commit(res);
       const lo = r.from + (startT - vd - r.anchor) / r.spb;
       const hi = r.from + (endT - vd - r.anchor) / r.spb;
-      const id = newId('c');
-      const a = Math.round((startT - res.t0) * res.rate), b = Math.round((endT - res.t0) * res.rate);
-      const take = StudioVoice.boosted(data.slice(a, b), res.boost);   // the Voice panel's boost, capped under full scale
-      await StudioVoice.saveClip(id, res.rate, take.data, { gain: take.gain, clipped: take.clipped, mic: res.mic, removed: removedDb });
       pushUndo('the take on track ' + (r.armed + 1));
       cutRegions(tr, lo, hi);
-      tr.regions.push({ c: id, b: lo, o: 0, d: (b - a) / res.rate });
+      tr.regions.push({ c: res.id, b: lo, o: Math.round((startT - res.t0) * res.rate) / res.rate, d: endT - startT });
       tr.regions.sort(byBeat);
       tr.kind = 'voice';
       save();
       renderAll();
-      const bleedHot = Number.isFinite(bleedDb) && bleedDb > -6;
-      const word = take.clipped ? 'That take was too loud for the microphone in places (it clipped). Move back a little for the next one.'
-        : bleedHot ? `The speakers were loud at the microphone during the count-in (${Math.round(bleedDb)} dB): turn them down, or use headphones.`
-          : removalFail != null ? `The backing could not be taken out of that take cleanly (${removalFail} dB), so it is kept as recorded. Line up the microphone again in the Voice panel.`
-            : notLinedUp && !sessionGet('line-up-hint') ? (sessionSet('line-up-hint'), 'Line up the microphone (in the Voice panel) and the studio will take the backing back out of your voice takes.')
-              : pick != null ? 'Kept the pick-up you sang in the count-in.'
-                : removedDb != null ? `Backing taken out of the take: ${removedDb} dB.` : '';
+      const word = !stored ? 'The take could not be stored in this browser (its storage may be full). It plays for now: download the project file to keep your work.'
+        : res.peak < 0.0003 ? 'That take is silent. Is the right microphone chosen in the Voice panel?'
+          : res.clipped ? 'That take hit the top of the meter, so it may sound distorted. Move back a little and try again.'
+            : res.peak < 0.03 ? 'That take is very quiet. Move closer to the microphone if you can.'
+              : pick != null ? 'Kept the pick-up you sang in the count-in.' : '';
       if (word) setTimeout(() => toast(word), 400);
-      const notes = [];
-      if (found) notes.push(`lined up by its own sound (${found.ms} ms)`);
-      if (Number.isFinite(bleedDb)) notes.push(`speakers at the microphone ${Math.round(bleedDb)} dB${bleedHot ? ' (loud)' : ''}`);
-      if (removedDb != null) notes.push(`backing taken out ${removedDb} dB`);
-      else if (removalFail != null) notes.push(`backing left in (${removalFail} dB)`);
-      else if (notLinedUp) notes.push('backing left in — line up the microphone first');
-      StudioVoice.say(notes.length ? 'Last take: ' + notes.join(' · ') + '.' : '');
     } catch (e) {
       console.error(e);
       toast('The take could not be kept here (the browser’s storage may be full). Download the project file to keep your work.');
     } finally {
       voiceSaving = false;
     }
+  }
+  /* A take cut off by a closed page or a crash comes back: on its own track if nothing
+     else has taken that place since, else on an empty one. It covers nothing. */
+  async function recoverTakes() {
+    const found = await StudioVoice.recover();
+    if (!found.length) return;
+    const tracksWith = [];
+    found.forEach(f => {
+      const vd = f.vdelay || 0;
+      const startT = Math.max(f.t0, f.anchor + vd);
+      const o = Math.round((startT - f.t0) * f.rate) / f.rate;
+      const d = f.length / f.rate - o;
+      if (d < 0.25) { StudioVoice.forget([f.id]); return; }
+      const lo = f.from + (startT - vd - f.anchor) / f.spb;
+      const hi = lo + d / (60 / P.tempo);
+      if (!tracksWith.length) pushUndo('the recovered take');
+      let i = f.project === P.id ? P.tracks.findIndex(t => t.id === f.track) : -1;
+      const tr0 = P.tracks[i];
+      const free = tr0 && recordable(tr0) && (!hasContent(tr0) || tr0.kind === 'voice') && !tr0.regions.some(g => regionEnd(g) > lo && g.b < hi);
+      if (!free) i = emptyFor('voice');
+      if (i < 0) {   // sixteen full tracks: back where it was sung
+        i = Math.max(0, P.tracks.findIndex(t => t.id === f.track));
+        cutRegions(P.tracks[i], lo, hi);
+      }
+      const tr = P.tracks[i];
+      tr.kind = 'voice';
+      tr.regions.push({ c: f.id, b: lo, o, d });
+      tr.regions.sort(byBeat);
+      tracksWith.push(i + 1);
+    });
+    if (!tracksWith.length) return;
+    save();
+    buildTracks();
+    renderAll();
+    toast(`A take cut off when the page closed is back on track ${tracksWith.join(', ')}.`);
   }
   // What a take covers on a voice track goes, by tape rules: a take across
   // part of an older one leaves the rest of it.
@@ -2313,7 +2330,7 @@
       tracks: tracks.map(tr => {
         const eng = engineOf(tr);
         let events;
-        if (eng === 'audio') events = tr.regions.map(g => ({ at: at(g.b), clip: g.c, offset: g.o, dur: g.d }));
+        if (eng === 'audio') events = Voices.joined(tr.regions, spb).map(g => ({ at: at(g.b), clip: g.c, offset: g.o, dur: g.d }));
         else if (eng === 'hits') events = tr.hits.map(h => ({ at: at(h.b), inst: h.i, gain: h.g, gapMs: h.r * spb * 1000 }));
         else if (eng === 'strikes') events = tr.notes.map(n => ({ at: at(n.b), freq: midiFreq(n.m), sound: notePreset(tr, n), level: n.v }));
         else events = tr.notes.map(n => ({ at: at(n.b), hold: n.d * spb, freq: midiFreq(n.m), preset: notePreset(tr, n), level: n.v }));
@@ -2324,7 +2341,7 @@
 
   const toS16 = x => (x < -1 ? -32768 : x > 1 ? 32767 : Math.round(x < 0 ? x * 32768 : x * 32767));
   async function encodeMp3(buffer, progress) {
-    const enc = new lamejs.Mp3Encoder(2, buffer.sampleRate, 192);
+    const enc = new lamejs.Mp3Encoder(2, buffer.sampleRate, 320);
     const L = buffer.getChannelData(0), Rt = buffer.getChannelData(1);
     const BLOCK = 1152, l16 = new Int16Array(BLOCK), r16 = new Int16Array(BLOCK);
     const out = [];
@@ -2597,7 +2614,9 @@
     R.pos = songStart();
     renderAll();
     if (window.StudioLink) StudioLink.show(R.inst);
-    StudioVoice.keys().then(forgetUnused);   // takes from projects deleted or replaced on another visit
+    recoverTakes().catch(e => console.error(e))
+      .then(() => StudioVoice.keys()).then(forgetUnused);   // takes from projects deleted or replaced on another visit
+    setTimeout(() => recoverTakes().catch(e => console.error(e)), 5000);   // one whose page closed only moments ago
     new ResizeObserver(() => { sizeLanes(); drawAll(); }).observe(el('tracks-pane'));
     window.addEventListener('resize', applySplit);
     window.addEventListener('pagehide', saveNow);
@@ -2608,6 +2627,8 @@
   window.Studio = {
     KINDS, INSTRUMENTS, MAX_TRACKS, METERS, TEMPO_MIN, TEMPO_MAX,
     noteOn, noteOff, noteHit, togglePlay, stop: stopRun, busy,
+    sounding: () => !!run,
+    takeIds: () => clipIds(P.tracks),
     calibrating: () => !!cal, calTap,
     sheetOpen, toast, openSheet, closeSheet,
     get project() { return P; },

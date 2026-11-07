@@ -42,16 +42,12 @@ the live site): move a project between them with a project file.
 | D8 | Saved **on this device** (a list of projects, autosaved) and as **project files**; the mix as **MP3 or WAV**. | As in the Virtual Keyboard recorder. |
 | D9 | Not in this version: loops, moving notes one by one. (Zoom came 2026-10-24, D15.) | Each is a chapter of its own. |
 | V1 | **Voice tracks** (added 2026-10-22, the user's ask): the fourth tab, **Voice**, records the microphone as real sound. A take is kept in this browser's **IndexedDB** as 16-bit samples; the project only says where each take sits. | Sound is far too big for localStorage; IndexedDB holds hundreds of MB. |
-| V2 | The microphone comes in on **the studio's own audio clock** (an AudioWorklet, `js/voice-tap.js`), and a take is moved earlier by the **voice delay**: out of the speakers and back into the microphone. **Line up the microphone** measures it with six beeps; until then the browser's own figures stand in. | Sample-accurate, steady takes; a singer sings with what they hear. |
+| V2 | **The recording is Vocal Booth's** (2026-11-06, the user's call: "it hurt the sound quality too much"). Nothing sits between the microphone and the take: every call-style process asked off as `ideal` and read back, raw samples from `js/capture-worklet.js` (a copy of Vocal Booth's), no filter, no boost, no echo or backing removal. Everything from the 2026-10-23/24 microphone passes is gone: the 25 Hz high-pass, Boost, the echo checkbox, Line up the microphone (the sweep), the bleed readout, backing removal, the take lining itself up by its own bleed, the spectrum and report, and the speakers' bus (`bus.js`). | The removal subtracted a prediction from the voice on every take, and a singer heard the cost. So **what comes out of the speakers goes into the take: headphones.** |
 | V3 | A voice take **keeps its own speed**: a new tempo moves the other tracks under it (a toast says so once). | Stretching a voice changes its pitch or smears it. |
-| V4 | **No live monitoring** (you do not hear yourself) — a level meter instead; **headphones** advised. Echo cancellation, noise suppression and auto gain are **off** (made for calls, they smear music); "Filter out the speakers" turns the first two on for a room without headphones. | Speakers playing the mic back would feed back. |
-| V5 | Same tape rules: a take replaces from where Play began to Stop, splitting an older take around it. Something sung **in the count-in** loud beside the rest of the take is kept as a **pick-up**, as a key played in the count-in is. | Matches the keyboard tracks. |
-| V6 | **Project files carry the voice takes** (lossless 16-bit, inside the JSON) — about 6 MB a minute of voice. The microphone is on only while the Voice tab shows. | A project file must open complete on another computer. |
-| V7 | **The microphone is opened for music, not a call** (2026-10-23, from the user's *Recording Musical Sounds with Common Mics* notes): echo cancellation, noise suppression, auto gain and voice isolation each asked off by name as `ideal`, then **what the browser applied is read back** from the track and shown (plus a Bluetooth warning from the label). A 25 Hz high-pass takes DC and rumble. **Boost** is one static gain laid over the kept take, capped under −1 dBFS, stored with the take; nothing rides the level while recording. The **room noise** (quietest ¼ s of the last 8 s) sets "silent" and the pick-up rule. A stereo track keeps its louder channel (Safari hands a mono mic over as left-only). **Mic check** fold: settings, rates, live level, room noise, spectrum, copy-a-report. | A browser's defaults are for one talking voice: they dull overtones, warble held notes and pump the level — and a constraint is a request, not a promise. |
-| V8 | **The bleed check** (2026-10-24): in a voice take's count-in only the speakers sound, so the microphone's peak there is how loud they are at it — shown after the take ("speakers at the microphone −9 dB") and in the Mic check, with "turn them down or use headphones" past −6 dBFS. Shown, not acted on. | Clipped bleed cannot be undone later; the doc's rule: fix loud bleed at the source. |
-| V9 | **Backing removal** (2026-10-24, from the user's *Removing Speaker Playback* notes): a singer needs the backing out loud, so the studio takes its own sound back out afterwards. Every sound goes out through one bus (`StudioBus`) and a second worklet tap keeps the reference beside the take. "Line up the microphone" plays a 1.5 s sweep (60 Hz–20 kHz) and learns the room's 0.5 s response (its peak is the voice delay). A take's echo is predicted by convolution, fitted to the take (±15 ms lag + gain, over its first 20 s) and subtracted; the figure is ERLE in ¼ s blocks where the echo has energy, 90th percentile ("Backing taken out: 35 dB"), kept with the clip; under 6 dB, or a median below −1 dB, the take is kept as recorded. The singer need not be silent anywhere — the voice is unrelated to the echo, so the fit ignores it and the check finds its figure in the pauses. Not applied with the browser's echo cancellation on. | The one approach that leaves the singer's own sound untouched: a fixed filter cannot learn the performer. The browser's canceller, made for calls, swallows the voice while the speakers are loud at the microphone — it stays as a labelled last resort. |
-| V9a | Tried and taken out the same day, after the user tried them (2026-10-24): a **beat light** (a circle a beat, lit as heard) with a **"count in, then quiet"** take — "the lights are poorly designed for keeping the beat", and a take with nothing sounding blurs the beat; and an automatic half-level **duck** of the backing after a loud bleed. | A singer needs to hear the backing; the studio's job is to take it out afterwards, not to take it away. |
-| V11 | **A take lines itself up by its own sound** (2026-10-24, the user's ask after hearing a doubled rhythm: the bleed in a take sat 63 ms behind the real tracks). With the speakers heard in a take, the round trip is measured on that take — the onsets of what the microphone heard against the onsets of what was sent (1 ms envelopes, so the voice hardly counts), then the raw signals within ±2 ms — and the take is placed by it, the backing in it landing on the beat with the tracks. That figure becomes the voice delay ("from your last take") for takes that do not hear the speakers; the removal looks for its lag around it. A checkbox chooses whether the speakers' sound is then taken out or kept, lined up. | Calibration figures drift and can be wrong; the take itself carries the truth. |
+| V4 | **Whole samples, one rate.** The clock runs at the microphone's rate while the project has no takes and at the takes' rate once it has (`Audio.restart`, `matchRate`); a song file is made at the takes' rate; a take plays from a whole sample; pieces of a split take still side by side play as one; a fade under 3 ms only where a take is cut into. | Measured on a 15 kHz tone in Chrome: a start between two samples −5.1 dB, a 48 kHz take in the old fixed 44.1 kHz file −2.7 dB (a browser converts by plain interpolation). The capture alone would not have fixed the sound. |
+| V5 | A take is **kept whole**, count-in and all, mono, the louder input chosen at its end, as 32-bit floats in half-second rows written while it runs. The track hears from where Play began (or from a pick-up: sound in the count-in loud beside the rest), to Stop, by the same tape rules; dragging the start back opens up the rest. A closed page costs half a second at most and the take comes back on its track, covering nothing. A quiet or silent take is kept and the toast says what to change. | Nothing thrown away, nothing to redo. Older takes (16-bit, with whatever was done to them then) stay as they were and still play. |
+| V6 | **Project files carry the takes** as 16-bit samples inside the JSON, about 6 MB a minute, with the count-in. No live monitoring: a level meter, words and a Too loud light. The microphone is on only while the Voice tab shows. | A project file must open complete on another computer. 16 bits is far below any microphone's noise. Browser latency makes hearing yourself distracting. |
+| V7 | **The Voice tab is Vocal Booth's Mic check**: microphone, meter, level advice, room noise, Hear yourself (five seconds and back), Headphones and timing (five chirps: heard = the round trip, per microphone, and a warning that the speakers reach the microphone), where the sound is going. A take moves earlier by the measured round trip, else the browser's figures. | The same words and the same tests as the booth. Stored delays from the old line-up are dropped: they were measured a different way. |
 | D10 | **One key for the project** (2026-10-24, the user's ask): a key + scale menu beside the tempo and time signature (the Virtual Keyboard's scales, Minor listed once). Every instrument plays in it — C minor on the keyboard is C minor on the accordion and the xylophone (its Scales window's fitting). It is saved with the project, given to each instrument as it joins and whenever it changes, and a Song Writer song brought in sets it to the song's key. | One place to say what key the band is in. |
 | D11 | **The instrument's own controls sit in the studio's tab row** (2026-10-24): the app's header rows (key, view, octaves, sound, Library, gear) are hidden in the frame, and the studio shows the controls it needs beside the tabs (not Library, nor the xylophone's ? tutorial — the user's call), its settings gear at the end — each one clicking or setting the app's real control and reading back what it shows (`js/inst-controls.js`). The line of words that was there ("Track 5 is empty…") is gone. | The user asked for fewer rows of words: the instrument gets two rows' height back. |
 | D13 | **Move and trim takes on the timeline** (2026-10-24, the user's ask): drag a take to move it (by whole beats; hold Option/Alt for finer), drag either end to trim it (an end snaps to a beat line within 6 px; Option/Alt for free). Trimming only narrows the take's window onto its recording (`o`, `d`) — nothing is cut from the clip, so the same end dragged back out opens it up again, as far as the recording goes; the whole recording shows faintly behind a take while it is dragged. A take moved or widened over another on its track covers it by the tape rules (`cutRegions`; the covered take keeps its recording too). A click that doesn't move still sets where Play starts. Undo / Redo cover it. | |
@@ -74,11 +70,9 @@ the live site): move a project between them with a project file.
 | `js/voices.js` | Playing tracks back on the one clock, and rendering them for a file. |
 | `js/xylo.js` | The Rainbow Xylophone's vibraphone and marimba, on any audio context. |
 | `js/bring-in.js` | Bringing in Ostinato Builder and Song Writer songs. |
-| `js/voice.js` | Voice tracks: the microphone, the Voice panel and its meter, the takes in IndexedDB, Line up the microphone. |
-| `js/voice-tap.js` | The AudioWorklet that hands the microphone's samples over with their place on the clock (two channels in, the louder kept); a second one taps the bus as the reference. |
-| `js/bus.js` | `StudioBus.out(ctx)`: the one way out to the speakers, so the studio can tap exactly what it sent. Loaded first. |
-| `js/backing-removal.js` | Taking the speakers' sound back out of a voice take: the sweep, the room's response (FFT), the predicted echo, ERLE. |
-| `audio.js` | Copy of `Digital Accordion/audio.js` (authoritative there) differing by ONE line: the master goes through `StudioBus`. |
+| `js/voice.js` | Voice tracks: the microphone, the Voice panel and its meter and tests, the takes in IndexedDB, the rescue of a take cut off by a closed page. From Vocal Booth's `engine.js` + `miccheck.js`. |
+| `js/capture-worklet.js` | The AudioWorklet: raw samples on exact frames of the studio's clock, up to two inputs. A copy of `vocal-booth/js/capture-worklet.js`. |
+| `audio.js` | Copy of `Digital Accordion/audio.js` (authoritative there) with ONE thing added: `restart(rate)`. |
 | `lib/evm-count-in.*` | Copies of `EVM Library/` (check-copies.sh). |
 | `lib/instruments/js/virtual-instruments.js` | Copy of `Virtual Instrument Assets/js/` (authoritative there). |
 | `vendor/lame.min.js` | lamejs 1.2.1 (LGPL), for MP3 — as in the Virtual Keyboard. |
@@ -207,26 +201,24 @@ melody's — plus the chords track. A one-part song comes in exactly as before.
 ## Voice tracks
 
 - **Model**: a voice track's `regions` — `{ c (clip id), b (beat it starts on), o (seconds into the clip), d (seconds) }`.
-  Clips live in IndexedDB `evm_studio_audio_v1`, store `clips`, key = clip id, value `{ rate, pcm (Int16 ArrayBuffer), at }`.
-  A clip is the take from where it was kept (count-in trimmed off). Takes no project and no undo step uses are let go
-  when a project is deleted and when the studio opens.
-- **Timing**: sample at audio time `T` is musical time `T − voice delay`. The take's region begins at beat `from`
+  Takes no project and no undo step uses are let go when a project is deleted and when the studio opens.
+- **Storage**: IndexedDB `evm_studio_audio_v1`, store `clips` (no new version: an older page in another tab still works).
+  `<clip id>` → `{ rate, rows: 1, ch, length, at, clipped, mic, delayMs }`; `_r:<id>:<ch>:<row>` → Float32Array, half a second;
+  `_take:<id>` → a take still going, with where it belongs and a heartbeat (`alive`), rewritten with each row; `keys()` leaves `_` keys out.
+  An older take is `<clip id>` → `{ rate, pcm (Int16 ArrayBuffer), at, … }`.
+- **Timing**: sample at audio time `T` is musical time `T − voice delay`. The region begins at beat `from`
   (`anchor + delay` in the clip) or at a pick-up onset sung in the count-in.
-- **Prefs**: `evm_studio_voice_v1` (microphone, boost, echo filter), `evm_studio_mic_delay_v1` (the measured
-  round trip), `evm_studio_bleed_v1` (the last count-in's bleed, dB + when). The room's response: key `_ir` in the clips store
-  `{ rate, ir, ms, erle, at, label }` (`keys()` leaves `_` keys out, so the sweep is never forgotten as an unused take).
-- **With each clip** (IndexedDB record and project file alike): `gain` (the boost actually applied, absent when 1),
-  `clipped` (the microphone itself hit full scale), `mic` (label, which processing was on, rates, channels, room noise),
-  `removed` (dB of backing taken out, when it was).
-- **Not in the reference** (so not removed): an instrument played live in its frame during a voice take (its own context),
-  sound from other tabs or apps, the count-in library's inaudible wake noise.
-- **The microphone's constraints** (`MUSIC` in voice.js): every processing flag `ideal: false` (echo cancellation
-  `ideal: true` only with "Filter out the speakers"), one channel, 48 kHz and 10 ms asked for; `exact` only for a chosen
-  `deviceId`. Flags cannot be changed on a live stream — changing one closes the microphone and opens it again.
+- **Prefs**: `evm_studio_voice_v1` (`{ deviceId }`), `evm_studio_mic_delays_v2` (microphone name → `{ ms, at }`), `evm_studio_fold_tips`.
+  On opening, the old boost, echo and removal prefs, `evm_studio_mic_delay_v1`, `evm_studio_bleed_v1` and the `_ir` record are cleared.
+- **The microphone's constraints** (`openMic` in voice.js): every processing flag `ideal: false`, two channels and the project's rate asked for;
+  `exact` only for a chosen `deviceId`, which falls back to the default when unplugged.
+- **The rescue**: at opening, and again 5 s later (a page closed moments ago still looks alive), `_take:` records with a heartbeat older than 4 s are
+  read back, the louder input kept, and placed on their own track if that place is still free, else on an empty one.
 - **Embedding**: inside another page the frame needs `allow="microphone"`; without it the panel's error offers
   "Open the studio in its own tab".
-- **Project file**: `data.clips = { id: { rate, pcm16: base64 } }` beside the tracks; opening the file puts them back.
-- **Song file**: voice tracks render on an offline context of their own and are added to the mix like the others.
+- **Project file**: `data.clips = { id: { rate, pcm16: base64, clipped, mic, delayMs } }` beside the tracks; opening the file puts them back as rows.
+- **Song file**: at the takes' rate (the one most of the sound was made at), 44.1 kHz with no takes. MP3 320 kbps. Voice tracks render on an offline context of their own and are added to the mix like the others.
+- **Tests**: `node tools/test-voice.mjs` with the Bash sandbox off, launch entry `recording-studio-test` (8831). A real microphone is not exercised: `getUserMedia` never returns in a Chrome launched from this tooling.
 
 ## Tested (2026-10-22, headless pane, port 8831)
 
@@ -294,11 +286,16 @@ lined itself up at the true 51 ms, placed itself right and came out 35 dB
 clean; a synthetic check (clicks 77 ms late in noise and a "voice") measured
 77 ms, and the same with no bleed measured nothing, as it should.
 
-Not yet: by ear on real speakers, a real microphone (levels, the pick-up rule's
-thresholds, a USB interface, whether Chrome honours the flags on the user's
-laptop), the self-lining-up and the removal in a real room (ERLE, whether 6 dB is the right floor, the
-duck), the timing test with real taps, a touch screen / smart board, Safari
-(the left-only stereo case), a long project (64+ bars).
+2026-11-06, the recording replaced by Vocal Booth's (`tools/test-voice.mjs`, stand-in microphone): a known ramp fed to
+the worklet comes back from a take exactly, through the count-in, after a reload and from input 2; into the song file
+sample for sample from any start time; across a split; a 37 ms room reads 37 ms and a take lands 0 samples off its
+backing; a page closed mid-take gives back 2.56 s of 2.6 s on its own track; old 16-bit takes load, play and go into
+project files; keyboard, xylophone and drums play after the clock moves. The earlier entries above describe code
+that is gone where they mention the sweep, the bus or the removal.
+
+Not yet: a real microphone and real headphones, by ear (the chirp test through air, the level words, a USB
+interface, whether Chrome honours the flags on the user's laptop, the pick-up rule's thresholds), a touch screen /
+smart board, Safari and Firefox, a long project (64+ bars).
 
 ## Promoting
 

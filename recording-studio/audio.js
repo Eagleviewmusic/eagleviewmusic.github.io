@@ -45,6 +45,20 @@ const Audio = (() => {
     return ctx;
   }
 
+  /* Recording Studio only — the ONE thing this copy adds to Digital Accordion's: a new
+     clock at the rate of the microphone or the takes, so a voice is never converted.
+     Nothing may be sounding. Everything on the old context goes with it. */
+  function restart(rate) {
+    if (ctx) { try { ctx.close(); } catch (e) {} }
+    Object.keys(sides).forEach(k => delete sides[k]);
+    voices.clear();
+    timed.clear();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC({ latencyHint: 'interactive', sampleRate: rate });
+    ({ mixBus, hp, comp, master, dryGain, reverb, reverbGain } = buildChain(ctx));
+    return ctx;
+  }
+
   /* The master chain on a context — the live one, or render()'s offline one. */
   function buildChain(c) {
     const mixBus = c.createGain(); mixBus.gain.value = 0.9;
@@ -59,8 +73,7 @@ const Audio = (() => {
 
     mixBus.connect(dryGain); dryGain.connect(hp);
     mixBus.connect(reverb); reverb.connect(reverbGain); reverbGain.connect(hp);
-    hp.connect(comp); comp.connect(master);
-    master.connect(window.StudioBus ? StudioBus.out(c) : c.destination);   // Recording Studio: through its bus (bus.js) — the ONE line this copy differs by
+    hp.connect(comp); comp.connect(master); master.connect(c.destination);
     return { mixBus, hp, comp, master, dryGain, reverb, reverbGain };
   }
 
@@ -248,5 +261,5 @@ const Audio = (() => {
   }
   function stopAll() { [...voices.keys(), ...timed.keys()].forEach(stop); }
 
-  return { ensure, play, schedule, render, stop, stopAll, setLevel, setReverb, PRESETS, PRESET_ORDER };
+  return { ensure, restart, play, schedule, render, stop, stopAll, setLevel, setReverb, PRESETS, PRESET_ORDER };
 })();

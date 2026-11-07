@@ -31,7 +31,8 @@
    ========================================================================== */
 const Voices = (() => {
   const BASE = 0.8;          // the engine's own level for a side (Digital Accordion, Virtual Keyboard)
-  const RATE = 44100;
+  const DEFAULT_RATE = 44100;
+  const FADE = 128;          // samples, under 3 ms: only where a take is cut into, so the cut cannot click
   const VI = window.VirtualInstruments;
 
   const sideOf = track => 'trk-' + track.id;
@@ -39,7 +40,7 @@ const Voices = (() => {
   /* ---------------- live ---------------- */
   function start(ctx) {
     const gate = ctx.createGain();
-    gate.connect(window.StudioBus ? StudioBus.out(ctx) : ctx.destination);
+    gate.connect(ctx.destination);
     const timed = EVMCountIn.timed(ctx);
     let xyloBus = null;
     const gains = new Map();      // track id -> GainNode (xylophone, ostinato)
@@ -120,20 +121,41 @@ const Voices = (() => {
   }
 
   // One region of a take: `dur` seconds from `offset` into the buffer, at `at`.
+  /* Whole samples only: a start or an offset between two samples makes the browser
+     interpolate every sample of the take, which dulls the top of the voice. */
   function playTake(ctx, buf, out, ev) {
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    const g = ctx.createGain();
-    const at = ev.at, end = ev.at + ev.dur, fade = Math.min(0.004, ev.dur / 3);
-    g.gain.setValueAtTime(0, at);
-    g.gain.linearRampToValueAtTime(1, at + fade);
-    g.gain.setValueAtTime(1, end - fade);
-    g.gain.linearRampToValueAtTime(0, end);
-    src.connect(g);
-    g.connect(out);
-    src.start(at, Math.max(0, ev.offset), ev.dur);
-    src.onended = () => { try { g.disconnect(); } catch (e) {} };
+    const sr = ctx.sampleRate;
+    const at = Math.round(ev.at * sr) / sr;
+    const offset = Math.round(Math.max(0, ev.offset) * buf.sampleRate) / buf.sampleRate;
+    const dur = Math.min(Math.round(ev.dur * sr) / sr, buf.duration - offset);
+    const end = at + dur, fade = Math.min(FADE / sr, dur / 3);
+    const cutIn = offset > 0, cutOut = offset + dur < buf.duration - 1 / buf.sampleRate;
+    if (!cutIn && !cutOut) {
+      src.connect(out);
+    } else {
+      const g = ctx.createGain();
+      if (cutIn) { g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(1, at + fade); }
+      if (cutOut) { g.gain.setValueAtTime(1, end - fade); g.gain.linearRampToValueAtTime(0, end); }
+      src.connect(g);
+      g.connect(out);
+      src.onended = () => { try { g.disconnect(); } catch (e) {} };
+    }
+    src.start(at, offset, dur);
     return src;
+  }
+
+  /* Pieces of one take still side by side (a split) play as one, so nothing
+     happens to the sound where they meet. regions in beat order; spb seconds a beat. */
+  function joined(regions, spb) {
+    const out = [];
+    regions.forEach(g => {
+      const p = out[out.length - 1];
+      if (p && p.c === g.c && Math.abs(p.o + p.d - g.o) < 1e-4 && Math.abs(p.b + p.d / spb - g.b) * spb < 1e-4) p.d = g.o + g.d - p.o;
+      else out.push({ c: g.c, b: g.b, o: g.o, d: g.d });
+    });
+    return out;
   }
 
   /* ---------------- a song file ----------------
@@ -142,6 +164,10 @@ const Voices = (() => {
      engines render apart and are added together; a mix that would clip is
      brought down as a whole (never squashed). */
   async function render(song) {
+    // the takes' own rate, so a voice goes into the file untouched (a browser's
+    // conversion between rates is plain interpolation, and dulls the top of it)
+    const takeIds = song.tracks.flatMap(t => (t.kind === 'voice' ? t.events.map(ev => ev.clip) : []));
+    const RATE = StudioVoice.mainRate(takeIds) || DEFAULT_RATE;
     const length = Math.max(1, Math.ceil(song.seconds * RATE));
     const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const renders = [];
@@ -231,5 +257,5 @@ const Voices = (() => {
     return { sampleRate: RATE, length, duration: length / RATE, numberOfChannels: 2, getChannelData: ch => (ch ? R : L) };
   }
 
-  return { BASE, start, render, sideOf };
+  return { BASE, start, render, sideOf, joined };
 })();

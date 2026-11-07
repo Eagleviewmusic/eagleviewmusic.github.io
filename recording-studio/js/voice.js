@@ -1,52 +1,29 @@
 /* ==========================================================================
    Recording Studio — voice.js
-   Voice tracks: the microphone, recorded as sound.
+   Voice tracks: the microphone, recorded as sound. The recording is Vocal
+   Booth's (vocal-booth/js/engine.js, miccheck.js), on the studio's timeline.
 
-   - THE MICROPHONE comes in on the studio's own audio context, through
-     voice-tap.js (an AudioWorklet), so every sample carries the clock the
-     tracks are played on. It is on only while the Voice tab is showing (or
-     a take is going).
-   - MUSIC, NOT A PHONE CALL: a browser's microphone defaults are tuned for
-     one talking voice — echo cancellation, noise suppression, automatic
-     gain and (where it exists) voice isolation. Each of them dulls, warbles
-     or pumps a sung note, a recorder, a class. So every one is asked off by
-     name, as an `ideal` (an `exact` a device cannot meet would throw and
-     leave no microphone at all), and then what the browser ACTUALLY applied
-     is read back from the track and shown — a request is not a promise.
-     "Filter out the speakers" turns echo cancellation alone back on.
-   - LEVELS: with automatic gain off, the level is whatever the microphone
-     gives, and a basic one is quiet at a distance and clips up close. The
-     meter says so in words, next to the band to aim for. "Boost" is one
-     static gain laid over the whole take once it is in, held back so the
-     loudest sample stays under full scale, and kept with the take; nothing
-     rides the level while recording. The quietest quarter second of the
-     last eight is kept as the ROOM NOISE, so "is anyone singing" judgements
-     are made against this room, not a fixed number.
-   - TIMING: a voice is heard late twice over — the backing reaches the
-     singer through the speakers, and the singing reaches the studio through
-     the microphone. "Line up the microphone" measures both at once: beeps
-     out of the speakers, listened for by the microphone. Until then, the
-     browser's own figures stand in.
-   - CLIPS are kept in this browser's IndexedDB as 16-bit samples (too big
-     for localStorage), with the boost and the microphone settings they were
-     made with. A project only says where each take sits:
+   - NOTHING IS PUT BETWEEN THE MICROPHONE AND THE TAKE. Every call-style
+     process is asked off and read back (a constraint is a request, not a
+     promise); samples come raw from an AudioWorklet (capture-worklet.js, a
+     copy of Vocal Booth's); no filter, no boost, no echo or noise removal.
+     So what comes out of the speakers goes into the take: headphones.
+   - THE CLOCK runs at the microphone's own rate while the project has no
+     takes, and at the takes' rate once it has, so nothing is converted.
+   - A TAKE IS MONO: whichever input carried more, chosen when it ends. It is
+     kept whole, count-in and all, as rows of 32-bit floats written while it
+     runs, so a closed page costs half a second of singing at most. The
+     project says which part of it is heard:
      regions { c (clip id), b (beat), o (seconds into the clip), d (seconds) }.
      A take does not change speed with the tempo.
-   - MIC CHECK: a fold in the panel with what the browser applied, the
-     rates, the live level, the room noise, a spectrum (overtones past
-     4 kHz, or a wall where a Bluetooth path ends) and a report to copy.
-   - THE SPEAKERS IN THE TAKE. A singer needs the backing out loud, so the
-     studio's own sound is taken back out of the take afterwards: a second
-     tap listens to exactly what went to the speakers (the reference, from
-     StudioBus), "Line up the microphone" plays a sweep and learns how the
-     room returns it (backing-removal.js), and a take's predicted echo —
-     fitted to the take, checked in its pauses — is subtracted before the
-     take is kept. The singer's own sound is untouched: the filter is fixed
-     before the take and cannot learn them. The count-in, where only the
-     speakers sound, measures how loud they are at the microphone (the
-     bleed), which is shown, not acted on. The browser's own echo
-     cancellation stays as a last resort: it is made for calls, and with
-     the speakers loud at the microphone it swallows the voice too.
+   - TIMING: a take moves earlier by the round trip, measured by the timing
+     test per microphone, else the browser's own figures.
+
+   IndexedDB, store `clips`:
+     <clip id>            { rate, rows: 1, ch, length, at, clipped, mic, delayMs }
+                          (older takes: { rate, pcm: Int16 samples, at, … })
+     _r:<id>:<ch>:<row>   Float32Array, half a second
+     _take:<id>           a take still going: where it belongs, for the rescue
 
    window.StudioVoice — studio.js, voices.js and link.js call in.
    ========================================================================== */
@@ -54,19 +31,18 @@ const StudioVoice = (() => {
   'use strict';
 
   const DB_NAME = 'evm_studio_audio_v1', STORE = 'clips';
-  const PREFS_KEY = 'evm_studio_voice_v1';
-  const DELAY_KEY = 'evm_studio_mic_delay_v1';
-  const BLEED_KEY = 'evm_studio_bleed_v1';
-  const IR_KEY = '_ir';        // the room's response, in the clips store (keys() leaves it out)
+  const PREFS_KEY = 'evm_studio_voice_v1';        // { deviceId }
+  const DELAY_KEY = 'evm_studio_mic_delays_v2';   // microphone name -> { ms, at }
   const PEAKS = 200;          // waveform peaks a second, for drawing
-  const CEILING = 0.89;       // about −1 dBFS: no boosted sample goes past it
+  const ROW_SEC = 0.5;        // the most a closed page can cost
 
   const el = id => document.getElementById(id);
   const loadJSON = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
   const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
-  const dB = x => x > 0 ? 20 * Math.log10(x) : -100;
+  const dB = x => 20 * Math.log10(Math.max(x, 1e-6));
   const FRAMED = (() => { try { return window.top !== window.self; } catch (e) { return true; } })();
+  const named = n => { const e = new Error(n); e.name = n; return e; };
 
   // -------- THE CLIPS (IndexedDB) --------
   let dbp = null;
@@ -89,10 +65,22 @@ const StudioVoice = (() => {
       t.onerror = t.onabort = () => reject(t.error);
     }));
   }
+  const rowKey = (id, ch, row) => `_r:${id}:${ch}:${String(row).padStart(6, '0')}`;
+  const rowRange = (id, ch) => {
+    const head = `_r:${id}:${ch == null ? '' : ch + ':'}`;
+    return IDBKeyRange.bound(head, head + '￿');
+  };
+  const takeKey = id => '_take:' + id;
 
   const cache = new Map();    // id -> { rate, data: Float32Array, peaks: Float32Array, meta }
   const missing = new Set();  // ids looked for and not found (a deleted take)
 
+  const concat = (list, n) => {
+    const out = new Float32Array(n);
+    let at = 0;
+    for (const x of list) { out.set(x, at); at += x.length; }
+    return out;
+  };
   function toI16(f32) {
     const out = new Int16Array(f32.length);
     for (let i = 0; i < f32.length; i++) {
@@ -116,34 +104,49 @@ const StudioVoice = (() => {
     }
     return out;
   }
-  // What travels with a take besides its samples: the boost it was given,
-  // whether the microphone clipped, and the microphone it was made with.
+  // What travels with a take besides its samples.
   function cleanMeta(m) {
     const out = {};
     if (!m || typeof m !== 'object') return out;
-    if (Number.isFinite(m.gain) && m.gain > 0 && m.gain !== 1) out.gain = Math.round(m.gain * 1000) / 1000;
     if (m.clipped === true) out.clipped = true;
-    if (Number.isFinite(m.removed)) out.removed = Math.round(m.removed);
+    if (Number.isFinite(m.delayMs)) out.delayMs = Math.round(m.delayMs);
     if (m.mic && typeof m.mic === 'object') { try { if (JSON.stringify(m.mic).length < 600) out.mic = m.mic; } catch (e) {} }
     return out;
   }
 
+  async function readChannel(id, ch) {
+    const rows = (await tx('readonly', st => st.getAll(rowRange(id, ch)))) || [];
+    let n = 0;
+    rows.forEach(r => { n += r.length; });
+    return concat(rows, n);
+  }
+  const dropChannel = (id, ch) => tx('readwrite', st => { st.delete(rowRange(id, ch)); return null; });
+
+  // A whole take at once (one from a project file).
   async function saveClip(id, rate, data, meta) {
     const m = cleanMeta(meta);
     cache.set(id, { rate, data, peaks: peaksOf(data, rate), meta: m });
     missing.delete(id);
-    await tx('readwrite', st => st.put({ rate, pcm: toI16(data).buffer, at: Date.now(), ...m }, id));
+    await dropChannel(id, null);
+    const step = Math.round(rate * ROW_SEC);
+    for (let at = 0, row = 0; at < data.length; at += step, row++) {
+      const part = data.slice(at, at + step);
+      await tx('readwrite', st => { st.put(part, rowKey(id, 0, row)); return null; });
+    }
+    await tx('readwrite', st => { st.put({ rate, rows: 1, ch: 0, length: data.length, at: Date.now(), ...m }, id); return null; });
   }
   // Bring takes into memory. Resolves true when every one is there.
   async function load(ids) {
     const want = [...new Set(ids)].filter(id => !cache.has(id) && !missing.has(id));
     for (const id of want) {
-      let rec = null;
-      try { rec = await tx('readonly', st => st.get(id)); } catch (e) {}
-      if (rec && rec.pcm) {
-        const data = toF32(new Int16Array(rec.pcm));
-        cache.set(id, { rate: rec.rate, data, peaks: peaksOf(data, rec.rate), meta: cleanMeta(rec) });
-      } else missing.add(id);
+      let rec = null, data = null;
+      try {
+        rec = await tx('readonly', st => st.get(id));
+        if (rec && rec.pcm) data = toF32(new Int16Array(rec.pcm));
+        else if (rec && rec.rows) data = await readChannel(id, rec.ch || 0);
+      } catch (e) { console.error(e); }
+      if (data && data.length) cache.set(id, { rate: rec.rate, data, peaks: peaksOf(data, rec.rate), meta: cleanMeta(rec) });
+      else missing.add(id);
     }
     return ids.every(id => cache.has(id));
   }
@@ -153,7 +156,15 @@ const StudioVoice = (() => {
   async function forget(ids) {
     if (!ids.length) return;
     ids.forEach(id => cache.delete(id));
-    try { await tx('readwrite', st => { ids.forEach(id => st.delete(id)); return null; }); } catch (e) {}
+    try { await tx('readwrite', st => { ids.forEach(id => { st.delete(id); st.delete(takeKey(id)); st.delete(rowRange(id, null)); }); return null; }); } catch (e) {}
+  }
+  // The rate most of these takes (in memory) were made at, or 0.
+  function mainRate(ids) {
+    const by = new Map();
+    new Set(ids).forEach(id => { const c = cache.get(id); if (c) by.set(c.rate, (by.get(c.rate) || 0) + c.data.length); });
+    let best = 0, most = -1;
+    by.forEach((n, rate) => { if (n > most) { most = n; best = rate; } });
+    return best;
   }
 
   // A take as an AudioBuffer on a context (made once per context).
@@ -210,377 +221,418 @@ const StudioVoice = (() => {
   }
 
   // -------- THE MICROPHONE --------
-  let prefs = { deviceId: '', gain: 1, echo: false, remove: true };
-  (() => {
+  let prefs = { deviceId: '' };
+  (() => {   // (an older page also kept a boost and echo switches here: they mean nothing now)
     const p = loadJSON(PREFS_KEY);
-    if (!p || typeof p !== 'object') return;
-    if (typeof p.deviceId === 'string') prefs.deviceId = p.deviceId;
-    if (Number.isFinite(p.gain)) prefs.gain = Math.min(3, Math.max(0.5, p.gain));
-    prefs.echo = p.echo === true;
-    prefs.remove = p.remove !== false;
+    if (p && typeof p.deviceId === 'string') prefs.deviceId = p.deviceId;
+    saveJSON(PREFS_KEY, prefs);
+    try { ['evm_studio_mic_delay_v1', 'evm_studio_bleed_v1'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    tx('readwrite', st => { st.delete('_ir'); return null; }).catch(() => {});
   })();
-  let bleed = (() => { const b = loadJSON(BLEED_KEY); return b && Number.isFinite(b.db) && Number.isFinite(b.at) ? b : null; })();
   const savePrefs = () => saveJSON(PREFS_KEY, prefs);
 
-  let mic = null;             // { stream, track, source, hp, tap, refTap, analyser, sink, ctx, audit }
+  let mic = null;             // { ctx, stream, track, settings, label, deviceId, problems, src, node, silent }
   let opening = null;         // the promise of a microphone being opened
-  let workletOn = false;
   let shownNow = false;
   let problem = '';           // why there is no microphone, in words
-  let meterPeak = 0, meterRms = 0, meterHold = 0, meterHoldAt = 0, clipAt = 0;
-  const recent = [];          // [time, peak] of the last chunks: the words judge a held peak, not the falling bar
-  let chanInfo = { chs: 0, ch: 0 };
-  let cap = null;             // the capture under way, if any
+  let testing = false;        // a test in the panel is using the microphone
+  let closeAfter = false;     // the microphone went away during a take: close when it is kept
+  let capId = 0;
+  let raw = null;             // the capture the worklet is sending, if any
+  let cap = null;             // the take under way, if any
+  const level = { peak: 0, rms: 0, chs: 0, clipped: false };
+  const log = [];             // the last 10 s of { t, peak, rms }
+  const modules = new WeakSet();   // contexts that have the worklet
 
-  /* What is asked of the browser — every call-tuned process named and off,
-     each as an `ideal`. Firefox turns the others off along with echo
-     cancellation only when that is the sole constraint; naming all of them
-     removes the guesswork. Unknown names (voiceIsolation, in most browsers)
-     are dropped, not errors. `exact` is kept for the chosen device only. */
-  const MUSIC = {
-    echoCancellation: { ideal: false }, noiseSuppression: { ideal: false }, autoGainControl: { ideal: false },
-    voiceIsolation: { ideal: false },
-    channelCount: { ideal: 1 }, sampleRate: { ideal: 48000 }, latency: { ideal: 0.01 }
-  };
-  function constraints() {
-    const a = { ...MUSIC, echoCancellation: { ideal: prefs.echo } };
-    if (prefs.deviceId) a.deviceId = { exact: prefs.deviceId };
-    return a;
-  }
+  const goodRate = r => (r === 44100 || r === 48000 ? r : 48000);
+  const sounding = () => window.Studio && Studio.sounding();
+  const projectIds = () => (window.Studio ? Studio.takeIds() : []);
 
-  /* What the browser actually applied. A problem is shown, not fatal: the
-     take is still made, and the report says what it was made through. */
-  function auditMic(track) {
-    let s = {};
-    try { s = (track && track.getSettings) ? track.getSettings() : {}; } catch (e) {}
-    const problems = [];
-    if (s.echoCancellation && !prefs.echo) problems.push('Echo cancellation is on, though the studio asked for it off. Sound may be gated when the backing plays.');
-    if (s.noiseSuppression) problems.push('Noise suppression is on (the browser would not turn it off): held notes and overtones may come out dull or wobbly.');
-    if (s.autoGainControl) problems.push('Automatic gain is on (the browser would not turn it off): the level will swell and sag on its own.');
-    if (s.voiceIsolation) problems.push('Voice isolation is on: other voices and instruments will be cut away.');
-    const label = (track && track.label) || '';
-    if (/bluetooth|hands-free|airpods|headset|buds|\bbt\b|hfp/i.test(label))
-      problems.push('This looks like a Bluetooth microphone: phone quality, with the overtones cut off. The built-in, a wired or a USB microphone sounds far better.');
-    return { settings: s, label, problems };
+  /* The rate this project's takes want. Nothing may be sounding to change clocks;
+     the microphone is on the old context, so it goes and comes back. */
+  async function matchRate() {
+    const ids = projectIds();
+    if (ids.length) await load(ids);
+    const want = mainRate(ids);
+    let ctx = Audio.ensure();
+    if (want && ctx.sampleRate !== want && !sounding() && !cap && !testing) {
+      const had = !!mic;
+      if (had) dropMic();
+      ctx = Audio.restart(want);
+      if (had) { try { await openMic(savedDevice()); } catch (err) { problem = errorText(err); render(); } }
+    }
+    return want;
   }
-  // the microphone, in a few words — kept with each take and in the report
-  function micInfo() {
+  const savedDevice = () => prefs.deviceId || undefined;
+
+  function audit(track, s) {
+    const out = [];
+    if (s.echoCancellation) out.push('Echo cancellation is on. This browser would not turn it off, so held notes may cut out.');
+    if (s.noiseSuppression) out.push('Noise suppression is on. This browser would not turn it off, so your tone may come out dull or wobbly.');
+    if (s.autoGainControl) out.push('Automatic volume is on. This browser would not turn it off, so your level may swell and sag.');
+    if (s.voiceIsolation) out.push('Voice isolation is on, which can thin out your tone. Turn it off in your computer’s microphone settings.');
+    if (/bluetooth|hands-?free|airpods|headset|buds|\bbt\b|hfp/i.test(track.label || '')) {
+      out.push('This looks like a Bluetooth microphone, which is phone quality. A wired or USB microphone, or even your computer’s built-in one, will sound far better.');
+    }
+    return out;
+  }
+  // the microphone, in a few words — kept with each take
+  function micInfo(ch) {
     if (!mic) return null;
-    const s = mic.audit.settings || {};
+    const s = mic.settings || {};
     const on = v => v === true ? 'on' : v === false ? 'off' : '?';
-    return { label: mic.audit.label.slice(0, 80), ec: on(s.echoCancellation), ns: on(s.noiseSuppression), agc: on(s.autoGainControl),
-             vi: on(s.voiceIsolation), rate: mic.ctx.sampleRate, trackRate: s.sampleRate || null, chs: chanInfo.chs || s.channelCount || null,
-             ch: chanInfo.ch, floorDb: Math.round(floorDb()) };
+    return { label: mic.label.slice(0, 80), ec: on(s.echoCancellation), ns: on(s.noiseSuppression), agc: on(s.autoGainControl), vi: on(s.voiceIsolation),
+             rate: mic.ctx.sampleRate, trackRate: s.sampleRate || null, chs: level.chs || s.channelCount || null, ch: ch || 0 };
   }
 
+  function dropMic() {
+    const m = mic;
+    if (!m) return;
+    mic = null;
+    try { m.track.onended = null; } catch (e) {}
+    try { m.stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+    try { m.src.disconnect(); m.node.disconnect(); m.silent.disconnect(); m.node.port.onmessage = null; } catch (e) {}
+    level.peak = level.rms = 0;
+    log.length = 0;
+  }
+  function closeMic() {
+    if (cap) return;
+    dropMic();
+    render();
+  }
+
+  /* One request at a time: a permission box can wait for as long as the person
+     likes, and a second request meanwhile would leave a microphone with nothing using it. */
   function ensureMic() {
     if (mic) return Promise.resolve(true);
     if (opening) return opening;
-    opening = openMic().finally(() => { opening = null; });
+    problem = '';
+    opening = openMic(savedDevice())
+      .then(() => {
+        if (!shownNow && !cap) { dropMic(); return false; }   // the tab was left while the browser asked
+        return true;
+      })
+      .catch(err => { console.warn('microphone:', err && err.name, err && err.message); problem = errorText(err); return false; })
+      .finally(() => { opening = null; render(); if (mic) startMeters(); });
+    render();
     return opening;
   }
-  async function openMic() {
-    problem = '';
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      problem = location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
-        ? 'A microphone needs a secure page (https). Open the studio on eagleviewmusic.com, or from “Open the Recording Studio”.'
-        : 'This browser cannot record from a microphone on this page.';
-      render();
-      return false;
-    }
-    const ctx = Audio.ensure();
-    if (!ctx.audioWorklet || !window.AudioWorkletNode) {
-      problem = 'This browser is too old to record a voice here. Try the latest Chrome, Edge, Firefox or Safari.';
-      render();
-      return false;
-    }
-    try {
-      if (!workletOn) { await ctx.audioWorklet.addModule('js/voice-tap.js'); workletOn = true; }
-    } catch (e) {
-      console.error(e);
-      problem = 'The recorder did not start. Reload the page and try again.';
-      render();
-      return false;
-    }
+  async function openMic(deviceId) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw named('NoApi');
+    const want = await matchRate();
+    let ctx = Audio.ensure();
+    if (!ctx.audioWorklet || !window.AudioWorkletNode) throw named('NoWorklet');
+    if (mic) return mic;
+    const audio = {
+      echoCancellation: { ideal: false }, noiseSuppression: { ideal: false }, autoGainControl: { ideal: false },
+      voiceIsolation: { ideal: false }, channelCount: { ideal: 2 }, sampleRate: { ideal: want || 48000 }
+    };
     let stream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: constraints(), video: false });
-    } catch (e) {
-      const name = (e && e.name) || '';
-      if (name === 'OverconstrainedError' && prefs.deviceId) {   // the chosen microphone is gone
-        prefs.deviceId = '';
-        savePrefs();
-        return openMic();
-      }
-      console.warn('microphone:', name, e && e.message);
-      problem = name === 'NotAllowedError'
-        ? (FRAMED
-            ? 'The microphone is not allowed inside this page. Open the studio in its own tab — or, if the browser asked and Block was clicked, click the lock icon in the address bar and allow Microphone.'
-            : 'The microphone was not allowed. Click the lock icon in the address bar, allow Microphone, then turn it on again.')
-        : name === 'NotFoundError'
-          ? 'No microphone was found. Plug one in, then turn it on again.'
-          : name === 'NotReadableError'
-            ? 'Another app or tab is using the microphone (or it is not working). Close that app, then try again.'
-            : name === 'OverconstrainedError'
-              ? 'That microphone could not be opened the way the studio asks. Choose another one, or try again.'
-              : (name === 'SecurityError' || name === 'AbortError' || name === 'TypeError')
-                ? 'This page cannot use the microphone here. Open the studio in its own tab (it needs https, or its own window).'
-                : 'The microphone did not start. Check no other app is using it, then try again.';
-      render();
-      return false;
+      stream = await navigator.mediaDevices.getUserMedia({ audio: deviceId ? Object.assign({ deviceId: { exact: deviceId } }, audio) : audio, video: false });
+    } catch (err) {
+      // the microphone chosen last time may be unplugged now: use the default one
+      if (!deviceId || (err.name !== 'OverconstrainedError' && err.name !== 'NotFoundError')) throw err;
+      stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
     }
-    if (ctx.state === 'suspended') { try { await ctx.resume(); } catch (e) {} }
     const track = stream.getAudioTracks()[0];
-    const source = ctx.createMediaStreamSource(stream);
-    // 25 Hz: DC and rumble go, every fundamental stays (a bass's low B is 31 Hz)
-    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 25; hp.Q.value = 0.7;
-    // two channels in (see voice-tap.js: the louder one is kept)
-    const tap = new AudioWorkletNode(ctx, 'voice-tap', { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 2, channelCountMode: 'explicit', channelInterpretation: 'speakers' });
-    const analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.55;
-    const sink = ctx.createGain();
-    sink.gain.value = 0;      // the tap has to be pulled by the graph to run; nothing is heard
-    source.connect(hp);
-    hp.connect(tap);
-    hp.connect(analyser);
-    tap.connect(sink);
-    analyser.connect(sink);
-    sink.connect(ctx.destination);
-    tap.port.onmessage = e => onChunk(e.data);
-    // the reference: exactly what the studio sends to the speakers, as one channel
-    const refTap = new AudioWorkletNode(ctx, 'voice-tap', { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1, channelCountMode: 'explicit', channelInterpretation: 'speakers' });
-    StudioBus.out(ctx).connect(refTap);
-    refTap.connect(sink);
-    refTap.port.onmessage = e => onRefChunk(e.data);
-    mic = { stream, track, source, hp, tap, refTap, analyser, sink, ctx, audit: auditMic(track) };
-    await loadIR();
-    resetNoise();
-    if (track) track.addEventListener('ended', () => { closeMic(); problem = 'The microphone was disconnected.'; render(); });
+    const settings = track.getSettings ? track.getSettings() : {};
+
+    // No takes yet: run at the microphone's own rate, so nothing is converted.
+    ctx = Audio.ensure();
+    if (!want && settings.sampleRate && goodRate(settings.sampleRate) !== ctx.sampleRate && !sounding()) {
+      ctx = Audio.restart(goodRate(settings.sampleRate));
+    }
+    let src;
+    try {
+      src = ctx.createMediaStreamSource(stream);
+    } catch (err) {
+      // Firefox refuses a microphone at a different rate from the context.
+      if (!want && settings.sampleRate && !sounding()) {
+        ctx = Audio.restart(settings.sampleRate);
+        src = ctx.createMediaStreamSource(stream);
+      } else {
+        stream.getTracks().forEach(t => t.stop());
+        throw named('RateMismatch');
+      }
+    }
+    if (!modules.has(ctx)) { await ctx.audioWorklet.addModule('js/capture-worklet.js'); modules.add(ctx); }
+    if (ctx.state === 'suspended') {
+      try { await ctx.resume(); } catch (e) {}
+      if (ctx.state === 'suspended') document.addEventListener('pointerdown', () => ctx.resume(), { once: true });
+    }
+    const node = new AudioWorkletNode(ctx, 'vocal-capture', {
+      numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1],
+      channelCountMode: 'max', channelInterpretation: 'discrete'
+    });
+    const silent = ctx.createGain();
+    silent.gain.value = 0;      // the worklet has to be pulled by the graph to run; nothing is heard
+    src.connect(node);
+    node.connect(silent);
+    silent.connect(ctx.destination);
+    node.port.onmessage = onCapture;
+    mic = {
+      ctx, stream, track, settings, src, node, silent,
+      label: track.label || 'Microphone',
+      deviceId: settings.deviceId || deviceId || '',
+      problems: audit(track, settings)
+    };
+    track.onended = () => {
+      if (cap) {
+        closeAfter = true;
+        if (window.Studio) { Studio.toast('The microphone went away, so recording stopped. Your take is saved.'); Studio.stop(); }
+        return;
+      }
+      dropMic();
+      problem = 'The microphone was disconnected.';
+      render();
+    };
+    level.clipped = false;
     watchDevices();
     listDevices();
-    render();
-    meterLoop();
-    return true;
+    return mic;
   }
-  function closeMic() {
-    if (!mic) return;
-    if (cap) finish(cap);
-    try { mic.stream.getTracks().forEach(t => t.stop()); } catch (e) {}
-    try { mic.source.disconnect(); mic.hp.disconnect(); mic.tap.disconnect(); mic.analyser.disconnect(); mic.sink.disconnect(); StudioBus.out(mic.ctx).disconnect(mic.refTap); mic.refTap.disconnect(); } catch (e) {}
-    mic.tap.port.onmessage = null;
-    mic.refTap.port.onmessage = null;
-    mic = null;
-    meterPeak = meterRms = meterHold = 0;
-    recent.length = 0;
-    chanInfo = { chs: 0, ch: 0 };
-    resetNoise();
-    render();
+  function errorText(err) {
+    const name = err && err.name;
+    if (name === 'NoApi') return 'This page can’t reach a microphone. It has to be opened over https, in a current version of Chrome, Edge or Safari.';
+    if (name === 'NoWorklet') return 'This browser is too old to record a voice here. Try the latest Chrome, Edge, Firefox or Safari.';
+    if (name === 'NotAllowedError' || name === 'SecurityError') {
+      return FRAMED
+        ? 'The microphone is blocked inside this frame. Open the studio in its own tab.'
+        : 'The microphone is blocked. Click the icon at the left of the address bar, allow the microphone, then try again.';
+    }
+    if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'No microphone was found. Plug one in, then try again.';
+    if (name === 'NotReadableError' || name === 'AbortError') return 'Another app may be using the microphone. Close it, then try again.';
+    if (name === 'RateMismatch') return 'This browser can’t use this microphone with these recordings. Chrome or Edge will.';
+    return 'The microphone would not open (' + (name || 'unknown') + ').';
   }
+
   async function listDevices() {
     const sel = el('vp-device');
     if (!sel || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
-    let devs = [];
-    try { devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); } catch (e) {}
-    const current = (mic && mic.audit.settings.deviceId) || prefs.deviceId;
-    sel.innerHTML = devs.map((d, i) => `<option value="${d.deviceId.replace(/"/g, '&quot;')}">${(d.label || 'Microphone ' + (i + 1)).replace(/</g, '&lt;')}</option>`).join('');
-    if (current && devs.some(d => d.deviceId === current)) sel.value = current;
-    sel.disabled = devs.length < 2 || !!cap;
+    let list = [];
+    try { list = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput' && d.deviceId !== 'communications'); } catch (e) {}
+    sel.innerHTML = '';
+    for (const d of list) {
+      const o = document.createElement('option');
+      o.value = d.deviceId;
+      o.textContent = (d.label || 'Microphone').replace(/^Default\s*-\s*/i, 'Default: ');
+      sel.append(o);
+    }
+    const current = mic ? mic.deviceId : prefs.deviceId;
+    if (current && list.some(d => d.deviceId === current)) sel.value = current;
+    sel.disabled = !!cap || list.length < 2;
   }
   // a USB microphone plugged in mid-lesson appears in the picker
   let watching = false;
   function watchDevices() {
     if (watching || !navigator.mediaDevices || !navigator.mediaDevices.addEventListener) return;
     watching = true;
-    navigator.mediaDevices.addEventListener('devicechange', () => listDevices());
+    navigator.mediaDevices.addEventListener('devicechange', () => { listDevices(); showOutput(); });
   }
 
-  // -------- ROOM NOISE --------
-  /* The quietest quarter second of the last eight seconds, as RMS. The
-     words "quiet", "silent" and the pick-up rule are set against it. */
-  const NOISE_CHUNKS = 6, NOISE_KEEP = 32;
-  let nAcc = 0, nN = 0, nHist = [], floorRms = 0;
-  function resetNoise() { nAcc = 0; nN = 0; nHist = []; floorRms = 0; }
-  function noteNoise(rms) {
-    nAcc += rms * rms;
-    if (++nN < NOISE_CHUNKS) return;
-    nHist.push(Math.sqrt(nAcc / nN));
-    nAcc = 0; nN = 0;
-    if (nHist.length > NOISE_KEEP) nHist.shift();
-    floorRms = Math.min(...nHist);
-  }
-  const floorDb = () => nHist.length ? dB(floorRms) : -100;
-  const floorKnown = () => nHist.length >= 4;
-
-  // -------- CAPTURE --------
-  /* From now (audio clock) until endCapture(c, at): every sample, placed by
-     its frame. c.peaks grows as it goes, for the lane to draw the take live. */
-  function startCapture() {
-    const ctx = Audio.ensure();
-    cap = { from: ctx.currentTime, rate: ctx.sampleRate, chunks: [], t0: null, end: 0, stopAt: Infinity,
-            peaks: [], acc: 0, accN: 0, win: Math.max(1, Math.round(ctx.sampleRate / PEAKS)), done: null, finished: false, boost: prefs.gain,
-            ref: [], countSpan: null };   // the speakers' feed; the count-in's span on the speakers' clock (set by studio.js)
-    if (el('vp-device')) el('vp-device').disabled = true;
-    return cap;
-  }
-  function onChunk(m) {
-    const p = m.peak || 0;
-    if (p > meterPeak) meterPeak = p;
-    meterRms = m.rms || 0;
-    const now = performance.now();
-    recent.push([now, p]);
-    while (recent.length && recent[0][0] < now - 400) recent.shift();
-    if (p >= 0.99) clipAt = now;
-    if (m.chs) chanInfo = { chs: m.chs, ch: m.ch };
-    noteNoise(m.rms || 0);
-    const c = cap;
-    if (!c || c.finished) return;
-    const rate = c.rate;
-    const t = m.frame / rate;
-    const end = t + m.data.length / rate;
-    if (end <= c.from) return;
-    let data = m.data, t1 = t;
-    if (t < c.from) { const k = Math.round((c.from - t) * rate); data = data.subarray(k); t1 = t + k / rate; }
-    if (t1 >= c.stopAt) { finish(c); return; }
-    let last = false;
-    if (t1 + data.length / rate > c.stopAt) { data = data.subarray(0, Math.max(0, Math.round((c.stopAt - t1) * rate))); last = true; }
-    if (c.t0 == null) c.t0 = t1;
-    c.chunks.push({ t: t1, data });
-    c.end = t1 + data.length / rate;
-    for (let i = 0; i < data.length; i++) {           // the lane's live sketch, boosted, never past full scale
-      const a = data[i] < 0 ? -data[i] : data[i];
-      if (a > c.acc) c.acc = a;
-      if (++c.accN >= c.win) { c.peaks.push(Math.min(1, c.acc * c.boost)); c.acc = 0; c.accN = 0; }
+  // -------- FROM THE WORKLET --------
+  function onCapture(e) {
+    const m = e.data;
+    if (m.type === 'meter') {
+      const peak = m.chs > 1 ? Math.max(m.p0, m.p1) : m.p0;
+      const rms = m.chs > 1 ? Math.max(m.r0, m.r1) : m.r0;
+      if (peak > level.peak) level.peak = peak;
+      level.rms = rms;
+      level.chs = m.chs;
+      if (peak >= 0.99) level.clipped = true;
+      const now = performance.now();
+      log.push({ t: now, peak, rms });
+      while (log.length && now - log[0].t > 10000) log.shift();
+    } else if (m.type === 'chunk') {
+      const s = raw;
+      if (!s || s.id !== m.id) return;
+      if (s.first == null) s.first = m.first;
+      if (s.onChunk) s.onChunk(m);
+    } else if (m.type === 'end') {
+      const s = raw;
+      if (!s || s.id !== m.id) return;
+      raw = null;
+      if (s.done) s.done();
     }
-    if (last) finish(c);
   }
-  // The speakers' feed, kept by frame beside the microphone's samples.
-  function onRefChunk(m) {
-    const c = cap;
-    if (!c || c.finished) return;
-    const t = m.frame / c.rate;
-    if (t + m.data.length / c.rate <= c.from) return;
-    c.ref.push({ t, data: m.data });
+  function beginRaw(from, onChunk) {
+    const s = { id: ++capId, from, first: null, onChunk, done: null };
+    raw = s;
+    mic.node.port.postMessage({ cmd: 'start', id: s.id, from });
+    return s;
   }
-  // Resolves { t0, rate, data (raw), peak, boost, clipped, mic, ref, countSpan } once the last samples before `at` are in.
-  function endCapture(c, at) {
-    if (!c) return Promise.resolve(null);
-    c.stopAt = at;
-    return new Promise(resolve => {
-      c.done = resolve;
-      if (c.finished) { resolve(c.result); return; }
-      c.timer = setTimeout(() => finish(c), 700);   // a microphone that stopped sending
+  function endRaw(s) {
+    return new Promise(res => {
+      s.done = res;
+      if (mic && raw === s) mic.node.port.postMessage({ cmd: 'stop', id: s.id });
+      else { if (raw === s) raw = null; res(); }
     });
   }
-  function finish(c) {
-    if (c.finished) { if (c.done) c.done(c.result); return; }
-    c.finished = true;
-    clearTimeout(c.timer);
-    if (cap === c) cap = null;
-    listDevices();
-    let result = null;
-    if (c.t0 != null && c.chunks.length) {
-      const n = Math.max(0, Math.round((c.end - c.t0) * c.rate));
-      const data = new Float32Array(n);
-      let peak = 0;
-      c.chunks.forEach(ch => {
-        const at = Math.round((ch.t - c.t0) * c.rate);
-        const part = ch.data.subarray(0, Math.max(0, Math.min(ch.data.length, n - at)));
-        data.set(part, at);
-        for (let i = 0; i < part.length; i++) { const a = part[i] < 0 ? -part[i] : part[i]; if (a > peak) peak = a; }
-      });
-      // raw: the boost goes on the kept slice (boosted()), not the count-in
-      result = { t0: c.t0, rate: c.rate, data, peak, boost: c.boost, clipped: peak >= 0.99, mic: micInfo(), countSpan: c.countSpan };
-      if (c.ref.length) {          // the speakers' feed, on the same samples
-        const ref = new Float32Array(n);
-        c.ref.forEach(ch => {
-          const at = Math.round((ch.t - c.t0) * c.rate);
-          const skip = at < 0 ? -at : 0;
-          const len = Math.min(ch.data.length - skip, n - (at + skip));
-          if (len > 0) ref.set(ch.data.subarray(skip, skip + len), at + skip);
-        });
-        result.ref = ref;
+  /* The voice: whichever input carries more. */
+  function louder(a, b) {
+    if (!b) return 0;
+    let ea = 0, eb = 0;
+    for (let i = 0; i < a.length; i++) { ea += a[i] * a[i]; eb += b[i] * b[i]; }
+    return eb > ea ? 1 : 0;
+  }
+
+  // -------- A TAKE --------
+  const newQueue = () => ({ list: [], frames: 0, row: 0, writes: [] });
+  function queueRow(c, ch, data, force) {
+    const q = c.q[ch];
+    if (data) { q.list.push(data); q.frames += data.length; }
+    if (!q.frames || (!force && q.frames < Math.round(c.rate * ROW_SEC))) return;
+    const row = concat(q.list, q.frames);
+    q.list = []; q.frames = 0;
+    const key = rowKey(c.id, ch, q.row++);
+    const place = ch === 0 ? { ...c.info, id: c.id, rate: c.rate, t0: c.t0, mic: mic ? mic.label : '', alive: Date.now() } : null;
+    q.writes.push(tx('readwrite', st => {
+      st.put(row, key);
+      if (place) st.put(place, takeKey(c.id));
+      return null;
+    }).catch(err => { console.error(err); c.failed = true; }));
+  }
+  /* From now until endCapture: every sample, on exact frames of the clock the
+     tracks are scheduled on. c.peaks grows for the lane to draw the take live.
+     info = { id, project, track, from, anchor, spb, vdelay } says where it belongs. */
+  function startCapture(info) {
+    const ctx = mic.ctx, sr = ctx.sampleRate;
+    const c = cap = {
+      id: info.id, info, rate: sr, t0: null, n: 0, a: [], b: null, failed: false,
+      peaks: [], acc: 0, accN: 0, win: Math.max(1, Math.round(sr / PEAKS)),
+      q: [newQueue(), newQueue()]
+    };
+    level.clipped = false;
+    if (navigator.storage && navigator.storage.persist) { try { navigator.storage.persist(); } catch (e) {} }
+    if (navigator.wakeLock) navigator.wakeLock.request('screen').then(w => { if (c.finishing) w.release(); else c.wake = w; }).catch(() => {});
+    c.raw = beginRaw(Math.ceil(ctx.currentTime * sr), m => takeChunk(c, m));
+    if (el('vp-device')) el('vp-device').disabled = true;
+    return c;
+  }
+  function takeChunk(c, m) {
+    const a = m.n === m.a.length ? m.a : m.a.subarray(0, m.n);
+    let b = null;
+    if (c.t0 == null) c.t0 = m.first / c.rate;
+    if (m.b) {
+      b = m.n === m.b.length ? m.b : m.b.subarray(0, m.n);
+      if (!c.b) {            // a second channel woke up: everything so far was silent on it
+        c.b = [];
+        if (c.n) { const z = new Float32Array(c.n); c.b.push(z); queueRow(c, 1, z, true); }
       }
+    } else if (c.b) {
+      b = new Float32Array(m.n);
     }
-    c.result = result;
-    if (c.done) c.done(result);
+    c.a.push(a);
+    queueRow(c, 0, a, false);
+    if (c.b) { c.b.push(b); queueRow(c, 1, b, false); }
+    for (let i = 0; i < m.n; i++) {     // the lane's live sketch
+      let v = a[i] < 0 ? -a[i] : a[i];
+      if (b) { const w = b[i] < 0 ? -b[i] : b[i]; if (w > v) v = w; }
+      if (v > c.acc) c.acc = v;
+      if (++c.accN >= c.win) { c.peaks.push(c.acc); c.acc = 0; c.accN = 0; }
+    }
+    c.n += m.n;
   }
-
-  /* How late the speakers reached the microphone in this take, measured on
-     the take itself (backing-removal.js). A take that heard the speakers is
-     placed by this, and it becomes the voice delay for the takes that do not. */
-  function measureDelay(res) {
-    if (!res || !res.ref) return null;
-    const m = BackingRemoval.measureDelay(res.data, res.ref, res.rate);
-    if (!m || m.ms < 1 || m.ms > 550) return null;
-    saveJSON(DELAY_KEY, { ms: m.ms, how: 'take' });
-    render();
-    return m;
+  function measure(data) {
+    let peak = 0, clipped = 0, run = 0;
+    for (let i = 0; i < data.length; i++) {
+      const v = data[i] < 0 ? -data[i] : data[i];
+      if (v > peak) peak = v;
+      if (v >= 0.99) { if (++run === 3) clipped++; } else run = 0;
+    }
+    return { peak, clipped: clipped > 0 };
   }
-  /* The count-in, where only the speakers sounded: how loud they were at
-     the microphone, dBFS peak (null without a count-in). Kept for the panel. */
-  function bleedOf(res, vd) {
-    const sp = res && res.countSpan;
-    if (!sp) return null;
-    const a = Math.max(0, Math.round((sp.from + vd - res.t0) * res.rate)), b = Math.min(res.data.length, Math.round((sp.to + vd - res.t0) * res.rate));
-    if (b - a < 0.2 * res.rate) return null;
-    let bp = 0;
-    for (let i = a; i < b; i++) { const v = res.data[i] < 0 ? -res.data[i] : res.data[i]; if (v > bp) bp = v; }
-    bleed = { db: dB(bp), at: Date.now() };
-    saveJSON(BLEED_KEY, bleed);
-    return bleed.db;
+  /* Resolves { id, t0, rate, data, ch, peak, clipped, mic, delayMs, failed } once the last samples are in. */
+  function endCapture(c) {
+    if (!c) return Promise.resolve(null);
+    if (!c.ending) c.ending = new Promise(resolve => {
+      const go = () => { clearTimeout(timer); finish(c).then(resolve); };
+      const timer = setTimeout(go, 700);   // a microphone that stopped sending
+      endRaw(c.raw).then(go);
+    });
+    return c.ending;
   }
-
-  // -------- THE ROOM'S RESPONSE --------
-  let irRec;                  // undefined: not looked up yet; null: none; { rate, ir, ms, erle, at, label }
-  async function loadIR() {
-    if (irRec !== undefined) return irRec;
+  function finish(c) {
+    if (!c.finishing) c.finishing = (async () => {
+      if (c.wake) { try { c.wake.release(); } catch (e) {} c.wake = null; }
+      let result = null;
+      if (c.n) {
+        const A = concat(c.a, c.n), B = c.b ? concat(c.b, c.n) : null;
+        const ch = louder(A, B);
+        const data = ch ? B : A;
+        queueRow(c, 0, null, true);
+        if (c.b) queueRow(c, 1, null, true);
+        await Promise.all([...c.q[0].writes, ...c.q[1].writes]);
+        if (B) { try { await dropChannel(c.id, ch ? 0 : 1); } catch (e) { console.error(e); } }
+        const stats = measure(data);
+        result = { id: c.id, t0: c.t0, rate: c.rate, data, ch, peak: stats.peak, clipped: stats.clipped, mic: micInfo(ch), delayMs: Math.round((c.info.vdelay || 0) * 1000), failed: c.failed };
+      }
+      if (cap === c) cap = null;
+      listDevices();
+      if (closeAfter) { closeAfter = false; dropMic(); problem = 'The microphone was disconnected.'; render(); }
+      else if (!shownNow && !testing) closeMic();
+      return result;
+    })();
+    return c.finishing;
+  }
+  /* The take stays. False when the browser could not store it: it still plays here. */
+  async function commit(res) {
+    const m = cleanMeta(res);
+    cache.set(res.id, { rate: res.rate, data: res.data, peaks: peaksOf(res.data, res.rate), meta: m });
+    missing.delete(res.id);
     try {
-      const r = await tx('readonly', st => st.get(IR_KEY));
-      irRec = r && r.ir && Number.isFinite(r.rate) ? { rate: r.rate, ir: new Float32Array(r.ir), ms: r.ms, erle: r.erle, at: r.at, label: r.label || '' } : null;
-    } catch (e) { irRec = null; }
-    return irRec;
+      await tx('readwrite', st => {
+        st.put({ rate: res.rate, rows: 1, ch: res.ch || 0, length: res.data.length, at: Date.now(), ...m }, res.id);
+        st.delete(takeKey(res.id));
+        return null;
+      });
+    } catch (e) { console.error(e); return false; }
+    return !res.failed;
   }
-  async function saveIR(rec) {
-    irRec = rec;
-    await tx('readwrite', st => st.put({ rate: rec.rate, ir: rec.ir.buffer.slice(0), ms: rec.ms, erle: rec.erle, at: rec.at, label: rec.label }, IR_KEY));
-  }
-  // The backing can be taken out of a take: a response for this sample rate, and the browser not filtering already.
-  const removalReady = () => !!(prefs.remove && irRec && mic && irRec.rate === mic.ctx.sampleRate && !prefs.echo);
-  /* A take's predicted echo, fitted (a small lag, a gain — the path may have
-     shifted since the sweep) over the take itself and subtracted. The singer
-     need not be silent anywhere: their voice is unrelated to the echo, so the
-     fit ignores it and the check (blockErle) finds the figure in the pauses.
-     Returns { clean, erle (dB, null when nothing to measure), median, lag, gain }. */
-  async function removeBacking(res, delaySec) {
-    if (!res || !res.ref || !irRec || irRec.rate !== res.rate) return null;
-    const echo = await BackingRemoval.predictEcho(res.ref, irRec.ir, res.rate);
-    const n = res.data.length;
-    // the sweep's response carries the sweep's delay; this take's own, when measured, says how far to look
-    const center = Number.isFinite(delaySec) ? Math.round((delaySec - irRec.ms / 1000) * res.rate) : 0;
-    const fit = BackingRemoval.fitEcho(res.data, echo, 0, Math.min(n, Math.round(20 * res.rate)), Math.round(0.015 * res.rate), center);
-    const lag = fit ? fit.lag : 0, gain = fit ? fit.gain : 1;
-    const clean = new Float32Array(n);
-    for (let i = 0; i < n; i++) { const j = i - lag; clean[i] = res.data[i] - (j >= 0 && j < echo.length ? gain * echo[j] : 0); }
-    const q = BackingRemoval.blockErle(res.data, clean, echo, res.rate);
-    return { clean, erle: q ? q.best : null, median: q ? q.median : null, lag, gain };
+  const discard = res => forget([res.id]);
+
+  /* Takes cut off by a closed page or a crash. Takes another tab is still writing
+     (their rows are fresh) are left alone; studio.js asks again a little later. */
+  async function recover() {
+    let recs = [];
+    try { recs = (await tx('readonly', st => st.getAll(IDBKeyRange.bound('_take:', '_take:￿')))) || []; } catch (e) { return []; }
+    const out = [];
+    for (const rec of recs) {
+      if (!rec || !rec.id || (cap && cap.id === rec.id) || Date.now() - (rec.alive || 0) < 4000) continue;
+      const a = await readChannel(rec.id, 0), b = await readChannel(rec.id, 1);
+      const both = Math.min(a.length, b.length);
+      const ch = b.length && (!a.length || louder(a.subarray(0, both), b.subarray(0, both))) ? 1 : 0;
+      const data = ch ? b : a;
+      if (data.length < rec.rate * 0.25) { await forget([rec.id]); continue; }
+      if (a.length && b.length) await dropChannel(rec.id, ch ? 0 : 1);
+      const stats = measure(data);
+      await commit({ id: rec.id, rate: rec.rate, data, ch, clipped: stats.clipped, mic: { label: rec.mic || '' }, delayMs: Math.round((rec.vdelay || 0) * 1000) });
+      out.push({ ...rec, length: data.length });
+    }
+    return out;
   }
 
-  /* The boost: one static gain over the whole kept take, held back so its
-     loudest sample stays under the ceiling (a boosted clip is still a clip).
-     Returns { data, gain, peak, clipped }; gain is kept with the take. */
-  function boosted(data, boost) {
-    let raw = 0;
-    for (let i = 0; i < data.length; i++) { const a = data[i] < 0 ? -data[i] : data[i]; if (a > raw) raw = a; }
-    let gain = Number.isFinite(boost) && boost > 0 ? boost : 1;
-    if (gain > 1) gain = Math.min(gain, Math.max(1, raw > 0 ? CEILING / raw : gain));
-    if (gain !== 1) for (let i = 0; i < data.length; i++) data[i] *= gain;
-    return { data, gain, peak: raw * gain, clipped: raw >= 0.99 };
+  // The quietest quarter second lately, as RMS, or null before there is enough to say.
+  function roomRms() {
+    if (log.length <= 150) return null;
+    let quiet = null;
+    const W = 12;
+    for (let i = 0; i + W <= log.length; i += 4) {
+      let s = 0;
+      for (let k = 0; k < W; k++) s += log[i + k].rms * log[i + k].rms;
+      s = Math.sqrt(s / W);
+      if (quiet == null || s < quiet) quiet = s;
+    }
+    return quiet;
   }
 
   /* A take begins where Play began — unless it was sung into during the
      count-in (a pick-up), as a key played in the count-in is. The count-in's
      sound has to be loud beside the take's own — and well above this room's
-     noise — so speaker bleed of the clicks is not mistaken for singing.
-     Returns that onset (audio time) or null. */
+     noise — so a click heard by the microphone is not mistaken for singing.
+     Returns that onset (audio time) or null. The rest is still in the clip,
+     so dragging the take's start back brings it out either way. */
   function pickupOnset(res, tFrom) {
     if (!res || tFrom <= res.t0) return null;
     const win = Math.max(1, Math.round(res.rate * 0.02));
@@ -591,78 +643,183 @@ const StudioVoice = (() => {
     const count = [];
     for (let i = 0; i + win <= split; i += win) count.push(rms(i, i + win));
     const countMax = count.reduce((m, x) => Math.max(m, x), 0);
-    const floor = floorKnown() ? floorRms : 0;
+    const floor = roomRms() || 0;
     if (countMax < Math.max(0.03, floor * 6, 0.4 * mainMax)) return null;
     const k = count.findIndex(x => x > 0.5 * countMax);
     return res.t0 + Math.max(0, k * win / res.rate - 0.03);
   }
 
   // -------- TIMING --------
-  function estimate() {
-    let out = 0, inp = 0.01;
-    try { const ctx = Audio.ensure(); out = ctx.outputLatency || ctx.baseLatency || 0; } catch (e) {}
-    try { const s = mic && mic.track && mic.track.getSettings(); if (s && Number.isFinite(s.latency)) inp = s.latency; } catch (e) {}
-    return out + inp;
+  function delayInfo() {
+    const d = (loadJSON(DELAY_KEY) || {})[mic ? mic.label : ''];
+    if (d && Number.isFinite(d.ms)) return { ms: d.ms, how: 'measured' };
+    let sec = 0;
+    try { const ctx = Audio.ensure(); sec = (ctx.outputLatency || 0) + (ctx.baseLatency || 0); } catch (e) {}
+    const inp = mic && mic.settings && Number.isFinite(mic.settings.latency) ? mic.settings.latency : 0.01;
+    return { ms: Math.round((sec + inp) * 1000), how: 'estimated' };
   }
-  function stored() { const d = loadJSON(DELAY_KEY); return d && Number.isFinite(d.ms) ? d : null; }
-  const delaySec = () => { const d = stored(); return d ? d.ms / 1000 : estimate(); };
+  const delaySec = () => delayInfo().ms / 1000;
+  function saveDelay(ms) {
+    const all = loadJSON(DELAY_KEY) || {};
+    if (mic) all[mic.label] = { ms, at: Date.now() };
+    saveJSON(DELAY_KEY, all);
+  }
 
-  /* A sweep out of the speakers, listened for by the microphone, with the
-     speakers' feed kept beside it. The room's response to it (how, and how
-     late, the speakers come back to the microphone) is learned and kept:
-     its peak is the round trip a voice take is moved back by, and the whole
-     of it is what a take's backing is taken out with. Needs speakers
-     (headphones cannot be heard) and the echo filter off. */
-  const SWEEP_S = 1.5, IR_S = 0.5;
-  async function lineUp() {
-    const msg = el('vp-cal-msg');
-    const say = t => { if (msg) msg.textContent = t; };
+  // -------- THE TWO TESTS --------
+  async function testRecord(seconds) {
+    const ctx = mic.ctx, sr = ctx.sampleRate;
+    const a = [], b = [];
+    const s = beginRaw(Math.ceil((ctx.currentTime + 0.05) * sr), m => {
+      a.push(m.a.subarray(0, m.n));
+      if (m.b) b.push(m.b.subarray(0, m.n));
+    });
+    await sleep(seconds * 1000 + 100);
+    await endRaw(s);
+    let n = 0;
+    for (const x of a) n += x.length;
+    const A = concat(a, n);
+    const B = b.length === a.length && b.length ? concat(b, n) : null;
+    return louder(A, B) ? B : A;
+  }
+  function playBuffer(ctx, data) {
+    const buffer = ctx.createBuffer(1, Math.max(1, data.length), ctx.sampleRate);
+    buffer.copyToChannel(data, 0);
+    return new Promise(res => {
+      const n = ctx.createBufferSource();
+      n.buffer = buffer;
+      n.connect(ctx.destination);
+      n.onended = () => res();
+      n.start();
+    });
+  }
+  /* Soft chirps out, listened for at the microphone. Heard: the exact round trip
+     (and the speakers can reach the microphone). Not heard: no leak. */
+  async function timingTest() {
+    const ctx = mic.ctx, sr = ctx.sampleRate;
+    const LEN = Math.round(0.02 * sr);
+    const chirp = new Float32Array(LEN);
+    let ph = 0, energy = 0;
+    for (let i = 0; i < LEN; i++) {
+      const t = i / LEN;
+      ph += 2 * Math.PI * (1000 + 5000 * t) / sr;
+      const w = Math.sin(Math.PI * t);
+      chirp[i] = Math.sin(ph) * w * w * 0.35;
+      energy += chirp[i] * chirp[i];
+    }
+    const buf = ctx.createBuffer(1, LEN, sr);
+    buf.copyToChannel(chirp, 0);
+    const SPACE = Math.round(0.7 * sr), LEAD = Math.round(0.35 * sr), COUNT = 5;
+    const SEARCH = Math.round(0.6 * sr);
+    const a = [], b = [];
+    const from = Math.ceil((ctx.currentTime + 0.1) * sr);
+    const s = beginRaw(from, m => {
+      a.push(m.a.subarray(0, m.n));
+      if (m.b) b.push(m.b.subarray(0, m.n));
+    });
+    for (let k = 0; k < COUNT; k++) {
+      const n = ctx.createBufferSource();
+      n.buffer = buf;
+      n.connect(ctx.destination);
+      n.start((from + LEAD + k * SPACE) / sr);
+    }
+    await sleep((0.1 + (LEAD + COUNT * SPACE) / sr) * 1000 + 150);
+    await endRaw(s);
+    let n = 0;
+    for (const x of a) n += x.length;
+    const A = concat(a, n);
+    const B = b.length === a.length && b.length ? concat(b, n) : null;
+    const x = louder(A, B) ? B : A;
+    const first = s.first == null ? from : s.first;
+
+    const lags = [];
+    for (let k = 0; k < COUNT; k++) {
+      const at = from + LEAD + k * SPACE - first;
+      if (at < 0 || at + LEN + SEARCH > x.length) continue;
+      const c = new Float32Array(SEARCH);
+      let top = 0;
+      for (let lag = 0; lag < SEARCH; lag++) {
+        let sum = 0;
+        const o = at + lag;
+        for (let i = 0; i < LEN; i++) sum += chirp[i] * x[o + i];
+        const v = Math.abs(sum) / energy;
+        c[lag] = v;
+        if (v > top) top = v;
+      }
+      const sorted = Array.from(c).sort((p, q) => p - q);
+      const middle = sorted[SEARCH >> 1] || 1e-9;
+      if (top < middle * 12 || top < 0.002) continue;
+      let hit = 0;
+      while (c[hit] < top * 0.6) hit++;
+      lags.push(hit);
+      await sleep(0);
+    }
+    lags.sort((p, q) => p - q);
+    if (lags.length < 3) return { heard: false };
+    const mid = lags[lags.length >> 1];
+    const tol = Math.round(0.002 * sr);
+    if (lags.filter(l => Math.abs(l - mid) <= tol).length < 3) return { heard: false };
+    const ms = Math.round(mid / sr * 1000);
+    if (ms < 1) return { heard: false };
+    saveDelay(ms);
+    return { heard: true, ms };
+  }
+
+  // A test needs the microphone to itself: playback stops, a take is left alone.
+  function testsFree() {
     if (window.Studio && Studio.busy()) Studio.stop();
-    if (!await ensureMic()) return;
-    if (prefs.echo || (mic.audit.settings && mic.audit.settings.echoCancellation)) { say('Turn off “Filter out the speakers” first — echo cancellation would filter out the test sound too.'); return; }
-    const ctx = Audio.ensure();
-    say('Listen: a two-second whoosh out of the speakers. Keep the room quiet…');
-    const btn = el('vp-cal');
-    if (btn) btn.disabled = true;
-    const c = startCapture();
-    const src = ctx.createBufferSource();
-    src.buffer = BackingRemoval.makeSweep(ctx, SWEEP_S, 60, Math.min(20000, ctx.sampleRate * 0.45), 0.5);
-    src.connect(StudioBus.out(ctx));
-    const t0 = ctx.currentTime + 0.5;
-    src.start(t0);
-    await sleep((0.5 + SWEEP_S + 0.7) * 1000);
-    const res = await endCapture(c, ctx.currentTime);
-    if (btn) btn.disabled = false;
-    if (!res || !res.ref) { say('Nothing came from the microphone. Check it is plugged in, then try again.'); return; }
-    const sr = res.rate;
-    const at = t => Math.max(0, Math.min(res.data.length, Math.round((t - res.t0) * sr)));
-    let noise = 0, heard = 0;
-    for (let i = 0; i < at(t0 - 0.05); i++) noise = Math.max(noise, Math.abs(res.data[i]));
-    for (let i = at(t0); i < at(t0 + SWEEP_S + 0.3); i++) heard = Math.max(heard, Math.abs(res.data[i]));
-    if (heard < Math.max(0.01, noise * 3)) { say('The microphone did not hear the whoosh. Turn the speakers up (this test cannot hear headphones), then try again — or keep the estimate.'); return; }
-    const s = Math.max(0, at(t0) - Math.round(0.05 * sr)), e = at(t0 + SWEEP_S + 0.6);
-    const ir = BackingRemoval.estimateIR(res.ref.subarray(s, e), res.data.subarray(s, e), Math.round(IR_S * sr), 3e-4);
-    const d = BackingRemoval.irDelay(ir);
-    const ms = Math.round(d.at / sr * 1000);
-    if (d.clarity < 6 || ms < 1 || ms > 450) { say('The whoosh came back too faint or too muddled to measure — a noisy room, or the speakers very quiet? Try again in a quiet moment.'); return; }
-    const echo = await BackingRemoval.predictEcho(res.ref.subarray(s, e), ir, sr);
-    const clean = new Float32Array(e - s);
-    for (let i = 0; i < clean.length; i++) clean[i] = res.data[s + i] - (echo[i] || 0);
-    const erle = Math.round(BackingRemoval.erleDb(res.data.subarray(s, e), clean));
-    try { await saveIR({ rate: sr, ir, ms, erle, at: Date.now(), label: mic.audit.label }); } catch (err) { console.error(err); }
-    saveJSON(DELAY_KEY, { ms, how: 'test' });
-    let text = `Measured: your speakers and microphone take ${ms} ms there and back; voice takes will be moved ${ms} ms earlier. `;
-    text += erle >= 10
-      ? `The backing can be taken back out of voice takes (${erle} dB).`
-      : `The backing will only partly come out of voice takes (${erle} dB): a quieter room, or the speakers a little louder, measure better.`;
-    if (heard > 0.5) text += ' The speakers are loud at the microphone — turn them down a little before recording.';
-    say(text);
+    return !testing && !cap && !!mic;
+  }
+  function testsBusy(on) {
+    testing = on;
+    el('vp-test').disabled = on;
+    el('vp-chirp').disabled = on;
+    if (!on && !shownNow) closeMic();
+  }
+  async function hearYourself() {
+    if (!testsFree()) return;
+    const btn = el('vp-test');
+    testsBusy(true);
+    try {
+      const ctx = mic.ctx;
+      btn.textContent = 'Recording, sing now…';
+      const data = await testRecord(5);
+      btn.textContent = 'Playing it back…';
+      await playBuffer(ctx, data);
+      btn.textContent = 'Test again';
+    } catch (err) {
+      console.error(err);
+      btn.textContent = 'Test recording';
+    }
+    testsBusy(false);
+  }
+  const TIMING_INTRO = 'Put your headphones on, then press Test. You’ll hear five soft chirps.';
+  async function runTiming() {
+    if (!testsFree()) return;
+    const msg = el('vp-timing-msg');
+    testsBusy(true);
+    msg.dataset.kind = '';
+    msg.textContent = 'Listening… please stay quiet for a moment.';
+    try {
+      const r = await timingTest();
+      if (r.heard) {
+        msg.dataset.kind = 'warn';
+        msg.textContent = 'Your microphone heard the chirps, so timing is now measured exactly (' + r.ms + ' ms). If that came from speakers or leaky headphones, the music will end up in your voice track too: record with headphones on, and keep them away from the microphone.';
+      } else {
+        msg.dataset.kind = 'good';
+        msg.textContent = 'Your microphone didn’t hear the chirps. That is what you want while recording. Optional, for exact timing: hold one headphone right against the microphone and press Test again.';
+      }
+    } catch (err) {
+      console.error(err);
+      msg.textContent = 'That test didn’t work. Try once more.';
+    }
+    testsBusy(false);
     render();
   }
 
   // -------- THE PANEL --------
   const MIC_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>';
   const OFF_NOTE = 'The browser asks first. Recordings stay in this browser — nothing is sent anywhere.';
+  const TIPS = 'Wear headphones: whatever comes out of the speakers goes into the take. Sing about a hand’s width from the microphone, a little off to the side, and leave one ear uncovered so you can hear yourself. The studio can’t change your microphone’s hardware level, so if it’s too loud or too quiet, move, or change the input volume in your computer’s sound settings. It adds no effects and doesn’t clean up your sound, so a quiet room makes the biggest difference.';
   function build() {
     const p = el('voice-panel');
     if (!p || p.dataset.built) return;
@@ -675,65 +832,100 @@ const StudioVoice = (() => {
         </div>
         <div class="vp-off-ui">
           <button class="btn btn-primary" id="vp-on" type="button">Turn on the microphone</button>
-          <p class="panel-note" id="vp-problem">${OFF_NOTE}</p>
+          <p class="panel-note" id="vp-problem" role="status">${OFF_NOTE}</p>
           <a class="link-btn" id="vp-own-tab" target="_blank" rel="noopener" hidden>Open the studio in its own tab</a>
         </div>
         <div class="vp-on-ui">
-          <div class="vp-meter-row">
-            <div class="vp-meter" aria-hidden="true" title="Aim for the shaded band"><div class="vp-target"></div><div class="vp-fill" id="vp-fill"></div><div class="vp-hold" id="vp-hold"></div></div>
-            <span class="vp-level" id="vp-level">Quiet</span>
-          </div>
-          <p class="vp-advice" id="vp-advice" role="status"></p>
-          <ul class="vp-audit" id="vp-audit" hidden></ul>
-          <div class="vp-grid">
+          <div class="vp-col">
             <label class="vp-field"><span>Microphone</span><select class="select" id="vp-device" aria-label="Microphone"></select></label>
-            <label class="vp-field"><span>Boost (laid over the take, never past full scale)</span><span class="vp-range"><input type="range" id="vp-gain" min="50" max="300" step="5"><output id="vp-gain-out">100%</output></span></label>
+            <div class="vp-level">
+              <div class="vp-meter-row">
+                <div class="vp-meter" aria-hidden="true">
+                  <div class="vp-meter-cover" id="vp-cover"></div>
+                  <div class="vp-meter-hold" id="vp-hold"></div>
+                </div>
+                <button class="vp-clip" id="vp-clip" type="button" title="Your sound reached the very top of the meter. Click to clear.">Too loud</button>
+              </div>
+              <div class="vp-scale" aria-hidden="true">
+                <span style="left:0%">−60 dB</span><span style="left:50%">−30</span><span style="left:70%">−18</span><span style="left:90%">−6</span><span style="left:100%">0</span>
+              </div>
+              <p class="vp-verdict" id="vp-verdict" role="status"></p>
+              <p class="vp-room" id="vp-room"></p>
+            </div>
+            <ul class="vp-problems" id="vp-problems" hidden></ul>
           </div>
-          <p class="panel-note" id="vp-last"></p>
-          <p class="vp-tip">Sing with the speakers on: once the microphone is lined up, the studio takes its own sound back out of the take and leaves your voice as it was. You will not hear yourself through the speakers while recording. A good level comes from your distance to the microphone, not from the boost — aim for the shaded band.</p>
-          <label class="check"><input type="checkbox" id="vp-remove"><span>Take the studio’s own sound back out of voice takes (once the microphone is lined up). Off, a take keeps the speakers’ sound in it, lined up with the tracks.</span></label>
-          <label class="check"><input type="checkbox" id="vp-echo"><span>Use the browser’s echo cancellation instead (a last resort: made for calls, it swallows the voice while the speakers are loud)</span></label>
-          <div class="vp-timing"><span id="vp-delay"></span> <button class="link-btn" id="vp-cal" type="button">Line up the microphone</button></div>
-          <p class="panel-note vp-cal-msg" id="vp-cal-msg" role="status"></p>
-          <details class="vp-check" id="vp-check">
-            <summary>Mic check</summary>
-            <dl class="vp-dl">
-              <dt>Microphone</dt><dd id="vc-label">—</dd>
-              <dt>Processing</dt><dd id="vc-proc">—</dd>
-              <dt>Sound</dt><dd id="vc-rate">—</dd>
-              <dt>Level now</dt><dd id="vc-level">—</dd>
-              <dt>Room noise</dt><dd id="vc-noise">—</dd>
-              <dt>Voice timing</dt><dd id="vc-delay">—</dd>
-              <dt>Speakers at the mic</dt><dd id="vc-bleed">—</dd>
-            </dl>
-            <canvas class="vp-spec" id="vp-spec" width="640" height="96" aria-label="Spectrum of the microphone"></canvas>
-            <p class="vp-tip">The spectrum, low notes left, overtones right. A bright sound should reach past 4 kHz; a wall at 4 or 8 kHz means a phone-quality path, such as Bluetooth. Your computer may process the microphone too (macOS Voice Isolation, Windows “audio enhancements”, ChromeOS noise cancellation) — turn those off for music; this page cannot.</p>
-            <div class="row-wrap"><button class="btn btn-sm btn-quiet" id="vc-copy" type="button">Copy a report</button><span class="panel-note" id="vc-copied"></span></div>
-          </details>
-          <div class="row-wrap"><button class="btn btn-sm btn-quiet" id="vp-off" type="button">Turn the microphone off</button></div>
+          <div class="vp-col">
+            <section class="vp-card">
+              <div>
+                <h4>Hear yourself</h4>
+                <p>Records five seconds of you, then plays them back.</p>
+              </div>
+              <button class="btn" id="vp-test" type="button">Test recording</button>
+            </section>
+            <section class="vp-card">
+              <div>
+                <h4>Headphones and timing</h4>
+                <p id="vp-timing-msg" role="status">${TIMING_INTRO}</p>
+              </div>
+              <button class="btn" id="vp-chirp" type="button">Test</button>
+            </section>
+            <p class="vp-foot"><span id="vp-output"></span> <span id="vp-delay"></span></p>
+            <p class="vp-note" data-key="tips">${TIPS}</p>
+            <div class="row-wrap"><button class="btn btn-sm btn-quiet" id="vp-off" type="button">Turn the microphone off</button></div>
+          </div>
         </div>
       </div>`;
     el('vp-on').addEventListener('click', () => ensureMic());
-    el('vp-off').addEventListener('click', () => { if (!cap) closeMic(); });
+    el('vp-off').addEventListener('click', () => { if (!cap && !testing) closeMic(); });
     el('vp-own-tab').href = location.href;
+    el('vp-clip').addEventListener('click', () => { level.clipped = false; });
+    el('vp-test').addEventListener('click', hearYourself);
+    el('vp-chirp').addEventListener('click', runTiming);
     el('vp-device').addEventListener('change', async (e) => {
       prefs.deviceId = e.target.value;
       savePrefs();
-      if (mic && !cap) { closeMic(); await ensureMic(); }
+      if (cap || testing) return;
+      dropMic();
+      await ensureMic();
     });
-    el('vp-gain').addEventListener('input', (e) => {
-      prefs.gain = e.target.value / 100;
-      el('vp-gain-out').textContent = e.target.value + '%';
-      savePrefs();
+    foldNote(p.querySelector('.vp-note'));
+  }
+  // An explaining note folds into a circled i, remembered per device.
+  function foldNote(note) {
+    const key = 'evm_studio_fold_' + note.dataset.key;
+    const body = document.createElement('span');
+    body.className = 'vp-note-body';
+    while (note.firstChild) body.append(note.firstChild);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'vp-note-i';
+    btn.textContent = 'i';
+    btn.setAttribute('aria-label', 'Show or hide this note');
+    note.append(body, btn);
+    const apply = folded => {
+      note.classList.toggle('folded', folded);
+      btn.setAttribute('aria-expanded', String(!folded));
+      btn.title = folded ? body.textContent.trim() : '';
+    };
+    let folded = false;
+    try { folded = localStorage.getItem(key) === '1'; } catch (e) {}
+    apply(folded);
+    btn.addEventListener('click', () => {
+      folded = !note.classList.contains('folded');
+      apply(folded);
+      try { localStorage.setItem(key, folded ? '1' : '0'); } catch (e) {}
     });
-    el('vp-echo').addEventListener('change', async (e) => {
-      prefs.echo = e.target.checked;
-      savePrefs();
-      if (mic && !cap) { closeMic(); await ensureMic(); }   // the flags are fixed when a stream opens
-    });
-    el('vp-remove').addEventListener('change', (e) => { prefs.remove = e.target.checked; savePrefs(); render(); });
-    el('vp-cal').addEventListener('click', lineUp);
-    el('vc-copy').addEventListener('click', copyReport);
+  }
+  async function showOutput() {
+    let label = '';
+    try {
+      const list = await navigator.mediaDevices.enumerateDevices();
+      const out = list.filter(d => d.kind === 'audiooutput');
+      const dev = out.find(d => d.deviceId === 'default') || out[0];
+      label = dev && dev.label ? dev.label.replace(/^Default\s*-\s*/i, '') : '';
+    } catch (e) {}
+    const o = el('vp-output');
+    if (o) o.textContent = label ? 'Sound is going to: ' + label + '.' : '';
   }
   function render() {
     const p = el('voice-panel');
@@ -741,177 +933,90 @@ const StudioVoice = (() => {
     build();
     p.classList.toggle('mic-on', !!mic);
     const prob = el('vp-problem');
-    if (prob) {
-      prob.textContent = problem || OFF_NOTE;
-      prob.classList.toggle('vp-warn', !!problem);
-    }
+    prob.textContent = problem || (opening ? 'Your browser is asking to use the microphone. Look near the address bar and choose Allow.' : OFF_NOTE);
+    prob.classList.toggle('vp-warn', !!problem);
+    el('vp-on').disabled = !!opening;
     el('vp-own-tab').hidden = !(FRAMED && problem);
-    el('vp-gain').value = Math.round(prefs.gain * 100);
-    el('vp-gain-out').textContent = Math.round(prefs.gain * 100) + '%';
-    el('vp-echo').checked = prefs.echo;
-    el('vp-remove').checked = prefs.remove;
-    const d = stored();
-    const delayText = d
-      ? `${d.ms} ms (${d.how === 'take' ? 'from your last take' : 'measured'}).`
-      : `about ${Math.round(estimate() * 1000)} ms (the browser’s estimate).`;
-    const removal = !prefs.remove ? ' Takes keep the speakers’ sound, lined up.'
-      : irRec
-        ? (irRec.rate === (mic ? mic.ctx.sampleRate : irRec.rate) ? ` Backing removal ready (${irRec.erle} dB).` : ' The sample rate changed — line up the microphone again for backing removal.')
-        : ' Line up the microphone and the studio can take the backing back out of voice takes.';
-    el('vp-delay').textContent = 'Voice timing: ' + delayText + removal;
-    el('vc-delay').textContent = delayText;
-    el('vc-bleed').textContent = bleed ? `${Math.round(bleed.db)} dB in the last count-in${bleed.db > -6 ? ' — loud: turn the speakers down' : bleed.db > -20 ? ' — fine' : ' — quiet'}` : 'not measured yet (recorded with a count-in)';
-    const audit = el('vp-audit');
-    const problems = mic ? mic.audit.problems : [];
-    audit.hidden = !problems.length;
-    audit.innerHTML = problems.map(t => `<li>${t.replace(/</g, '&lt;')}</li>`).join('');
-    renderCheck();
-  }
-  // The Mic check's standing lines (the live ones are in meterTick).
-  function renderCheck() {
-    const s = mic ? mic.audit.settings : null;
-    const on = v => v === true ? 'on' : v === false ? 'off' : 'unknown';
-    el('vc-label').textContent = mic ? (mic.audit.label || 'the default microphone') : 'off';
-    el('vc-proc').textContent = s
-      ? `echo cancellation ${on(s.echoCancellation)} · noise suppression ${on(s.noiseSuppression)} · auto gain ${on(s.autoGainControl)}${'voiceIsolation' in s ? ' · voice isolation ' + on(s.voiceIsolation) : ''}`
-      : '—';
-    el('vc-rate').textContent = mic ? soundLine() : '—';
-  }
-  function soundLine() {
-    const s = mic.audit.settings || {};
-    const chs = chanInfo.chs || s.channelCount;
-    let t = `${mic.ctx.sampleRate} Hz`;
-    if (s.sampleRate && s.sampleRate !== mic.ctx.sampleRate) t += ` (the microphone gives ${s.sampleRate} Hz; the browser resamples)`;
-    if (chs) t += `, ${chs === 1 ? 'one channel' : chs + ' channels, keeping the ' + (chanInfo.ch ? 'right' : 'left') + ' one'}`;
-    return t;
+    const ul = el('vp-problems');
+    const list = mic ? mic.problems : [];
+    ul.hidden = !list.length;
+    ul.innerHTML = '';
+    list.forEach(t => { const li = document.createElement('li'); li.textContent = t; ul.append(li); });
+    if (mic) {
+      const info = delayInfo();
+      el('vp-delay').textContent = `Timing: takes move ${info.ms} ms earlier to line up (${info.how}).`;
+      showOutput();
+    }
   }
 
-  // The meter: peak in dB, a hold line, words for it, and advice under it.
-  let metering = false, tick = 0;
-  function meterLoop() {
+  // The meter: its colours sit still, a cover slides off them. Falls at 26 dB a second.
+  let metering = false, shownPeak = 0, holdPeak = 0, holdAt = 0, lastFrame = 0;
+  const toFrac = d => Math.max(0, Math.min(1, (d + 60) / 60));
+  function startMeters() {
     if (metering) return;
     metering = true;
-    meterTick();
+    lastFrame = performance.now();
+    requestAnimationFrame(meterFrame);
   }
-  function meterTick() {
+  function meterFrame(now) {
     if (!mic || !shownNow) { metering = false; return; }
-    const fill = el('vp-fill'), hold = el('vp-hold'), word = el('vp-level'), advice = el('vp-advice');
-    const now = performance.now();
-    const clipped = now - clipAt < 1500;
-    const shown = Math.min(1, meterPeak * prefs.gain);     // what the take will get
-    const held = recent.reduce((m, r) => r[1] > m ? r[1] : m, 0);
-    const db = dB(Math.min(1, held * prefs.gain));
-    const pct = Math.max(0, Math.min(100, (dB(shown) + 60) / 60 * 100));
-    if (pct >= meterHold || now - meterHoldAt > 1200) { meterHold = pct; meterHoldAt = now; }
-    if (fill) { fill.style.width = pct + '%'; fill.dataset.zone = clipped || db > -1 ? 'red' : db > -6 ? 'yellow' : 'green'; }
-    if (hold) hold.style.left = meterHold + '%';
-    const floor = floorDb();
-    const noisy = floorKnown() && floor > -50;
-    const rawDb = dB(held);
-    const text = clipped ? 'Too loud — move back'
-      : db > -1 ? 'Loud'
-        : db > -6 ? 'Loud — a touch back'
-          : db > -18 ? 'Good'
-            : db > -30 ? 'A little quiet'
-              : rawDb > floor + 8 ? 'Quiet — come closer'
-                : 'Silent';
-    if (word) { word.textContent = text; word.classList.toggle('vp-warn', clipped); }
-    if (advice) {
-      advice.textContent = clipped
-        ? 'The microphone itself is clipping: move back, or turn the microphone down in your computer’s sound settings. The boost cannot mend this.'
-        : noisy
-          ? `Room noise is high (${Math.round(floor)} dB): fans, windows, the keyboard? A quieter spot, or the microphone further from the computer, helps more than any setting.`
-          : '';
-    }
-    const check = el('vp-check');
-    if (check && check.open && (tick++ % 4 === 0)) {
-      el('vc-level').textContent = `peak ${Math.round(rawDb)} dB · average ${Math.round(dB(meterRms))} dB` + (prefs.gain !== 1 ? ` · with the boost, peak ${Math.round(db)} dB` : '');
-      el('vc-noise').textContent = floorKnown() ? `${Math.round(floor)} dB — ${floor > -40 ? 'loud' : floor > -50 ? 'noisy' : floor > -60 ? 'fair' : 'quiet'}` : 'listening…';
-      el('vc-rate').textContent = soundLine();
-      drawSpectrum();
-    }
-    meterPeak *= 0.6;
-    requestAnimationFrame(meterTick);
+    const dt = Math.min(100, Math.max(0, now - lastFrame)) / 1000;
+    lastFrame = now;
+    shownPeak = Math.max(level.peak, shownPeak * Math.pow(10, -26 * dt / 20));
+    level.peak = 0;
+    if (shownPeak >= holdPeak || now - holdAt > 1600) { holdPeak = shownPeak; holdAt = now; }
+    el('vp-cover').style.transform = 'scaleX(' + (1 - toFrac(dB(shownPeak))).toFixed(4) + ')';
+    const hold = toFrac(dB(holdPeak));
+    el('vp-hold').style.left = (hold * 100).toFixed(2) + '%';
+    el('vp-hold').style.opacity = hold > 0.02 ? '1' : '0';
+    el('vp-clip').classList.toggle('lit', !!level.clipped);
+    verdict(now);
+    requestAnimationFrame(meterFrame);
   }
-  // The spectrum: 40 Hz to the top on a log axis, −100 to −10 dB tall.
-  let specArr = null;
-  function drawSpectrum() {
-    const cv = el('vp-spec');
-    if (!cv || !mic) return;
-    const an = mic.analyser, N = an.frequencyBinCount;
-    if (!specArr || specArr.length !== N) specArr = new Float32Array(N);
-    an.getFloatFrequencyData(specArr);
-    const g = cv.getContext('2d'), W = cv.width, H = cv.height;
-    const cs = getComputedStyle(cv);
-    const fmin = 40, fmax = mic.ctx.sampleRate / 2, lw = Math.log(fmax / fmin);
-    const binOf = f => Math.min(N - 1, Math.max(0, Math.round(f / fmax * N)));
-    g.clearRect(0, 0, W, H);
-    g.fillStyle = cs.getPropertyValue('--rec').trim() || '#ff3b4a';
-    let prev = binOf(fmin);
-    for (let x = 0; x < W; x++) {
-      const b = binOf(fmin * Math.exp(lw * (x + 1) / W));
-      let m = -200;
-      for (let k = prev; k <= b; k++) if (specArr[k] > m) m = specArr[k];
-      prev = b;
-      const h = Math.max(0, Math.min(1, (m + 100) / 90)) * H;
-      g.fillRect(x, H - h, 1, h);
+  // What the last few seconds say about the level and the room.
+  function verdict(now) {
+    const v = el('vp-verdict'), room = el('vp-room');
+    let loud = 0;
+    for (const r of log) if (now - r.t < 5000 && r.peak > loud) loud = r.peak;
+    const d = dB(loud);
+    let word, kind;
+    if (level.clipped && d > -1) { word = 'Too loud: that distorted. Move back, or turn the input volume down in your computer’s sound settings.'; kind = 'bad'; }
+    else if (d < -50) { word = 'Sing the loudest part of your song.'; kind = ''; }
+    else if (d < -30) { word = 'Too quiet. Move closer, or turn the input volume up in your computer’s sound settings.'; kind = 'bad'; }
+    else if (d < -18) { word = 'A little quiet, but it will work. Closer would be better.'; kind = 'warn'; }
+    else if (d <= -6) { word = 'Great level. Your loudest notes have room.'; kind = 'good'; }
+    else if (d < -0.5) { word = 'A little loud. Back up a bit so your biggest notes have room.'; kind = 'warn'; }
+    else { word = 'Too loud: that distorted. Move back, or turn the input volume down in your computer’s sound settings.'; kind = 'bad'; }
+    if (v.textContent !== word) v.textContent = word;
+    v.dataset.kind = kind;
+    const quiet = roomRms();
+    let t = '';
+    if (quiet != null) {
+      const q = dB(quiet);
+      t = q > -45 ? 'Room noise: high. A quieter spot would help (fans, windows, other people).'
+        : q > -58 ? 'Room noise: some, but fine.'
+          : 'Room noise: nice and quiet.';
     }
-    g.fillStyle = cs.getPropertyValue('--text-3').trim() || '#7f8799';
-    g.font = '700 10px ' + (cs.getPropertyValue('--font-ui') || 'sans-serif');
-    [[100, '100'], [1000, '1k'], [4000, '4k'], [8000, '8k'], [16000, '16k']].forEach(([f, l]) => {
-      if (f >= fmax) return;
-      const x = Math.round(Math.log(f / fmin) / lw * W);
-      g.fillRect(x, 0, 1, H);
-      g.fillText(l, x + 3, 11);
-    });
-  }
-  // A report for a teacher to paste when something sounds wrong.
-  async function copyReport() {
-    const lines = [];
-    const s = mic ? mic.audit.settings : {};
-    lines.push('Recording Studio — mic check, ' + new Date().toISOString());
-    lines.push('Page: ' + location.href + (FRAMED ? ' (inside another page)' : ''));
-    lines.push('Browser: ' + navigator.userAgent);
-    lines.push('Microphone: ' + (mic ? (mic.audit.label || '(no label)') : 'off'));
-    lines.push('Asked for: ' + JSON.stringify(constraints()));
-    lines.push('Applied: ' + JSON.stringify(s));
-    if (mic) {
-      lines.push('Sound: ' + soundLine());
-      lines.push('Level now: ' + el('vc-level').textContent);
-      lines.push('Room noise: ' + el('vc-noise').textContent);
-      lines.push('Boost: ' + Math.round(prefs.gain * 100) + '%');
-      lines.push('Voice timing: ' + el('vc-delay').textContent);
-      lines.push('Speakers at the mic: ' + el('vc-bleed').textContent);
-      lines.push('Backing removal: ' + (!prefs.remove ? 'off' : irRec ? `response of ${irRec.rate} Hz, ${irRec.ms} ms, ${irRec.erle} dB, measured ${new Date(irRec.at).toISOString()}` : 'not measured'));
-      lines.push('Context: ' + mic.ctx.sampleRate + ' Hz, base latency ' + Math.round((mic.ctx.baseLatency || 0) * 1000) + ' ms, output latency ' + Math.round((mic.ctx.outputLatency || 0) * 1000) + ' ms');
-      mic.audit.problems.forEach(p => lines.push('Problem: ' + p));
-    } else if (problem) lines.push('Problem: ' + problem);
-    const text = lines.join('\n');
-    const out = el('vc-copied');
-    try { await navigator.clipboard.writeText(text); out.textContent = 'Copied.'; }
-    catch (e) { out.textContent = 'Could not copy — it is in the browser console instead.'; console.log(text); }
-    setTimeout(() => { out.textContent = ''; }, 2500);
+    if (room.textContent !== t) room.textContent = t;
   }
 
   // The Voice tab showing (link.js): the microphone is on only while it is.
   async function shown(on) {
     shownNow = on;
-    if (!on) { if (!cap) closeMic(); return; }
+    if (!on) { if (!cap && !testing) closeMic(); return; }
     render();
     let granted = false;
     try { granted = navigator.permissions && (await navigator.permissions.query({ name: 'microphone' })).state === 'granted'; } catch (e) {}
     if (granted && shownNow) await ensureMic();
-    if (mic) meterLoop();
+    if (mic) startMeters();
   }
 
-  // A line under the fields about the last take (studio.js).
-  function say(text) { const p = el('vp-last'); if (p) p.textContent = text || ''; }
-
   return {
-    ensureMic, closeMic, shown, render, say,
+    ensureMic, closeMic, shown, render, matchRate,
     get on() { return !!mic; },
-    startCapture, endCapture, boosted, pickupOnset, delaySec, floorDb, micInfo,
-    bleed: () => bleed, bleedOf, measureDelay, removalReady, removeBacking, echoFilter: () => prefs.echo, removalWanted: () => prefs.remove,
-    saveClip, load, clip, isMissing, keys, forget, bufferFor, exportClips, importClips, peaksPerSec: PEAKS
+    get testing() { return testing; },
+    get mic() { return mic; },        // (the tests)
+    startCapture, endCapture, commit, discard, recover, pickupOnset, delaySec, delayInfo,
+    saveClip, load, clip, isMissing, keys, forget, mainRate, bufferFor, exportClips, importClips, peaksPerSec: PEAKS
   };
 })();
