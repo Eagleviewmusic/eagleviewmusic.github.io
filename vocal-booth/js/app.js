@@ -543,6 +543,10 @@
     $('play').addEventListener('click', pressPlay);
     $('rec').addEventListener('click', pressRecord);
     $('to-start').addEventListener('click', toStart);
+    // the name at the top: what this app is, and who made it
+    $('about-open').addEventListener('click', () => $('dlg-about').showModal());
+    $('ab-close').addEventListener('click', () => $('dlg-about').close());
+    $('ab-done').addEventListener('click', () => $('dlg-about').close());
     $('mic-check').addEventListener('click', () => VB.MicCheck.open());
     $('empty-mic').addEventListener('click', () => VB.MicCheck.open());
     $('export').addEventListener('click', () => VB.Export.open());
@@ -607,6 +611,7 @@
   function deviceWords() {
     const dev = VB.device;
     if (!dev.mobile) return;
+    document.documentElement.classList.add('is-mobile');
     for (const w of document.querySelectorAll('.device-word')) w.textContent = dev.kind;
     $('mc-level-tip').textContent = 'This app can’t change your microphone’s level, and a ' + dev.kind +
       ' has no setting for it, so if it’s too loud or too quiet, move closer or further away. Use wired headphones:' +

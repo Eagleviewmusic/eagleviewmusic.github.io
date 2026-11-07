@@ -45,6 +45,8 @@ Keys: Space play/stop · R record · S split · D duplicate · M mute · Delete 
 | D22 | A take stops, and is kept, when the audio clock stops (any device) or, on a phone or tablet, when the microphone is muted (a call, an alarm, Siri). Stopping waits at most 1.5 s for the capture to answer | A frozen clock leaves a silent gap nobody hears until later; a stopped clock cannot answer the stop message |
 | D23 | Phones and tablets get Share (one per file, and Share all) after an export; an iPhone or iPad downloads the MP3 as a plain file (`application/octet-stream`, still named .mp3) | Share needs a tap of its own (5 s), so it cannot follow a long encode by itself. iPhones can open some files in a tab instead of saving them |
 | D24 | Phones and tablets get their own words: "Saved on this phone", no "computer's sound settings" (they have no input level), "use wired headphones" in the Mic check tip, no "drop the MP3 here" on a phone | |
+| D25 | Pressing the name at the top opens About: what the app is (a simple multi-track recorder for clean vocal lines), that nothing is added or uploaded, and "Created by Nathan Walby" | The user's ask, 2026-11-07; the credit matches ClassPlanner's |
+| D26 | Delete All is red on every device. On a phone or tablet the bottom row has 18 px below it plus the home-bar inset, and Delete All a 31 px tap height | The user's ask: an important button, easy to miss on the very edge of a phone |
 
 Left out on purpose: effects, count-in, solo, project files, sharing.
 
@@ -58,7 +60,7 @@ Left out on purpose: effects, count-in, solo, project files, sharing.
 - Singer on input 2, a page closed mid-take, a real MP3 (encoded with lamejs), and real mouse and key events on the timeline.
 - A refused microphone, an unplugged saved microphone, a permission box left waiting, and two requests at once.
 
-`node tools/test-mobile.mjs` (about 60 s, Bash sandbox off, same server): 43 checks with Chrome posing as an iPhone, an iPad in desktop mode, an Android phone and tablet, and a computer: the words, what is asked of the microphone, the iPhone audio session, Bluetooth and call-quality readings, a take ended by a stopped clock and by a muted microphone, Share and the iPhone download, a real 192 kbps MP3 from the phone take. It cannot reach a real phone's audio.
+`node tools/test-mobile.mjs` (about 60 s, Bash sandbox off, same server): 51 checks with Chrome posing as an iPhone, an iPad in desktop mode, an Android phone and tablet, and a computer: the words, what is asked of the microphone, the iPhone audio session, Bluetooth and call-quality readings, a take ended by a stopped clock and by a muted microphone, Share and the iPhone download, a real 192 kbps MP3 from the phone take, the bottom row's cushion, Delete All in red, and About. It cannot reach a real phone's audio.
 
 **Phones and tablets, what a page cannot change** (researched 2026-11-07, WebKit and Chromium source): an iPhone or iPad turns off its voice processing (auto volume, noise removal, echo cancellation) when echo cancellation is asked off, from iOS 16.4; older iOS keeps it, and Mic check then says so. While recording, Safari always runs Apple's video-call audio mode, which shapes the tone a little for voice; no page can avoid it. Android Chrome (153+) records through the plain microphone input with Chrome's processing off, but a phone maker's own processing may still apply. Both phones record mono at 48 kHz. A wired or USB microphone is the only real step up from the built-in one.
 
