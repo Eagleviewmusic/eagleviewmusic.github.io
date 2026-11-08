@@ -178,7 +178,13 @@ kbd {
   margin-right: 7px; vertical-align: 1px; background: #34C759;
 }
 .layout-btn.is-chromatic::before { background: #007AFF; }
+/* lit: the computer keys' letters are on the piano, in the layout's own colour */
+.quick-btn.layout-btn[aria-pressed="true"] { background: #34C759; color: #0d2a16; }
+.quick-btn.layout-btn.is-chromatic[aria-pressed="true"] { background: #007AFF; color: #fff; }
+.layout-btn[aria-pressed="true"]::before { background: currentColor; }
 .names-btn { min-width: 104px; } /* the row stays still as the words change */
+.names-btn.covered { opacity: 0.5; } /* the letters stand in for the names */
+.names-btn.covered:hover { opacity: 0.8; }
 
 /* the Keys view needs only Flex / Chromatic here, and Focus once it is Chromatic */
 body.keys-view .oct-seg,
@@ -253,34 +259,22 @@ body.keys-view .keyboard { display: none; }
   transition: bottom 0.2s;
 }
 
-.white-key.bindings-active .key-label {
-  bottom: 45px;
+/* the Flex button's letters: a little computer key on each piano key it plays */
+.hotkey-label {
+  --s: clamp(16px, calc(var(--white-w) * 0.56), 30px);
+  position: absolute; left: 50%; bottom: 9px; transform: translateX(-50%);
+  min-width: var(--s); height: var(--s); padding: 0 3px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: calc(var(--s) * 0.24);
+  background: #2c2c30; color: #fff;
+  font: 700 calc(var(--s) * 0.58)/1 var(--font-block);
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.35);
+  pointer-events: none; user-select: none;
 }
-
-.black-key.bindings-active .key-label {
-  bottom: 40px;
-}
-
-.binding-label {
-  position: absolute;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 12px;
-  line-height: 1.1;
-  color: #000;
-  background-color: rgba(255, 255, 255, 0.7);
-  padding: 2px 4px;
-  border-radius: 3px;
-  pointer-events: none;
-  user-select: none;
-  text-align: center;
-}
-
-.black-key .binding-label {
-  color: #000;
-  background-color: rgba(255, 255, 255, 0.8);
+.black-key .hotkey-label {
+  --s: clamp(13px, calc(var(--black-w) * 0.7), 24px);
+  bottom: 7px; background: #f2f2f7; color: #1c1c1e;
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,0.25);
 }
 
 .white-key .key-label {
@@ -533,6 +527,7 @@ body.keys-view .keyboard { display: none; }
 .btn:hover { border-color: var(--text-3); }
 .btn-primary { background: var(--tonic); color: var(--tonic-ink); border-color: transparent; }
 .btn-sm { height: 30px; padding: 0 12px; font-size: 12px; border-radius: 8px; }
+.btn[hidden] { display: none; }
 .row-wrap { display: flex; gap: 8px; flex-wrap: wrap; }
 .share-row { display: flex; gap: 6px; }
 .share-row[hidden] { display: none; }
@@ -584,6 +579,107 @@ body.keys-view .keyboard { display: none; }
 .lib-swatch i { width: 6px; height: 13px; border-radius: 2px; display: inline-block; }
 .lib-actions { grid-row: 1 / span 2; grid-column: 2; display: flex; gap: 4px; }
 
+/* Library: My scales (script.js renderMyScales) */
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#my-scales-list:empty { display: none; }
+.btn-danger { background: var(--danger); color: #1c1c1e; border-color: transparent; }
+.btn-quiet { color: var(--text-2); }
+.lib-item.confirming { border-color: var(--danger); }
+.lib-item.confirming .lib-meta { color: var(--text); white-space: normal; }
+@media (max-width: 480px) { /* three buttons beside a long name leave it no room: they go underneath */
+  .lib-item.mine { grid-template-columns: 1fr; }
+  .lib-item.mine .lib-meta { grid-row: 2; }
+  .lib-item.mine .lib-actions { grid-row: 3; grid-column: 1; margin-top: 6px; }
+}
+
+/* Explaining notes fold into a circled i (script.js foldNotes, after Vocal Booth) */
+.fold-note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-2); font-weight: 600; }
+.fold-note.folded .fold-body { display: none; }
+.fold-i {
+  display: inline-grid; place-items: center;
+  width: 17px; height: 17px; margin-left: 5px; padding: 0; vertical-align: 1px;
+  border: 1px solid var(--text-3); border-radius: 50%; background: transparent;
+  color: var(--text-2); font: italic 700 11px/1 Georgia, 'Times New Roman', serif;
+}
+.fold-note.folded .fold-i { margin-left: 0; }
+.fold-i:hover { background: var(--surface-2); }
+
+/* The scale builder: one octave from the base key up to the base again, in the
+   piano's own colours in either theme */
+.sb-body { gap: 12px; padding-top: 14px; }
+.sb-body .status-msg:empty { display: none; }
+.sb-name-row { display: flex; align-items: center; gap: 10px; }
+.sb-base-row { display: flex; align-items: center; gap: 6px; }
+.sb-base-row .sb-label { margin-right: 4px; }
+.sb-base-name {
+  min-width: 64px; height: 34px; padding: 0 10px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--text);
+  font: 600 17px/1 var(--font-block);
+}
+.sb-white.stub { cursor: default; background: #5a5a60; border-color: #333; opacity: 0.55; }
+.sb-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); font-weight: 800; }
+.sb-frame {
+  padding: 6px; border-radius: 12px; background: #111;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+}
+.sb-piano {
+  position: relative; display: flex; height: 190px;
+  user-select: none; -webkit-user-select: none; touch-action: manipulation;
+}
+.sb-white {
+  flex: 1; min-width: 0; position: relative; margin: 0 1px; padding: 0 0 10px;
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px;
+  border: 1px solid #999; border-radius: 4px 4px 9px 9px;
+  background: #f4f4f7; color: #8e8e93; cursor: pointer;
+  font: 600 18px/1 var(--font-block);
+}
+.sb-white.on { background: var(--c); color: var(--ink); border-color: rgba(0,0,0,0.35); }
+.sb-white.on .sb-letter { font-weight: 700; }
+.sb-black {
+  position: absolute; top: 0; z-index: 2; height: 60%;
+  width: calc(100% / 7 * 0.66); transform: translateX(-50%);
+  border: 1px solid #000; border-radius: 0 0 7px 7px;
+  background: linear-gradient(#1b1b1d, #3a3a3e);
+  box-shadow: 0 3px 6px rgba(0,0,0,0.6);
+}
+.sb-black.on { background: var(--c); }
+.sb-black-body { position: absolute; inset: 0; padding: 0; border: 0; border-radius: inherit; background: transparent; cursor: pointer; }
+.sb-names { position: absolute; left: 3px; right: 3px; bottom: 4px; display: flex; flex-direction: column; gap: 3px; }
+.sb-acc {
+  height: 25px; padding: 0; border-radius: 6px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06);
+  color: #aeaeb2; font: 600 13px/1 var(--font-block);
+}
+.sb-acc:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+.sb-black.on .sb-acc { color: rgba(0,0,0,0.6); border-color: rgba(0,0,0,0.22); background: rgba(255,255,255,0.22); }
+.sb-acc.chosen, .sb-black.on .sb-acc.chosen {
+  background: #fff; color: #1c1c1e; border-color: #fff; font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.45);
+}
+.sb-first {
+  padding: 3px 6px; border-radius: 999px; background: #1c1c1e; color: #fff;
+  font: 800 10px/1 var(--font-ui); letter-spacing: 0.02em; pointer-events: none;
+}
+.sb-black .sb-first { position: absolute; top: 7px; left: 50%; transform: translateX(-50%); background: #fff; color: #1c1c1e; padding: 3px 4px; }
+.sb-white:focus-visible, .sb-black-body:focus-visible, .sb-acc:focus-visible { outline: 2px solid #8ab4ff; outline-offset: -3px; }
+.sb-white.sounding { box-shadow: inset 0 0 0 3px rgba(255,255,255,0.95), inset 0 0 0 5px rgba(0,0,0,0.25); }
+.sb-black.sounding { box-shadow: 0 0 0 3px #fff; }
+.sb-summary { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; min-height: 26px; }
+.sb-count { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); font-weight: 800; }
+.sb-notes { display: flex; flex-wrap: wrap; gap: 4px; }
+.sb-note {
+  min-width: 30px; height: 26px; padding: 0 7px; border-radius: 7px;
+  background: var(--c); color: var(--ink); text-align: center;
+  font: 600 15px/26px var(--font-block);
+}
+.sb-actions { justify-content: flex-end; padding-top: 4px; border-top: 1px solid var(--line); margin-top: 2px; padding-top: 12px; }
+@media (max-width: 480px) {
+  .sb-piano { height: 170px; }
+  .sb-acc { height: 23px; font-size: 12px; }
+  .sb-white { font-size: 16px; }
+}
+
 /* key picker */
 .key-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
 .key-grid button {
@@ -610,12 +706,34 @@ body.keys-view .keyboard { display: none; }
   margin-right: 7px; vertical-align: 0; background: #ff453a;
 }
 .rec-toggle[aria-pressed="true"]::before { box-shadow: 0 0 0 2px rgba(255,255,255,0.75); }
+/* record mode: in the top bar, red and on; pressed again it goes back to the quick row */
+.topbar .rec-toggle { flex: none; height: 34px; }
+.topbar .rec-toggle[aria-pressed="true"] {
+  background: #ff453a; color: #fff; border-color: transparent;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #ff453a 28%, transparent);
+}
+.topbar .rec-toggle[aria-pressed="true"]::before { background: #fff; box-shadow: none; }
+
+/* RECORD MODE (recorder.js setOpen): the page fills the screen and no more —
+   the top bar, the recorder, the keyboard along the bottom. The tracks
+   scroll in the room the keyboard leaves them. */
+body.rec-mode {
+  height: 100vh; height: 100dvh; min-height: 0;
+  display: flex; flex-direction: column;
+}
+body.rec-mode .topbar { flex: none; }
+body.rec-mode .quickbar, body.rec-mode .view-seg { display: none; }
+body.rec-mode .piano-container { flex: none; padding: 10px 0 max(12px, env(safe-area-inset-bottom)); }
+@media (max-height: 560px) {
+  body.rec-mode { --white-h: 132px; --black-h: 84px; } /* a short screen keeps room for the tracks */
+}
 
 .recorder {
   --rec: #ff453a;
-  width: calc(100% - 20px); max-width: 1000px; margin: 0 auto 24px;
-  display: flex; flex-direction: column; gap: 10px;
-  padding: 12px; border-radius: 16px;
+  flex: 1 1 auto; min-height: 200px; /* below this the page scrolls instead */
+  width: calc(100% - 16px); max-width: 1600px; margin: 8px auto 0;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px; border-radius: 16px;
   background: var(--bg-2); border: 1px solid var(--line);
   box-shadow: 0 6px 20px rgba(0,0,0,0.18);
   user-select: none; -webkit-user-select: none;
@@ -623,14 +741,17 @@ body.keys-view .keyboard { display: none; }
 .recorder[hidden] { display: none; }
 .recorder.is-recording { border-color: color-mix(in srgb, var(--rec) 60%, transparent); }
 
-.rec-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; }
-.rec-transport { display: flex; gap: 6px; }
+/* one row: ⏮ ▶ ● · tempo · metre · 1 2 3 4 · Focus · Flex · Key Names · Count-in · click */
+.rec-bar { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.rec-transport { display: flex; gap: 4px; }
+.rec-time, .rec-keys { display: flex; align-items: center; gap: 6px; }
+.rec-keys { padding-left: 8px; border-left: 1px solid var(--line); }
 .rec-tbtn {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 42px; height: 42px; padding: 0; border-radius: 12px;
+  width: 36px; height: 36px; padding: 0; border-radius: 10px;
   border: 1px solid var(--line-strong); background: var(--surface); color: var(--text);
 }
-.rec-tbtn svg { width: 22px; height: 22px; fill: currentColor; stroke: currentColor; stroke-width: 0; }
+.rec-tbtn svg { width: 20px; height: 20px; fill: currentColor; stroke: currentColor; stroke-width: 0; }
 .rec-tbtn:hover { border-color: var(--text-3); }
 .rec-tbtn:disabled { opacity: 0.4; cursor: default; }
 .rec-play.on { background: var(--tonic); color: var(--tonic-ink); border-color: transparent; }
@@ -639,35 +760,104 @@ body.keys-view .keyboard { display: none; }
 .rec-record.on svg { color: #fff; }
 @keyframes rec-pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--rec) 30%, transparent); } }
 
-.rec-pos {
-  min-width: 118px; font-family: var(--font-block); font-weight: 600; font-size: 19px;
-  font-variant-numeric: tabular-nums; white-space: nowrap;
-}
-.recorder.is-recording .rec-pos { color: var(--rec); }
-
-.rec-settings { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.rec-settings { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .rec-tempo {
-  display: flex; align-items: center; height: 32px; padding: 0 2px; border-radius: 8px;
+  display: flex; align-items: center; height: 32px; padding: 0 1px; border-radius: 8px;
   border: 1px solid var(--line); background: var(--surface);
 }
 .rec-step {
-  width: 26px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent;
-  color: var(--text-2); font-weight: 800; font-size: 16px;
+  width: 22px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent;
+  color: var(--text-2); font-weight: 800; font-size: 15px;
 }
 .rec-step:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
 .rec-tempo-input {
-  width: 42px; height: 28px; padding: 0; border: 0; background: transparent; text-align: center;
-  font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; -moz-appearance: textfield;
+  width: 32px; height: 28px; padding: 0; border: 0; background: transparent; text-align: center;
+  font-weight: 800; font-size: 13px; font-variant-numeric: tabular-nums; -moz-appearance: textfield;
 }
 .rec-tempo-input::-webkit-inner-spin-button, .rec-tempo-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .rec-tempo-input:focus { outline: 2px solid color-mix(in srgb, var(--tonic) 70%, transparent); border-radius: 4px; }
-.rec-unit { padding: 0 8px 0 2px; font-size: 11px; font-weight: 800; color: var(--text-3); }
+.rec-unit { padding: 0 6px 0 1px; font-size: 10px; font-weight: 800; color: var(--text-3); }
 .recorder .select { height: 32px; background-position: calc(100% - 15px) 13px, calc(100% - 10px) 13px; }
+.recorder .rec-meter { padding: 0 22px 0 9px; background-position: calc(100% - 13px) 13px, calc(100% - 8px) 13px; }
+/* the quick row's buttons, moved in (recorder.js placeControls) */
+.recorder .quick-btn { height: 32px; padding: 0 10px; font-size: 12.5px; white-space: nowrap; }
+.recorder .quick-label { display: none; } /* 1 2 3 4, without "Octaves" */
+.recorder .oct-btn { width: 26px; height: 26px; }
+.recorder .layout-btn { min-width: 100px; } /* wide enough for "Chromatic": the row stays still */
+.recorder .names-btn { min-width: 92px; }
+/* Quantize: once its choices are confirmed, a pencil joins it (the two as one button) */
+.rec-quant { display: inline-flex; flex: none; }
+.rec-quant.set .rec-quant-btn { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.recorder .rec-quant-edit {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; padding: 0; margin-left: -1px; border-top-left-radius: 0; border-bottom-left-radius: 0;
+}
+.rec-quant-edit[hidden] { display: none !important; }
+.rec-quant.on .rec-quant-edit {
+  background: var(--tonic); color: var(--tonic-ink); border-color: transparent;
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--tonic-ink) 30%, transparent);
+}
+/* the Quantize sheet */
+.quant-group { display: flex; flex-direction: column; gap: 8px; }
+.quant-group h3 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); font-weight: 800; }
+.chip.off { opacity: 0.4; cursor: default; }
+.chip.off span { text-decoration: line-through; text-decoration-thickness: 1px; }
+.quant-actions { padding-top: 2px; }
+.quant-all[hidden] { display: none; } /* (.choice's display beats [hidden]) — gone in the note editor */
+#quant-feel-note:empty { display: none; }
+/* Undo: yellow, easy to find */
+.recorder #rec-undo { background: #FFCC00; color: #1c1c1e; border-color: transparent; }
+.recorder #rec-undo:hover:not(:disabled) { filter: brightness(1.08); }
+/* the click: a metronome and a word, with the menu laid invisibly over them */
+.rec-click-face {
+  position: relative; display: inline-flex; align-items: center; gap: 5px; flex: none;
+  height: 32px; padding: 0 22px 0 8px; border-radius: 8px;
+  border: 1px solid var(--line); background-color: var(--surface); color: var(--text-2);
+  font-weight: 800; font-size: 12.5px; white-space: nowrap; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%), linear-gradient(135deg, var(--text-3) 50%, transparent 50%);
+  background-position: calc(100% - 13px) 13px, calc(100% - 8px) 13px;
+  background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+}
+.rec-click-face:hover { color: var(--text); border-color: var(--line-strong); }
+.rec-click-face:focus-within { outline: 2px solid color-mix(in srgb, var(--tonic) 70%, transparent); outline-offset: 1px; }
+.rec-click-face svg { flex: none; }
+.rec-click-face.off svg { opacity: 0.45; }
+.rec-click {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer;
+  font-size: 16px; /* (iOS zooms into a smaller menu) */
+}
+.rec-click option { color: var(--text); background: var(--surface); }
 .recorder button:disabled, .recorder input:disabled, .recorder select:disabled { opacity: 0.45; cursor: default; }
 
+/* the tracks scroll between the bar and the foot; the ruler stays on top,
+   the zoomed-in scroll bar at the bottom */
+.rec-scroll { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.rec-ruler-row { position: sticky; top: 0; z-index: 3; background: var(--bg-2); }
+.rec-scroll-row { position: sticky; bottom: 0; z-index: 3; background: var(--bg-2); padding-top: 2px; }
+
 /* the tracks: controls on the left, the lane of notes on the right */
-.rec-tracks { display: flex; flex-direction: column; gap: 6px; }
-.rec-row { display: grid; grid-template-columns: 318px minmax(0, 1fr); gap: 8px; align-items: center; }
+.rec-tracks { position: relative; display: flex; flex-direction: column; gap: 6px; --head-w: 356px; }
+.rec-row { display: grid; grid-template-columns: var(--head-w) minmax(0, 1fr); gap: 8px; align-items: center; }
+/* dragged narrower (recorder.js HEADS): number, sound, mute, loop — then number, mute, loop */
+.recorder[data-head="name"] :is(.rec-vol, .rec-clear),
+.recorder[data-head="small"] :is(.rec-vol, .rec-clear, .rec-sound) { display: none; }
+/* the handle between the controls and the lanes */
+.rec-grip {
+  position: absolute; top: 0; bottom: 0; left: calc(var(--head-w) - 1px); width: 10px; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  cursor: col-resize; touch-action: none; border-radius: 5px; outline: none;
+}
+.rec-grip::before {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; border-radius: 1px;
+  background: var(--tonic); opacity: 0; transition: opacity 0.12s ease;
+}
+.rec-grip-pill {
+  position: relative; width: 6px; height: 30px; border-radius: 3px;
+  background: var(--line-strong); transition: background 0.12s ease;
+}
+.rec-grip:hover .rec-grip-pill, .rec-grip:focus-visible .rec-grip-pill, .rec-grip.dragging .rec-grip-pill { background: var(--tonic); }
+.rec-grip:hover::before, .rec-grip:focus-visible::before, .rec-grip.dragging::before { opacity: 0.5; }
+.recorder.is-recording .rec-grip, .recorder.is-playing .rec-grip { pointer-events: none; }
 .rec-ctl { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .rec-arm {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none;
@@ -684,7 +874,7 @@ body.keys-view .keyboard { display: none; }
 .rec-arm[aria-pressed="true"] .rec-arm-dot { background: var(--rec); opacity: 1; }
 .rec-track.taking .rec-arm-dot { animation: rec-blink 0.9s steps(2, jump-none) infinite; }
 @keyframes rec-blink { 50% { opacity: 0.25; } }
-.rec-sound { flex: 1; min-width: 0; max-width: none; }
+.rec-sound { flex: 1 1 0; min-width: 84px; max-width: none; } /* "Piano" whole; the volume gives way first */
 .rec-icon-btn {
   display: inline-flex; align-items: center; justify-content: center; flex: none;
   width: 32px; height: 32px; padding: 0; border-radius: 8px;
@@ -692,16 +882,36 @@ body.keys-view .keyboard { display: none; }
 }
 .rec-icon-btn:hover:not(:disabled) { color: var(--text); border-color: var(--line-strong); }
 .rec-mute[aria-pressed="true"] { background: var(--text-3); color: var(--bg); border-color: transparent; }
-.rec-vol { width: 64px; flex: none; accent-color: var(--tc); }
+.rec-loop[aria-pressed="true"] { background: var(--tc); color: #1c1c1e; border-color: transparent; }
+.rec-vol { width: 64px; flex: 0 1 64px; min-width: 40px; accent-color: var(--tc); }
 
 .rec-lane {
   position: relative; height: 50px; border-radius: 8px; overflow: hidden; cursor: pointer;
   background: var(--surface); border: 1px solid var(--line);
   box-shadow: inset 3px 0 0 var(--tc, transparent);
 }
+.rec-track-lane, .rec-ruler { touch-action: pan-y; } /* a sideways drag moves or sizes a part, or slides the view */
+.recorder.moving-part, .recorder.moving-part *, .recorder.panning, .recorder.panning * { cursor: grabbing !important; }
+.recorder.sizing-part, .recorder.sizing-part * { cursor: ew-resize !important; }
 .rec-track.armed .rec-lane { border-color: color-mix(in srgb, var(--rec) 45%, var(--line)); }
 .rec-track.taking .rec-lane { border-color: var(--rec); }
 .rec-ruler { height: 20px; background: transparent; border-color: transparent; box-shadow: none; }
+/* zoom (after Vocal Booth): − ⤢ + above the track controls, the ruler down by the lanes */
+.rec-ruler-row { align-items: end; }
+.rec-corner { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
+.rec-zoom-btn { width: 30px; height: 30px; }
+/* the scroll bar under the lanes, while zoomed in */
+.rec-scroll-row[hidden] { display: none; }
+.rec-hscroll {
+  position: relative; height: 14px; border-radius: 7px; cursor: pointer; touch-action: none;
+  background: var(--surface); border: 1px solid var(--line);
+}
+.rec-hscroll-thumb {
+  position: absolute; top: 2px; bottom: 2px; left: 0; border-radius: 5px;
+  background: var(--line-strong); cursor: grab; will-change: transform;
+}
+.rec-hscroll:hover .rec-hscroll-thumb, .rec-hscroll-thumb.held { background: var(--text-3); }
+.rec-hscroll-thumb.held { cursor: grabbing; }
 .rec-lane canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .rec-head {
   position: absolute; top: 0; bottom: 0; left: 0; width: 2px; margin-left: -1px;
@@ -710,7 +920,7 @@ body.keys-view .keyboard { display: none; }
 .recorder.is-recording .rec-head { background: var(--rec); opacity: 1; }
 .rec-ruler .rec-head { border-radius: 2px; }
 
-.rec-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.rec-foot { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
 .rec-timing { text-decoration: none; color: var(--text-2); font-weight: 700; }
 .rec-timing u { color: #8ab4ff; text-underline-offset: 3px; }
 /* on a light page the usual link blue is too pale */
@@ -748,16 +958,265 @@ body.keys-view .keyboard { display: none; }
 .cal-row output { width: 64px; }
 
 @media (max-width: 760px) {
-  /* each track: its controls, then its lane under them */
-  .rec-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-  .rec-ctl-spacer { display: none; }
-  .rec-track { padding-top: 4px; }
-  .rec-settings { margin-left: 0; }
-  .rec-vol { width: 80px; }
+  /* each track: its controls, then its lane under them (all the controls;
+     the narrower ones still fit beside the lane) — the handle at the left */
+  .recorder[data-head="full"] .rec-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .recorder[data-head="full"] .rec-ctl-spacer { display: none; }
+  .recorder[data-head="full"] .rec-track { padding-top: 4px; }
+  .recorder[data-head="full"] .rec-tracks { padding-left: 14px; }
+  .recorder[data-head="full"] .rec-grip { left: -2px; }
+}
+@media (max-width: 520px) {
+  .recorder[data-head="name"] .rec-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .recorder[data-head="name"] .rec-ctl-spacer { display: none; }
+  .recorder[data-head="name"] .rec-track { padding-top: 4px; }
+  .recorder[data-head="name"] .rec-tracks { padding-left: 14px; }
+  .recorder[data-head="name"] .rec-grip { left: -2px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rec-record.on, .rec-track.taking .rec-arm-dot, .cal-pad.beat { animation: none; }
 }
+/* The recorder's bar stays one row on a computer, narrowing step by step:
+   the tempo's − + go (type it, or ↑ ↓), then the click's word (its menu
+   still says), then everything a little tighter. Narrower than that (a
+   tablet standing up, a phone) the keyboard's buttons take a row of their
+   own, and on a phone the recording ones may too. */
+@media (max-width: 1060px) {
+  .rec-bar { gap: 6px; }
+  .rec-keys { padding-left: 6px; }
+  .rec-step { display: none; }
+  .rec-tempo-input { width: 34px; }
+}
+@media (max-width: 1000px) {
+  .rec-click-word { display: none; }
+  .rec-click-face { padding-left: 7px; }
+  .rec-tbtn { width: 34px; height: 34px; }
+}
+@media (max-width: 940px) {
+  .recorder .quick-btn { padding: 0 8px; font-size: 12px; }
+  .recorder .oct-btn { width: 23px; }
+  .recorder .layout-btn { min-width: 92px; }
+  .recorder .names-btn { min-width: 84px; }
+  .rec-time, .rec-keys, .rec-settings { gap: 4px; }
+}
+@media (max-width: 890px) {
+  .rec-bar { gap: 5px; }
+  .rec-keys { padding-left: 5px; }
+  .rec-transport { gap: 3px; }
+  .rec-tbtn { width: 31px; height: 32px; }
+  .recorder .quick-btn { padding: 0 6px; }
+  .recorder .rec-quant-edit { width: 26px; padding: 0; }
+  .recorder .oct-btn { width: 20px; }
+  .recorder .layout-btn { min-width: 74px; }
+  .recorder .layout-btn::before { display: none; }
+  .recorder .names-btn { min-width: 78px; }
+  .rec-unit { display: none; }
+  .rec-tempo::before { content: '♩'; padding-left: 6px; font-size: 14px; color: var(--text-3); }
+  .recorder .rec-meter { padding: 0 18px 0 7px; background-position: calc(100% - 11px) 13px, calc(100% - 6px) 13px; }
+  .rec-click-face { padding: 0 18px 0 6px; background-position: calc(100% - 11px) 13px, calc(100% - 6px) 13px; }
+}
+@media (max-width: 779px) {
+  /* transport, tempo, metre, Quantize, count-in and click; then the keyboard's buttons */
+  .rec-bar { row-gap: 6px; }
+  .rec-keys { order: 3; flex-basis: 100%; padding-left: 0; border-left: 0; }
+}
+@media (max-width: 679px) {
+  .recorder { width: calc(100% - 8px); margin-top: 4px; padding: 8px; }
+}
+
+/* THE NOTE EDITOR (recorder.js): a double-click on a track opens it out.
+   Its controls join the recorder's bar: Copy, Paste and Delete after
+   Quantize; which track (and what to do) in the room left; Cancel / Save
+   Changes at the far right in place of the count-in and click. The other
+   tracks step aside and the track fills their room, with the piano's keys
+   down the left in the controls' place (the column narrows to them). */
+.recorder:not(.editing) .rec-edit-only, .recorder.editing .rec-settings { display: none; }
+.rec-edit-tools { display: flex; gap: 4px; flex: none; }
+.recorder .rec-edit-tool { display: inline-flex; align-items: center; gap: 5px; padding: 0 9px; }
+.rec-edit-tool svg { flex: none; }
+/* which track, and what to do: one line each, so the bar never changes height under a drag */
+.rec-edit-info { flex: 1 1 0; min-width: 26px; height: 34px; display: flex; align-items: center; gap: 8px; overflow: hidden; }
+.rec-edit-num {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 24px; height: 24px; border-radius: 50%; background: var(--tc); color: #1c1c1e;
+  font-family: var(--font-block); font-weight: 700; font-size: 14px;
+}
+.rec-edit-text { min-width: 0; display: flex; flex-direction: column; line-height: 15px; }
+.rec-edit-title, .rec-edit-hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rec-edit-title { font-family: var(--font-block); font-weight: 600; font-size: 13.5px; }
+.rec-edit-hint { font-size: 11.5px; font-weight: 700; color: var(--text-2); }
+.rec-edit-done { display: flex; gap: 6px; margin-left: auto; flex: none; }
+.rec-edit-done.nudge { animation: rec-nudge 0.42s ease; }
+@keyframes rec-nudge { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+.rec-edit-done .btn { height: 32px; padding: 0 14px; font-size: 13px; }
+.rec-edit-done .rec-edit-save { background: #34C759; color: #0d2a16; border-color: transparent; }
+.rec-edit-done .rec-edit-save:hover { filter: brightness(1.07); }
+
+/* open: no keyboard (nor its buttons in the bar) — the notes take the whole screen */
+body.rec-editing .piano-container, body.rec-editing .rec-keys { display: none; }
+body.rec-editing .recorder { margin-bottom: max(8px, env(safe-area-inset-bottom)); }
+/* open: the one track, as tall as the room allows */
+.recorder.editing .rec-tracks { height: 100%; min-height: 0; padding-left: 0 !important; }
+.recorder.editing .rec-track:not(.editing), .recorder.editing .rec-grip { display: none !important; }
+.recorder.editing .rec-row { grid-template-columns: var(--head-w) minmax(0, 1fr) !important; gap: 6px !important; }
+.recorder.editing .rec-ctl-spacer { display: block !important; }
+.recorder.editing .rec-track.editing { flex: 1 1 0; min-height: 150px; align-items: stretch; padding-top: 0 !important; }
+.recorder.editing .rec-track.editing .rec-ctl { align-items: stretch; }
+.recorder.editing .rec-track.editing .rec-ctl > :not(.rec-ladder) { display: none !important; }
+.recorder.editing .rec-track.editing .rec-lane {
+  height: auto; cursor: default; touch-action: none; /* every drag is the editor's: moving, sizing, highlighting */
+  border-color: color-mix(in srgb, var(--tc) 55%, var(--line)); box-shadow: none;
+}
+.rec-ladder { display: none; position: relative; flex: 1 1 auto; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); cursor: ns-resize; touch-action: none; }
+.recorder.editing .rec-track.editing .rec-ladder { display: block; }
+.rec-ladder canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.recorder.moving-note, .recorder.moving-note * { cursor: grabbing !important; }
+.recorder.sizing-note, .recorder.sizing-note * { cursor: ew-resize !important; }
+/* while editing, the song files and the timing wait */
+.recorder.editing :is(.rec-save-btn, .rec-timing) { display: none; }
+/* the bar stays one row while editing: Copy, Paste and Delete as icons first
+   (their names are in the tooltips), then — on a phone — the words beside the number go */
+@media (max-width: 960px) {
+  .recorder .rec-edit-tool span { display: none; }
+  .recorder .rec-edit-tool { width: 34px; padding: 0; justify-content: center; }
+}
+@media (max-width: 560px) {
+  .rec-edit-text { display: none; }
+  .recorder.editing .rec-zoom-all { display: none; }
+  .recorder.editing .rec-zoom-btn { width: 27px; height: 28px; }
+}
+
+/* ---------------- a link open (lesson.js; LESSON in script.js) ----------------
+   A locked control goes; what must still be read stays as plain text with a
+   lock. body.in-lesson (any link open) / lesson-locked (something locked) /
+   lock-scale / lock-key / lock-layout / lock-record / lock-meter /
+   lock-tempo / lock-quant. */
+body.lesson-locked .lesson-hide { display: none !important; }
+body:not(.in-lesson) .lesson-only { display: none !important; }
+.scale-fixed { display: none; }
+body.lock-key .key-ctl .key-arrow, body.lock-scale .key-ctl .scale-select { display: none; }
+body.lock-record #recorder-btn { display: none; }
+body.lock-scale .scale-fixed {
+  display: inline-flex; align-items: center; height: 34px; padding: 0 10px; max-width: 200px;
+  border-radius: 8px; border: 1px solid var(--line); background: var(--surface);
+  font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lesson-lock {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 34px; height: 34px; padding: 0; border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--tonic) 55%, var(--line));
+  background: color-mix(in srgb, var(--tonic) 18%, var(--surface)); color: var(--text);
+}
+.lesson-lock[hidden] { display: none; }
+.lesson-lock:hover { border-color: var(--tonic); }
+.lesson-lock svg { width: 17px; height: 17px; }
+/* Settings: the computer keys, kept by the lesson */
+#settings-layout-locked:empty { display: none; }
+body.lock-layout #settings-layout :is(.choice-list, .layout-cycle-note) { display: none; }
+/* the computer-keyboard view's button only switches Flex and Chromatic */
+body.lock-layout.keys-view #layout-btn { display: none; }
+/* the recorder: tempo and time signature as text */
+.rec-fixed {
+  display: none; align-items: center; gap: 5px; height: 32px; padding: 0 10px; border-radius: 8px;
+  border: 1px dashed var(--line-strong); color: var(--text-2);
+  font-weight: 800; font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.rec-fixed svg { width: 13px; height: 13px; flex: none; }
+body.lock-tempo .rec-tempo, body.lock-meter .rec-meter { display: none; }
+body.lock-tempo .rec-tempo-fixed, body.lock-meter .rec-meter-fixed { display: inline-flex; }
+/* Quantize locked on (its rhythm) or off: text in place of the button and its pencil */
+body.lock-quant #rec-quant :is(.rec-quant-btn, .rec-quant-edit) { display: none !important; }
+body.lock-quant .rec-quant-fixed { display: inline-flex; }
+.rq-text { display: flex; flex-direction: column; line-height: 1.1; }
+.rq-text small { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); }
+/* a locked track: a lock in place of the record dot, no trash, the loop shown as it is */
+.rec-arm-lock { display: none; }
+.rec-arm-lock svg { width: 14px; height: 14px; }
+.rec-arm.locked { cursor: default; border-style: dashed; }
+.rec-arm.locked .rec-arm-dot { display: none; }
+.rec-arm.locked .rec-arm-lock { display: inline-flex; color: var(--text-2); }
+.rec-track.locked .rec-clear { visibility: hidden; }
+.rec-track.locked .rec-loop:disabled { opacity: 1; cursor: default; }
+.rec-track.locked .rec-lane {
+  background-image: repeating-linear-gradient(135deg, transparent 0 10px, color-mix(in srgb, var(--tc) 9%, transparent) 10px 11px);
+}
+/* the Library's lesson card */
+.lesson-card {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--tonic) 55%, var(--line)); background: var(--surface);
+}
+.lesson-name { display: flex; align-items: center; gap: 8px; font-family: var(--font-block); font-weight: 600; font-size: 18px; }
+.lesson-name svg { width: 16px; height: 16px; flex: none; color: var(--text-2); }
+.lesson-line { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-2); font-weight: 600; }
+.lesson-line b { color: var(--text); font-weight: 800; }
+.row-wrap[hidden] { display: none; }
+#lesson-status:empty { display: none; }
+/* the lock list's groups and track numbers (Create a Link) */
+.ls-group { display: flex; flex-direction: column; gap: 8px; }
+.ls-group h3 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); font-weight: 800; }
+.ls-num {
+  display: inline-flex; align-items: center; justify-content: center; vertical-align: 1px;
+  width: 19px; height: 19px; margin-right: 7px; border-radius: 50%;
+  background: var(--tc); color: #1c1c1e; font-family: var(--font-block); font-size: 12px;
+}
+
+/* ---------------- the Library: Create a Link · Save Workspace · Build a Scale ---------------- */
+.lib-make { padding-top: 12px; }
+.lib-make-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.lib-make-row .btn { flex: 1 1 auto; height: 40px; }
+.lib-make-row .btn svg { flex: none; }
+.lib-make #library-status:empty { display: none; }
+#ws-list:empty, #ws-empty[hidden] { display: none; }
+.lib-file-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.lib-file-row .btn { flex: 1 1 auto; }
+.lib-file-row .btn svg { flex: none; }
+.lib-file-note { margin-top: -2px; }
+
+/* Create a Link: the link on top, then Scale | Workspace and the Lock link switch */
+.lk-body { gap: 14px; padding-top: 14px; }
+.lk-body > * { flex-shrink: 0; } /* (a scrolling column: nothing squeezed, the status line least of all) */
+.lk-top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.lk-top .lk-share { flex: 1 1 240px; }
+#lk-status:empty { display: none; }
+.lk-choose { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.lk-seg { display: inline-flex; gap: 3px; padding: 3px; border-radius: 11px; border: 1px solid var(--line-strong); background: var(--surface); }
+.lk-seg-btn {
+  height: 32px; padding: 0 18px; border: 0; border-radius: 8px; background: none;
+  color: var(--text-2); font-weight: 800; font-size: 13px;
+}
+.lk-seg-btn:hover { color: var(--text); }
+.lk-seg-btn[aria-checked="true"] { background: var(--tonic); color: var(--tonic-ink); box-shadow: 0 1px 4px rgba(0,0,0,0.25); }
+.lk-switch {
+  display: inline-flex; align-items: center; gap: 9px; height: 36px; padding: 0 2px;
+  border: 0; background: none; color: var(--text); font-weight: 800; font-size: 14px;
+}
+.lk-switch-track {
+  position: relative; width: 42px; height: 24px; border-radius: 999px; flex: none;
+  background: var(--surface-2); border: 1px solid var(--line-strong); transition: background 0.15s;
+}
+.lk-switch-knob {
+  position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--text-2); transition: transform 0.15s, background 0.15s;
+}
+.lk-switch[aria-checked="true"] .lk-switch-track { background: var(--tonic); border-color: transparent; }
+.lk-switch[aria-checked="true"] .lk-switch-knob { transform: translateX(18px); background: var(--tonic-ink); }
+.lk-switch:focus-visible, .lk-seg-btn:focus-visible { outline: 2px solid var(--tonic); outline-offset: 2px; }
+#lk-name-row[hidden] { display: none; }
+.lk-locks { display: flex; flex-direction: column; gap: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+#link-sheet:not(.lk-locked) .lk-locks { display: none; }
+#link-sheet.lk-scale [data-for="workspace"], #link-sheet.lk-workspace [data-for="scale"] { display: none; }
+.lk-quant-on { display: flex; flex-direction: column; gap: 6px; padding: 4px 0 0 2px; }
+.lk-quant-on[hidden] { display: none; }
+.lk-mini { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); font-weight: 800; }
+#lk-tracks:empty, #lk-tracks-note:empty { display: none; }
+#lk-free b { color: var(--text); font-weight: 800; }
+#lk-free:empty { display: none; }
+.lk-file .link-btn { padding-left: 0; margin-right: 2px; }
+
+/* Save Workspace */
+.ws-body { gap: 12px; padding-top: 14px; }
+.ws-replace { color: var(--text); }
+.ws-replace[hidden] { display: none; }
 
 /* ---------------- narrower screens ---------------- */
 /* two lines: brand and actions, then key & scale across the middle */

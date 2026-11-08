@@ -148,20 +148,112 @@ const HIDDEN_SCALES = new Set(['minor']);
 // The name this app gives each pitch: the one the piano keys use (data-note).
 const PHYSICAL_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
+// -------- MY SCALES (built in the Library's scale builder) --------
+// Kept on this device as an id map in localStorage. A scale is its degrees
+// ('1', 'b3', '#4'…, first note first, one per pitch, 1 to 12 of them) plus
+// the first note as it was spelled when it was built ('Eb' or 'D#'), so in
+// that key every note is named exactly as chosen; in other keys it is spelled
+// the way every scale here is (fewest accidentals, a tie goes to the flat).
+// It also keeps its BASE KEY ('C', 'Db'…), only a look: the key the builder's
+// octave starts on, furthest to the left. The first note is the chosen key
+// furthest to the right of it (or the base itself), so no chosen note lies
+// between the two.
+const MY_SCALES_KEY = 'virtual_keyboard_scales_v1';
+const DEGREE_RE = /^(#{1,2}|b{1,2})?[1-7]$/;
+const BLACK_PCS = new Set([1, 3, 6, 8, 10]);
+let myScaleById = {};
+// A lesson's own scale (lesson.js): used while its lesson is open, never filed
+// in My scales, so a lesson always plays the scale it was sent with, even in
+// the browser of the teacher who later changed their copy.
+let lessonScales = {};
+function customScale(scaleId) { return lessonScales[scaleId] || myScaleById[scaleId] || null; }
+
+// The base key a scale gets when none was chosen: its first note, or for a
+// black first note the white key just below, unless that key is in the scale.
+function defaultBase(tonicPc, chosenPcs) {
+  if (!BLACK_PCS.has(tonicPc)) return tonicPc;
+  const below = (tonicPc + 11) % 12;
+  return chosenPcs.has(below) ? tonicPc : below;
+}
+
+function cleanTitle(t) { return typeof t === 'string' ? t.replace(/\s+/g, ' ').trim().slice(0, 40) : ''; }
+function cleanScale(s) {
+  if (!s || typeof s !== 'object' || typeof s.id !== 'string' || !/^my-[a-z0-9-]{1,40}$/.test(s.id)) return null;
+  const given = Array.isArray(s.degrees) ? s.degrees.filter(d => typeof d === 'string' && DEGREE_RE.test(d)) : [];
+  const seen = new Set();
+  const degrees = [];
+  ['1', ...given].forEach(d => {
+    const semis = Theory.degreeSemis(d);
+    if (!seen.has(semis)) { seen.add(semis); degrees.push(d); }
+  });
+  degrees.sort((a, b) => Theory.degreeSemis(a) - Theory.degreeSemis(b));
+  const tonic = typeof s.tonic === 'string' && /^[A-G][#b]?$/.test(s.tonic) && pitchIndex[s.tonic] !== undefined ? s.tonic : 'C';
+  const tonicPc = pitchIndex[tonic];
+  const chosen = new Set(degrees.map(d => (tonicPc + Theory.degreeSemis(d)) % 12));
+  let base = typeof s.base === 'string' && /^[A-G][#b]?$/.test(s.base) && pitchIndex[s.base] !== undefined ? pitchIndex[s.base] : null;
+  const fromBase = pc => (pc - base + 12) % 12;
+  if (base === null || [...chosen].some(pc => fromBase(pc) < fromBase(tonicPc))) base = defaultBase(tonicPc, chosen);
+  const when = v => (typeof v === 'string' && !isNaN(Date.parse(v))) ? v : new Date().toISOString();
+  return { id: s.id, title: cleanTitle(s.title) || 'My scale', degrees, tonic, base: PHYSICAL_NAMES[base],
+           createdAt: when(s.createdAt), updatedAt: when(s.updatedAt || s.createdAt), isCustom: true };
+}
+function loadMyScales() {
+  myScaleById = {};
+  let stored = null;
+  try { stored = JSON.parse(localStorage.getItem(MY_SCALES_KEY) || 'null'); } catch (e) {}
+  if (stored && typeof stored === 'object') {
+    Object.values(stored).forEach(s => { const rec = cleanScale(s); if (rec) myScaleById[rec.id] = rec; });
+  }
+}
+function storeMyScales() {
+  try { localStorage.setItem(MY_SCALES_KEY, JSON.stringify(myScaleById)); return true; } catch (e) { return false; }
+}
+// Oldest first: the order of the scale menu (a new scale lands at the bottom).
+function myScalesInOrder() {
+  return Object.values(myScaleById).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+}
+function newScaleId() { return 'my-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6); }
+loadMyScales();
+
+// Any scale by id: one of mine, else one of Theory's (Major when unknown).
+function scaleOf(scaleId) {
+  return customScale(scaleId) || Theory.SCALE_BY_ID[scaleId] || Theory.SCALE_BY_ID.major;
+}
+function isKnownScale(scaleId) {
+  return !!customScale(scaleId) || (!!Theory.SCALE_BY_ID[scaleId] && !HIDDEN_SCALES.has(scaleId));
+}
+// The first note's spelling ('Eb' or 'D#'): Theory's rule, and for one of my
+// scales the same rule on its own degrees, except in the key it was built in.
+function spelledTonic(keyIndex, scaleId) {
+  const mine = customScale(scaleId);
+  if (!mine) return Theory.tonicName(keyIndex, scaleId);
+  const flat = Theory.TONIC_FLAT[keyIndex], sharp = Theory.TONIC_SHARP[keyIndex];
+  if (flat === sharp) return flat;
+  if (pitchIndex[mine.tonic] === keyIndex) return mine.tonic;
+  const cost = t => mine.degrees.reduce((n, d) => n + Math.abs(Theory.spellDegree(t, d).alter), 0);
+  return cost(sharp) < cost(flat) ? sharp : flat;
+}
+
 // Flex rows, bottom row first. Each row walks ten keys up the scale from the
-// tonic, an octave above the row below it.
+// tonic, an octave above the row below it. A scale of more than ten notes
+// would not fit a row, so its rows run on instead: Z X C … / climb from the
+// low tonic, then A S D … carry on from there, then Q, then the number row.
 const FLEX_ROWS = ['zxcvbnm,./', 'asdfghjkl;', 'qwertyuiop', '1234567890'];
+const FLEX_ROW_LEN = 10;
+// A scale of one to four notes climbs its rows far past the piano: its notes
+// fold down by octaves to stay at or under E8, the highest note any built-in
+// scale reaches (so the built-in scales are untouched).
+const FLEX_CEILING = 112;
 
 // Shift (or Caps Lock) stretches Flex a little: the Z row plays an octave
 // lower, the number row an octave higher; the A and Q rows stay put.
 const FLEX_SHIFT = [-1, 0, 0, 1];
 
-let flexLayout = null; // { keyName, map: computer key -> { note, octave, row, pos } }
+let flexLayout = null; // { keyName, long, map: computer key -> { note, octave, row, pos } }
 let currentKey = 'C';  // the tonic, by piano-key name: C Db D Eb E F Gb G Ab A Bb B
 
 function scaleSemitones(scaleId) {
-  const scale = Theory.SCALE_BY_ID[scaleId] || Theory.SCALE_BY_ID.major;
-  return scale.degrees.map(Theory.degreeSemis);
+  return scaleOf(scaleId).degrees.map(Theory.degreeSemis);
 }
 
 function midiOf(note, octave) {
@@ -190,12 +282,32 @@ function topShownMidi() {
   return Math.max(...shown.map(n => midiOf(n.slice(0, -1), parseInt(n.slice(-1), 10))));
 }
 
+// A pitch moved by octaves onto the keys on screen (unchanged when it is on
+// screen already, or before the keyboard is drawn).
+function foldIntoView(midi) {
+  const shown = whiteKeysPhysical.concat(blackKeysPhysical).map(n => midiOf(n.slice(0, -1), parseInt(n.slice(-1), 10)));
+  if (!shown.length) return midi;
+  const top = Math.max(...shown), bottom = Math.min(...shown);
+  while (midi > top) midi -= 12;
+  while (midi < bottom) midi += 12;
+  return midi;
+}
+
 function buildFlexKeymap(keyName, scaleId) {
   const semis = scaleSemitones(scaleId);
+  const n = semis.length;
+  const long = n > FLEX_ROW_LEN;
   const map = {};
   FLEX_ROWS.forEach((keys, row) => {
     [...keys].forEach((key, pos) => {
-      const midi = rowTonicMidi(keyName, row) + 12 * Math.floor(pos / semis.length) + semis[pos % semis.length];
+      let midi;
+      if (long) { // one run up the scale through all four rows
+        const step = row * FLEX_ROW_LEN + pos;
+        midi = rowTonicMidi(keyName, 0) + 12 * Math.floor(step / n) + semis[step % n];
+      } else {
+        midi = rowTonicMidi(keyName, row) + 12 * Math.floor(pos / n) + semis[pos % n];
+      }
+      while (midi > FLEX_CEILING) midi -= 12;
       map[key] = { ...noteFromMidi(midi), row, pos };
     });
   });
@@ -204,12 +316,19 @@ function buildFlexKeymap(keyName, scaleId) {
 
 function fillScaleSelect() {
   const select = document.querySelector('.scale-selector');
+  const keep = select.value;
   const families = [];
   Theory.SCALES.filter(s => !HIDDEN_SCALES.has(s.id)).forEach(s => {
     let family = families.find(f => f.name === s.family);
     if (!family) families.push(family = { name: s.family, scales: [] });
     family.scales.push(s);
   });
+  // My scales come last, oldest first, so a new one is at the very bottom.
+  const mine = myScalesInOrder();
+  if (mine.length) families.push({ name: 'My scales', scales: mine.map(s => ({ id: s.id, name: s.title })) });
+  // an open lesson's scale (the menu only shows while its scale is not locked)
+  const lessons = Object.values(lessonScales).filter(s => !myScaleById[s.id]);
+  if (lessons.length) families.push({ name: 'From the link', scales: lessons.map(s => ({ id: s.id, name: s.title })) });
   select.innerHTML = '';
   families.forEach(family => {
     const og = document.createElement('optgroup');
@@ -222,7 +341,7 @@ function fillScaleSelect() {
     });
     select.appendChild(og);
   });
-  select.value = 'major';
+  select.value = keep && isKnownScale(keep) ? keep : 'major';
 }
 
 // The scale's notes by piano-key name, for Focus and the in-scale Names.
@@ -290,109 +409,30 @@ const keyData = {
 };
 
 function updateFlexLayout(keyName, scaleId) {
-  flexLayout = { keyName, map: buildFlexKeymap(keyName, scaleId) };
+  flexLayout = { keyName, long: scaleSemitones(scaleId).length > FLEX_ROW_LEN, map: buildFlexKeymap(keyName, scaleId) };
   for (const key in flexLayout.map) {
     if (keyData[key]) keyData[key].green = flexLayout.map[key];
   }
 }
 
-const keyBindings = {
-  't-green': {
-    1: {
-      'C3': '1qaz', 'D3': '2wsx', 'E3': '3edc', 'F3': '4rfv', 'G3': '5tgb', 'A3': '6yhn', 'B3': '7ujm',
-      'C4': '8ik,', 'D4': '9ol.', 'E4': '0p;/'
-    },
-    2: {
-      'C3': 'zq', 'D3': 'xw', 'E3': 'ce', 'F3': 'vr', 'G3': 'bt', 'A3': 'ny', 'B3': 'mu',
-      'C4': '1a,i', 'D4': '2s.o', 'E4': '3d/p', // Note: User bindings were slightly different, this is corrected based on keyData
-      'F4': '4f', 'G4': '5g', 'A4': '6h', 'B4': '7j',
-      'C5': '8k', 'D5': '9l', 'E5': '0;'
-    },
-    3: {}, 4: {}
-  },
-  't-blue': {
-    1: {
-      'C3': 'zq', 'Db3': 's2', 'D3': 'xw', 'Eb3': 'd3', 'E3': 'ce', 'F3': 'vr', 'Gb3': 'g5', 'G3': 'bt', 'Ab3': 'h6', 'A3': 'ny', 'Bb3': 'j7', 'B3': 'mu',
-      'C4': ',i', 'Db4': 'l9', 'D4': '.o', 'Eb4': ';0', 'E4': '/p'
-    },
-    2: {
-        'C3': 'z', 'Db3': 's', 'D3': 'x', 'Eb3': 'd', 'E3': 'c', 'F3': 'v', 'Gb3': 'g', 'G3': 'b', 'Ab3': 'h', 'A3': 'n', 'Bb3': 'j', 'B3': 'm',
-        'C4': ',q', 'Db4': 'l2', 'D4': '.w', 'Eb4': ';3', 'E4': '/e',
-        'F4': 'r', 'Gb4': '5', 'G4': 't', 'Ab4': '6', 'A4': 'y', 'Bb4': '7', 'B4': 'u',
-        'C5': 'i', 'Db5': '9', 'D5': 'o', 'Eb5': '0', 'E5': 'p'
-    },
-    3: {}, 4: {}
-  }
-};
-
-function populateDynamicBindings() {
-  // Generate bindings for green 3 & 4
-  for (let octaves = 3; octaves <= 4; octaves++) {
-    const bindings = {};
-    for (const key in keyData) {
-      const keyInfo = keyData[key].green;
-      if (keyInfo) {
-        const note = `${keyInfo.note}${keyInfo.octave}`;
-        if (!bindings[note]) bindings[note] = '';
-        bindings[note] += key;
-      }
-    }
-    keyBindings['t-green'][octaves] = bindings;
-  }
-
-  // Generate un-shifted bindings for blue 3 & 4
-  for (let octaves = 3; octaves <= 4; octaves++) {
-    const bindings = {};
-    for (const key in keyData) {
-      const keyInfo = keyData[key].blue;
-      if (keyInfo) {
-        const note = `${keyInfo.note}${keyInfo.octave}`;
-        if (!bindings[note]) bindings[note] = '';
-        bindings[note] += key;
-      }
-    }
-    keyBindings['t-blue'][octaves] = bindings;
-  }
-
-  // Calculate shifted blue bindings just once
-  const shiftedBlueBindings = {};
-  for (const key in keyData) {
-    const keyInfo = keyData[key].blue;
-    if (keyInfo) {
-      const shiftedNote = `${keyInfo.note}${keyInfo.octave + 2}`;
-      const displayKey = key.toUpperCase();
-      if (!shiftedBlueBindings[shiftedNote]) {
-        shiftedBlueBindings[shiftedNote] = '';
-      }
-      shiftedBlueBindings[shiftedNote] += displayKey;
-    }
-  }
-
-  // Merge the shifted bindings into all blue layouts
-  for (let octaves = 1; octaves <= 4; octaves++) {
-    const targetBindings = keyBindings['t-blue'][octaves];
-    for (const note in shiftedBlueBindings) {
-      if (targetBindings[note]) {
-        targetBindings[note] += shiftedBlueBindings[note];
-      } else {
-        targetBindings[note] = shiftedBlueBindings[note];
-      }
-    }
-  }
-}
-
 fillScaleSelect();
 updateFlexLayout('C', 'major');
-populateDynamicBindings();
 
-function formatBinding(bindingString) {
-    const chars = bindingString.split('');
-    if (chars.length === 4) {
-        return `${chars[0]}${chars[1]}<br>${chars[2]}${chars[3]}`;
-    } else if (chars.length === 2) {
-        return `${chars[0]} ${chars[1]}`;
-    }
-    return bindingString;
+// Where the Flex piano starts. One of my scales starts on its base key, the
+// nearest one at or below the low first note (the Z row's), so C stays on
+// the left of a D scale built on a C base; the computer keys still start on
+// the first note. A black base starts on the white key just below it.
+// Other scales: the usual range for the key.
+function flexRange(keyName, scaleId) {
+  const mine = customScale(scaleId);
+  if (!mine) return keyDisplayRanges[keyName] || keyDisplayRanges['C'];
+  const below = (pitchIndex[keyName] - pitchIndex[mine.base] + 12) % 12;
+  // (a base on the first note, or the white key under a black one: the usual view)
+  if (below === 0 || (below === 1 && BLACK_PCS.has(pitchIndex[keyName]))) return keyDisplayRanges[keyName];
+  let startMidi = rowTonicMidi(keyName, 0) - below;
+  if (BLACK_PCS.has(startMidi % 12)) startMidi -= 1;
+  const start = noteFromMidi(startMidi);
+  return { startNote: start.note + start.octave, endNoteBase: PHYSICAL_NAMES[(startMidi + 4) % 12] };
 }
 
 const KEYBOARD_GUTTER = 10; // px between the keyboard and each side of the screen
@@ -404,8 +444,8 @@ function drawKeyboard(numOctaves = 1) {
   blackKeysPhysical = [];
   
   const colorMode = toggleStates.color[currentToggleStates.color];
-  const namesMode = toggleStates.names[currentToggleStates.names];
-  const bindingsMode = toggleStates.bindings[currentToggleStates.bindings];
+  const letters = showHotkeys && !keysView; // the Flex button's letters stand in for the names
+  const namesMode = letters ? 'deactivated' : toggleStates.names[currentToggleStates.names];
   const layoutMode = currentToggleStates.layout;
   const focusMode = toggleStates.focus[currentToggleStates.focus];
 
@@ -420,9 +460,9 @@ function drawKeyboard(numOctaves = 1) {
   if (layoutMode === 't-blue') { // Chromatic mode
     range = { startNote: 'C3', endNoteBase: 'E' };
   } else { // Flex mode
-    range = keyDisplayRanges[keyName] || keyDisplayRanges['C'];
+    range = flexRange(keyName, currentScaleName);
   }
-  
+
   let startNote = range.startNote;
   if (numOctaves === 1) {
     const noteName = startNote.slice(0, -1);
@@ -476,7 +516,8 @@ function drawKeyboard(numOctaves = 1) {
             whiteKeysPhysical.push(note);
         }
     });
-  
+  const hotkeys = letters ? hotkeyLetters() : {}; // (needs the keys on screen, just listed)
+
   const blackBetweenIndex = {};
   blackKeysPhysical.forEach(note => {
       const octave = parseInt(note.at(-1), 10);
@@ -553,17 +594,7 @@ function drawKeyboard(numOctaves = 1) {
         label.textContent = noteName;
         div.appendChild(label);
       }
-
-      if (bindingsMode !== 'deactivated') {
-        const binding = keyBindings[layoutMode]?.[numOctaves]?.[note];
-        if (binding) {
-          const bindingLabel = document.createElement('div');
-          bindingLabel.className = 'binding-label';
-          bindingLabel.innerHTML = formatBinding(binding);
-          div.appendChild(bindingLabel);
-          div.classList.add('bindings-active');
-        }
-      }
+      if (hotkeys[note]) div.appendChild(hotkeyLabel(hotkeys[note]));
 
       whitesEl.appendChild(div);
       if (!isDisabled) {
@@ -603,20 +634,17 @@ function drawKeyboard(numOctaves = 1) {
       if (showLabel) {
         const label = document.createElement('div');
         label.className = 'key-label';
-        label.innerHTML = blackKeyDisplayMap[pc] || '';
+        // One of my scales names its black keys the way they were chosen (sharp
+        // or flat); every other black key shows both names.
+        if (customScale(currentScaleName) && isNoteInScale) {
+          const name = spellMidi(midiOf(pc, parseInt(note.slice(-1), 10)), currentKeyName, currentScaleName);
+          label.textContent = name.letter + name.accidental;
+        } else {
+          label.innerHTML = blackKeyDisplayMap[pc] || '';
+        }
         div.appendChild(label);
       }
-
-      if (bindingsMode !== 'deactivated') {
-        const binding = keyBindings[layoutMode]?.[numOctaves]?.[note];
-        if (binding) {
-          const bindingLabel = document.createElement('div');
-          bindingLabel.className = 'binding-label';
-          bindingLabel.innerHTML = formatBinding(binding);
-          div.appendChild(bindingLabel);
-          div.classList.add('bindings-active');
-        }
-      }
+      if (hotkeys[note]) div.appendChild(hotkeyLabel(hotkeys[note]));
 
       blacksEl.appendChild(div);
       if (!isDisabled) {
@@ -735,6 +763,13 @@ function getNoteMapping(key, layout, octaves, isShifted) {
     const { row, pos } = layoutKeyData;
     const shift = isShifted ? FLEX_SHIFT[row] : 0;
     if (shift) noteToPlay = `${note}${octave + shift}`;
+    if (flexLayout.long) {
+      // A scale of more than ten notes runs on from row to row, so the rows no
+      // longer repeat each other: each key lights the note it plays, moved by
+      // octaves onto the keys on screen.
+      const lit = noteFromMidi(foldIntoView(midiOf(note, octave) + 12 * shift));
+      return { noteToPlay, noteToLightUp: `${lit.note}${lit.octave}` };
+    }
     const refRow = octaves === 1 ? 1 : octaves === 2 ? row % 2 : row;
     const ref = flexLayout.map[FLEX_ROWS[refRow][pos]];
     let midi = midiOf(ref.note, ref.octave);
@@ -764,7 +799,7 @@ function getNoteMapping(key, layout, octaves, isShifted) {
       // Default to the left-side block (octave 4)
       noteToLightUp = `${noteName}4`;
       // Override for right-side keys that are C, D, or E
-      if (',./?;:iop90)'.includes(key) && ['C', 'D', 'E', 'Db', 'Eb'].includes(noteName)) {
+      if (',./?l;:iop90)'.includes(key) && ['C', 'D', 'E', 'Db', 'Eb'].includes(noteName)) {
         noteToLightUp = `${noteName}5`;
       }
     } else if (octaves === 2) {
@@ -948,17 +983,40 @@ soundSelect.addEventListener('change', (e) => {
 const toggleStates = {
   color: ['deactivated', 't-green', 't-blue'],
   names: ['deactivated', 't-orange', 't-yellow', 't-green', 't-blue'],
-  bindings: ['deactivated', 't-blue'],
   focus: ['deactivated', 't-purple'],
 };
 
 const currentToggleStates = {
   color: 1,
   names: 0,
-  bindings: 0,
   layout: 't-green', // This is for Flex/Chromatic
   focus: 0, // This is for the new Focus toggle
 };
+// The Flex button's lit step: the computer keys' letters on the piano keys,
+// in place of the Key Names. Not kept: a look, then off again.
+let showHotkeys = false;
+
+// Which letter goes on which piano key: Flex, the A row's (a s d … climbing
+// the scale from the tonic); Chromatic, the Z row's white keys and the S
+// row's black ones. Each on the key it lights, one letter a key.
+const HOTKEY_ROWS = { 't-green': ['asdfghjkl;'], 't-blue': ['zxcvbnm,./', 'sdfghjkl;'] };
+function hotkeyLetters() {
+  const layout = currentToggleStates.layout;
+  const letters = {};
+  // A scale of more than ten notes starts on Z and runs on into the A row.
+  const rows = layout === 't-green' && flexLayout.long ? ['zxcvbnm,./', 'asdfghjkl;'] : HOTKEY_ROWS[layout];
+  rows.forEach(row => [...row].forEach(key => {
+    const m = getNoteMapping(key, layout, currentOctaves, false);
+    if (m && !letters[m.noteToLightUp]) letters[m.noteToLightUp] = key.toUpperCase();
+  }));
+  return letters;
+}
+function hotkeyLabel(letter) {
+  const label = document.createElement('div');
+  label.className = 'hotkey-label';
+  label.textContent = letter;
+  return label;
+}
 
 // -------- KEYS VIEW (the computer keyboard, after Key Blocks) --------
 const QWERTY_ROWS = ['1234567890', 'qwertyuiop', 'asdfghjkl;', 'zxcvbnm,./']; // top row first
@@ -982,14 +1040,18 @@ const heldCaps = new Set(); // computer keys held down right now
 // outside the scale that would come out as a double accidental, or as an
 // accidental on a white key, takes its piano key's plain name instead
 // (D, not E𝄫, in D♭ major), sharp or flat by the direction of the key.
+// One of my scales, moved to another key, never takes a double accidental
+// either: its in-scale notes then take the piano key's name the same way.
 function spellMidi(midi, keyName, scaleId) {
   const keyIndex = pitchIndex[keyName];
-  const scale = Theory.SCALE_BY_ID[scaleId] || Theory.SCALE_BY_ID.major;
-  const tonic = Theory.tonicName(keyIndex, scale.id);
+  const scale = scaleOf(scaleId);
+  const tonic = spelledTonic(keyIndex, scale.id);
   const degree = Theory.semisToDegree(midi - keyIndex, scale.degrees);
   let { letter, alter } = Theory.spellDegree(tonic, degree);
   const plain = PHYSICAL_NAMES[midi % 12];
-  if (!scale.degrees.includes(degree) && alter !== 0 && (Math.abs(alter) > 1 || plain.length === 1)) {
+  const inScale = scale.degrees.includes(degree);
+  if ((!inScale && alter !== 0 && (Math.abs(alter) > 1 || plain.length === 1)) ||
+      (inScale && scale.isCustom && Math.abs(alter) > 1)) {
     const name = plain.length > 1 && tonic.includes('#') ? flatToSharpMap[plain] : plain;
     letter = name[0];
     alter = name.length === 1 ? 0 : name[1] === '#' ? 1 : -1;
@@ -1113,7 +1175,8 @@ function renderQwerty() {
        shiftOn ? 'Shift (or Caps Lock) is on: two octaves higher.' : 'Hold Shift for two octaves higher.',
        outside - off > 0 ? 'Striped keys are outside the scale.' : '',
        off ? 'Focus is on: only the colored keys play.' : '']
-    : ['Each row climbs the scale from its first key.',
+    : [flexLayout.long ? 'This scale has more than ten notes, so the rows run on: Z climbs the scale from its first note, then A, Q and the number row carry on.'
+                       : 'Each row climbs the scale from its first key.',
        shiftOn ? 'Shift (or Caps Lock) is on: the Z row plays an octave lower, the number row an octave higher.'
                : 'Hold Shift and the Z row plays an octave lower, the number row an octave higher.'];
   legend.push('Play the keys here or on your computer keyboard.');
@@ -1162,11 +1225,48 @@ const nameStep = () => NAME_CYCLE.findIndex(c => c.mode === NAME_MODES[currentTo
 
 function redraw() { drawKeyboard(currentOctaves); }
 
+// -------- LESSON LOCKS --------
+// A link (lesson.js, Library → Create a Link) opens the teacher's scale and
+// keyboard, or the whole workspace with its recording, kept apart from the
+// student's own. LESSON is null outside one; inside one (`locked` when Lock
+// link was on and anything is locked) its locks say what stays as the
+// teacher left it:
+//   scale   the scale               key     the key
+//   layout  Flex or Chromatic (the letters still show and hide)
+//   record  the recorder (a scale link: students play, never record)
+//   meter   the time signature      tempo   the tempo
+//   quant   Quantize: { on: true, grid, feel } or { on: false }, else free
+//   tracks  the recorder tracks (by index) that can be muted, sized by whole
+//           loops and given another sound, but never recorded over, edited
+//           or deleted
+// A locked control is taken away, not greyed: what must still be read (the
+// key, the scale, the time signature) shows as plain text with a lock.
+let LESSON = null;
+const lockOn = what => !!(LESSON && LESSON.locks[what]);
+const LOCK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>';
+
+function renderLocks() {
+  const body = document.body;
+  body.classList.toggle('in-lesson', !!LESSON);
+  body.classList.toggle('lesson-locked', !!(LESSON && LESSON.locked));
+  ['scale', 'key', 'layout', 'record', 'meter', 'tempo', 'quant'].forEach(w => body.classList.toggle('lock-' + w, lockOn(w)));
+  const lock = document.getElementById('lesson-lock');
+  lock.hidden = !LESSON;
+  if (LESSON) lock.title = `Lesson: ${LESSON.title}. Press to see what is locked.`;
+  document.getElementById('scale-fixed').textContent = scaleName(scaleSelector.value);
+  keyNameBtn.title = lockOn('key') ? 'The key is set by this lesson' : 'Choose a key';
+  document.getElementById('scale-fixed').title = 'The scale is set by this lesson';
+  const chromatic = currentToggleStates.layout === 't-blue';
+  document.getElementById('settings-layout-locked').textContent = lockOn('layout')
+    ? `This lesson keeps the computer keys on ${chromatic ? 'Chromatic' : 'Flex'}. The ${chromatic ? 'Chromatic' : 'Flex'} button still shows and hides the letters on the piano keys.`
+    : '';
+}
+
 function prettyNote(name) { return name[0] + name.slice(1).replace(/#/g, '♯').replace(/b/g, '♭'); }
 function tonicName(keyName = currentKey, scaleId = scaleSelector.value) {
-  return prettyNote(Theory.tonicName(pitchIndex[keyName], scaleId));
+  return prettyNote(spelledTonic(pitchIndex[keyName], scaleId));
 }
-function scaleName(scaleId) { return (Theory.SCALE_BY_ID[scaleId] || Theory.SCALE_BY_ID.major).name; }
+function scaleName(scaleId) { const s = scaleOf(scaleId); return s.isCustom ? s.title : s.name; }
 function noteColor(pc) { const n = PHYSICAL_NAMES[pc]; return noteColors[n] || blackNoteColors[n]; }
 
 // Everything on screen that shows a setting, brought up to date at once.
@@ -1178,7 +1278,7 @@ function renderChrome() {
   root.style.setProperty('--tonic-ink', inkFor(color));
 
   document.querySelectorAll('.seg-btn').forEach(b => {
-    const on = (b.dataset.view === 'keys') === keysView;
+    const on = b.dataset.view === viewChoice;
     b.classList.toggle('active', on);
     b.setAttribute('aria-selected', String(on));
   });
@@ -1186,10 +1286,22 @@ function renderChrome() {
   soundSelect.value = currentSound;
   focusBtn.setAttribute('aria-pressed', String(currentToggleStates.focus === 1));
   const chromatic = currentToggleStates.layout === 't-blue';
+  const letters = showHotkeys && !keysView;
   layoutBtn.textContent = chromatic ? 'Chromatic' : 'Flex';
   layoutBtn.classList.toggle('is-chromatic', chromatic);
+  layoutBtn.setAttribute('aria-pressed', String(letters));
+  layoutBtn.title = lockOn('layout')
+    ? `${chromatic ? 'Chromatic' : 'Flex'}, kept by this lesson. Press to ${letters ? 'hide' : 'show'} the ${chromatic ? 'Z and S rows’' : 'A row’s'} letters on the keys.`
+    : keysView
+    ? (chromatic ? 'Chromatic: every note, laid out like a piano. Press for Flex.' : 'Flex: each row climbs the scale. Press for Chromatic.')
+    : !letters
+      ? (chromatic ? 'Chromatic: every note, laid out like a piano. Press to see the Z and S rows’ letters on the keys.'
+                   : 'Flex: each row of computer keys climbs the scale. Press to see the A row’s letters on the keys.')
+      : (chromatic ? 'Showing the Z and S rows’ letters. Press for Flex.' : 'Showing the A row’s letters. Press for Chromatic.');
   document.body.classList.toggle('chromatic', chromatic);
   namesBtn.textContent = NAME_CYCLE[nameStep()].label;
+  namesBtn.classList.toggle('covered', letters);
+  namesBtn.title = letters ? 'The computer keys’ letters are showing: press for the note names' : 'Note names on the keys';
 
   const check = (name, value) => { const r = document.querySelector(`input[name="${name}"][value="${value}"]`); if (r) r.checked = true; };
   check('layout', chromatic ? 'chromatic' : 'flex');
@@ -1200,37 +1312,69 @@ function renderChrome() {
   roomRange.value = Math.round(room * 100);
   roomValue.textContent = Math.round(room * 100) + '%';
 
+  renderLocks();
   if (librarySheet.classList.contains('open')) renderLibrary();
   if (window.Recorder) Recorder.syncSound(); // the track being recorded plays in the keyboard's sound
   document.title = `${tonicName()} ${scaleName(scaleId)} — Virtual Keyboard`;
+  if (LESSON && window.VKLesson) VKLesson.layoutChanged(); // a lesson keeps the student's octaves, sounds and so on
 }
 
 function setKey(keyName) {
+  if (lockOn('key')) return;
   currentKey = keyName;
   updateFlexLayout(currentKey, scaleSelector.value);
   redraw();
   renderChrome();
 }
 
-function setView(view) {
-  keysView = view === 'keys';
+// The view switch's choice. Record mode (recorder.js) shows the piano
+// whatever it is, and the choice comes back when the recorder closes.
+let viewChoice = 'piano';
+function syncView() {
+  keysView = viewChoice === 'keys' && !document.body.classList.contains('rec-mode');
   document.body.classList.toggle('keys-view', keysView);
   qwertyView.hidden = !keysView;
+}
+function setView(view) {
+  viewChoice = view === 'keys' ? 'keys' : 'piano';
+  syncView();
   renderQwerty();
   renderChrome();
 }
 
 function setLayoutMode(mode) {
+  if (lockOn('layout')) { renderChrome(); return; }
   currentToggleStates.layout = mode === 'chromatic' ? 't-blue' : 't-green';
+  redraw();
+  renderChrome();
+}
+
+// The Flex button, one step a press: Flex → Flex with letters → Chromatic →
+// Chromatic with letters → Flex. The computer-keyboard view always shows
+// its letters, so there it only switches Flex and Chromatic. A lesson that
+// keeps the layout leaves it only the letters: on, off (and in the
+// computer-keyboard view, where it would only switch, it is hidden).
+function stepLayout() {
+  const chromatic = currentToggleStates.layout === 't-blue';
+  if (lockOn('layout')) {
+    if (keysView) return;
+    showHotkeys = !showHotkeys;
+  } else if (keysView || showHotkeys) {
+    showHotkeys = false;
+    currentToggleStates.layout = chromatic ? 't-green' : 't-blue';
+  } else {
+    showHotkeys = true;
+  }
   redraw();
   renderChrome();
 }
 
 document.getElementById('key-down').addEventListener('click', () => setKey(PHYSICAL_NAMES[(pitchIndex[currentKey] + 11) % 12]));
 document.getElementById('key-up').addEventListener('click', () => setKey(PHYSICAL_NAMES[(pitchIndex[currentKey] + 1) % 12]));
-keyNameBtn.addEventListener('click', openKeySheet);
+keyNameBtn.addEventListener('click', () => { if (lockOn('key')) openLibrary(); else openKeySheet(); });
 
 scaleSelector.addEventListener('change', (e) => {
+  if (lockOn('scale')) { scaleSelector.value = LESSON.layout.scale; e.target.blur(); return; }
   updateFlexLayout(currentKey, scaleSelector.value);
   redraw();
   renderChrome();
@@ -1251,10 +1395,16 @@ focusBtn.addEventListener('click', () => {
   renderChrome();
 });
 
-layoutBtn.addEventListener('click', () => setLayoutMode(currentToggleStates.layout === 't-blue' ? 'flex' : 'chromatic'));
+layoutBtn.addEventListener('click', stepLayout);
 
+// While the Flex button's letters show, they stand in for the names: a press
+// here brings the names back (the next choice when it was "Key Names", none).
 namesBtn.addEventListener('click', () => {
-  currentToggleStates.names = NAME_MODES.indexOf(NAME_CYCLE[(nameStep() + 1) % NAME_CYCLE.length].mode);
+  const covered = showHotkeys && !keysView;
+  showHotkeys = false;
+  if (!covered || NAME_MODES[currentToggleStates.names] === 'none') {
+    currentToggleStates.names = NAME_MODES.indexOf(NAME_CYCLE[(nameStep() + 1) % NAME_CYCLE.length].mode);
+  }
   redraw();
   renderChrome();
 });
@@ -1306,8 +1456,14 @@ matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { s
 // -------- SHEETS --------
 const librarySheet = document.getElementById('library-sheet');
 
+const onSheetClose = {}; // sheet id -> what to do when it closes (however it closes)
 function openSheet(id) { document.getElementById(id).classList.add('open'); }
-function closeSheet(id) { document.getElementById(id).classList.remove('open'); }
+function closeSheet(id) {
+  const el = document.getElementById(id);
+  if (!el.classList.contains('open')) return;
+  el.classList.remove('open');
+  if (onSheetClose[id]) onSheetClose[id]();
+}
 document.querySelectorAll('.sheet-backdrop').forEach(bd => {
   bd.addEventListener('pointerdown', (e) => { if (e.target === bd) closeSheet(bd.id); });
   bd.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => closeSheet(bd.id)));
@@ -1316,12 +1472,14 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') document.querySelectorAll('.sheet-backdrop.open').forEach(bd => closeSheet(bd.id));
 });
 document.getElementById('settings-btn').addEventListener('click', () => { renderChrome(); openSheet('settings-sheet'); });
-document.getElementById('library-btn').addEventListener('click', () => {
-  document.getElementById('share-row').hidden = true;
+function openLibrary() {
   libraryStatus.textContent = '';
+  pendingDelete = null;
+  if (window.VKLesson) VKLesson.libraryOpened(); // (a workspace's Delete or Open asking first is forgotten too)
   renderLibrary();
   openSheet('library-sheet');
-});
+}
+document.getElementById('library-btn').addEventListener('click', openLibrary);
 
 function openKeySheet() {
   const grid = document.getElementById('key-grid');
@@ -1346,12 +1504,13 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
 }
 
-// -------- LIBRARY (phase 1: send and open a layout; starters) --------
-// A layout is what a link or a file carries. It travels as an Eagle View
-// Music envelope (EVM Library/README.md §7) without an id: nothing is saved
-// yet, so a received layout is simply opened. Saving layouts and scales of
-// your own comes with phase two (LIBRARY-PLAN.md). Volume is the listener's
-// own and never travels.
+// -------- LIBRARY --------
+// Create a Link · Save Workspace · Build a Scale on top, then the saved
+// workspaces (lesson.js), then the scales: mine, newest first, and the
+// starters. A LAYOUT is the scale and keyboard a scale link or file carries,
+// as an Eagle View Music envelope (EVM Library/README.md §7) without an id: a
+// received layout is simply opened. Volume is the listener's own and never
+// travels.
 const APP_SLUG = 'virtual-keyboard';
 const DEFAULT_LAYOUT = {
   key: 'C', scale: 'major', layout: 'flex', octaves: 1, sound: 'piano',
@@ -1379,7 +1538,7 @@ function getLayout() {
     colors: COLOR_MODES[currentToggleStates.color],
     names: NAME_MODES[currentToggleStates.names],
     focus: currentToggleStates.focus === 1,
-    view: keysView ? 'keys' : 'piano',
+    view: viewChoice,
     room
   };
 }
@@ -1390,7 +1549,7 @@ function normalizeLayout(src) {
   if (!src || typeof src !== 'object') return d;
   if (pitchIndex[src.key] !== undefined) d.key = PHYSICAL_NAMES[pitchIndex[src.key]];
   if (src.scale === 'minor') d.scale = 'natural-minor'; // Key Blocks' "Minor": the same notes
-  else if (Theory.SCALE_BY_ID[src.scale] && !HIDDEN_SCALES.has(src.scale)) d.scale = src.scale;
+  else if (isKnownScale(src.scale)) d.scale = src.scale;
   if (src.layout === 'chromatic' || src.layout === 'flex') d.layout = src.layout;
   if ([1, 2, 3, 4].includes(+src.octaves)) d.octaves = +src.octaves;
   if (Audio.PRESETS[src.sound]) d.sound = src.sound;
@@ -1405,6 +1564,9 @@ function normalizeLayout(src) {
 
 function applyLayout(src) {
   const d = normalizeLayout(src);
+  if (lockOn('key')) d.key = LESSON.layout.key;       // a lesson's locks always win
+  if (lockOn('scale')) d.scale = LESSON.layout.scale;
+  if (lockOn('layout')) d.layout = LESSON.layout.layout;
   currentKey = d.key;
   scaleSelector.value = d.scale;
   currentToggleStates.layout = d.layout === 'chromatic' ? 't-blue' : 't-green';
@@ -1415,9 +1577,9 @@ function applyLayout(src) {
   currentToggleStates.focus = d.focus ? 1 : 0;
   setRoom(d.room);
   updateFlexLayout(currentKey, d.scale);
-  keysView = d.view === 'keys';
-  document.body.classList.toggle('keys-view', keysView);
-  qwertyView.hidden = !keysView;
+  showHotkeys = false;
+  viewChoice = d.view;
+  syncView();
   redraw();
   renderChrome();
 }
@@ -1438,10 +1600,85 @@ function swatch(d) {
 }
 const sameLayout = (a, b) => JSON.stringify(normalizeLayout(a)) === JSON.stringify(normalizeLayout(b));
 
+// One of my scales in the key it was built in: its notes as they were chosen.
+function myScaleNotes(rec) { return rec.degrees.map(d => Theory.spellDegree(rec.tonic, d).name); }
+
+// Put one of my scales on screen: its scale in the key it was built in.
+function useMyScale(rec) {
+  currentKey = PHYSICAL_NAMES[pitchIndex[rec.tonic]];
+  scaleSelector.value = rec.id;
+  updateFlexLayout(currentKey, rec.id);
+  redraw();
+  renderChrome();
+}
+
+let pendingDelete = null; // the id of my scale whose Delete was pressed once
+function deleteMyScale(rec) {
+  delete myScaleById[rec.id];
+  const stored = storeMyScales();
+  const wasOn = scaleSelector.value === rec.id;
+  fillScaleSelect(); // (falls back to Major when it was on screen)
+  if (wasOn) { updateFlexLayout(currentKey, scaleSelector.value); redraw(); }
+  pendingDelete = null;
+  renderChrome();
+  renderLibrary();
+  toast(stored ? `Deleted “${rec.title}”` : `Deleted “${rec.title}” for now: this browser would not save the change`);
+}
+
+function smallBtn(text, cls, onClick) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'btn btn-sm' + (cls ? ' ' + cls : '');
+  b.textContent = text;
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+// My scales, newest on top: the top of the Library's list of scales.
+function renderMyScales() {
+  const list = document.getElementById('my-scales-list');
+  list.innerHTML = '';
+  const mine = myScalesInOrder().reverse();
+  mine.forEach(rec => {
+    const item = document.createElement('div');
+    item.className = 'lib-item mine';
+    if (scaleSelector.value === rec.id) item.classList.add('current');
+    const tonicPc = pitchIndex[rec.tonic];
+    const title = document.createElement('div');
+    title.className = 'lib-title';
+    title.innerHTML = `<span class="lib-swatch">${rec.degrees.map(d => `<i style="background:${noteColor((tonicPc + Theory.degreeSemis(d)) % 12)}"></i>`).join('')}</span>`;
+    title.append(rec.title);
+    const meta = document.createElement('div');
+    meta.className = 'lib-meta';
+    const actions = document.createElement('div');
+    actions.className = 'lib-actions';
+    if (pendingDelete === rec.id) {
+      item.classList.add('confirming');
+      meta.textContent = `Delete “${rec.title}”? It can’t be brought back.`;
+      actions.append(
+        smallBtn('Delete', 'btn-danger', () => deleteMyScale(rec)),
+        smallBtn('Keep', '', () => { pendingDelete = null; renderLibrary(); }));
+    } else {
+      const notes = myScaleNotes(rec);
+      const baseNote = rec.base !== PHYSICAL_NAMES[pitchIndex[rec.tonic]]
+        ? ` · the piano starts on ${SB_BLACKS[pitchIndex[rec.base]] ? SB_BLACKS[pitchIndex[rec.base]].map(prettyNote).join('/') : rec.base}` : '';
+      meta.textContent = `${notes.length} ${notes.length === 1 ? 'note' : 'notes'} · ${notes.join(' ')}${baseNote}`;
+      actions.append(
+        smallBtn('Open', 'btn-primary', () => { useMyScale(rec); closeSheet('library-sheet'); toast(`Opened “${rec.title}”`); }),
+        smallBtn('Edit', '', () => openBuilder(rec)),
+        smallBtn('Delete', 'btn-quiet', () => { pendingDelete = rec.id; renderLibrary(); }));
+    }
+    item.append(title, actions, meta);
+    list.appendChild(item);
+  });
+}
+
 function renderLibrary() {
   const now = getLayout();
   document.getElementById('now-title').textContent = layoutTitle(now);
   document.getElementById('now-note').textContent = layoutNote(now);
+  if (window.VKLesson) VKLesson.renderLibrary(); // the link open, and the saved workspaces
+  renderMyScales();
   const list = document.getElementById('library-list');
   list.innerHTML = '';
   STARTERS.forEach(st => {
@@ -1469,8 +1706,40 @@ function renderLibrary() {
   });
 }
 
+// A layout on one of my scales carries the scale too (scaleRecord), so it
+// opens anywhere; the scale is filed in that person's My scales on arrival.
 function toEnvelope(d) {
-  return { format: 'evm-item', formatVersion: 1, app: APP_SLUG, kind: 'layout', title: layoutTitle(d), data: d };
+  const data = { ...d };
+  const mine = customScale(d.scale);
+  if (mine) data.scaleRecord = { id: mine.id, title: mine.title, degrees: mine.degrees, tonic: mine.tonic, base: mine.base, updatedAt: mine.updatedAt };
+  return { format: 'evm-item', formatVersion: 1, app: APP_SLUG, kind: 'layout', title: layoutTitle(d), data };
+}
+const sameScale = (a, b) => a.title === b.title && a.tonic === b.tonic && a.base === b.base && a.degrees.join() === b.degrees.join();
+// File a layout's scaleRecord in My scales (once: the same id, or the same
+// scale under another id, is reused) and point the layout at it. Returns
+// true when it was new here.
+function takeScaleRecord(d) {
+  if (!d || !d.scaleRecord || typeof d.scaleRecord !== 'object') return false;
+  const rec = cleanScale(d.scaleRecord);
+  if (!rec) return false;
+  const have = myScaleById[rec.id];
+  if (have) {
+    if (!sameScale(have, rec) && Date.parse(rec.updatedAt) > Date.parse(have.updatedAt)) {
+      myScaleById[rec.id] = { ...rec, createdAt: have.createdAt }; // a newer copy of it
+      storeMyScales();
+      fillScaleSelect();
+    }
+    d.scale = rec.id;
+    return false;
+  }
+  const twin = Object.values(myScaleById).find(s => sameScale(s, rec));
+  if (twin) { d.scale = twin.id; return false; }
+  rec.createdAt = new Date().toISOString();
+  myScaleById[rec.id] = rec;
+  storeMyScales();
+  fillScaleSelect();
+  d.scale = rec.id;
+  return true;
 }
 // A link or file: an envelope, a bundle holding one, or a bare layout.
 function readLayout(obj) {
@@ -1518,30 +1787,24 @@ function fallbackCopy(text) {
   return ok;
 }
 
-const shareLinkInput = document.getElementById('share-link');
-document.getElementById('make-link-btn').addEventListener('click', () => {
-  const link = location.origin + location.pathname + '?layout=' + encodeLink(toEnvelope(getLayout()));
-  shareLinkInput.value = link;
-  document.getElementById('share-row').hidden = false;
-  copyText(link).then(ok => { libraryStatus.textContent = ok ? 'Link copied. Anyone who opens it gets this layout.' : 'Copy the link above to send it.'; });
-  shareLinkInput.select();
-});
-document.getElementById('copy-link-btn').addEventListener('click', () => {
-  copyText(shareLinkInput.value).then(ok => { libraryStatus.textContent = ok ? 'Link copied.' : 'Select the link and copy it.'; });
-});
-
-document.getElementById('download-btn').addEventListener('click', () => {
+// The scale link with nothing locked (Create a Link → Scale): this layout.
+const layoutLink = () => location.origin + location.pathname + '?layout=' + encodeLink(toEnvelope(getLayout()));
+// …and as a file. Returns its name.
+function downloadLayout() {
   const d = getLayout();
   const blob = new Blob([JSON.stringify(toEnvelope(d), null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `virtual-keyboard-${Theory.tonicName(pitchIndex[d.key], d.scale).replace('#', '-sharp').replace(/^([A-G])b/, '$1-flat').toLowerCase()}-${d.scale}.json`;
+  const scalePart = customScale(d.scale)
+    ? (customScale(d.scale).title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'my-scale')
+    : d.scale;
+  a.download = `virtual-keyboard-${spelledTonic(pitchIndex[d.key], d.scale).replace('#', '-sharp').replace(/^([A-G])b/, '$1-flat').toLowerCase()}-${scalePart}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  libraryStatus.textContent = 'Downloaded ' + a.download;
-});
+  return a.download;
+}
 
 const openFileInput = document.getElementById('open-file');
 document.getElementById('open-file-btn').addEventListener('click', () => openFileInput.click());
@@ -1553,10 +1816,14 @@ openFileInput.addEventListener('change', () => {
   reader.onload = () => {
     let obj = null;
     try { obj = JSON.parse(reader.result); } catch (e) {}
+    // the Library's own file, a workspace, a lesson (the teacher's copy, opened
+    // unlocked), a scale or the recorder's tracks: lesson.js. A layout: here.
+    if (window.VKLesson && VKLesson.upload(obj, file.name)) return;
     const d = readLayout(obj);
-    if (!d) { libraryStatus.textContent = 'That file is not a Virtual Keyboard layout.'; return; }
+    if (!d) { libraryStatus.textContent = 'That file is not a Virtual Keyboard file.'; return; }
+    const filed = takeScaleRecord(d);
     applyLayout(d);
-    libraryStatus.textContent = 'Opened ' + layoutTitle(normalizeLayout(d)) + '.';
+    libraryStatus.textContent = 'Opened ' + layoutTitle(normalizeLayout(d)) + '.' + (filed ? ' Its scale is in My scales now.' : '');
     renderLibrary();
   };
   reader.readAsText(file);
@@ -1569,9 +1836,326 @@ function layoutFromUrl() {
   const d = readLayout(decodeLink(params.get('layout')));
   if (history.replaceState) history.replaceState({}, '', location.pathname);
   if (!d) { setTimeout(() => toast('That link could not be read'), 300); return; }
+  const filed = takeScaleRecord(d);
   applyLayout(d);
-  setTimeout(() => toast('Opened ' + layoutTitle(normalizeLayout(d))), 300);
+  setTimeout(() => toast('Opened ' + layoutTitle(normalizeLayout(d)) + (filed ? ' — its scale is in My scales now' : '')), 300);
 }
+
+// -------- SCALE BUILDER (Library → Build a scale) --------
+// One octave of piano keys drawn from the BASE KEY, the one furthest to the
+// left (only a look: ◀ ▶ moves it), up to the base again an octave higher.
+// Nothing is locked: the chosen key furthest to the left is the scale's
+// first note, where the Flex keys start. A black key carries both of its
+// names: tap the one it should be written as, tap it again to take the note
+// out. Saved scales are degrees counted by letter from the first note, so
+// G♭ above E♭ is a ♭3 and F♯ above D a 3.
+const SB_BLACKS = { 1: ['C#', 'Db'], 3: ['D#', 'Eb'], 6: ['F#', 'Gb'], 8: ['G#', 'Ab'], 10: ['A#', 'Bb'] };
+const LETTER_ORDER = 'CDEFGAB';
+const MAJOR_STEPS = [0, 2, 4, 5, 7, 9, 11];
+const sb = { base: 0, on: new Map(), editId: null, from: null, saved: false };
+const sbPiano = document.getElementById('sb-piano');
+const sbName = document.getElementById('sb-name');
+const sbStatus = document.getElementById('sb-status');
+const scaleSheet = document.getElementById('scale-sheet');
+
+function degreeOf(tonic, note) {
+  const num = (LETTER_ORDER.indexOf(note[0]) - LETTER_ORDER.indexOf(tonic[0]) + 7) % 7 + 1;
+  const semis = (pitchIndex[note] - pitchIndex[tonic] + 12) % 12;
+  let alter = ((semis - MAJOR_STEPS[num - 1]) % 12 + 12) % 12;
+  if (alter > 6) alter -= 12;
+  return (alter > 0 ? '#'.repeat(alter) : 'b'.repeat(-alter)) + num;
+}
+// A pitch as this piano can write it: a white key by its letter, a black key
+// by whichever of its two names is nearer the spelling given.
+function keyNameFor(pc, spelled) {
+  const pair = SB_BLACKS[pc];
+  if (!pair) return PHYSICAL_NAMES[pc];
+  return pair.find(n => n[0] === spelled.letter) || (spelled.alter > 0 ? pair[0] : pair[1]);
+}
+const sbFromBase = pc => (pc - sb.base + 12) % 12;
+// The chosen notes left to right from the base: the first one is the first note.
+function builderNotes() { return [...sb.on.entries()].sort((a, b) => sbFromBase(a[0]) - sbFromBase(b[0])); }
+function firstNote() { const notes = builderNotes(); return notes.length ? { pc: notes[0][0], name: notes[0][1] } : null; }
+function builderDegrees() {
+  const first = firstNote();
+  return builderNotes().map(([pc, name]) => pc === first.pc ? '1' : degreeOf(first.name, name));
+}
+// A black key switched on by tapping the key itself: the usual name for that
+// step above the first note (♭2 ♭3 ♯4 ♭6 ♭7), or above the base while
+// nothing is chosen.
+function defaultKeyName(pc) {
+  const first = firstNote();
+  const ref = first ? first.name : (SB_BLACKS[sb.base] ? SB_BLACKS[sb.base][1] : PHYSICAL_NAMES[sb.base]);
+  const degree = Theory.semisToDegree((pc - pitchIndex[ref] + 12) % 12, []);
+  return keyNameFor(pc, Theory.spellDegree(ref, degree));
+}
+const keyLabel = pc => SB_BLACKS[pc] ? SB_BLACKS[pc].map(prettyNote).join('/') : PHYSICAL_NAMES[pc];
+
+function builderStart(base, tonic, degrees) {
+  sb.base = base;
+  sb.on = new Map();
+  const tonicPc = pitchIndex[tonic];
+  degrees.forEach(d => {
+    const pc = (tonicPc + Theory.degreeSemis(d)) % 12;
+    sb.on.set(pc, keyNameFor(pc, Theory.spellDegree(tonic, d)));
+  });
+  sb.on.set(tonicPc, tonic);
+}
+
+function uniqueTitle(base, exceptId) {
+  const taken = new Set(Object.values(myScaleById).filter(s => s.id !== exceptId).map(s => s.title.toLowerCase()));
+  if (!taken.has(base.toLowerCase())) return base;
+  let n = 2;
+  while (taken.has(`${base} ${n}`.toLowerCase())) n++;
+  return `${base} ${n}`;
+}
+
+// Sounds rise left to right as drawn: step 0 is the base (near middle C),
+// step 12 the base an octave up. Play climbs the scale from its first note
+// to that note an octave higher.
+let sbVoices = [];
+let sbTimers = [];
+const sbBaseMidi = () => rowTonicMidi(PHYSICAL_NAMES[sb.base], 1);
+function sbSound(midi, ms) {
+  wakeAudio();
+  const v = Audio.play(SOUND_SIDE, [440 * Math.pow(2, (midi - 69) / 12)], currentSound);
+  sbVoices.push(v);
+  sbTimers.push(setTimeout(() => Audio.stop(v), ms));
+}
+function previewStep(step) { sbSound(sbBaseMidi() + step, 450); }
+function stopBuilderSound() {
+  sbTimers.forEach(clearTimeout);
+  sbTimers = [];
+  sbVoices.forEach(v => Audio.stop(v));
+  sbVoices = [];
+  sbPiano.querySelectorAll('.sounding').forEach(el => el.classList.remove('sounding'));
+}
+function playBuilderScale() {
+  stopBuilderSound();
+  const notes = builderNotes();
+  if (!notes.length) { sbStatus.textContent = 'Pick a note or two first.'; return; }
+  const steps = notes.map(([pc]) => sbFromBase(pc));
+  steps.push(steps[0] + 12);
+  steps.forEach((s, i) => sbTimers.push(setTimeout(() => {
+    sbSound(sbBaseMidi() + s, 380);
+    const el = sbPiano.querySelector(`[data-step="${s}"]`);
+    if (el) {
+      el.classList.add('sounding');
+      sbTimers.push(setTimeout(() => el.classList.remove('sounding'), 300));
+    }
+  }, i * 340)));
+}
+
+// The keys drawn: base … base an octave up (13 keys). A black base gets half
+// a white key on each side, outside the octave, so its ends sit on something.
+function builderKeys() {
+  const keys = [];
+  const blackBase = BLACK_PCS.has(sb.base);
+  if (blackBase) keys.push({ pc: (sb.base + 11) % 12, stub: true });
+  for (let s = 0; s <= 12; s++) keys.push({ pc: (sb.base + s) % 12, step: s });
+  if (blackBase) keys.push({ pc: (sb.base + 1) % 12, stub: true });
+  return keys;
+}
+
+function renderBuilder() {
+  sbPiano.innerHTML = '';
+  const first = firstNote();
+  const keys = builderKeys();
+  const widthOf = k => k.stub ? 0.5 : 1;
+  const total = keys.filter(k => !BLACK_PCS.has(k.pc)).reduce((n, k) => n + widthOf(k), 0);
+  let x = 0; // white widths so far: where the next black key's centre goes
+  keys.forEach(k => {
+    const black = BLACK_PCS.has(k.pc);
+    const chosen = k.stub ? undefined : sb.on.get(k.pc);
+    const isFirst = !!first && k.step === sbFromBase(first.pc);
+    if (!black) {
+      const name = PHYSICAL_NAMES[k.pc];
+      const key = document.createElement(k.stub ? 'div' : 'button');
+      key.className = 'sb-white' + (k.stub ? ' stub' : '') + (chosen ? ' on' : '');
+      key.style.flex = String(widthOf(k));
+      x += widthOf(k);
+      if (!k.stub) {
+        key.type = 'button';
+        key.dataset.pc = k.pc;
+        key.dataset.step = k.step;
+        key.setAttribute('aria-pressed', String(!!chosen));
+        key.setAttribute('aria-label', name + (isFirst ? ', the first note' : '') + (k.step === 0 ? ', the base key' : ''));
+        if (chosen) {
+          key.style.setProperty('--c', noteColors[name]);
+          key.style.setProperty('--ink', inkFor(noteColors[name]));
+        }
+        key.innerHTML = (isFirst ? '<span class="sb-first">1st</span>' : '') + `<span class="sb-letter">${name}</span>`;
+        key.addEventListener('click', () => pressBuilderKey(k.pc, k.step));
+      }
+      sbPiano.appendChild(key);
+      return;
+    }
+    const pair = SB_BLACKS[k.pc];
+    const wrap = document.createElement('div');
+    wrap.className = 'sb-black' + (chosen ? ' on' : '');
+    wrap.dataset.pc = k.pc;
+    wrap.dataset.step = k.step;
+    wrap.style.left = `${(x / total) * 100}%`;
+    wrap.style.width = `${(0.66 / total) * 100}%`;
+    if (chosen) wrap.style.setProperty('--c', blackNoteColors[PHYSICAL_NAMES[k.pc]]);
+    const body = document.createElement('button');
+    body.type = 'button';
+    body.className = 'sb-black-body';
+    body.setAttribute('aria-pressed', String(!!chosen));
+    body.setAttribute('aria-label', pair.map(prettyNote).join(' or ') + (isFirst ? ', the first note' : '') + (k.step === 0 ? ', the base key' : ''));
+    body.addEventListener('click', () => pressBuilderKey(k.pc, k.step));
+    wrap.appendChild(body);
+    if (isFirst) wrap.insertAdjacentHTML('beforeend', '<span class="sb-first">1st</span>');
+    const names = document.createElement('div');
+    names.className = 'sb-names';
+    pair.forEach(n => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sb-acc' + (chosen === n ? ' chosen' : '');
+      b.textContent = prettyNote(n);
+      b.setAttribute('aria-pressed', String(chosen === n));
+      b.title = chosen === n ? `Written as ${prettyNote(n)}: tap again to take it out` : `Write it as ${prettyNote(n)}`;
+      b.addEventListener('click', () => pressBuilderName(k.pc, n, k.step));
+      names.appendChild(b);
+    });
+    wrap.appendChild(names);
+    sbPiano.appendChild(wrap);
+  });
+
+  document.getElementById('sb-base-name').textContent = keyLabel(sb.base);
+  const notes = builderNotes();
+  document.getElementById('sb-count').textContent = notes.length ? `${notes.length} ${notes.length === 1 ? 'note' : 'notes'}` : 'No notes yet';
+  const list = document.getElementById('sb-notes');
+  list.innerHTML = '';
+  notes.forEach(([pc, name]) => {
+    const chip = document.createElement('span');
+    chip.className = 'sb-note';
+    chip.style.setProperty('--c', noteColor(pc));
+    chip.style.setProperty('--ink', inkFor(noteColor(pc)));
+    chip.textContent = prettyNote(name);
+    list.appendChild(chip);
+  });
+  const firstText = first ? prettyNote(first.name) : '';
+  const firstNoteEl = document.getElementById('sb-first-note');
+  firstNoteEl.hidden = !first;
+  firstNoteEl.textContent = first ? `First note: ${firstText}. The Flex keys start here: Z, A, Q and 1 each play ${firstText}.` : '';
+  const flexNote = document.getElementById('sb-flex');
+  flexNote.hidden = notes.length <= FLEX_ROW_LEN;
+  flexNote.textContent = `More than ten notes: on the computer keys (Flex) the rows run on from one to the next. Z starts on ${firstText}, and once the Z row runs out the A row carries on up the scale, then Q, then the number row.`;
+  if (notes.length > FLEX_ROW_LEN) firstNoteEl.textContent = `First note: ${firstText}.`;
+}
+
+function pressBuilderKey(pc, step) {
+  sbStatus.textContent = '';
+  if (sb.on.has(pc)) sb.on.delete(pc);
+  else { sb.on.set(pc, defaultKeyName(pc)); previewStep(step); }
+  renderBuilder();
+}
+function pressBuilderName(pc, name, step) {
+  sbStatus.textContent = '';
+  if (sb.on.get(pc) === name) sb.on.delete(pc);
+  else { sb.on.set(pc, name); previewStep(step); }
+  renderBuilder();
+}
+function setBuilderBase(pc) {
+  sb.base = (pc + 12) % 12;
+  sbStatus.textContent = '';
+  renderBuilder();
+}
+
+// rec: one of my scales to edit; none: a new scale, starting from the one on
+// screen, drawn from a base key that keeps its first note first.
+function openBuilder(rec) {
+  sb.editId = rec ? rec.id : null;
+  sb.saved = false;
+  sb.from = librarySheet.classList.contains('open') ? 'library' : null;
+  if (rec) builderStart(pitchIndex[rec.base], rec.tonic, rec.degrees);
+  else {
+    const tonic = spelledTonic(pitchIndex[currentKey], scaleSelector.value);
+    builderStart(0, tonic, scaleOf(scaleSelector.value).degrees);
+    sb.base = defaultBase(pitchIndex[tonic], new Set(sb.on.keys()));
+  }
+  sbName.value = rec ? rec.title : uniqueTitle('My scale');
+  document.getElementById('sb-title').textContent = rec ? 'Edit a scale' : 'Build a scale';
+  document.getElementById('sb-save').textContent = rec ? 'Save changes' : 'Save scale';
+  document.getElementById('sb-save-new').hidden = !rec;
+  sbStatus.textContent = '';
+  renderBuilder();
+  librarySheet.classList.remove('open'); // (the builder takes its place; Cancel brings it back)
+  openSheet('scale-sheet');
+  scaleSheet.querySelector('.sheet-scroll').scrollTop = 0;
+}
+
+function saveBuilder(asNew) {
+  const first = firstNote();
+  if (!first) { sbStatus.textContent = 'Pick at least one note first.'; return; }
+  const typed = cleanTitle(sbName.value);
+  const old = !asNew && sb.editId ? myScaleById[sb.editId] : null;
+  const title = old ? (typed || old.title) : uniqueTitle(typed || 'My scale');
+  const now = new Date().toISOString();
+  const fields = { title, degrees: builderDegrees(), tonic: first.name, base: PHYSICAL_NAMES[sb.base], updatedAt: now };
+  const rec = old ? { ...old, ...fields } : { id: newScaleId(), ...fields, createdAt: now, isCustom: true };
+  myScaleById[rec.id] = rec;
+  const stored = storeMyScales();
+  fillScaleSelect();
+  sb.saved = true;
+  closeSheet('scale-sheet');
+  useMyScale(rec);
+  toast(stored ? `Saved “${title}”: it’s in the scale menu and the Library`
+               : `“${title}” is on for now, but this browser would not save it`);
+}
+
+onSheetClose['scale-sheet'] = () => {
+  stopBuilderSound();
+  if (!sb.saved && sb.from === 'library') openLibrary();
+};
+document.getElementById('build-scale-btn').addEventListener('click', () => openBuilder(null));
+document.getElementById('sb-base-down').addEventListener('click', () => setBuilderBase(sb.base - 1));
+document.getElementById('sb-base-up').addEventListener('click', () => setBuilderBase(sb.base + 1));
+document.getElementById('sb-play').addEventListener('click', playBuilderScale);
+document.getElementById('sb-clear').addEventListener('click', () => {
+  sb.on = new Map();
+  sbStatus.textContent = '';
+  renderBuilder();
+});
+document.getElementById('sb-all').addEventListener('click', () => {
+  for (let pc = 0; pc < 12; pc++) if (!sb.on.has(pc)) sb.on.set(pc, defaultKeyName(pc));
+  sbStatus.textContent = '';
+  renderBuilder();
+});
+document.getElementById('sb-save').addEventListener('click', () => saveBuilder(false));
+document.getElementById('sb-save-new').addEventListener('click', () => saveBuilder(true));
+sbName.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveBuilder(false); } });
+
+// Explaining notes fold into a circled i (open until folded; remembered here).
+function foldNotes() {
+  document.querySelectorAll('.fold-note').forEach(note => {
+    const key = 'virtual_keyboard_fold_' + note.dataset.key;
+    const body = document.createElement('span');
+    body.className = 'fold-body';
+    while (note.firstChild) body.append(note.firstChild);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fold-i';
+    btn.textContent = 'i';
+    btn.setAttribute('aria-label', 'Show or hide this note');
+    note.append(body, btn);
+    const apply = folded => {
+      note.classList.toggle('folded', folded);
+      btn.setAttribute('aria-expanded', String(!folded));
+      btn.title = folded ? body.textContent.trim() : '';
+    };
+    let folded = false;
+    try { folded = localStorage.getItem(key) === '1'; } catch (e) {}
+    apply(folded);
+    btn.addEventListener('click', () => {
+      folded = !note.classList.contains('folded');
+      apply(folded);
+      try { localStorage.setItem(key, folded ? '1' : '0'); } catch (e) {}
+    });
+  });
+}
+foldNotes();
 
 // -------- START --------
 try { if (window.self !== window.top) root.classList.add('in-iframe'); } catch (e) { root.classList.add('in-iframe'); }

@@ -68,6 +68,11 @@
     <button class="key-name" id="key-name" type="button" title="Choose a key">C</button>
     <button class="key-arrow" id="key-up" type="button" aria-label="Key up">&#9654;</button>
     <select class="scale-select scale-selector" id="scale-select" aria-label="Scale"></select>
+    <!-- a lesson (lesson.js): the scale as plain text when it is locked, and the lock that says what else is -->
+    <span class="scale-fixed" id="scale-fixed"></span>
+    <button class="lesson-lock" id="lesson-lock" type="button" aria-label="This lesson: what is locked" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>
+    </button>
   </div>
 
   <div class="topbar-right">
@@ -100,10 +105,106 @@
   </div>
   <select id="sound-select" class="select sound-select" aria-label="Sound"></select>
   <button class="quick-btn" id="focus-btn" type="button" aria-pressed="false" title="Focus: only the notes of the scale can be played">Focus</button>
-  <button class="quick-btn layout-btn" id="layout-btn" type="button" title="Switch the computer keys between Flex and Chromatic (explained in Settings)">Flex</button>
+  <button class="quick-btn layout-btn" id="layout-btn" type="button" aria-pressed="false">Flex</button>
   <button class="quick-btn rec-toggle" id="recorder-btn" type="button" aria-pressed="false" aria-controls="recorder" title="The four-track recorder">Record</button>
   <button class="quick-btn names-btn" id="names-btn" type="button">Key Names</button>
 </div>
+
+<!-- ================= RECORDER (four tracks; recorder.js) =================
+     Open, the page is in record mode (body.rec-mode): the recorder on top,
+     the keyboard at the bottom of the screen. The quick row's octaves,
+     Focus, Flex and Key Names move into its bar (#rec-keys), and the Record
+     button into the top bar in place of the view switch. -->
+<section class="recorder" id="recorder" aria-label="Recorder" hidden>
+  <div class="rec-bar">
+    <div class="rec-transport">
+      <button class="rec-tbtn" id="rec-home" type="button" aria-label="Back to the start" title="Back to the start">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6v12" fill="none" stroke-width="2.4"/><path d="M18 6.5v11l-8.5-5.5z"/></svg>
+      </button>
+      <button class="rec-tbtn rec-play" id="rec-play" type="button" aria-label="Play" title="Play (Space)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+      </button>
+      <button class="rec-tbtn rec-record" id="rec-record" type="button" aria-pressed="false" aria-label="Record" title="Record">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/></svg>
+      </button>
+    </div>
+    <div class="rec-time">
+      <div class="rec-tempo" role="group" aria-label="Tempo">
+        <button class="rec-step" id="rec-tempo-down" type="button" aria-label="Slower">−</button>
+        <input class="rec-tempo-input" id="rec-tempo" type="number" min="40" max="220" step="1" inputmode="numeric" aria-label="Tempo, beats a minute" title="Tempo, beats a minute">
+        <button class="rec-step" id="rec-tempo-up" type="button" aria-label="Faster">+</button>
+        <span class="rec-unit">bpm</span>
+      </div>
+      <select class="select rec-meter" id="rec-meter" aria-label="Time signature" title="Time signature (6/8 is counted in two)">
+        <option value="2/4">2/4</option>
+        <option value="3/4">3/4</option>
+        <option value="4/4">4/4</option>
+        <option value="6/8">6/8</option>
+      </select>
+      <!-- locked by a lesson: the tempo and the time signature as plain text -->
+      <span class="rec-fixed rec-tempo-fixed" id="rec-tempo-fixed" title="The tempo is set by this lesson"></span>
+      <span class="rec-fixed rec-meter-fixed" id="rec-meter-fixed" title="The time signature is set by this lesson"></span>
+    </div>
+    <div class="rec-quant" id="rec-quant">
+      <button class="quick-btn rec-quant-btn" id="rec-quant-btn" type="button" aria-pressed="false">Quantize</button>
+      <button class="quick-btn rec-quant-edit" id="rec-quant-edit" type="button" aria-label="Change the Quantize choices" title="Change the Quantize choices" hidden>
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>
+      </button>
+      <!-- locked by a lesson: on (with its rhythm) or off, as plain text -->
+      <span class="rec-fixed rec-quant-fixed" id="rec-quant-fixed"></span>
+    </div>
+    <!-- THE NOTE EDITOR's controls (recorder.js, NOTE EDITOR), shown only while it
+         is open — a double-click on a track opens it: Copy, Paste and Delete
+         here, which track and what to do beside them, and Cancel / Save
+         Changes at the far right in place of the count-in and click. -->
+    <div class="rec-edit-tools rec-edit-only" role="group" aria-label="The highlighted notes">
+      <button class="quick-btn rec-edit-tool" id="rec-edit-copy" type="button">
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg>
+        <span>Copy</span>
+      </button>
+      <button class="quick-btn rec-edit-tool" id="rec-edit-paste" type="button">
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M9 4.5h6v3H9z"/><path d="M15 6h2.5A1.5 1.5 0 0 1 19 7.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18.5v-11A1.5 1.5 0 0 1 6.5 6H9"/></svg>
+        <span>Paste</span>
+      </button>
+      <button class="quick-btn rec-edit-tool" id="rec-edit-delete" type="button">
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 12.5h9l1-12.5"/></svg>
+        <span>Delete</span>
+      </button>
+    </div>
+    <div class="rec-edit-info rec-edit-only" id="rec-edit-info">
+      <span class="rec-edit-num" id="rec-edit-num">1</span>
+      <span class="rec-edit-text">
+        <span class="rec-edit-title" id="rec-edit-title">Track 1</span>
+        <span class="rec-edit-hint" id="rec-edit-hint"></span>
+      </span>
+    </div>
+    <div class="rec-keys" id="rec-keys"></div>
+    <div class="rec-settings">
+      <button class="quick-btn rec-countin" id="rec-countin" type="button" aria-pressed="true" title="A bar of clicks before recording starts">Count-in</button>
+      <label class="rec-click-face" title="Metronome click">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 3.5h6l3.5 17h-13z"/><path d="M7.2 15.5h9.6"/><path d="M12 15.5l5-9"/></svg>
+        <span class="rec-click-word" id="rec-click-word">Recording</span>
+        <select class="rec-click" id="rec-click" aria-label="Metronome click">
+          <option value="record">Click when recording</option>
+          <option value="always">Click always</option>
+          <option value="off">No click</option>
+        </select>
+      </label>
+    </div>
+    <div class="rec-edit-done rec-edit-only" id="rec-edit-done">
+      <button class="btn btn-sm" id="rec-edit-cancel" type="button">Cancel</button>
+      <button class="btn btn-sm rec-edit-save" id="rec-edit-save" type="button">Save Changes</button>
+    </div>
+  </div>
+  <div class="rec-scroll" id="rec-scroll">
+    <div class="rec-tracks" id="rec-tracks"></div>
+  </div>
+  <div class="rec-foot">
+    <button class="btn btn-sm" id="rec-undo" type="button">Undo</button>
+    <button class="link-btn rec-timing" id="rec-timing" type="button">Timing</button>
+    <button class="btn btn-sm btn-primary rec-save-btn" id="rec-save" type="button">Save as MP3…</button>
+  </div>
+</section>
 
 <!-- ================= INSTRUMENT ================= -->
 <main class="piano-container">
@@ -118,50 +219,6 @@
     <p class="qwerty-legend" id="qwerty-legend" hidden></p>
   </div>
 </main>
-
-<!-- ================= RECORDER (four tracks; recorder.js) ================= -->
-<section class="recorder" id="recorder" aria-label="Recorder" hidden>
-  <div class="rec-bar">
-    <div class="rec-transport">
-      <button class="rec-tbtn" id="rec-home" type="button" aria-label="Back to the start" title="Back to the start">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6v12" fill="none" stroke-width="2.4"/><path d="M18 6.5v11l-8.5-5.5z"/></svg>
-      </button>
-      <button class="rec-tbtn rec-play" id="rec-play" type="button" aria-label="Play" title="Play (Space)">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
-      </button>
-      <button class="rec-tbtn rec-record" id="rec-record" type="button" aria-pressed="false" aria-label="Record" title="Record">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/></svg>
-      </button>
-    </div>
-    <div class="rec-pos" id="rec-pos">Bar 1 · 1</div>
-    <div class="rec-settings">
-      <div class="rec-tempo" role="group" aria-label="Tempo">
-        <button class="rec-step" id="rec-tempo-down" type="button" aria-label="Slower">−</button>
-        <input class="rec-tempo-input" id="rec-tempo" type="number" min="40" max="220" step="1" inputmode="numeric" aria-label="Tempo, beats a minute">
-        <button class="rec-step" id="rec-tempo-up" type="button" aria-label="Faster">+</button>
-        <span class="rec-unit">bpm</span>
-      </div>
-      <select class="select rec-meter" id="rec-meter" aria-label="Time signature">
-        <option value="2/4">2/4</option>
-        <option value="3/4">3/4</option>
-        <option value="4/4">4/4</option>
-        <option value="6/8">6/8 (in 2)</option>
-      </select>
-      <button class="quick-btn" id="rec-countin" type="button" aria-pressed="true" title="A bar of clicks before recording starts">Count-in</button>
-      <select class="select rec-click" id="rec-click" aria-label="Metronome">
-        <option value="record">Click when recording</option>
-        <option value="always">Click always</option>
-        <option value="off">No click</option>
-      </select>
-    </div>
-  </div>
-  <div class="rec-tracks" id="rec-tracks"></div>
-  <div class="rec-foot">
-    <button class="btn btn-sm" id="rec-undo" type="button">Undo</button>
-    <button class="link-btn rec-timing" id="rec-timing" type="button">Timing</button>
-    <button class="btn btn-sm btn-primary rec-save-btn" id="rec-save" type="button">Save as MP3…</button>
-  </div>
-</section>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -188,25 +245,229 @@
       <button class="sheet-close" type="button" data-close aria-label="Close">&times;</button>
     </div>
     <div class="sheet-body sheet-scroll">
-      <section class="panel-section">
-        <h3>Send this layout</h3>
-        <p class="panel-note">A link or a file carries the key, scale, sound, Flex or Chromatic, octaves, Focus, key colors, note names and view. Nothing is uploaded.</p>
-        <div class="row-wrap">
-          <button class="btn btn-primary" id="make-link-btn" type="button">Create a link</button>
-          <button class="btn" id="download-btn" type="button">Download as JSON</button>
-          <button class="btn" id="open-file-btn" type="button">Open a JSON file…</button>
+      <!-- A LINK OPEN (lesson.js): what it is, what is locked, and the ways out -->
+      <section class="panel-section lesson-only" id="lib-lesson-section">
+        <h3 id="lesson-heading">This lesson</h3>
+        <div class="lesson-card">
+          <div class="lesson-name" id="lesson-name"></div>
+          <p class="lesson-line" id="lesson-locked"></p>
+          <p class="lesson-line" id="lesson-free"></p>
+        </div>
+        <p class="panel-note" id="lesson-kept">What you record is kept in this browser: open the link again to carry on.</p>
+        <div class="row-wrap" id="lesson-actions">
+          <button class="btn btn-primary" id="lesson-send" type="button">Send my work as a link</button>
+          <button class="btn" id="lesson-restart" type="button">Start again</button>
+          <button class="btn" id="lesson-leave" type="button">Leave the lesson</button>
+          <button class="btn" id="lesson-edit" type="button" hidden>Edit this lesson</button>
+        </div>
+        <div class="row-wrap" id="lesson-confirm" hidden>
+          <button class="btn btn-danger" id="lesson-restart-yes" type="button">Start again</button>
+          <button class="btn" id="lesson-restart-no" type="button">Keep my work</button>
+        </div>
+        <div class="share-row" id="lesson-share-row" hidden>
+          <input type="text" id="lesson-share-link" class="text-field" readonly aria-label="Link to your work">
+          <button class="btn" id="lesson-share-copy" type="button">Copy</button>
+        </div>
+        <span class="status-msg" id="lesson-status" role="status"></span>
+      </section>
+      <!-- WHAT YOU MAKE: a link to send, a workspace to keep, a scale of your own -->
+      <section class="panel-section lesson-hide lib-make">
+        <div class="lib-make-row">
+          <button class="btn btn-primary" id="make-link-btn" type="button">
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.2 1.2"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2"/></svg>
+            Create a Link
+          </button>
+          <button class="btn" id="save-ws-btn" type="button">
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg>
+            Save Workspace
+          </button>
+          <button class="btn" id="build-scale-btn" type="button">+ Build a Scale</button>
+        </div>
+        <!-- one JSON file with everything: what is on screen, the saved workspaces and the scales (lesson.js) -->
+        <div class="lib-file-row">
+          <button class="btn" id="download-json-btn" type="button">
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
+            Download JSON
+          </button>
+          <button class="btn" id="open-file-btn" type="button">
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 19.5h14"/></svg>
+            Upload JSON
+          </button>
           <input type="file" id="open-file" accept=".json,application/json" hidden>
         </div>
-        <div class="share-row" id="share-row" hidden>
-          <input type="text" id="share-link" class="text-field" readonly aria-label="Link to this layout">
-          <button class="btn" id="copy-link-btn" type="button">Copy</button>
-        </div>
+        <p class="sheet-hint lib-file-note">Download JSON keeps your saved workspaces, your scales and the recorder’s tracks in one file. Upload JSON brings them back, on any computer, and opens a workspace, scale or lesson file too.</p>
         <span class="status-msg" id="library-status" role="status"></span>
       </section>
-      <section class="panel-section">
-        <h3>Starters</h3>
-        <div class="library-list" id="library-list"></div>
+      <section class="panel-section lesson-hide">
+        <h3>Saved workspaces</h3>
+        <p class="panel-note" id="ws-empty">Save Workspace keeps the keyboard and everything in the recorder under a name, in this browser. Your workspaces are listed here.</p>
+        <div class="library-list" id="ws-list"></div>
       </section>
+      <section class="panel-section lesson-hide">
+        <h3>Scales</h3>
+        <!-- the ones built here on top, newest first, then the starters -->
+        <div class="library-list">
+          <div class="library-list" id="my-scales-list"></div>
+          <div class="library-list" id="library-list"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SHEET: BUILD A SCALE (Library → My scales) ================= -->
+<div class="sheet-backdrop" id="scale-sheet">
+  <div class="sheet" role="dialog" aria-labelledby="sb-title">
+    <div class="sheet-head"><h2 id="sb-title">Build a scale</h2><button class="sheet-close" type="button" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body sheet-scroll sb-body">
+      <label class="sb-name-row">
+        <span class="sb-label">Name</span>
+        <input type="text" id="sb-name" class="text-field" maxlength="40" autocomplete="off" spellcheck="false">
+      </label>
+      <div class="sb-base-row">
+        <span class="sb-label">Base key</span>
+        <button class="key-arrow" id="sb-base-down" type="button" aria-label="Base key down">&#9664;</button>
+        <span class="sb-base-name" id="sb-base-name" aria-live="polite">C</span>
+        <button class="key-arrow" id="sb-base-up" type="button" aria-label="Base key up">&#9654;</button>
+      </div>
+      <p class="fold-note" data-key="scale-builder-base">The base key is only a look: the piano below starts on it, and so does the keyboard when you play the scale. Tap the keys you want; the chosen key furthest to the left is the first note, where the computer keys start. On a black key, tap the name it should be written as, and tap it again to take it out.</p>
+      <div class="sb-frame"><div class="sb-piano" id="sb-piano"></div></div>
+      <div class="sb-summary">
+        <span class="sb-count" id="sb-count"></span>
+        <span class="sb-notes" id="sb-notes"></span>
+      </div>
+      <p class="sheet-hint" id="sb-first-note" hidden></p>
+      <p class="sheet-hint" id="sb-flex" hidden></p>
+      <div class="row-wrap">
+        <button class="btn" id="sb-play" type="button">&#9654; Play it</button>
+        <button class="btn" id="sb-clear" type="button">Clear</button>
+        <button class="btn" id="sb-all" type="button">All 12</button>
+      </div>
+      <span class="status-msg" id="sb-status" role="status"></span>
+      <div class="row-wrap sb-actions">
+        <button class="btn" type="button" data-close>Cancel</button>
+        <button class="btn" id="sb-save-new" type="button" hidden>Save as a new scale</button>
+        <button class="btn btn-primary" id="sb-save" type="button">Save scale</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SHEET: CREATE A LINK (Library; lesson.js) =================
+     The link on top; under it what it sends (the scale and keyboard, or the
+     whole workspace with the recorder) and the Lock link switch, which shows
+     what students cannot change. -->
+<div class="sheet-backdrop" id="link-sheet">
+  <div class="sheet" role="dialog" aria-labelledby="lk-title">
+    <div class="sheet-head"><h2 id="lk-title">Create a Link</h2><button class="sheet-close" type="button" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body sheet-scroll lk-body">
+      <div class="lk-top">
+        <button class="btn btn-primary" id="lk-generate" type="button">Generate link</button>
+        <div class="share-row lk-share">
+          <input type="text" id="lk-link" class="text-field" readonly placeholder="The link appears here" aria-label="The link">
+          <button class="btn" id="lk-copy" type="button" disabled>Copy</button>
+        </div>
+      </div>
+      <span class="status-msg" id="lk-status" role="status"></span>
+      <div class="lk-choose">
+        <div class="lk-seg" role="radiogroup" aria-label="What the link sends">
+          <button class="lk-seg-btn" type="button" role="radio" data-what="scale">Scale</button>
+          <button class="lk-seg-btn" type="button" role="radio" data-what="workspace">Workspace</button>
+        </div>
+        <button class="lk-switch" id="lk-lock" type="button" role="switch" aria-checked="false">
+          <span class="lk-switch-track" aria-hidden="true"><span class="lk-switch-knob"></span></span>
+          <span>Lock link</span>
+        </button>
+      </div>
+      <p class="sheet-hint" id="lk-carries"></p>
+      <label class="sb-name-row" id="lk-name-row">
+        <span class="sb-label">Name</span>
+        <input type="text" id="lk-name" class="text-field" maxlength="60" autocomplete="off" spellcheck="false">
+      </label>
+      <div class="lk-locks">
+        <section class="ls-group">
+          <h3>Locked for students</h3>
+          <div class="choice-list">
+            <label class="choice">
+              <input type="checkbox" id="lk-scale">
+              <span class="choice-body"><span class="choice-title" id="lk-scale-title">Scale</span><span class="choice-note">The scale menu and the scale builder are gone; the scale shows as plain text with a lock.</span></span>
+            </label>
+            <label class="choice">
+              <input type="checkbox" id="lk-key">
+              <span class="choice-body"><span class="choice-title" id="lk-key-title">Key</span><span class="choice-note">The key arrows and the key menu are gone.</span></span>
+            </label>
+            <label class="choice">
+              <input type="checkbox" id="lk-layout">
+              <span class="choice-body"><span class="choice-title" id="lk-layout-title">Computer keys: Flex</span><span class="choice-note" id="lk-layout-note">Students can show or hide the letters on the piano keys, but not switch to Chromatic.</span></span>
+            </label>
+            <label class="choice" data-for="scale">
+              <input type="checkbox" id="lk-record">
+              <span class="choice-body"><span class="choice-title">Recording</span><span class="choice-note">The Record button is gone: students play the keyboard, but do not record.</span></span>
+            </label>
+            <label class="choice" data-for="workspace">
+              <input type="checkbox" id="lk-meter">
+              <span class="choice-body"><span class="choice-title" id="lk-meter-title">Time signature</span><span class="choice-note">Shown, but students cannot change it.</span></span>
+            </label>
+            <label class="choice" data-for="workspace">
+              <input type="checkbox" id="lk-tempo">
+              <span class="choice-body"><span class="choice-title" id="lk-tempo-title">Tempo</span><span class="choice-note">Leave it unticked to let students speed it up or slow it down.</span></span>
+            </label>
+          </div>
+        </section>
+        <section class="ls-group" data-for="workspace">
+          <h3>Quantize</h3>
+          <div class="chip-row" role="radiogroup" aria-label="Quantize">
+            <label class="chip"><input type="radio" name="lk-quant" value="free"><span>Students choose</span></label>
+            <label class="chip"><input type="radio" name="lk-quant" value="on"><span>Locked on</span></label>
+            <label class="chip"><input type="radio" name="lk-quant" value="off"><span>Locked off</span></label>
+          </div>
+          <div class="lk-quant-on" id="lk-quant-on">
+            <span class="lk-mini">Rhythm</span>
+            <div class="chip-row" role="radiogroup" aria-label="Rhythm">
+              <label class="chip"><input type="radio" name="lk-qgrid" value="4"><span>Quarter</span></label>
+              <label class="chip"><input type="radio" name="lk-qgrid" value="8"><span>8th</span></label>
+              <label class="chip"><input type="radio" name="lk-qgrid" value="16"><span>16th</span></label>
+            </div>
+            <span class="lk-mini">Feel</span>
+            <div class="chip-row" role="radiogroup" aria-label="Feel">
+              <label class="chip"><input type="radio" name="lk-qfeel" value="none"><span>None</span></label>
+              <label class="chip"><input type="radio" name="lk-qfeel" value="swing8"><span>Swing 8th Notes</span></label>
+              <label class="chip"><input type="radio" name="lk-qfeel" value="swing16"><span>Swing 16th</span></label>
+              <label class="chip"><input type="radio" name="lk-qfeel" value="triplets"><span>Allow Triplets</span></label>
+            </div>
+          </div>
+          <p class="sheet-hint" id="lk-quant-note"></p>
+        </section>
+        <section class="ls-group" data-for="workspace">
+          <h3>Tracks students play along with</h3>
+          <div class="choice-list" id="lk-tracks"></div>
+          <p class="sheet-hint" id="lk-tracks-note"></p>
+        </section>
+        <p class="panel-note" id="lk-free"></p>
+      </div>
+      <p class="sheet-hint lk-file"><button class="link-btn" id="lk-download" type="button">Download JSON</button> instead of a link: the same thing as a file, to keep or to send.</p>
+      <p class="fold-note" data-key="link-sheet">The link holds everything, so nothing is uploaded and it keeps working. With Lock link on, each student's work stays in their own browser: opening the link again carries on where they left off, and they can send their work back as a link of its own. A lesson file brought back with the Library's Upload JSON comes back unlocked, as a workspace, ready to change.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SHEET: SAVE WORKSPACE (Library; lesson.js) =================
+     The keyboard and everything in the recorder, kept under a name in this
+     browser; listed in the Library above the scales. -->
+<div class="sheet-backdrop" id="ws-sheet">
+  <div class="sheet sheet-narrow" role="dialog" aria-labelledby="ws-title">
+    <div class="sheet-head"><h2 id="ws-title">Save Workspace</h2><button class="sheet-close" type="button" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body ws-body">
+      <label class="sb-name-row">
+        <span class="sb-label">Name</span>
+        <input type="text" id="ws-name" class="text-field" maxlength="60" autocomplete="off" spellcheck="false">
+      </label>
+      <p class="sheet-hint" id="ws-what"></p>
+      <p class="sheet-hint ws-replace" id="ws-replace" hidden></p>
+      <div class="row-wrap sb-actions">
+        <button class="btn" type="button" data-close>Cancel</button>
+        <button class="btn btn-primary" id="ws-save" type="button">Save</button>
+      </div>
     </div>
   </div>
 </div>
@@ -255,14 +516,15 @@
         </div>
       </section>
 
-      <section class="panel-section">
+      <section class="panel-section" id="settings-layout">
         <h3>Computer keyboard</h3>
+        <p class="panel-note lesson-locked-note" id="settings-layout-locked"></p>
         <div class="choice-list" role="radiogroup" aria-label="Computer keyboard">
           <label class="choice">
             <input type="radio" name="layout" value="flex">
             <span class="choice-body">
               <span class="choice-title">Flex</span>
-              <span class="choice-note">Only the notes of the scale. Each row of keys climbs the scale from its first key: <kbd>Z</kbd> starts on the low tonic, <kbd>A</kbd> an octave higher, then <kbd>Q</kbd> and <kbd>1</kbd> higher again. Hold <kbd>Shift</kbd> and the <kbd>Z</kbd> row plays an octave lower, the <kbd>1</kbd> row an octave higher. The same keys work in every key and scale.</span>
+              <span class="choice-note">Only the notes of the scale. Each row of keys climbs the scale from its first key: <kbd>Z</kbd> starts on the low tonic, <kbd>A</kbd> an octave higher, then <kbd>Q</kbd> and <kbd>1</kbd> higher again. Hold <kbd>Shift</kbd> and the <kbd>Z</kbd> row plays an octave lower, the <kbd>1</kbd> row an octave higher. The same keys work in every key and scale. A scale of your own with more than ten notes runs on from row to row instead.</span>
             </span>
           </label>
           <label class="choice">
@@ -273,7 +535,7 @@
             </span>
           </label>
         </div>
-        <p class="panel-note">The Flex / Chromatic button under the top bar switches this too.</p>
+        <p class="panel-note layout-cycle-note">The Flex button switches this too, one step a press: Flex, then Flex with the <kbd>A</kbd> row's letters on the piano keys, then Chromatic, then Chromatic with the <kbd>Z</kbd> and <kbd>S</kbd> rows' letters, and round again. While the letters show, they take the place of the Key Names.</p>
       </section>
 
       <section class="panel-section" id="settings-recording">
@@ -318,15 +580,54 @@
         <p class="panel-note">The notes themselves, to keep a copy or open the recording on another computer. This browser also keeps your recording by itself.</p>
         <div class="row-wrap">
           <button class="btn" id="rec-project-dl" type="button">Download project</button>
-          <button class="btn" id="rec-project-open" type="button">Open a project…</button>
+          <button class="btn lesson-hide" id="rec-project-open" type="button">Open a project…</button>
           <input type="file" id="rec-project-file" accept=".json,application/json" hidden>
         </div>
       </section>
       <section class="panel-section">
         <h3>Start over</h3>
-        <p class="panel-note">Clears all four tracks. Undo brings them back.</p>
+        <p class="panel-note" id="rec-new-note">Clears all four tracks. Undo brings them back.</p>
         <div class="row-wrap"><button class="btn" id="rec-new" type="button">New recording</button></div>
       </section>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SHEET: QUANTIZE (recorder.js) ================= -->
+<div class="sheet-backdrop" id="quant-sheet">
+  <div class="sheet sheet-narrow" role="dialog" aria-labelledby="quant-title">
+    <div class="sheet-head"><h2 id="quant-title">Quantize</h2><button class="sheet-close" type="button" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body sheet-scroll">
+      <p class="panel-note" id="quant-intro"></p>
+      <section class="quant-group">
+        <h3>Rhythm</h3>
+        <div class="chip-row" role="radiogroup" aria-label="Rhythm">
+          <label class="chip"><input type="radio" name="quant-grid" value="4"><span>Quarter</span></label>
+          <label class="chip"><input type="radio" name="quant-grid" value="8"><span>8th</span></label>
+          <label class="chip"><input type="radio" name="quant-grid" value="16"><span>16th</span></label>
+        </div>
+      </section>
+      <section class="quant-group">
+        <h3>Feel</h3>
+        <div class="chip-row" role="radiogroup" aria-label="Feel">
+          <label class="chip"><input type="radio" name="quant-feel" value="none"><span>None</span></label>
+          <label class="chip"><input type="radio" name="quant-feel" value="swing8"><span>Swing 8th Notes</span></label>
+          <label class="chip"><input type="radio" name="quant-feel" value="swing16"><span>Swing 16th</span></label>
+          <label class="chip"><input type="radio" name="quant-feel" value="triplets"><span>Allow Triplets</span></label>
+        </div>
+        <p class="sheet-hint" id="quant-feel-note"></p>
+      </section>
+      <label class="choice quant-all">
+        <input type="checkbox" id="quant-all">
+        <span class="choice-body">
+          <span class="choice-title">Quantize the entire song</span>
+          <span class="choice-note">Every part on every track, not only what you record next. Undo takes it back.</span>
+        </span>
+      </label>
+      <div class="row-wrap quant-actions">
+        <button class="btn btn-primary" id="quant-ok" type="button">Confirm</button>
+        <button class="btn" id="quant-alt" type="button" hidden>Not this part</button>
+      </div>
     </div>
   </div>
 </div>
@@ -359,5 +660,6 @@
 <script src="vendor/lame.min.js"></script>
 <script src="script.js"></script>
 <script src="recorder.js"></script>
+<script src="lesson.js"></script>
 </body>
 </html>

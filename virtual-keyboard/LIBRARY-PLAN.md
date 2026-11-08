@@ -93,6 +93,25 @@ embedded in a Google Site, which reloads its link on every visit, never piles up
 copies. Phase-one links (no id) still open and are matched by content.
 
 ### 5. Custom scales — the reason for all of this
+
+> **Built 2026-11-07 (the user's spec), sandbox only.** Library → *My scales*
+> (top of the Library, newest first) → **+ Build a scale**: one octave C–B,
+> the first note (the key in the top bar) always in, each black key shows
+> both names and you tap the one to use. Stored in
+> `virtual_keyboard_scales_v1` as `{ id: 'my-…', title, degrees, tonic,
+> createdAt, updatedAt, isCustom }`; `tonic` is the first note as spelled
+> when built, so that key names every note exactly as chosen. The scale menu
+> lists them last ("My scales", oldest first). Links and files carry
+> `data.scaleRecord`, filed on arrival (same id or same scale → no copy).
+> Later the same day: a **base key** (◀ ▶ in the builder, saved as `base`) is only a look — the
+> builder's octave starts on it (base … base an octave up; a black base gets half a white key each
+> side). Nothing is locked: the chosen key furthest to the left is the first note (`tonic`), where
+> Flex starts. Scales saved before get a base that keeps their first note first.
+> The Flex piano starts on the base too (`flexRange`), whatever key the scale is in; the computer
+> keys still start on the first note.
+> More than ten notes: the Flex rows run on (Z, then A, Q, 1) instead of
+> each row restarting on the tonic. Not done from this plan: §1 evm-library.js,
+> saved layouts, Shared with you, backups, the Key Blocks degree-set question.
 The Flex keys, Focus, the in-scale names and the computer-keyboard labels are
 all built from a scale's **degree list** (`['1', 'b3', '4', '#4', '5', 'b7']`),
 never from tables. So a custom scale drops in wherever
