@@ -201,7 +201,7 @@
   document.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('button');
     if (!b || b.closest('.sheet-backdrop, .menu') || !shown) return;
-    setTimeout(() => { if (!Studio.sheetOpen() && document.getElementById('track-menu').hidden) focusFrame(shown); }, 0);
+    setTimeout(() => { if (!Studio.sheetOpen() && document.getElementById('sound-pop').hidden) focusFrame(shown); }, 0);
   });
 
   window.StudioLink = { show, inputStamp, forward, setSound, setKey, focus: () => focusFrame(shown), sources: SOURCES };
