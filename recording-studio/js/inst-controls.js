@@ -59,6 +59,18 @@ const InstControls = (() => {
         { type: 'button', sel: 'header button[aria-label^="Switch to"]', text: b => b.textContent.trim() },
         { type: 'gear', sel: 'header .settings-container > button' }
       ]
+    },
+    drums: {
+      // The rack's header (title, Play, BPM, Rearrange, gear) goes: the tempo
+      // is the project's, and the user's call is that only how many pads show
+      // and Rearrange are needed here. The settings panel's Instruments buttons
+      // become one menu.
+      hide: '.rack-header { display: none !important; } .rack-chassis { padding-top: 12px !important; }',
+      watch: '.rack-header',
+      items: [
+        { type: 'pick', sel: '.voice-option-btn', label: 'Instruments', on: b => b.classList.contains('is-active') },
+        { type: 'button', sel: '#rearrange-btn', toggle: true, on: b => b.classList.contains('is-active'), text: () => 'Rearrange' }
+      ]
     }
   };
 
@@ -134,6 +146,24 @@ const InstControls = (() => {
         });
         scroll.appendChild(seg);
         parts.push({ item, els, srcs });
+      } else if (item.type === 'pick') {   // a row of the app's buttons, one lit, as a menu here
+        const sel = document.createElement('select');
+        sel.className = 'select ic-select';
+        if (item.label) { sel.setAttribute('aria-label', item.label); sel.title = item.label; }
+        srcs.forEach((s, k) => {
+          const o = document.createElement('option');
+          o.value = String(k);
+          o.textContent = (item.label ? item.label + ': ' : '') + wordsOf(item, s);
+          sel.appendChild(o);
+        });
+        sel.addEventListener('change', () => {
+          const s = srcs[Number(sel.value)];
+          if (s) press(s);
+          sel.blur();
+          if (window.StudioLink) StudioLink.focus();
+        });
+        scroll.appendChild(sel);
+        parts.push({ item, els: [sel], srcs });
       } else if (item.type === 'select') {
         const s = srcs[0];
         const sel = document.createElement('select');
@@ -192,6 +222,11 @@ const InstControls = (() => {
         const s = srcs[0], sel = els[0];
         if (sel.dataset.opts !== s.innerHTML) { sel.innerHTML = s.innerHTML; sel.dataset.opts = s.innerHTML; }
         if (sel.value !== s.value) sel.value = s.value;
+        return;
+      }
+      if (item.type === 'pick') {
+        const k = srcs.findIndex(s => (item.on ? item.on(s) : pressed(s)));
+        if (k >= 0 && els[0].value !== String(k)) els[0].value = String(k);
         return;
       }
       els.forEach((el, k) => {

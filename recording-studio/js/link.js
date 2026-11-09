@@ -13,8 +13,11 @@
      while a frame has the keyboard; a key pressed on the studio's own page
      is handed to the instrument showing.
 
-   window.StudioLink = { show(kind), inputStamp(), forward(e), setSound(kind, id) }
+   window.StudioLink = { show(kind), inputStamp(), forward(e), setSound(kind, id), setTempo(), setGrid(origin, beatMs) }
    (kind 'voice' shows the microphone panel instead of a frame)
+   The Virtual Drum Rack is percussion: it reports hits by instrument
+   (`drum`), takes the project's tempo and meter, and while the studio runs
+   its repeating pads keep to the studio's beat grid (setGrid).
    ========================================================================== */
 (() => {
   'use strict';
@@ -22,7 +25,8 @@
   const SOURCES = {
     keyboard:  { app: 'virtual-keyboard',  url: '../virtual-keyboard/index.html?embed=studio',  label: 'the keyboard' },
     accordion: { app: 'digital-accordion', url: '../Digital%20Accordion/index.html?embed=studio', label: 'the accordion' },
-    xylophone: { app: 'rainbow-xylophone', url: '../rainbow-xylophone/index.html?embed=studio', label: 'the xylophone' }
+    xylophone: { app: 'rainbow-xylophone', url: '../rainbow-xylophone/index.html?embed=studio', label: 'the xylophone' },
+    drums:     { app: 'virtual-drum-rack', url: '../virtual-drum-kit/index.html?embed=studio',   label: 'the drum rack' }
   };
   const BY_APP = {};
   Object.keys(SOURCES).forEach(kind => { SOURCES[kind].kind = kind; BY_APP[SOURCES[kind].app] = SOURCES[kind]; });
@@ -94,10 +98,20 @@
         on(id, freqs, sound, level) { if (Array.isArray(freqs) && freqs.length) Studio.noteOn(kind, key(id), freqs, sound, level); },
         off(id) { Studio.noteOff(kind, key(id)); },
         hit(freqs, sound, level) { if (Array.isArray(freqs) && freqs.length) Studio.noteHit(kind, freqs, sound, level); },
+        // a percussion hit: `when` (the app's own performance.now(), for a hit
+        // its repeaters played) is put on this page's clock; a hand-played hit
+        // leaves it out and is placed at the key or touch that made it
+        drum(inst, level, when) {
+          if (typeof inst !== 'string') return;
+          let shift = 0;
+          try { shift = win.performance.timeOrigin - performance.timeOrigin; } catch (e) {}
+          Studio.drumHit(kind, inst, level, when != null ? when + shift : null);
+        },
         offer(api) {
           src.api = api && typeof api === 'object' ? api : null;
           src.keyGiven = null;
-          setTimeout(() => giveKey(src), 0);   // once the app has finished starting
+          src.tempoGiven = null;
+          setTimeout(() => { giveKey(src); giveTempo(src); giveGrid(src); }, 0);   // once the app has finished starting
         }
       };
     }
@@ -115,6 +129,7 @@
     f.addEventListener('load', () => {
       f.classList.add('loaded');
       giveKey(src);
+      giveTempo(src);
       if (shown === kind) { focusFrame(kind); if (window.InstControls) InstControls.render(kind); }
     });
     stage.appendChild(f);
@@ -191,6 +206,30 @@
   }
   function setKey() { Object.values(SOURCES).forEach(giveKey); }
 
+  // -------- THE TEMPO AND THE BEAT GRID --------
+  // An instrument with a clock of its own (the drum rack's repeating pads)
+  // plays at the project's tempo, in its meter, and while the studio runs its
+  // beats fall on the studio's: `origin` is performance.now() (this page's
+  // clock) when the run's first beat sounds, `beatMs` a beat.
+  let grid = null;   // { origin, beatMs } while the studio plays or records
+  function giveTempo(src) {
+    if (!src || !src.api || !src.api.setTempo || !Studio.project) return;
+    const p = Studio.project, k = p.tempo + ' ' + p.meter;
+    if (src.tempoGiven === k) return;
+    try { src.api.setTempo(p.tempo, p.meter.endsWith('/8')); src.tempoGiven = k; } catch (e) {}
+  }
+  function setTempo() { Object.values(SOURCES).forEach(giveTempo); }
+  function giveGrid(src) {
+    if (!src || !src.api || !src.api.setGrid) return;
+    let shift = 0;
+    try { shift = src.win.performance.timeOrigin - performance.timeOrigin; } catch (e) {}
+    try { src.api.setGrid(grid ? grid.origin - shift : null, grid ? grid.beatMs : 0); } catch (e) {}
+  }
+  function setGrid(origin, beatMs) {
+    grid = origin != null ? { origin, beatMs } : null;
+    Object.values(SOURCES).forEach(giveGrid);
+  }
+
   function setSound(kind, id) {
     const src = SOURCES[kind];
     try { if (src && src.api && src.api.setSound) src.api.setSound(id); } catch (e) {}
@@ -204,5 +243,5 @@
     setTimeout(() => { if (!Studio.sheetOpen() && document.getElementById('sound-pop').hidden) focusFrame(shown); }, 0);
   });
 
-  window.StudioLink = { show, inputStamp, forward, setSound, setKey, focus: () => focusFrame(shown), sources: SOURCES };
+  window.StudioLink = { show, inputStamp, forward, setSound, setKey, setTempo, setGrid, focus: () => focusFrame(shown), sources: SOURCES };
 })();

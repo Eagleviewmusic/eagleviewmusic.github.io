@@ -7,9 +7,12 @@
    for each, voice takes, and songs brought in from the other apps.
 
    A track keeps what was played, not the sound: notes { m (MIDI), b (beat),
-   d (beats), s (sound), v (level, 1 = as played) }, or for an ostinato hits
-   { i (instrument), b, g (gain), r (beats to that line's next hit) }. Beats,
-   not seconds, so a new tempo re-times the whole project.
+   d (beats), s (sound), v (level, 1 = as played) }, or for an ostinato or
+   a drum rack track hits { i (instrument), b, g (gain), r (beats to that
+   line's next hit) }. Beats, not seconds, so a new tempo re-times the whole
+   project. A hits track opens in the editor as a drum machine does: a row an
+   instrument (THE DRUM LADDER), up or down changes what plays a hit, along
+   changes its beat.
 
    Each take is a PART (clip): a box on its track. Drag a part's middle to
    move it, or an end to size it. A track plays straight through by default;
@@ -35,13 +38,14 @@
     accordion: { label: 'Accordion', engine: 'notes',   play: true },
     xylophone: { label: 'Xylophone', engine: 'strikes', play: true },
     voice:     { label: 'Voice',     engine: 'audio',   play: true },
+    drums:     { label: 'Drum Rack', engine: 'hits',    play: true },
     ostinato:  { label: 'Ostinato',  engine: 'hits' },
     melody:    { label: 'Melody',    engine: 'notes' },
     chords:    { label: 'Chords',    engine: 'notes' }
   };
-  const INSTRUMENTS = ['keyboard', 'accordion', 'xylophone', 'voice'];
+  const INSTRUMENTS = ['keyboard', 'accordion', 'xylophone', 'drums', 'voice'];
   // how the words name what is played: "record the keyboard", "record your voice"
-  const PLAYED = { keyboard: 'the keyboard', accordion: 'the accordion', xylophone: 'the xylophone', voice: 'your voice' };
+  const PLAYED = { keyboard: 'the keyboard', accordion: 'the accordion', xylophone: 'the xylophone', drums: 'the drum rack', voice: 'your voice' };
   const METERS = { '2/4': 2, '3/4': 3, '4/4': 4, '5/4': 5, '6/4': 6, '6/8': 2, '9/8': 3, '12/8': 4 }; // beats in a bar (x/8 counted in dotted quarters)
   const CLICKS = ['record', 'always', 'off'];
   const CLICK_WORDS = { record: 'Recording', always: 'Always', off: 'Off' };
@@ -156,7 +160,33 @@
   const engineOf = tr => (tr.kind && KINDS[tr.kind] ? KINDS[tr.kind].engine : 'notes');
   const isHits = tr => engineOf(tr) === 'hits';
   const isAudio = tr => engineOf(tr) === 'audio';
-  const editable = tr => engineOf(tr) === 'notes' || engineOf(tr) === 'strikes';   // the note editor's tracks
+  const editable = tr => engineOf(tr) === 'notes' || engineOf(tr) === 'strikes' || engineOf(tr) === 'hits';   // the note editor's tracks
+
+  // THE DRUM LADDER: the percussion kit's instruments as the rows of a hits
+  // track (the editor's, and the lane's), in the kit's own order — bass at
+  // the top, as on the rack and in Ostinato Builder. One row an instrument,
+  // so a hit moved up or down changes what plays it. A hit { i, b, g, r } has
+  // no length; the editor reads an item's row with rowOf (a note's is its
+  // pitch) and its length with durOf. Row m counts from the bottom (rowY).
+  const VI = window.VirtualInstruments;
+  const DRUMS = VI.INSTRUMENTS.map(x => x.id);
+  const drumM = id => DRUMS.length - 1 - Math.max(0, DRUMS.indexOf(id));
+  const drumId = m => DRUMS[DRUMS.length - 1 - clamp(Math.round(m), 0, DRUMS.length - 1)];
+  const drumLabel = id => (VI.INSTRUMENT_MAP[id] || {}).label || id;
+  const drumColor = id => NOTE_COLORS[(Math.max(0, DRUMS.indexOf(id)) * 7) % 12];
+  const isHit = n => n.i != null;
+  const rowOf = n => (isHit(n) ? drumM(n.i) : n.m);
+  const durOf = n => (isHit(n) ? 0 : n.d);
+  const setRow = (n, m) => { if (isHit(n)) n.i = drumId(m); else n.m = m; };
+  // a note's own sound and level travel with it; a hit its gain (and that it is one)
+  const fieldsOf = n => (isHit(n) ? { v: n.g, hit: true } : { s: n.s, v: n.v });
+  // A hit's `r`, the beats to its line's next hit, read off the track as it
+  // plays (so a hit moved in the editor never carries a stale gap): the kit
+  // shapes a fast repeat by it. A line's last hit has none.
+  function regap(hits) {
+    const last = new Map();
+    hits.forEach(h => { const p = last.get(h.i); if (p) p.r = Math.max(0, h.b - p.b); h.r = 0; last.set(h.i, h); });
+  }
 
   function cleanNotes(list) {
     return (Array.isArray(list) ? list : [])
@@ -262,6 +292,7 @@
   function partsView(tr) {
     const hits = isHits(tr);
     const out = [].concat(...tr.clips.map(c => partNotes(c, c.items, hits))).sort(byBeat);
+    if (hits) regap(out);
     tr.notes = hits ? [] : out;
     tr.hits = hits ? out : [];
   }
@@ -759,6 +790,8 @@
       run.capture = StudioVoice.startCapture({ id: newId('c'), project: P.id, track: P.tracks[run.armed].id, from, anchor, spb, vdelay: run.vdelay });
     }
     applyLevels();
+    // the drum rack's repeating pads fall in with the studio's beats
+    if (window.StudioLink) StudioLink.setGrid(performance.now() + (anchor - ctx.currentTime) * 1000, spb * 1000);
     if (count) {
       const times = [];
       for (let k = count; k > 0; k--) times.push(EVMCountIn.heardAt(ctx, anchor - k * spb));
@@ -844,6 +877,7 @@
     run = null;
     clearInterval(r.timer);
     cancelAnimationFrame(r.raf);
+    if (window.StudioLink) StudioLink.setGrid(null);
     R.state = 'idle';
     R.pos = r.from <= 0 ? songStart() : r.from;
     renderAll();
@@ -853,6 +887,7 @@
   function stopRun() {
     runToken++; // a start still waking the sound will not go on
     EVMCountIn.close();
+    if (window.StudioLink) StudioLink.setGrid(null);
     const r = run;
     run = null;
     if (r) {
@@ -903,6 +938,19 @@
     freqs.forEach(f => run.take.push({ m: freqMidi(f), b, d, s: sound, v }));
   }
 
+  // From the drum rack (link.js): a hit, by instrument. A repeating pad's hit
+  // comes with its own moment (`stamp`, this page's clock) and is placed just
+  // there: it was the machine's, on the studio's grid, not a hand's behind
+  // the speakers (those are moved earlier by the recording delay, as notes are).
+  function drumHit(kind, inst, level, stamp) {
+    if (!run || !run.recording || kind !== run.inst || !VI.INSTRUMENT_MAP[inst]) return;
+    const t = stamp != null ? clockOf(stamp) : clockOf(inputStamp()) - run.delay;
+    const b = run.from + (t - run.anchor) / run.spb;
+    if (b < run.from - run.count - 0.25) return;
+    const g = Math.round((level == null ? 1 : clamp(level, 0, 2)) * 1000) / 1000;
+    run.take.push({ i: inst, b, g, r: 0 });
+  }
+
   // Tape rules: the take is a new part, replacing what the track had from
   // where it began to where it stopped. A take with no notes changes nothing.
   function keepTake(r) {
@@ -915,7 +963,7 @@
     if (!tr) return;
     pushUndo('the take on track ' + (r.armed + 1));
     const lo = Math.floor(Math.min(r.from, ...r.take.map(n => n.b)) + EARLY);   // on the beat: a note a moment early still counts
-    const hi = Math.ceil(Math.max(stop, ...r.take.map(n => n.b + n.d)) - 1e-6);
+    const hi = Math.ceil(Math.max(stop, ...r.take.map(n => n.b + durOf(n))) - 1e-6);
     tr.kind = r.inst;
     let part = makePart(r.take, lo, Math.max(hi, lo + 1));
     if (tr.loop) part = loopTake(r, stop, part);
@@ -951,7 +999,7 @@
     const items = r.take
       .map(n => ({ ...n, b: n.b - lo }))
       .filter(n => n.b >= -EARLY && n.b < L - EARLY)
-      .map(n => ({ ...n, d: Math.max(MIN_HOLD, Math.min(n.d, L - n.b)) }));
+      .map(n => (isHit(n) ? n : { ...n, d: Math.max(MIN_HOLD, Math.min(n.d, L - n.b)) }));
     if (!items.length) return toLoop(plain, false);
     return { b: lo, o: 0, d: L, len: L, loop: L, items, was: { b: plain.b - lo, o: plain.o, d: plain.d, len: plain.len, items: plain.items } };
   }
@@ -1299,6 +1347,7 @@
     keyboard: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 5v14M12 5v14M16 5v14"/><path class="fill" d="M6.6 5h2.8v8H6.6zM14.6 5h2.8v8h-2.8z"/></svg>',
     accordion: '<svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="4.5" height="12" rx="1.2"/><rect x="17" y="6" width="4.5" height="12" rx="1.2"/><path d="M7 7.5l2.5 9 2.5-9 2.5 9 2.5-9"/></svg>',
     xylophone: '<svg viewBox="0 0 24 24"><path d="M5 5v14M9.5 6.5v11M14 8v8M18.5 9.5v5" stroke-width="3"/></svg>',
+    drums: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect class="fill" x="13" y="13" width="8" height="8" rx="2"/></svg>',
     ostinato: '<svg viewBox="0 0 24 24"><ellipse cx="12" cy="8" rx="8" ry="3"/><path d="M4 8v8c0 1.7 3.6 3 8 3s8-1.3 8-3V8"/><path d="M15 3.5l4-2M9 3.5 5 1.5"/></svg>',
     melody: '<svg viewBox="0 0 24 24"><path d="M9 18V5l10-2v12"/><circle class="fill" cx="6.5" cy="18" r="2.5"/><circle class="fill" cx="16.5" cy="15" r="2.5"/></svg>',
     chords: '<svg viewBox="0 0 24 24"><circle class="fill" cx="8" cy="18" r="2.4"/><circle class="fill" cx="8" cy="12.5" r="2.4"/><circle class="fill" cx="8" cy="7" r="2.4"/><path d="M10.4 18V3.5"/><path d="M14.5 8h6M14.5 12.5h6M14.5 17h6"/></svg>',
@@ -1738,7 +1787,12 @@
   let lastTap = null;     // the last press on a track, for the double-click
   const BLACK = new Set([1, 3, 6, 8, 10]);
   const inBox = (c, b) => b >= c.b - EARLY && b < c.b + c.d - 1e-6;
-  const editHeadW = () => (matchMedia('(max-width: 560px)').matches ? 60 : 104);
+  const DRUM_ROW_MAX = 56;             // px a drum ladder row, at most
+  // the head's width while the editor is open: the piano's keys, or the drum ladder's names
+  const editHeadW = () => {
+    const narrow = matchMedia('(max-width: 560px)').matches;
+    return ed && isHits(P.tracks[ed.i]) ? (narrow ? 86 : 130) : (narrow ? 60 : 104);
+  };
 
   // Every note the editor can grab, where it is heard: v.n is the note in its
   // part (c). A loop part's note is there once for every pass (the same n).
@@ -1748,7 +1802,8 @@
       const end = c.o + c.d;
       const add = (n, t) => {
         if (t < c.o - EARLY || t >= end - 1e-6) return;
-        out.push({ c, n, m: n.m, b: c.b + t - c.o, d: t + n.d > end ? Math.max(MIN_HOLD, end - t) : n.d });
+        const d = durOf(n);
+        out.push({ c, n, m: rowOf(n), b: c.b + t - c.o, d: d && t + d > end ? Math.max(MIN_HOLD, end - t) : d });
       };
       if (c.loop) {
         for (let k = Math.floor((c.o - EARLY) / c.loop); k * c.loop < end; k++) c.items.forEach(n => add(n, k * c.loop + n.b));
@@ -1786,15 +1841,21 @@
   function tidy(items, sel) {
     const out = [];
     items.slice().sort(byBeat).forEach(n => {
-      const twin = out.find(x => x.m === n.m && Math.abs(x.b - n.b) < 1e-6);
+      const twin = out.find(x => rowOf(x) === rowOf(n) && Math.abs(x.b - n.b) < 1e-6);
       if (!twin) { out.push(n); return; }
-      twin.d = Math.max(twin.d, n.d);
+      if (!isHit(twin)) twin.d = Math.max(twin.d, n.d);
       if (sel.has(n)) { sel.delete(n); sel.add(twin); }
     });
     return out;
   }
-  // a note's own sound and level travel with it (w: a view with the note's fields)
-  const noteOf = (w, b, d) => { const n = { m: w.m, b, d }; if (w.s) n.s = w.s; if (w.v != null && w.v !== 1) n.v = w.v; return n; };
+  // a note's own sound and level travel with it (w: a view with the note's fields); a hit is made from its row
+  const noteOf = (w, b, d) => {
+    if (w.hit) return { i: drumId(w.m), b, g: w.v == null ? 1 : w.v, r: 0 };
+    const n = { m: w.m, b, d };
+    if (w.s) n.s = w.s;
+    if (w.v != null && w.v !== 1) n.v = w.v;
+    return n;
+  };
 
   // An edit, worked out on a copy of the track's parts (so a drag can show it
   // before it is let go). op: { kind: 'move', dt, dm } | { kind: 'size', dd, min }
@@ -1814,7 +1875,7 @@
   // A track that plays straight through: its notes where they are heard,
   // changed, then put back into parts round them.
   function editStraight(clips, sel, op) {
-    let W = editViews(clips).map(v => ({ m: v.m, b: v.b, d: v.d, s: v.n.s, v: v.n.v, home: v.c, on: sel.has(v.n), moved: false }));
+    let W = editViews(clips).map(v => ({ m: v.m, b: v.b, d: v.d, ...fieldsOf(v.n), home: v.c, on: sel.has(v.n), moved: false }));
     const touched = new Set();
     if (op.kind === 'move') {
       W.forEach(w => { if (w.on) { w.b += op.dt; w.m += op.dm; w.moved = true; touched.add(w.home); } });
@@ -1825,7 +1886,7 @@
     } else if (op.kind === 'add') { // the new notes are the highlighted ones
       sel.clear();
       W.forEach(w => { w.on = false; });
-      op.notes.forEach(p => W.push({ m: p.m, b: p.b, d: p.d, s: p.s, v: p.v, home: null, on: true, moved: true }));
+      op.notes.forEach(p => W.push({ m: p.m, b: p.b, d: p.d, s: p.s, v: p.v, hit: p.hit, home: null, on: true, moved: true }));
     } else if (op.kind === 'quant') { // the highlighted notes start on the rhythm (op.snap)
       W.forEach(w => {
         if (!w.on) return;
@@ -1892,11 +1953,11 @@
         if (op.kind === 'move') {
           let dt = op.dt; // the notes keep together, whole, inside the pass
           mine.forEach(n => { dt = Math.max(dt, -n.b); });
-          mine.forEach(n => { dt = Math.min(dt, Math.max(0, L - n.b - n.d)); });
+          mine.forEach(n => { dt = Math.min(dt, Math.max(0, L - n.b - Math.max(durOf(n), 1e-3))); });
           if (Math.abs(dt) < 1e-9 && !op.dm) return;
-          mine.forEach(n => { n.b += dt; n.m += op.dm; n.d = Math.max(MIN_HOLD, Math.min(n.d, L - n.b)); });
+          mine.forEach(n => { n.b += dt; setRow(n, rowOf(n) + op.dm); if (!isHit(n)) n.d = Math.max(MIN_HOLD, Math.min(n.d, L - n.b)); });
         } else {
-          mine.forEach(n => { n.d = clamp(n.d + op.dd, Math.max(MIN_HOLD, Math.min(op.min, n.d)), Math.max(MIN_HOLD, L - n.b)); });
+          mine.forEach(n => { if (!isHit(n)) n.d = clamp(n.d + op.dd, Math.max(MIN_HOLD, Math.min(op.min, n.d)), Math.max(MIN_HOLD, L - n.b)); });
         }
         touched.add(c);
       });
@@ -1914,7 +1975,7 @@
         if (t > L - 1e-6) t = 0;
         if (Math.abs(t - n.b) < 1e-9) return;
         n.b = t;
-        n.d = Math.max(MIN_HOLD, Math.min(n.d, L - t));
+        if (!isHit(n)) n.d = Math.max(MIN_HOLD, Math.min(n.d, L - t));
         touched.add(c);
       }));
     } else if (op.kind === 'add') {
@@ -1995,7 +2056,7 @@
     ed = {
       i,
       before: JSON.stringify(tr.clips),                       // Cancel's track
-      saved: { clips: JSON.parse(JSON.stringify(tr.clips)), notes: tr.notes.map(n => ({ ...n })), hits: [] }, // what autosave keeps meanwhile
+      saved: { clips: JSON.parse(JSON.stringify(tr.clips)), notes: tr.notes.map(n => ({ ...n })), hits: tr.hits.map(n => ({ ...n })) }, // what autosave keeps meanwhile
       view0: { win, viewAt },                                 // the view to go back to
       undo: [], sel: new Set(), caret: part ? part.b : R.pos,
       top: 72, rowH: 12, h: 0, lo: EDIT_LO, hi: EDIT_HI,
@@ -2019,7 +2080,8 @@
     renderAll();
     if (!sessionGet('edit-tip')) {
       sessionSet('edit-tip');
-      toast('Drag notes to change them. Save Changes keeps them; Cancel puts the track back.');
+      toast(isHits(tr) ? 'Drag a hit along to move it, up or down to another instrument. Save Changes keeps them; Cancel puts the track back.'
+        : 'Drag notes to change them. Save Changes keeps them; Cancel puts the track back.');
     }
   }
   function closeEditor(keep) {
@@ -2068,7 +2130,7 @@
     if (R.state === 'recording' || R.state === 'priming') return false;
     const tr = P.tracks[i];
     if (!editable(tr)) {
-      if (hasContent(tr)) toast(isAudio(tr) ? 'A voice take is sound, not notes: drag its ends to trim it, or Split it.' : 'An ostinato’s hits are not edited one by one here: drag the part, or pull its end to repeat it.');
+      if (hasContent(tr)) toast('A voice take is sound, not notes: drag its ends to trim it, or Split it.');
       return false;
     }
     if (cutMode) return false;
@@ -2085,7 +2147,9 @@
   const rowY = m => (ed.top - m) * ed.rowH;
   // The rows the track's notes need: the piano's, and further for a note beyond it.
   function editRange() {
-    const notes = P.tracks[ed.i].notes;
+    const tr = P.tracks[ed.i];
+    if (isHits(tr)) { ed.lo = 0; ed.hi = DRUMS.length - 1; return; }   // the drum ladder: every instrument, always
+    const notes = tr.notes;
     ed.lo = Math.min(EDIT_LO, ...notes.map(n => n.m));
     ed.hi = Math.max(EDIT_HI, ...notes.map(n => n.m));
   }
@@ -2097,6 +2161,12 @@
   function fitRows(center) {
     const l = rows[ed.i];
     if (!l.h) return;
+    if (isHits(P.tracks[ed.i])) {   // the drum ladder: every instrument's row, as tall as the lane allows
+      ed.rowH = clamp(l.h / DRUMS.length, rowMin(), DRUM_ROW_MAX);
+      ed.h = l.h;
+      setTop(ed.hi);
+      return;
+    }
     const notes = P.tracks[ed.i].notes;
     let lo = 60, hi = 72;
     if (notes.length) { lo = Math.min(...notes.map(n => n.m)); hi = Math.max(...notes.map(n => n.m)); }
@@ -2141,10 +2211,18 @@
   }
 
   // A note heard as it is picked up or moved to another row, in the track's sound.
-  let auditionBus = null;
+  let auditionBus = null, auditionKit = null;
   function audition(m) {
     try {
       const ctx = wakeAudio(), tr = P.tracks[ed.i];
+      if (isHits(tr)) {   // the drum ladder's row: that instrument, on the kit
+        if (!auditionKit || auditionKit.ctx !== ctx) {
+          auditionKit = { ctx, kit: VI.createKit({ audioContext: ctx, destination: ctx.destination }) };
+          auditionKit.kit.unlock();
+        }
+        auditionKit.kit.play(drumId(m), { gain: prefs.volume });
+        return;
+      }
       const preset = notePreset(tr, tr.notes[0]);
       if (engineOf(tr) === 'strikes') {
         if (!auditionBus || auditionBus.context !== ctx) auditionBus = Xylo.bus(ctx, ctx.destination);
@@ -2172,6 +2250,7 @@
     for (let k = ed.hits.length - 1; k >= 0; k--) {
       const h = ed.hits[k];
       if (pt.x < h.x0 - padX || pt.x > h.x1 + padX || pt.y < h.y0 - padY || pt.y > h.y1 + padY) continue;
+      if (isHit(h.v.n)) return { v: h.v, how: 'move' };   // a hit has no length to size
       const w = h.x1 - h.x0;
       const edge = w < 12 ? 1 : Math.min(touch ? 14 : 8, w / 3);
       return { v: h.v, how: pt.x >= h.x1 - edge ? 'size' : 'move' };
@@ -2355,8 +2434,9 @@
     if (!vs.length) { toast('Highlight notes first: click one, or drag across several.'); return; }
     const lo = vs[0].b, hi = Math.max(...vs.map(v => v.b + v.d));
     // span: how far along the next copy goes, in whole beats (a note a hair long still fits)
-    clipboard = { notes: vs.map(v => ({ m: v.m, b: v.b - lo, d: v.d, s: v.n.s, v: v.n.v })), span: Math.max(1, Math.ceil(hi - lo - EARLY)) };
-    const many = vs.length === 1 ? 'the note' : `${vs.length} notes`;
+    const hits = isHits(P.tracks[ed.i]);
+    clipboard = { hits, notes: vs.map(v => ({ m: v.m, b: v.b - lo, d: v.d, ...fieldsOf(v.n) })), span: Math.max(1, Math.ceil(hi - lo - EARLY)) };
+    const many = vs.length === 1 ? (hits ? 'the hit' : 'the note') : `${vs.length} ${hits ? 'hits' : 'notes'}`;
     if (cut) {
       ed.caret = lo;
       commitEdit(applyEdit({ kind: 'delete' }));
@@ -2370,6 +2450,7 @@
   }
   function pasteNotes() {
     if (!clipboard) { toast('Copy some notes first.'); return; }
+    if (clipboard.hits !== isHits(P.tracks[ed.i])) { toast(clipboard.hits ? 'Those are drum hits: they go on a drum track.' : 'Those are notes: they go on a note track.'); return; }
     const at = ed.caret;
     commitEdit(applyEdit({ kind: 'add', notes: clipboard.notes.map(n => ({ ...n, b: at + n.b })) }));
     ed.caret = at + clipboard.span;
@@ -2415,13 +2496,15 @@
     const tr = P.tracks[ed.i], n = ed.sel.size;
     el('rec-edit-num').textContent = String(ed.i + 1);
     el('rec-edit-title').textContent = `Track ${ed.i + 1} · ${trackName(tr)}` + (tr.sound ? ` · ${soundName(tr, tr.sound)}` : '');
+    const hits = isHits(tr), word = hits ? 'hit' : 'note';
     editBtns.copy.disabled = editBtns.del.disabled = !n;
-    editBtns.paste.disabled = !clipboard;
+    editBtns.paste.disabled = !clipboard || clipboard.hits !== hits;
     editBtns.save.disabled = false;
-    const grid = P.quant.on ? 'Quantize on: notes land on the beat lines.' : 'Quantize off: notes go just where you put them.';
+    const grid = P.quant.on ? `Quantize on: ${word}s land on the beat lines.` : `Quantize off: ${word}s go just where you put them.`;
     const hint = (n
-      ? `${n === 1 ? 'One note' : n + ' notes'} highlighted: drag ${n === 1 ? 'it' : 'them'}, or press ← → ↑ ↓. `
-      : 'Drag a note to move it, its right end to resize it, or across empty space to highlight several. ')
+      ? `${n === 1 ? 'One ' + word : n + ' ' + word + 's'} highlighted: drag ${n === 1 ? 'it' : 'them'}, or press ← → ↑ ↓. `
+      : hits ? 'Drag a hit along to change its beat, up or down to change its instrument, or across empty space to highlight several. '
+        : 'Drag a note to move it, its right end to resize it, or across empty space to highlight several. ')
       + (tr.loop ? 'Every pass of the loop changes together. ' : '') + grid;
     el('rec-edit-hint').textContent = hint;
     editInfo.title = el('rec-edit-title').textContent + ' — ' + hint;
@@ -3091,37 +3174,41 @@
     const base = audible(tr) ? 1 : 0.3;
 
     if (isAudio(tr)) { drawTakes(i, l, g, ppb, base); return; }
-    if (isHits(tr)) {
-      // an ostinato: a row for each instrument, in the order they first play
-      // (every hit the parts hold, so sizing never reorders the rows)
-      const order = [];
-      tr.clips.forEach(c => c.items.forEach(h => { if (!order.includes(h.i)) order.push(h.i); }));
+    const taking = run && run.recording && run.armed === i;
+    if (isHits(tr) || (taking && run.inst === 'drums')) {
+      // an ostinato or the drum rack: a row for each instrument it plays, in
+      // the drum ladder's order (every hit the parts hold, so sizing never
+      // reorders the rows), each in its instrument's colour
+      const used = new Set();
+      tr.clips.forEach(c => c.items.forEach(h => used.add(h.i)));
+      const fresh = taking ? run.take : [];
+      fresh.forEach(h => used.add(h.i));
+      const order = DRUMS.filter(id => used.has(id));   // the ladder's order, top down
       const rowsN = Math.max(1, order.length);
       const rh = (l.h - 8) / rowsN;
-      const col = TRACK_COLORS[i % TRACK_COLORS.length];
       drawParts(i, l, g, ppb, base);
-      g.fillStyle = col;
       const hit = (h, alpha) => {
         const x = (h.b - view.start) * ppb;
         if (x < -4 || x > l.w + 4) return;
         const r = order.indexOf(h.i);
+        g.fillStyle = drumColor(h.i);
         g.globalAlpha = alpha * (0.55 + 0.45 * Math.min(1, h.g));
         g.fillRect(x, 4 + r * rh + rh * 0.15, Math.max(2, Math.min(ppb * 0.22, 6)), Math.max(2, rh * 0.7));
       };
       hiddenOf(i).forEach(h => hit(h, 0.25 * base));
-      tr.hits.forEach(h => hit(h, base));
+      // while a take goes on, what it will replace is shown faint
+      tr.hits.forEach(h => hit(h, taking && h.b >= run.from - run.count ? 0.25 : base));
+      fresh.forEach(h => hit(h, 1));
       g.globalAlpha = 1;
       if (rowsN > 1 && l.h / rowsN >= 9 && ppb * barBeats() > 40) {
         g.font = '700 9px Nunito, system-ui, sans-serif';
         g.textBaseline = 'middle';
         g.fillStyle = cssVar('--text-3');
-        const VI = window.VirtualInstruments;
-        order.forEach((id, r) => g.fillText((VI.INSTRUMENT_MAP[id] || {}).label || id, l.w - 60, 4 + r * rh + rh / 2));
+        order.forEach((id, r) => g.fillText(drumLabel(id), l.w - 60, 4 + r * rh + rh / 2));
       }
       return;
     }
 
-    const taking = run && run.recording && run.armed === i;
     let fresh = [];
     if (taking) {
       const now = heardBeat(run);
@@ -3338,12 +3425,23 @@
     const ppb = pxPerBeat(l.w), rh = ed.rowH;
     const line = cssVar('--line'), strong = cssVar('--line-strong'), ink = cssVar('--text');
     const mTop = Math.ceil(ed.top), mBot = Math.ceil(ed.top - l.h / rh);
+    const drums = isHits(tr);
 
-    // the rows: a black key's darker, a line under each C (where an octave begins)
-    g.fillStyle = line;
-    for (let m = mBot; m <= mTop; m++) if (BLACK.has(mod(m, 12))) g.fillRect(0, rowY(m), l.w, rh);
-    g.fillStyle = strong;
-    for (let m = mBot; m <= mTop; m++) if (mod(m, 12) === 0) g.fillRect(0, Math.round(rowY(m) + rh) - 1, l.w, 1);
+    if (drums) {
+      // the drum ladder's rows: every other one shaded, a line under each
+      g.fillStyle = line;
+      for (let m = mBot; m <= mTop; m++) if (m >= ed.lo && m <= ed.hi && m % 2 === 0) { g.globalAlpha = 0.6; g.fillRect(0, rowY(m), l.w, rh); }
+      g.globalAlpha = 1;
+      g.fillStyle = strong;
+      for (let m = mBot; m <= mTop; m++) if (m >= ed.lo && m <= ed.hi) { g.globalAlpha = 0.5; g.fillRect(0, Math.round(rowY(m) + rh) - 1, l.w, 1); }
+      g.globalAlpha = 1;
+    } else {
+      // the rows: a black key's darker, a line under each C (where an octave begins)
+      g.fillStyle = line;
+      for (let m = mBot; m <= mTop; m++) if (BLACK.has(mod(m, 12))) g.fillRect(0, rowY(m), l.w, rh);
+      g.fillStyle = strong;
+      for (let m = mBot; m <= mTop; m++) if (mod(m, 12) === 0) g.fillRect(0, Math.round(rowY(m) + rh) - 1, l.w, 1);
+    }
     // outside the piano's rows
     g.fillStyle = line;
     if (ed.hi < mTop) g.fillRect(0, 0, l.w, rowY(ed.hi));
@@ -3404,10 +3502,12 @@
     ed.hits = [];
     g.textBaseline = 'middle';
     g.font = `800 ${clamp(rh - 4, 8, 11)}px Nunito, system-ui, sans-serif`;
+    // a hit is a mark a quarter of a beat wide (never thinner than a finger can find), in its instrument's colour
+    const hw = drums ? clamp(ppb * 0.25, 8, Math.max(8, Math.min(22, rh - 4))) : 0;
     order.forEach(v => {
-      const x0 = (v.b - view.start) * ppb, x1 = x0 + Math.max(3, v.d * ppb);
+      const x0 = (v.b - view.start) * ppb, x1 = drums ? x0 + hw : x0 + Math.max(3, v.d * ppb);
       if (x1 < -2 || x0 > l.w + 2) return;
-      const y0 = rowY(v.m), on = sel.has(v.n), color = noteColor(v.m);
+      const y0 = rowY(v.m), on = sel.has(v.n), color = drums ? drumColor(v.n.i) : noteColor(v.m);
       if (y0 + rh <= 0 || y0 >= l.h) { // out of sight above or below: a mark at that edge
         g.globalAlpha = 0.9 * dim;
         g.fillStyle = color;
@@ -3416,15 +3516,16 @@
         return;
       }
       ed.hits.push({ v, x0, x1, y0, y1: y0 + rh });
-      g.globalAlpha = dim;
+      g.globalAlpha = dim * (drums ? 0.55 + 0.45 * Math.min(1, v.n.g) : 1);   // a softer hit, fainter
       g.fillStyle = color;
-      boxPath(g, x0 + 0.5, y0 + 1, x1 - x0 - 1, rh - 2, Math.min(3, rh / 3));
+      if (drums) boxPath(g, x0 + 0.5, y0 + 2, x1 - x0 - 1, rh - 4, 4);
+      else boxPath(g, x0 + 0.5, y0 + 1, x1 - x0 - 1, rh - 2, Math.min(3, rh / 3));
       g.fill();
       g.globalAlpha = 1;
       g.lineWidth = on ? 2 : 1;
       g.strokeStyle = on ? ink : 'rgba(0, 0, 0, 0.35)';
       g.stroke();
-      if (rh >= 12 && x1 - x0 >= 26) { // its name, when there is room
+      if (!drums && rh >= 12 && x1 - x0 >= 26) { // its name, when there is room
         g.fillStyle = inkFor(color);
         g.globalAlpha = 0.85 * dim;
         g.fillText(prettyNote(midiName(Math.round(v.m))), x0 + 4, y0 + rh / 2 + 0.5);
@@ -3477,7 +3578,8 @@
       g.fillStyle = cssVar('--text-3');
       g.font = '700 13px Nunito, system-ui, sans-serif';
       g.textBaseline = 'middle';
-      g.fillText(clipboard ? 'No notes yet: Paste puts the copied ones at the dashed line.' : 'No notes on this track yet.', 12, l.h / 2);
+      const what = drums ? 'hits' : 'notes';
+      g.fillText(clipboard && clipboard.hits === drums ? `No ${what} yet: Paste puts the copied ones at the dashed line.` : `No ${what} on this track yet.`, 12, l.h / 2);
     }
     drawLadder();
   }
@@ -3496,9 +3598,26 @@
     const rh = ed.rowH, mTop = Math.ceil(ed.top), mBot = Math.ceil(ed.top - h / rh);
     const marked = new Set();
     const clips = ed.preview ? ed.preview.clips : P.tracks[ed.i].clips, sel = ed.preview ? ed.preview.sel : ed.sel;
-    clips.forEach(c => c.items.forEach(n => { if (sel.has(n)) marked.add(n.m); }));
+    clips.forEach(c => c.items.forEach(n => { if (sel.has(n)) marked.add(rowOf(n)); }));
     g.fillStyle = '#eceef3';
     g.fillRect(0, 0, w, h);
+    if (isHits(P.tracks[ed.i])) {   // the drum ladder: an instrument a row, its colour at the left
+      g.textBaseline = 'middle';
+      g.font = `800 ${clamp(rh - 6, 8, 12)}px Nunito, system-ui, sans-serif`;
+      for (let m = mBot; m <= mTop; m++) {
+        const y = rowY(m);
+        if (m < ed.lo || m > ed.hi) { g.fillStyle = '#9aa0ad'; g.fillRect(0, y, w, rh); continue; }
+        const id = drumId(m), col = drumColor(id);
+        if (ed.heard === m) { g.globalAlpha = 0.35; g.fillStyle = col; g.fillRect(0, y, w, rh); g.globalAlpha = 1; }
+        g.fillStyle = col;
+        g.fillRect(0, y + 1, 6, rh - 2);
+        if (marked.has(m)) g.fillRect(w - 6, y + 1, 5, rh - 2);
+        g.fillStyle = 'rgba(0, 0, 0, 0.18)';
+        g.fillRect(0, Math.round(y + rh) - 1, w, 1);
+        if (rh >= 9) { g.fillStyle = '#2a2f3a'; g.fillText(drumLabel(id), 11, y + rh / 2 + 0.5); }
+      }
+      return;
+    }
     for (let m = mBot; m <= mTop; m++) {
       const y = rowY(m), pc = mod(m, 12);
       if (m < ed.lo || m > ed.hi) { g.fillStyle = '#9aa0ad'; g.fillRect(0, y, w, rh); continue; }
@@ -3605,6 +3724,7 @@
     sizeLanes();
     drawAll();
     renderPos();
+    if (window.StudioLink) StudioLink.setTempo();   // a project opened or brought in: the drum rack plays at its tempo, in its meter
   }
 
   playBtn.innerHTML = PLAY_ICON;
@@ -3625,6 +3745,7 @@
       toast('Voice takes keep their own speed: a new tempo moves the other tracks under them.');
     }
     tempoInput.value = P.tempo;
+    if (window.StudioLink) StudioLink.setTempo();   // the drum rack plays at it
     save();
   }
   tempoInput.addEventListener('change', () => { setTempo(tempoInput.value); tempoInput.blur(); });
@@ -4365,7 +4486,7 @@
   // -------- FOR link.js AND bring-in.js --------
   window.Studio = {
     KINDS, INSTRUMENTS, MAX_TRACKS, METERS, TEMPO_MIN, TEMPO_MAX,
-    noteOn, noteOff, noteHit, togglePlay, stop: stopRun, busy,
+    noteOn, noteOff, noteHit, drumHit, togglePlay, stop: stopRun, busy,
     sounding: () => !!run,
     takeIds: () => clipIds(P.tracks),
     calibrating: () => !!cal, calTap,

@@ -1,9 +1,9 @@
 # Recording Studio
 
 A multitrack recorder that holds the Eagle View Music instruments. Pick a
-track, pick an instrument — the **Virtual Keyboard**, the **Digital Accordion**
-or the **Rainbow Xylophone** — and play it right here in the studio while the
-other tracks play back. Songs from **Ostinato Builder 2.0** and **Song Writer
+track, pick an instrument — the **Virtual Keyboard**, the **Digital Accordion**,
+the **Rainbow Xylophone** or the **Virtual Drum Rack** — and play it right here
+in the studio while the other tracks play back. Songs from **Ostinato Builder 2.0** and **Song Writer
 3.5** can be brought in as tracks too, so the apps can build one bigger
 project together. The mix saves as an MP3 or WAV.
 
@@ -58,6 +58,7 @@ the live site): move a project between them with a project file.
 | D17 | **A selected take or part** (2026-10-25, the user's ask): a press on a take or part that doesn't drag selects it — a yellow outline and tint show which one — and Delete or Backspace removes it (Undo brings it back; a toast says so). A press on empty lane lets it go; a moved, trimmed or split one stays selected (the left half after a split). Remembered by track and start beat, so it survives the tracks being rebuilt or undone. Keys typed into a field, or with a sheet or menu open, are left alone. | You need to see what is about to go before the key does it. |
 | D18 | **Ostinato tracks are loops** (2026-10-25, the user's ask): a brought-in ostinato is a loop block — one pass of hits (`items`, `loop` beats long) that goes round for as long as its window is. Drag its end out and it keeps going, bar after bar; drag its start and the window moves over the loop with the phase kept (`o` is where in the pass the window starts, wrapped to the pass); split it and both halves loop on, in step. A notch on the block marks where each pass begins. Older projects: an ostinato block written out repeat after repeat becomes a loop on opening — the pass length is the shortest whole-beat shift that lands every hit on another of its instrument (the Rock beat is a 2-beat loop), or the whole block when there is none; a trimmed window that used to run past the written-out hits now hears the loop to its end. Saved with `loop`; the derived hits are still saved, so an older studio plays the file as it sounds. Note tracks (keyboard, songs) are not loops. | A drum pattern is a loop in every studio; nobody wants to bring it in again to make it longer. |
 | D12 | **Drag a track's name up or down** to reorder the tracks (2026-10-24, the user's ask); a press that doesn't move still arms the track. Undo / Redo cover it. A track's colour goes with its place. | |
+| D19 | **Percussion: the Virtual Drum Rack records, and hits are edited** (2026-11-08, the user's ask). A fourth instrument tab, **Drum Rack**, frames `virtual-drum-kit/index.html?embed=studio`; a track recorded from it is kind `drums`, engine `hits` — the same `{ i, b, g, r }` hits as an Ostinato Builder track, played by the same kit, so the two kinds are edited and heard alike. **The drum editor**: a double-click on a drum or ostinato track opens the note editor as a drum machine — in the piano's place THE DRUM LADDER, one row for each of the kit's 14 instruments in the kit's own order (bass at the top, as on the rack and in Ostinato Builder); a hit is a mark a quarter-beat wide in its instrument's colour (fainter when softer); drag it along to change its beat (Quantize on: onto the grid), up or down to change its instrument; box-select, copy / paste (hits paste only onto drum tracks, notes only onto note tracks), Delete, arrows, Undo, Save Changes / Cancel as for notes; a loop's passes change together. A hit's `r` (beats to its line's next hit, which shapes a fast repeat) is derived from the track as it plays (`regap` in `partsView`), never stored stale. **The rack in the studio**: its header is hidden; the studio's bar shows an *Instruments: n* menu (how many pads show — the track still holds every instrument) and *Rearrange*, nothing else (the user's call). It plays at the project's tempo in its meter (`offer({ setTempo(bpm, compound) })`, given on join, on every tempo or meter change and on opening a project; not remembered by the rack while framed). **Its repeating pads keep to the studio's beats**: when a run starts the studio hands every instrument the grid (`StudioLink.setGrid(origin, beatMs)`: performance.now() of the run's first beat) and withdraws it when the run stops — the rack seeds its own launch grid from it (a pad latched in the count-in first sounds on beat 1; Play-all falls in on the next grid point, or at once a little past one) and stops its pads when the grid is withdrawn. A repeater's hit is reported with its own moment (`studio.drum(inst, level, when)`) and recorded just there, not moved earlier by the recording delay (it was the machine's, not a hand's behind the speakers); a pad pressed by hand is placed at the key or touch, as notes are. Measured: a hi-hat latched during the count-in landed on 0, 0.5, 1.0 … within ±0.017 beats at 90 bpm, Quantize off. | The user: "like other percussion DAWs — each line an instrument, up or down changes the sound, left and right the beat"; the drum rack as a live instrument on the studio's BPM; one MIDI design for both apps. |
 
 ## Files
 
@@ -98,7 +99,8 @@ const studio = joinStudio('virtual-keyboard');
 studio.on(id, freqs, sound, level)   // a held note or chord starts now
 studio.off(id)                       // and ends now (id: unique while held)
 studio.hit(freqs, sound, level)      // a struck note that rings on its own
-studio.offer({ setSound, setKey, releaseAll })   // optional: what the studio may ask
+studio.drum(inst, level, when)       // a percussion hit by kit instrument id (the drum rack)
+studio.offer({ setSound, setKey, setTempo, setGrid, releaseAll })   // optional: what the studio may ask
 ```
 
 - `freqs` — the frequencies sounding (one for a note, several for a chord).
@@ -115,7 +117,14 @@ studio.offer({ setSound, setKey, releaseAll })   // optional: what the studio ma
   (pitch class 0 = C, a `Theory` scale id; given shortly after `offer` and on
   every change); `releaseAll()` lets go of every held note. The keyboard and
   accordion offer `setKey` in `script.js`; the xylophone in `App.tsx` (as Minor
-  for Natural Minor).
+  for Natural Minor). `setTempo(bpm, compound)` is the project's tempo and
+  whether its beat is a dotted quarter; `setGrid(origin, beatMs)` the studio's
+  beat grid while it runs (`origin` in the frame's own performance.now() terms,
+  `null` when it stops). The drum rack offers all three (D19).
+- `drum(inst, level, when)` — a percussion hit: `inst` a kit instrument id
+  (`VirtualInstruments.INSTRUMENT_MAP`), `level` 1 = as tuned, `when` the
+  frame's performance.now() for a hit the instrument's own clock played
+  (recorded at exactly that moment), left out for a hit played by hand.
 
 Who joins:
 
@@ -124,6 +133,7 @@ Who joins:
 | Virtual Keyboard | `startNote` / `stopNote` in `script.js`; embedded, its own recorder is not loaded. |
 | Digital Accordion | `startBlock` / `stopBlock` / `retriggerHeld` in `script.js`. |
 | Rainbow Xylophone | the bar strike in `App.tsx` (`hit`); built into `bundle.js`. |
+| Virtual Drum Rack | `playSound` in `index.html` (`drum`; a repeater step sets `opts.machine`); `STUDIO` at the top of its script. |
 
 The studio also catches **Space** (play / stop) and **Escape** (stop) in the
 frames, and hands keys pressed on the studio's own page to the instrument, so
@@ -306,6 +316,7 @@ together: **Virtual Keyboard** (`script.js`, `recorder.js`, `styles.css`,
 3.5** (`js/embed.js`, `js/studio-bridge.js`, `index.html`, `js/library.js`,
 `js/lessons.js`, `js/audio.js`, `js/player.js`, `README.md`) and the
 **Rainbow Xylophone** (`Claude Apps/rainbow-xylophone/` — its `index.html`
-carries the bundle inline; source in `App Projects/rainbow-xylophone/`).
+carries the bundle inline; source in `App Projects/rainbow-xylophone/`) and the
+**Virtual Drum Rack** (`virtual-drum-kit/index.html`, since 2026-11-08).
 Ostinato Builder needs nothing new. Leave `Open the Recording Studio.command` and
 `tools/` out of the Eagle View Music copies (the site is served already).

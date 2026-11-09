@@ -10,7 +10,7 @@
      strikes (xylophone)
                the Rainbow Xylophone's voices (xylo.js), each track through
                a gain of its own into the xylophone's master
-     hits (an ostinato)
+     hits (an ostinato, or the drum rack)
                the shared percussion engine (lib/instruments/), one kit a
                track, played through EVMCountIn.timed so a hit handed over a
                moment early still lands to the sample
@@ -71,7 +71,7 @@ const Voices = (() => {
     return {
       level(track, level) {
         levels.set(track.id, level);
-        if (track.kind === 'xylophone' || track.kind === 'ostinato' || track.kind === 'voice') {
+        if (track.kind === 'xylophone' || track.kind === 'ostinato' || track.kind === 'drums' || track.kind === 'voice') {
           trackGain(track, level).gain.setTargetAtTime(level / BASE, ctx.currentTime, 0.02);
         } else {
           Audio.setLevel(sideOf(track), level);
@@ -172,7 +172,7 @@ const Voices = (() => {
     const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const renders = [];
 
-    const noteTracks = song.tracks.filter(t => t.events.length && !(t.kind === 'xylophone' || t.kind === 'ostinato' || t.kind === 'voice'));
+    const noteTracks = song.tracks.filter(t => t.events.length && !(t.kind === 'xylophone' || t.kind === 'ostinato' || t.kind === 'drums' || t.kind === 'voice'));
     if (noteTracks.length) {
       renders.push(Audio.render({
         seconds: song.seconds, room: song.room, rate: RATE,
@@ -202,7 +202,7 @@ const Voices = (() => {
       renders.push(off.startRendering());
     }
 
-    const kitTracks = song.tracks.filter(t => t.events.length && t.kind === 'ostinato');
+    const kitTracks = song.tracks.filter(t => t.events.length && (t.kind === 'ostinato' || t.kind === 'drums'));
     if (kitTracks.length) {
       const off = new OAC(2, length, RATE);
       const timed = EVMCountIn.timed(off);

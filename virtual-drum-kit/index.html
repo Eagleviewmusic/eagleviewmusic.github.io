@@ -198,6 +198,13 @@
             z-index: 100;
         }
         
+        .rack-header-left {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            min-width: 0;
+        }
+
         .rack-brand {
             text-decoration: none;
             color: inherit;
@@ -238,12 +245,6 @@
             gap: 14px;
         }
         
-        .voice-selector-wrapper {
-            position: relative;
-            display: inline-block;
-            z-index: 101;
-        }
-        
         .rack-status {
             display: flex;
             align-items: center;
@@ -255,103 +256,343 @@
             box-shadow: 0 3px 0 var(--ink-shadow);
         }
         
-        .voice-btn {
+        @keyframes popover-slide-in {
+            0% { transform: translateY(-8px) scale(0.95); opacity: 0; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+
+        /* Settings Gear & Panel */
+        .settings-wrapper {
+            position: relative;
+            display: inline-block;
+            z-index: 101;
+        }
+
+        .settings-btn {
             cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border-radius: 50%;
+            color: var(--ink-dark);
+            background: var(--silver-light);
+            border: 2.5px solid var(--ink-dark);
+            box-shadow: 0 3px 0 var(--ink-dark);
             outline: none;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
             transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;
         }
-        
-        .voice-btn:hover {
+
+        .settings-btn svg {
+            display: block;
+            transition: transform 0.3s ease;
+        }
+
+        .settings-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 0 var(--ink-shadow);
-            background: #253745;
+            box-shadow: 0 5px 0 var(--ink-dark);
+            background: #EDF3F7;
         }
-        
-        .voice-btn:active {
+
+        .settings-btn:active {
             transform: translateY(2px);
-            box-shadow: 0 1px 0 var(--ink-shadow);
+            box-shadow: 0 1px 0 var(--ink-dark);
         }
-        
-        .voice-text {
-            font-family: 'Fredoka', sans-serif;
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: var(--cream-head);
-            letter-spacing: 1px;
+
+        .settings-btn[aria-expanded="true"] {
+            background: var(--cymbal-yellow);
         }
-        
-        .voice-arrow {
-            font-size: 0.65rem;
-            color: var(--cymbal-yellow);
-            transition: transform 0.15s ease;
-            line-height: 1;
+
+        .settings-btn[aria-expanded="true"] svg {
+            transform: rotate(60deg);
         }
-        
-        .voice-btn[aria-expanded="true"] .voice-arrow {
-            transform: rotate(180deg);
-        }
-        
-        .voice-popover {
+
+        .settings-panel {
             display: none;
             position: absolute;
-            top: calc(100% + 6px);
-            right: 0;
+            top: calc(100% + 10px);
+            right: -6px;
             z-index: 1000;
             background: var(--cream-card);
             border: 3.5px solid var(--ink-dark);
             border-radius: 14px;
-            padding: 10px;
+            padding: 12px 14px 14px;
             box-shadow: 0 6px 0 var(--ink-dark), 0 12px 28px rgba(0,0,0,0.35);
-            width: 190px;
+            width: 304px;
+            max-width: calc(100vw - 32px);
             animation: popover-slide-in 0.16s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        
-        .voice-popover::before {
+
+        .settings-panel::before {
             content: '';
             position: absolute;
             top: -9px;
-            right: 30px;
+            right: 16px;
             width: 0;
             height: 0;
             border-left: 8px solid transparent;
             border-right: 8px solid transparent;
             border-bottom: 9px solid var(--ink-dark);
         }
-        
-        .voice-popover::after {
+
+        .settings-panel::after {
             content: '';
             position: absolute;
             top: -4px;
-            right: 31px;
+            right: 17px;
             width: 0;
             height: 0;
             border-left: 7px solid transparent;
             border-right: 7px solid transparent;
             border-bottom: 7px solid var(--cream-card);
         }
-        
-        .voice-popover.is-open {
+
+        .settings-panel.is-open {
             display: block;
         }
-        
-        @keyframes popover-slide-in {
-            0% { transform: translateY(-8px) scale(0.95); opacity: 0; }
-            100% { transform: translateY(0) scale(1); opacity: 1; }
-        }
-        
-        .voice-popover-title {
+
+        .settings-title {
             font-family: 'Fredoka', sans-serif;
-            font-size: 0.72rem;
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: var(--ink-dark);
+            letter-spacing: 1.5px;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .settings-section + .settings-section {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 2px dashed rgba(28, 43, 54, 0.2);
+        }
+
+        /* Wide screens: Instruments and Meter on the left, Subdivisions on the right, so the panel stays short */
+        @media (min-width: 769px) {
+            .settings-panel {
+                width: 600px;
+            }
+            .settings-body {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: auto 1fr;
+                column-gap: 18px;
+            }
+            .settings-body .settings-subdivisions {
+                grid-column: 2;
+                grid-row: 1 / span 2;
+                margin-top: 0;
+                padding-top: 0;
+                padding-left: 18px;
+                border-top: none;
+                border-left: 2px dashed rgba(28, 43, 54, 0.2);
+            }
+        }
+
+        .settings-label {
+            font-family: 'Fredoka', sans-serif;
+            font-size: 0.68rem;
             font-weight: 800;
             color: var(--ink-dark);
             letter-spacing: 1px;
-            text-align: center;
-            margin-bottom: 8px;
-            text-transform: uppercase;
+            margin-bottom: 7px;
+            opacity: 0.75;
         }
-        
+
+        .settings-hint {
+            font-family: 'Fredoka', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 500;
+            color: var(--ink-dark);
+            opacity: 0.7;
+            margin-top: 8px;
+            line-height: 1.3;
+        }
+
+        .meter-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .meter-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1px;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 800;
+            color: var(--ink-dark);
+            background: var(--silver-light);
+            border: 2px solid var(--ink-dark);
+            border-radius: 8px;
+            padding: 5px 4px 6px;
+            box-shadow: 0 2px 0 var(--ink-dark);
+            cursor: pointer;
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.1s ease, background 0.1s ease, box-shadow 0.1s ease;
+        }
+
+        .meter-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 0 var(--ink-dark);
+        }
+
+        .meter-btn.is-active {
+            background: var(--cymbal-yellow);
+            box-shadow: 0 1px 0 var(--ink-dark);
+            transform: translateY(1px);
+        }
+
+        .meter-btn:focus-visible {
+            outline: 3px solid var(--indie-teal);
+            outline-offset: 2px;
+        }
+
+        .meter-sub {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.62rem;
+            font-weight: 700;
+            opacity: 0.7;
+        }
+
+        .subdiv-heads {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 4px;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 0.6rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: var(--ink-dark);
+            opacity: 0.55;
+        }
+
+        .subdiv-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px 6px;
+        }
+
+        .subdiv-cell {
+            display: flex;
+        }
+
+        .subdiv-cell > * {
+            flex: 1;
+        }
+
+        .subdiv-btn[hidden],
+        .subdiv-none[hidden] {
+            display: none;
+        }
+
+        /* A slot with no counterpart in this meter */
+        .subdiv-none {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 30px;
+            border: 2px dashed rgba(28, 43, 54, 0.3);
+            border-radius: 8px;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--ink-dark);
+            opacity: 0.6;
+        }
+
+        .subdiv-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 30px;
+            text-align: left;
+            line-height: 1.1;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 0.76rem;
+            font-weight: 700;
+            color: var(--ink-dark);
+            background: var(--cream-dark);
+            border: 2px solid var(--ink-dark);
+            border-radius: 8px;
+            padding: 5px 6px;
+            box-shadow: none;
+            transform: translateY(2px);
+            opacity: 0.55;
+            cursor: pointer;
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.1s ease, background 0.1s ease, box-shadow 0.1s ease, opacity 0.1s ease;
+        }
+
+        .subdiv-btn.is-on {
+            background: #FFF;
+            box-shadow: 0 2px 0 var(--ink-dark);
+            transform: none;
+            opacity: 1;
+        }
+
+        .subdiv-btn:hover {
+            opacity: 0.85;
+        }
+
+        .subdiv-btn.is-on:hover {
+            opacity: 1;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 0 var(--ink-dark);
+        }
+
+        .subdiv-btn:focus-visible,
+        .voice-option-btn:focus-visible,
+        .settings-btn:focus-visible,
+        .play-stop-btn:focus-visible {
+            outline: 3px solid var(--indie-teal);
+            outline-offset: 2px;
+        }
+
+        .subdiv-dot {
+            flex-shrink: 0;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid var(--ink-dark);
+        }
+
+        /* A counterpart's dot carries its tuplet number */
+        .subdiv-dot.is-counterpart {
+            width: 18px;
+            height: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.66rem;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .subdiv-btn:not(.is-on) .subdiv-dot {
+            filter: grayscale(1);
+        }
+
+        .subdiv-btn.is-refused {
+            animation: subdiv-refuse 0.32s ease;
+        }
+
+        @keyframes subdiv-refuse {
+            0%, 100% { translate: 0; }
+            25% { translate: -4px 0; }
+            75% { translate: 4px 0; }
+        }
+
         .voice-options-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
@@ -757,27 +998,33 @@
 
         .play-stop-btn {
             cursor: pointer;
+            flex-shrink: 0;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 32px;
-            height: 31px;
+            width: 56px;
+            height: 56px;
             padding: 0;
-            border-radius: 20px;
+            border-radius: 50%;
             color: var(--ink-dark);
-            background: var(--silver-light);
-            border: 2.5px solid var(--ink-dark);
-            box-shadow: 0 3px 0 var(--ink-dark);
+            background: var(--cymbal-yellow);
+            border: 3.5px solid var(--ink-dark);
+            box-shadow: 0 4px 0 var(--ink-dark);
             outline: none;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
-            transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease, color 0.15s ease;
+            touch-action: manipulation;
+            transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;
+        }
+
+        .play-stop-btn .play-icon {
+            margin-left: 3px; /* the triangle's weight sits left of its box */
         }
 
         .play-stop-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 0 var(--ink-dark);
-            background: #EDF3F7;
+            box-shadow: 0 6px 0 var(--ink-dark);
+            background: #FFD45E;
         }
 
         .play-stop-btn:active {
@@ -786,14 +1033,12 @@
         }
 
         .play-stop-btn.is-playing {
-            background: #FF7B54;
-            color: #FFF;
-            box-shadow: 0 3px 0 var(--ink-dark);
+            animation: play-glow 1s ease-in-out infinite alternate;
         }
 
-        .play-stop-btn.is-playing:hover {
-            background: #FF6233;
-            color: #FFF;
+        @keyframes play-glow {
+            0% { box-shadow: 0 4px 0 var(--ink-dark), 0 0 0 0 var(--led-glow); }
+            100% { box-shadow: 0 4px 0 var(--ink-dark), 0 0 0 7px var(--led-glow); }
         }
 
         .play-stop-btn .stop-icon {
@@ -1291,9 +1536,20 @@
 
         .repeat-options-grid {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
             gap: 7px;
+        }
+
+        /* One column per slot: the main speed, with its counterpart under it */
+        .repeat-col {
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+        }
+
+        .repeat-col[hidden] {
+            display: none;
         }
 
         .repeat-option-btn {
@@ -1311,6 +1567,41 @@
             transition: transform 0.12s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.12s ease;
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
+        }
+
+        /* A speed that's switched off keeps its place, so counterparts stay under their mains */
+        .repeat-option-btn[hidden] {
+            visibility: hidden;
+        }
+
+        .repeat-popover:not(.has-counterparts) .repeat-option-btn.is-counterpart {
+            display: none;
+        }
+
+        /* Counterparts: the main's colour plus the tuplet number (the pad's repeat button is already positioned) */
+        .repeat-option-btn.is-counterpart {
+            position: relative;
+        }
+
+        .repeat-option-btn.is-counterpart::after,
+        .pad-repeat-btn.is-counterpart::after {
+            content: attr(data-tuplet);
+            position: absolute;
+            right: -6px;
+            bottom: -6px;
+            min-width: 15px;
+            height: 15px;
+            padding: 0 3px;
+            border-radius: 8px;
+            background: var(--ink-dark);
+            border: 1.5px solid #FFFFFF;
+            color: #FFFFFF;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 9.5px;
+            font-weight: 800;
+            line-height: 12px;
+            text-align: center;
+            pointer-events: none;
         }
 
         .repeat-option-btn:hover {
@@ -1368,21 +1659,31 @@
                 margin-bottom: 14px;
                 padding-bottom: 12px;
             }
+            .rack-header-left {
+                gap: 12px;
+            }
+            .play-stop-btn {
+                width: 48px;
+                height: 48px;
+            }
             .rack-panel-right {
                 flex-wrap: wrap;
                 gap: 8px;
+                position: relative;
             }
-            .voice-popover {
+            /* Too narrow to hang off the gear: the panel lines up under the whole button row */
+            .settings-wrapper {
+                position: static;
+            }
+            .settings-panel {
+                right: auto;
                 left: 0;
-                right: auto;
+                width: 100%;
+                min-width: 248px;
             }
-            .voice-popover::before {
-                left: 36px;
-                right: auto;
-            }
-            .voice-popover::after {
-                left: 37px;
-                right: auto;
+            .settings-panel::before,
+            .settings-panel::after {
+                display: none;
             }
             .bpm-popover {
                 right: -24px;
@@ -1554,6 +1855,13 @@
         .in-iframe .back-home-btn {
             display: none !important;
         }
+
+        /* Leave room under the fixed back button so it never sits on the rack's title */
+        @media (min-width: 601px) {
+            html:not(.in-iframe) body {
+                padding-top: 72px;
+            }
+        }
         
         @media (max-width: 600px) {
             .back-home-btn {
@@ -1605,35 +1913,24 @@
         
         <div class="rack-chassis">
             <header class="rack-header">
-                <a href="https://www.musicapps4all.com" target="_blank" rel="noopener noreferrer" class="rack-brand">
-                    <h1 class="rack-title">VIRTUAL DRUM RACK</h1>
-                    <div class="rack-subtitle">MODEL VDR-100 // 10-VOICE RETRO PERCUSSION</div>
-                </a>
+                <div class="rack-header-left">
+                    <a href="https://www.musicapps4all.com" target="_blank" rel="noopener noreferrer" class="rack-brand">
+                        <h1 class="rack-title">VIRTUAL DRUM RACK</h1>
+                        <div class="rack-subtitle">MODEL VDR-100 // 10-VOICE RETRO PERCUSSION</div>
+                    </a>
+                    <button id="play-stop-btn" class="play-stop-btn" type="button" aria-label="Play all repeaters" title="Play all repeaters">
+                        <svg class="play-icon" viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+                            <polygon points="7,4 20,12 7,20"></polygon>
+                        </svg>
+                        <svg class="stop-icon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                            <rect x="5" y="5" width="14" height="14" rx="2" ry="2"></rect>
+                        </svg>
+                    </button>
+                </div>
                 <div class="rack-panel-right">
-                    <div class="voice-selector-wrapper">
-                        <button id="voice-btn" class="rack-status voice-btn" type="button" aria-label="Change voice count" aria-haspopup="true" aria-expanded="false">
-                            <span class="status-led"></span>
-                            <span class="voice-text">10-VOICE</span>
-                            <span class="voice-arrow">▾</span>
-                        </button>
-                        <div id="voice-popover" class="voice-popover" role="menu">
-                            <div class="voice-popover-title">VOICES (1–10)</div>
-                            <div class="voice-options-grid">
-                                <button class="voice-option-btn" type="button" data-voices="1">1</button>
-                                <button class="voice-option-btn" type="button" data-voices="2">2</button>
-                                <button class="voice-option-btn" type="button" data-voices="3">3</button>
-                                <button class="voice-option-btn" type="button" data-voices="4">4</button>
-                                <button class="voice-option-btn" type="button" data-voices="5">5</button>
-                                <button class="voice-option-btn" type="button" data-voices="6">6</button>
-                                <button class="voice-option-btn" type="button" data-voices="7">7</button>
-                                <button class="voice-option-btn" type="button" data-voices="8">8</button>
-                                <button class="voice-option-btn" type="button" data-voices="9">9</button>
-                                <button class="voice-option-btn is-active" type="button" data-voices="10">10</button>
-                            </div>
-                        </div>
-                    </div>
                     <div class="bpm-selector-wrapper">
                         <button id="bpm-btn" class="rack-status bpm-btn" type="button" aria-label="Change tempo (BPM)" aria-haspopup="dialog" aria-expanded="false">
+                            <span class="status-led"></span>
                             <span class="bpm-text">120 BPM</span>
                             <span class="bpm-arrow">▾</span>
                         </button>
@@ -1666,14 +1963,51 @@
                     <button id="rearrange-btn" class="rack-badge rearrange-btn" type="button" aria-label="Rearrange drum pads" aria-expanded="false">
                         <span class="rearrange-text">REARRANGE</span>
                     </button>
-                    <button id="play-stop-btn" class="rack-badge play-stop-btn" type="button" aria-label="Play all repeaters" title="Play all repeaters">
-                        <svg class="play-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                            <polygon points="7,4 20,12 7,20"></polygon>
-                        </svg>
-                        <svg class="stop-icon" viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
-                            <rect x="5" y="5" width="14" height="14" rx="2" ry="2"></rect>
-                        </svg>
-                    </button>
+                    <div class="settings-wrapper">
+                        <button id="settings-btn" class="settings-btn" type="button" aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-expanded="false" aria-controls="settings-panel">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                        <div id="settings-panel" class="settings-panel" role="dialog" aria-label="Settings">
+                            <div class="settings-title">SETTINGS</div>
+
+                            <div class="settings-body">
+                                <div class="settings-section">
+                                    <div class="settings-label">INSTRUMENTS</div>
+                                    <div class="voice-options-grid">
+                                        <button class="voice-option-btn" type="button" data-voices="1">1</button>
+                                        <button class="voice-option-btn" type="button" data-voices="2">2</button>
+                                        <button class="voice-option-btn" type="button" data-voices="3">3</button>
+                                        <button class="voice-option-btn" type="button" data-voices="4">4</button>
+                                        <button class="voice-option-btn" type="button" data-voices="5">5</button>
+                                        <button class="voice-option-btn" type="button" data-voices="6">6</button>
+                                        <button class="voice-option-btn" type="button" data-voices="7">7</button>
+                                        <button class="voice-option-btn" type="button" data-voices="8">8</button>
+                                        <button class="voice-option-btn" type="button" data-voices="9">9</button>
+                                        <button class="voice-option-btn is-active" type="button" data-voices="10">10</button>
+                                    </div>
+                                </div>
+
+                                <div class="settings-section">
+                                    <div class="settings-label">METER</div>
+                                    <div class="meter-options">
+                                        <button class="meter-btn" type="button" data-meter="simple" aria-pressed="true">Simple<span class="meter-sub">2/4 · 3/4 · 4/4</span></button>
+                                        <button class="meter-btn" type="button" data-meter="compound" aria-pressed="false">Compound<span class="meter-sub">6/8 · 9/8 · 12/8</span></button>
+                                    </div>
+                                    <div class="settings-hint" id="meter-hint"></div>
+                                </div>
+
+                                <div class="settings-section settings-subdivisions">
+                                    <div class="settings-label">SUBDIVISIONS</div>
+                                    <div class="subdiv-heads">
+                                        <span>MAIN</span>
+                                        <span>COUNTERPART</span>
+                                    </div>
+                                    <div class="subdiv-options" id="subdiv-options"></div>
+                                    <div class="settings-hint">The repeat speeds the pads can use. Keep at least one main speed.</div>
+                            </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </header>
             
@@ -1842,43 +2176,8 @@
 
             <!-- Repeat Speed Option Popover Window (Color Symbols Only) -->
             <div id="repeat-popover" class="repeat-popover" role="dialog" aria-label="Select repeat speed">
-                <div class="repeat-options-grid">
-                    <button class="repeat-option-btn opt-repeat-0" type="button" data-repeat-state="0" aria-label="Repeat Off" title="Repeat: Off">
-                        <svg class="repeat-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
-                        </svg>
-                    </button>
-                    <button class="repeat-option-btn opt-repeat-1" type="button" data-repeat-state="1" aria-label="Whole Note" title="Whole Note (1 every 4 beats)">
-                        <svg class="repeat-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
-                        </svg>
-                    </button>
-                    <button class="repeat-option-btn opt-repeat-2" type="button" data-repeat-state="2" aria-label="Half Note" title="Half Note (1 every 2 beats)">
-                        <svg class="repeat-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
-                        </svg>
-                    </button>
-                    <button class="repeat-option-btn opt-repeat-3" type="button" data-repeat-state="3" aria-label="Quarter Note" title="Quarter Note (1 beat)">
-                        <svg class="repeat-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
-                        </svg>
-                    </button>
-                    <button class="repeat-option-btn opt-repeat-4" type="button" data-repeat-state="4" aria-label="8th Note" title="8th Note (1/2 beat)">
-                        <svg class="repeat-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
-                        </svg>
-                    </button>
-                    <button class="repeat-option-btn opt-repeat-5" type="button" data-repeat-state="5" aria-label="16th Note" title="16th Note (1/4 beat)">
-                        <svg class="repeat-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
-                        </svg>
-                    </button>
-                    <button class="repeat-option-btn opt-repeat-6" type="button" data-repeat-state="6" aria-label="32nd Note" title="32nd Note (1/8 beat)">
-                        <svg class="repeat-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
-                        </svg>
-                    </button>
-                </div>
+                <!-- Built by buildRepeatChoices(): a column per slot, main on top, counterpart under it -->
+                <div class="repeat-options-grid"></div>
             </div>
         </div>
 
@@ -1890,6 +2189,19 @@
 
 
     <script>
+        // THE RECORDING STUDIO: framed by it (?embed=studio), every hit played here is
+        // reported to it (STUDIO.drum), the tempo and meter are the project's, and while
+        // the studio plays or records the repeating pads keep to its beat grid.
+        const STUDIO = (function () {
+            try {
+                if (new URLSearchParams(location.search).get('embed') !== 'studio') return null;
+                if (window.parent === window || !window.parent.EVMStudio) return null;
+                return window.parent.EVMStudio.join(window, 'virtual-drum-rack');
+            } catch (e) { return null; }
+        })();
+        if (STUDIO) document.documentElement.classList.add('in-studio');
+        let studioGrid = null;   // { origin, beatMs }: performance.now() of the studio's first beat, while it runs
+
         let audioContext;
         let analyser;
         let masterGainNode;
@@ -3240,7 +3552,84 @@
             } catch (e) {}
         }
 
-        // Pad Repeat Rates (0: Off, 1: Whole/Blue, 2: Half/Green, 3: Quarter/Yellow, 4: 8th/Orange, 5: 16th/Red, 6: 32nd/Purple)
+        // Repeat speeds, in beats. Simple meter: the beat is a quarter note. Compound meter: the beat is a dotted quarter.
+        // A pad's repeat state is a slot 1–6 (that slot's main speed) or slot + 6 (7–12, its counterpart); 0 is Off.
+        // The slots keep their colours in both meters (1 Blue, 2 Green, 3 Yellow, 4 Orange, 5 Red, 6 Purple),
+        // and a counterpart wears its main's colour with its tuplet number.
+        // snap: the grid a repeat may start on. accentEvery: how the 6- and 12-a-beat streams group in this meter.
+        const METER_REPEATERS = {
+            simple: {
+                main: [
+                    { beats: 4,    snap: 1,   label: 'Whole',   name: 'Whole note' },
+                    { beats: 2,    snap: 1/2, label: 'Half',    name: 'Half note' },
+                    { beats: 1,    snap: 1/2, label: 'Quarter', name: 'Quarter note' },
+                    { beats: 1/2,  snap: 1/2, label: '8th',     name: '8th note' },
+                    { beats: 1/4,  snap: 1/4, label: '16th',    name: '16th note' },
+                    { beats: 1/8,  snap: 1/4, label: '32nd',    name: '32nd note' }
+                ],
+                counterpart: [
+                    { beats: 4/3,  snap: 1,   tuplet: 3, label: 'Half triplet',    name: 'Half-note triplet (3 in a whole note)' },
+                    { beats: 2/3,  snap: 1/3, tuplet: 3, label: 'Quarter triplet', name: 'Quarter-note triplet (3 in a half note)' },
+                    { beats: 1/3,  snap: 1/3, tuplet: 3, label: '8th triplet',     name: '8th-note triplet (3 in a beat)' },
+                    { beats: 1/6,  snap: 1/6, tuplet: 3, label: '16th triplet',    name: '16th-note triplet (6 in a beat)', accentEvery: 3 },
+                    { beats: 1/12, snap: 1/6, tuplet: 3, label: '32nd triplet',    name: '32nd-note triplet (12 in a beat)', accentEvery: 3 },
+                    null // the 64th-note triplet is left out: 48 hits a second at 120 BPM
+                ]
+            },
+            compound: {
+                main: [
+                    { beats: 4,    snap: 1,   label: 'Dotted whole',   name: 'Dotted whole note (4 beats)' },
+                    { beats: 2,    snap: 1/3, label: 'Dotted half',    name: 'Dotted half note (2 beats)' },
+                    { beats: 1,    snap: 1/3, label: 'Dotted quarter', name: 'Dotted quarter note (the beat)' },
+                    { beats: 1/3,  snap: 1/3, label: '8th',            name: '8th note (3 in a beat)' },
+                    { beats: 1/6,  snap: 1/6, label: '16th',           name: '16th note (6 in a beat)', accentEvery: 2 },
+                    { beats: 1/12, snap: 1/6, label: '32nd',           name: '32nd note (12 in a beat)', accentEvery: 4 }
+                ],
+                counterpart: [
+                    { beats: 4/3,  snap: 1,   tuplet: 3, label: '3-over-4 hemiola', name: 'Dotted-half triplet: 3 across 4 beats' },
+                    { beats: 2/3,  snap: 1/3, tuplet: 3, label: '3-over-2 hemiola', name: 'Quarter-note hemiola: 3 across 2 beats' },
+                    null, // the dotted quarter is the beat itself, shared by both meters
+                    { beats: 1/2,  snap: 1/2, tuplet: 2, label: '8th duplet',       name: '8th-note duplet (2 in a beat)' },
+                    { beats: 1/4,  snap: 1/4, tuplet: 4, label: '16th quadruplet',  name: '16th-note quadruplet (4 in a beat)' },
+                    { beats: 1/8,  snap: 1/4, tuplet: 8, label: '32nd octuplet',    name: '32nd-note octuplet (8 in a beat)' }
+                ]
+            }
+        };
+
+        const METER_HINTS = {
+            simple: 'The beat is a quarter note. Its counterparts are triplets.',
+            compound: 'The beat is a dotted quarter, and BPM counts dotted quarters. Its counterparts are duplets and hemiolas.'
+        };
+
+        let currentMeter = 'simple';
+
+        try {
+            const savedMeter = localStorage.getItem('vdr_meter');
+            if (METER_REPEATERS[savedMeter]) currentMeter = savedMeter;
+        } catch (e) {}
+
+        function saveMeter() {
+            if (STUDIO) return;   // the studio's project sets it
+            try {
+                localStorage.setItem('vdr_meter', currentMeter);
+            } catch (e) {}
+        }
+
+        function repeatSlot(state) {
+            return state > 6 ? state - 6 : state;
+        }
+
+        // What a repeat state means in the current meter, or null (Off, or a counterpart this meter doesn't have)
+        function repeaterFor(state) {
+            if (!(state >= 1 && state <= 12)) return null;
+            const set = METER_REPEATERS[currentMeter];
+            return state > 6 ? set.counterpart[state - 7] : set.main[state - 1];
+        }
+
+        function beatMs() {
+            return 60000 / BPM;
+        }
+
         const DEFAULT_REPEATS = [0, 0, 0, 0, 0, 0, 0, 4, 3, 5];
         let padRepeats = [...DEFAULT_REPEATS];
 
@@ -3248,7 +3637,7 @@
             const savedRepeats = localStorage.getItem('vdr_pad_repeats_v3');
             if (savedRepeats) {
                 const parsed = JSON.parse(savedRepeats);
-                if (Array.isArray(parsed) && parsed.length === 10 && parsed.every(n => typeof n === 'number' && n >= 0 && n <= 6)) {
+                if (Array.isArray(parsed) && parsed.length === 10 && parsed.every(n => Number.isInteger(n) && n >= 0 && n <= 12)) {
                     padRepeats = parsed;
                 }
             } else {
@@ -3272,6 +3661,183 @@
             } catch (e) {}
         }
 
+        // Subdivisions the repeat menu offers (Settings → Subdivisions), as repeat states 1–12; Off is always offered
+        const ALL_SUBDIVISIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        let enabledSubdivisions = [...ALL_SUBDIVISIONS];
+
+        try {
+            const savedSubdivisions = localStorage.getItem('vdr_subdivisions');
+            if (savedSubdivisions) {
+                const parsed = JSON.parse(savedSubdivisions);
+                if (Array.isArray(parsed)) {
+                    const valid = ALL_SUBDIVISIONS.filter(s => parsed.includes(s));
+                    if (valid.some(s => s <= 6)) enabledSubdivisions = valid;
+                }
+            }
+        } catch (e) {
+            console.warn('Could not load subdivision choices:', e);
+        }
+
+        function saveSubdivisions() {
+            try {
+                localStorage.setItem('vdr_subdivisions', JSON.stringify(enabledSubdivisions));
+            } catch (e) {}
+        }
+
+        // A repeat speed that isn't offered becomes the closest one that is: a counterpart falls back to its main,
+        // and a main to the nearest main still on (ties go to the slower one)
+        function resolveRepeatState(state) {
+            if (state <= 0) return 0;
+            if (repeaterFor(state) && enabledSubdivisions.includes(state)) return state;
+            const slot = repeatSlot(state);
+            const mains = enabledSubdivisions.filter(s => s <= 6);
+            let best = mains[0];
+            mains.forEach(s => {
+                if (Math.abs(s - slot) < Math.abs(best - slot)) best = s;
+            });
+            return best;
+        }
+
+        const REPEAT_ICON_SVG = '<svg class="repeat-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>';
+
+        // The repeat menu (a column per slot: main on top, counterpart under it) and Settings → Subdivisions
+        // (a row per slot: main, counterpart) are built once; renderRepeatChoices() labels them for the meter
+        function buildRepeatChoices() {
+            const grid = document.querySelector('#repeat-popover .repeat-options-grid');
+            if (grid) {
+                for (let slot = 0; slot <= 6; slot++) {
+                    const col = document.createElement('div');
+                    col.className = 'repeat-col';
+                    col.setAttribute('data-slot', slot);
+                    const states = slot === 0 ? [0] : [slot, slot + 6];
+                    states.forEach(state => {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = `repeat-option-btn opt-repeat-${repeatSlot(state)}` + (state > 6 ? ' is-counterpart' : '');
+                        btn.setAttribute('data-repeat-state', state);
+                        btn.innerHTML = REPEAT_ICON_SVG;
+                        col.appendChild(btn);
+                    });
+                    grid.appendChild(col);
+                }
+            }
+
+            const list = document.getElementById('subdiv-options');
+            if (list) {
+                for (let slot = 1; slot <= 6; slot++) {
+                    [slot, slot + 6].forEach(state => {
+                        const cell = document.createElement('div');
+                        cell.className = 'subdiv-cell';
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'subdiv-btn';
+                        btn.setAttribute('data-repeat-state', state);
+                        btn.innerHTML = `<span class="subdiv-dot opt-repeat-${slot}${state > 6 ? ' is-counterpart' : ''}"></span><span class="subdiv-text"></span>`;
+                        cell.appendChild(btn);
+                        if (state > 6) {
+                            const none = document.createElement('span');
+                            none.className = 'subdiv-none';
+                            cell.appendChild(none);
+                        }
+                        list.appendChild(cell);
+                    });
+                }
+            }
+        }
+        buildRepeatChoices();
+
+        function renderRepeatChoices() {
+            document.querySelectorAll('.meter-btn').forEach(btn => {
+                const on = btn.getAttribute('data-meter') === currentMeter;
+                btn.classList.toggle('is-active', on);
+                btn.setAttribute('aria-pressed', on.toString());
+            });
+            const meterHint = document.getElementById('meter-hint');
+            if (meterHint) meterHint.textContent = METER_HINTS[currentMeter];
+
+            document.querySelectorAll('.subdiv-btn').forEach(btn => {
+                const state = parseInt(btn.getAttribute('data-repeat-state'), 10);
+                const repeater = repeaterFor(state);
+                const none = btn.parentElement.querySelector('.subdiv-none');
+                btn.hidden = !repeater;
+                if (none) {
+                    none.hidden = Boolean(repeater);
+                    none.textContent = currentMeter === 'compound' ? 'Is the beat' : '—';
+                    none.title = currentMeter === 'compound' ? 'The dotted quarter is the beat both meters share' : 'No counterpart for 32nd notes';
+                }
+                if (!repeater) return;
+                const on = enabledSubdivisions.includes(state);
+                btn.classList.toggle('is-on', on);
+                btn.setAttribute('aria-pressed', on.toString());
+                btn.title = repeater.name;
+                btn.querySelector('.subdiv-text').textContent = repeater.label;
+                btn.querySelector('.subdiv-dot').textContent = repeater.tuplet || '';
+            });
+
+            let anyCounterpart = false;
+            document.querySelectorAll('#repeat-popover .repeat-col').forEach(col => {
+                let colShown = false;
+                col.querySelectorAll('.repeat-option-btn').forEach(btn => {
+                    const state = parseInt(btn.getAttribute('data-repeat-state'), 10);
+                    const repeater = repeaterFor(state);
+                    const shown = state === 0 || Boolean(repeater && enabledSubdivisions.includes(state));
+                    btn.hidden = !shown;
+                    if (shown) colShown = true;
+                    if (shown && state > 6) anyCounterpart = true;
+                    const label = state === 0 ? 'Repeat: Off' : (repeater ? repeater.name : '');
+                    btn.setAttribute('aria-label', label);
+                    btn.setAttribute('title', label);
+                    if (state > 6) btn.setAttribute('data-tuplet', repeater ? repeater.tuplet : '');
+                });
+                col.hidden = !colShown;
+            });
+            const popover = document.getElementById('repeat-popover');
+            if (popover) popover.classList.toggle('has-counterparts', anyCounterpart);
+        }
+
+        // restartChanged: a playing pad whose speed changes restarts at once (setMeter restarts every pad itself)
+        function applySubdivisions({ restartChanged = true } = {}) {
+            renderRepeatChoices();
+
+            let changed = false;
+            padRepeats.forEach((state, padIndex) => {
+                const next = resolveRepeatState(state);
+                if (next === state) return;
+                const key = (padIndex + 1).toString();
+                const wasLatched = restartChanged && typeof latchedRepeats !== 'undefined' && latchedRepeats[key];
+                if (wasLatched) stopLatchedRepeat(key);
+                padRepeats[padIndex] = next;
+                updatePadRepeatButton(padIndex);
+                if (wasLatched) startLatchedRepeat(key);
+                changed = true;
+            });
+            if (changed) saveRepeats();
+        }
+
+        // Returns false when refused: the last main speed left stays on
+        function toggleSubdivision(state) {
+            if (!repeaterFor(state)) return false;
+            if (enabledSubdivisions.includes(state)) {
+                if (state <= 6 && enabledSubdivisions.filter(s => s <= 6).length === 1) return false;
+                enabledSubdivisions = enabledSubdivisions.filter(s => s !== state);
+            } else {
+                enabledSubdivisions = ALL_SUBDIVISIONS.filter(s => s === state || enabledSubdivisions.includes(s));
+            }
+            saveSubdivisions();
+            applySubdivisions();
+            return true;
+        }
+
+        // Simple ↔ Compound: every slot takes its new meaning, and playing pads restart together on a new beat 1
+        function setMeter(meter) {
+            if (!METER_REPEATERS[meter] || meter === currentMeter) return;
+            currentMeter = meter;
+            saveMeter();
+            applySubdivisions({ restartChanged: false });
+            updateAllPadRepeatButtons();
+            syncActiveRepeatersToBpm({ restartNow: true });
+        }
+
         function doesPadRepeat(key) {
             const padIndex = parseInt(key, 10) - 1;
             if (padIndex >= 0 && padIndex < padRepeats.length) {
@@ -3286,20 +3852,15 @@
             const btn = pad.querySelector('.pad-repeat-btn');
             if (!btn) return;
             const state = padRepeats[padIndex];
+            const repeater = repeaterFor(state);
             btn.classList.remove('repeat-0', 'repeat-1', 'repeat-2', 'repeat-3', 'repeat-4', 'repeat-5', 'repeat-6');
-            btn.classList.add(`repeat-${state}`);
+            btn.classList.add(`repeat-${repeater ? repeatSlot(state) : 0}`);
+            btn.classList.toggle('is-counterpart', Boolean(repeater && repeater.tuplet));
+            btn.setAttribute('data-tuplet', repeater && repeater.tuplet ? repeater.tuplet : '');
 
-            const descriptions = [
-                'Repeat: Off',
-                'Repeat: Whole note (1/1)',
-                'Repeat: Half note (1/2)',
-                'Repeat: Quarter note (1/4)',
-                'Repeat: 8th note (1/8)',
-                'Repeat: 16th note (1/16)',
-                'Repeat: 32nd note (1/32)'
-            ];
-            btn.setAttribute('aria-label', descriptions[state] || 'Repeat');
-            btn.setAttribute('title', descriptions[state] || 'Repeat');
+            const description = repeater ? `Repeat: ${repeater.name}` : 'Repeat: Off';
+            btn.setAttribute('aria-label', description);
+            btn.setAttribute('title', btn.classList.contains('is-latched') ? description + ' (Active - click or press note to stop)' : description);
         }
 
         function updateAllPadRepeatButtons() {
@@ -3373,7 +3934,7 @@
 
                 if (activeRepeatPopoverPad !== null) {
                     const state = parseInt(btn.getAttribute('data-repeat-state'), 10);
-                    if (state >= 0 && state <= 6) {
+                    if (state === 0 || repeaterFor(state)) {
                         const padIndex = activeRepeatPopoverPad;
                         const key = (padIndex + 1).toString();
                         if (typeof stopLatchedRepeat === 'function' && typeof latchedRepeats !== 'undefined' && latchedRepeats[key]) {
@@ -3452,7 +4013,7 @@
 
             // Sync repeat default for new instrument
             if (typeof newInst.defaultRepeat === 'number') {
-                padRepeats[padIndex] = newInst.defaultRepeat;
+                padRepeats[padIndex] = resolveRepeatState(newInst.defaultRepeat);
                 updatePadRepeatButton(padIndex);
                 saveRepeats();
             }
@@ -3479,9 +4040,7 @@
             saveLayout();
         }
 
-        // Voice Count Management & Popover
-        const voiceBtn = document.getElementById('voice-btn');
-        const voicePopover = document.getElementById('voice-popover');
+        // Voice Count Management (Settings → Instruments)
         const drumPadsContainer = document.querySelector('.drum-pads');
         const rackSubtitle = document.querySelector('.rack-subtitle');
         let currentVoiceCount = 10;
@@ -3507,14 +4066,6 @@
         function setVoiceCount(count) {
             currentVoiceCount = Math.max(1, Math.min(10, count));
             saveVoiceCount();
-
-            // Update voice button text
-            if (voiceBtn) {
-                const voiceText = voiceBtn.querySelector('.voice-text');
-                if (voiceText) {
-                    voiceText.textContent = `${currentVoiceCount}-VOICE`;
-                }
-            }
 
             // Update rack subtitle
             if (rackSubtitle) {
@@ -3561,30 +4112,36 @@
             }
         }
 
-        function toggleVoicePopover(forceState = null) {
-            if (!voicePopover || !voiceBtn) return;
-            const isCurrentlyOpen = voicePopover.classList.contains('is-open');
+        // Settings Gear & Panel
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsPanel = document.getElementById('settings-panel');
+
+        function toggleSettings(forceState = null) {
+            if (!settingsPanel || !settingsBtn) return;
+            const isCurrentlyOpen = settingsPanel.classList.contains('is-open');
             const shouldOpen = forceState !== null ? forceState : !isCurrentlyOpen;
 
             if (shouldOpen) {
                 if (typeof toggleBpmPopover === 'function' && typeof bpmPopover !== 'undefined' && bpmPopover && bpmPopover.classList.contains('is-open')) {
                     toggleBpmPopover(false);
                 }
-                voicePopover.classList.add('is-open');
-                voiceBtn.setAttribute('aria-expanded', 'true');
+                closeRepeatPopover();
+                settingsPanel.classList.add('is-open');
+                settingsBtn.setAttribute('aria-expanded', 'true');
             } else {
-                voicePopover.classList.remove('is-open');
-                voiceBtn.setAttribute('aria-expanded', 'false');
+                settingsPanel.classList.remove('is-open');
+                settingsBtn.setAttribute('aria-expanded', 'false');
             }
         }
 
-        if (voiceBtn) {
-            voiceBtn.addEventListener('click', function(e) {
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', function(e) {
                 e.stopPropagation();
-                toggleVoicePopover();
+                toggleSettings();
             });
         }
 
+        // The panel stays open while choosing, so the pads can be watched changing
         document.querySelectorAll('.voice-option-btn').forEach(btn => {
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
@@ -3592,15 +4149,36 @@
                 if (voices >= 1 && voices <= 10) {
                     setVoiceCount(voices);
                 }
-                toggleVoicePopover(false);
             });
         });
 
-        // Close popover on outside click
+        document.querySelectorAll('.subdiv-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const state = parseInt(this.getAttribute('data-repeat-state'), 10);
+                if (!toggleSubdivision(state)) {
+                    this.classList.remove('is-refused');
+                    void this.offsetWidth;
+                    this.classList.add('is-refused');
+                }
+            });
+            btn.addEventListener('animationend', function() {
+                this.classList.remove('is-refused');
+            });
+        });
+
+        document.querySelectorAll('.meter-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                setMeter(this.getAttribute('data-meter'));
+            });
+        });
+
+        // Close popovers on outside click
         document.addEventListener('click', function(e) {
-            if (voicePopover && voicePopover.classList.contains('is-open')) {
-                if (!voicePopover.contains(e.target) && !voiceBtn.contains(e.target)) {
-                    toggleVoicePopover(false);
+            if (settingsPanel && settingsPanel.classList.contains('is-open')) {
+                if (!settingsPanel.contains(e.target) && !settingsBtn.contains(e.target)) {
+                    toggleSettings(false);
                 }
             }
             if (typeof bpmPopover !== 'undefined' && bpmPopover && bpmPopover.classList.contains('is-open')) {
@@ -3760,24 +4338,12 @@
         const holdSchedulers = {};
         let lastRepeatDownTime = 0;
 
+        // Beats per minute of the meter's beat (a quarter in simple, a dotted quarter in compound); note lengths come from beatMs()
         let BPM = 120;
-        let wholeNoteMs = Math.round((60 / BPM) * 1000 * 4); // 2000ms
-        let halfNoteMs = Math.round((60 / BPM) * 1000 * 2);  // 1000ms
-        let quarterNoteMs = Math.round((60 / BPM) * 1000);   // 500ms
-        let eighthNoteMs = Math.round(quarterNoteMs / 2);    // 250ms
-        let sixteenthNoteMs = Math.round(quarterNoteMs / 4); // 125ms
-        let thirtySecondNoteMs = Math.round(quarterNoteMs / 8); // 63ms
 
-        function updateNoteIntervals() {
-            wholeNoteMs = Math.round((60 / BPM) * 1000 * 4);
-            halfNoteMs = Math.round((60 / BPM) * 1000 * 2);
-            quarterNoteMs = Math.round((60 / BPM) * 1000);
-            eighthNoteMs = Math.round(quarterNoteMs / 2);
-            sixteenthNoteMs = Math.round(quarterNoteMs / 4);
-            thirtySecondNoteMs = Math.round(quarterNoteMs / 8);
-        }
-
-        function syncActiveRepeatersToBpm() {
+        // restartNow: every playing pad strikes together now, as a new beat 1 (a meter change);
+        // otherwise each picks up again one of its own notes from now (tempo changes, which come in runs)
+        function syncActiveRepeatersToBpm({ restartNow = false } = {}) {
             if (typeof isAnyVoiceRepeating !== 'function' || !isAnyVoiceRepeating()) return;
 
             const now = performance.now();
@@ -3791,8 +4357,11 @@
                     }
                     const newInterval = getPadRepeatInterval(key);
                     if (newInterval > 0) {
-                        const stepInterval = (newInterval === 63 || newInterval === 62.5) ? 62.5 : newInterval;
-                        scheduleRepeatVoice(key, now + stepInterval, newInterval, latchedSchedulers[key], false);
+                        if (restartNow) {
+                            scheduleRepeatVoice(key, now, newInterval, latchedSchedulers[key], true);
+                        } else {
+                            scheduleRepeatVoice(key, now + newInterval, newInterval, latchedSchedulers[key], false);
+                        }
                     }
                 }
             }
@@ -3801,13 +4370,14 @@
         function setBpm(newBpm, options = {}) {
             const parsed = parseInt(newBpm, 10);
             if (isNaN(parsed)) return;
-            const clamped = Math.max(40, Math.min(240, parsed));
+            const clamped = Math.max(STUDIO ? 30 : 40, Math.min(STUDIO ? 300 : 240, parsed));
             BPM = clamped;
-            updateNoteIntervals();
 
-            try {
-                localStorage.setItem('vdr_bpm', BPM.toString());
-            } catch (e) {}
+            if (!STUDIO) {   // (the studio's project sets it)
+                try {
+                    localStorage.setItem('vdr_bpm', BPM.toString());
+                } catch (e) {}
+            }
 
             const bpmText = document.querySelector('.bpm-text');
             if (bpmText) bpmText.textContent = `${BPM} BPM`;
@@ -3836,8 +4406,8 @@
             const shouldOpen = forceState !== null ? forceState : !isCurrentlyOpen;
 
             if (shouldOpen) {
-                if (typeof toggleVoicePopover === 'function' && voicePopover && voicePopover.classList.contains('is-open')) {
-                    toggleVoicePopover(false);
+                if (typeof toggleSettings === 'function' && settingsPanel && settingsPanel.classList.contains('is-open')) {
+                    toggleSettings(false);
                 }
                 if (typeof closeRepeatPopover === 'function' && repeatPopover && repeatPopover.classList.contains('is-open')) {
                     closeRepeatPopover();
@@ -4037,17 +4607,26 @@
             soundDecayTimers.push(timer);
         }
 
+        // The grid a repeat may start on, so its notes land on the meter's grid
+        // (e.g. simple: whole → beat, half/quarter/8th → 8ths, 16th/32nd → 16ths; triplets → the triplet grid)
         function getPadQuantizeStep(padIndex) {
-            if (padIndex < 0 || padIndex >= padRepeats.length) return quarterNoteMs;
-            const state = padRepeats[padIndex];
-            if (state === 1) return quarterNoteMs;   // Whole note: quantize to quarter beat (500ms)
-            if (state === 2 || state === 3 || state === 4) return eighthNoteMs; // Half, Quarter, 8th: quantize to 8th beat (250ms)
-            if (state === 5 || state === 6) return sixteenthNoteMs; // 16th, 32nd: quantize to 16th beat (125ms)
-            return quarterNoteMs;
+            const repeater = (padIndex >= 0 && padIndex < padRepeats.length) ? repeaterFor(padRepeats[padIndex]) : null;
+            return (repeater ? repeater.snap : 1) * beatMs();
+        }
+
+        // Spec: the 6- and 12-a-beat streams sound their meter's grouping. Simple accents them in 3s (triplets);
+        // compound accents each of its 8th notes (every 2nd 16th, every 4th 32nd). Every other stream plays every note full.
+        function getAccentVelocity(repeater, nominalTime) {
+            if (!repeater || !repeater.accentEvery || masterGridOrigin === null) return 1;
+            const n = repeater.accentEvery;
+            const index = Math.round((nominalTime - masterGridOrigin) / (repeater.beats * beatMs()));
+            return ((index % n) + n) % n === 0 ? 1 : 0.6;
         }
 
         function getQuantizedLaunchInfo(gridStep, minTime = null) {
             const now = performance.now();
+            // in the studio, beat 1 of the grid is the studio's (even before it arrives: a count-in)
+            if (masterGridOrigin === null && studioGrid) masterGridOrigin = studioGrid.origin;
 
             if (minTime !== null) {
                 // For hold repeat: schedules forward after the minimum hold threshold
@@ -4056,7 +4635,7 @@
                     return { targetTime: minTime, anchorGridTime: minTime, playImmediate: false };
                 }
                 const elapsed = minTime - masterGridOrigin;
-                const rem = elapsed % gridStep;
+                const rem = ((elapsed % gridStep) + gridStep) % gridStep;
                 const delayToGrid = rem < 10 ? 0 : (gridStep - rem);
                 const targetTime = minTime + delayToGrid;
                 return { targetTime, anchorGridTime: targetTime, playImmediate: false };
@@ -4070,8 +4649,8 @@
 
             // Master grid is already running: align to internal beat structure with 60% late grace / 40% upcoming window
             const elapsed = now - masterGridOrigin;
-            if (elapsed <= 0) {
-                return { targetTime: masterGridOrigin, anchorGridTime: masterGridOrigin, playImmediate: true, ratio: 0, quantizedTo: 'preceding' };
+            if (elapsed <= 0) {   // before beat 1 (the studio's count-in): the first hit lands on it
+                return { targetTime: masterGridOrigin, anchorGridTime: masterGridOrigin, playImmediate: false, ratio: 0, quantizedTo: 'origin' };
             }
 
             const offset = elapsed % gridStep;
@@ -4104,13 +4683,14 @@
         const getQuantizedLaunchTime = getQuantizedLaunchInfo;
 
         function scheduleRepeatVoice(key, anchorGridTime, repeatInterval, schedulerState, playImmediate = false) {
-            const stepInterval = (repeatInterval === 63 || repeatInterval === 62.5) ? 62.5 : repeatInterval;
+            const stepInterval = repeatInterval;
+            const repeater = repeaterFor(padRepeats[parseInt(key, 10) - 1]);
             let step = 0;
 
             function tick() {
                 if (!schedulerState.isActive) return;
 
-                triggerRepeatStep(key, repeatInterval);
+                triggerRepeatStep(key, repeatInterval, getAccentVelocity(repeater, anchorGridTime + (step * stepInterval)));
 
                 step++;
                 const nextTargetTime = anchorGridTime + (step * stepInterval);
@@ -4121,7 +4701,7 @@
 
             if (playImmediate) {
                 if (!schedulerState.isActive) return;
-                triggerRepeatStep(key, repeatInterval);
+                triggerRepeatStep(key, repeatInterval, getAccentVelocity(repeater, anchorGridTime));
 
                 const now = performance.now();
                 step = Math.max(1, Math.ceil((now + 15 - anchorGridTime) / stepInterval));
@@ -4221,16 +4801,16 @@
             stopAllSounds();
 
             const now = performance.now();
-            masterGridOrigin = now;
+            masterGridOrigin = studioGrid ? studioGrid.origin : now;
 
             let repeatingCount = 0;
             for (let i = 0; i < currentVoiceCount && i < padRepeats.length; i++) {
                 if (padRepeats[i] > 0) repeatingCount++;
             }
             if (repeatingCount === 0 && currentVoiceCount > 0) {
-                padRepeats[0] = 3; // default to quarter note if none set
+                padRepeats[0] = resolveRepeatState(3); // default to the beat if none set
                 updatePadRepeatButton(0);
-                savePadRepeats();
+                saveRepeats();
             }
 
             for (let i = 0; i < currentVoiceCount && i < padRepeats.length; i++) {
@@ -4249,12 +4829,36 @@
                             }
                         }
                         latchedSchedulers[key] = { isActive: true, timerId: null };
-                        scheduleRepeatVoice(key, now, repeatInterval, latchedSchedulers[key], true);
+                        // in the studio the pads fall in with its beats: a little past one, now; else on the next
+                        let anchor = now, immediate = true;
+                        if (studioGrid) {
+                            const el = now - studioGrid.origin, k = Math.floor(el / repeatInterval);
+                            if (el < 0) { anchor = studioGrid.origin; immediate = false; }
+                            else if (el - k * repeatInterval <= repeatInterval * 0.4) { anchor = studioGrid.origin + k * repeatInterval; }
+                            else { anchor = studioGrid.origin + (k + 1) * repeatInterval; immediate = false; }
+                        }
+                        scheduleRepeatVoice(key, anchor, repeatInterval, latchedSchedulers[key], immediate);
                     }
                 }
             }
 
             updatePlayStopButton();
+        }
+
+        // The studio began to play or record: pads already repeating fall in with its beats.
+        function realignRepeatersToGrid() {
+            if (!studioGrid) return;
+            const now = performance.now();
+            masterGridOrigin = studioGrid.origin;
+            for (const key in latchedRepeats) {
+                const st = latchedSchedulers[key];
+                if (!latchedRepeats[key] || !st || !st.isActive) continue;
+                if (st.timerId) { clearTimeout(st.timerId); st.timerId = null; }
+                const interval = getPadRepeatInterval(key);
+                if (interval <= 0) continue;
+                const anchor = studioGrid.origin + Math.max(0, Math.ceil((now - studioGrid.origin) / interval)) * interval;
+                scheduleRepeatVoice(key, anchor, interval, st, false);
+            }
         }
 
         function stopAllSounds() {
@@ -4331,18 +4935,11 @@
             });
         }
 
+        // Exact (unrounded) milliseconds between repeats, so triplets stay on the beat; 0 is Off
         function getPadRepeatInterval(key) {
             const padIndex = parseInt(key, 10) - 1;
-            if (padIndex >= 0 && padIndex < padRepeats.length) {
-                const state = padRepeats[padIndex];
-                if (state === 1) return wholeNoteMs;        // 2000ms (Whole Note, Light Blue)
-                if (state === 2) return halfNoteMs;         // 1000ms (Half Note, Light Green)
-                if (state === 3) return quarterNoteMs;      // 500ms (Quarter Note, Yellow)
-                if (state === 4) return eighthNoteMs;       // 250ms (8th Note, Orange)
-                if (state === 5) return sixteenthNoteMs;    // 125ms (16th Note, Red)
-                if (state === 6) return thirtySecondNoteMs; // 63ms (32nd Note, Pinkish/Purple)
-            }
-            return 0; // Off (Grey)
+            const repeater = (padIndex >= 0 && padIndex < padRepeats.length) ? repeaterFor(padRepeats[padIndex]) : null;
+            return repeater ? repeater.beats * beatMs() : 0;
         }
 
         const guiroHoldTimers = {};
@@ -4378,7 +4975,7 @@
             return playSound(key, opts);
         }
 
-        function triggerRepeatStep(key, repeatInterval) {
+        function triggerRepeatStep(key, repeatInterval, velocity = 1) {
             const instId = getPadInstrument(key);
             let opts = {};
             if (instId === 'guiro') {
@@ -4391,7 +4988,9 @@
                 }
             }
             opts.repeatInterval = repeatInterval;
-            opts.is32nd = (repeatInterval === 63 || repeatInterval === 62.5 || (repeatInterval > 0 && repeatInterval <= 70));
+            opts.is32nd = repeatInterval > 0 && repeatInterval <= 70;
+            opts.velocity = velocity;
+            opts.machine = true;   // a repeater's hit, not a hand's: the studio records it at this moment
             const soundInfo = playSound(key, opts);
             animatePad(key, soundInfo);
             return soundInfo;
@@ -4404,7 +5003,7 @@
 
             const gridStep = getPadQuantizeStep(padIndex);
             const now = performance.now();
-            const minHoldTime = now + quarterNoteMs; // Hold threshold: quarter beat (500ms)
+            const minHoldTime = now + beatMs(); // Hold threshold: one beat
 
             const launch = getQuantizedLaunchTime(gridStep, minHoldTime);
 
@@ -4508,8 +5107,8 @@
                     closeRepeatPopover();
                     return;
                 }
-                if (voicePopover && voicePopover.classList.contains('is-open')) {
-                    toggleVoicePopover(false);
+                if (settingsPanel && settingsPanel.classList.contains('is-open')) {
+                    toggleSettings(false);
                     return;
                 }
                 if (isRearranging) {
@@ -4824,9 +5423,25 @@
             if (padIndex >= 0 && padIndex < padLayout.length) {
                 const instId = padLayout[padIndex];
                 if (sounds[instId]) {
+                    // the studio records it: a repeater's hit at this moment, a hand's at the key or touch that made it
+                    if (STUDIO) STUDIO.drum(instId, options.velocity < 1 ? options.velocity : 1, options.machine ? performance.now() : null);
+                    // A softer (unaccented) hit: every synth connects to `analyser`, so for this one call
+                    // `analyser` is a gain in front of it
+                    if (options.velocity < 1 && analyser) {
+                        const mainOut = analyser;
+                        const hitGain = audioContext.createGain();
+                        hitGain.gain.value = options.velocity;
+                        hitGain.connect(mainOut);
+                        analyser = hitGain;
+                        try {
+                            return sounds[instId](options);
+                        } finally {
+                            analyser = mainOut;
+                        }
+                    }
                     return sounds[instId](options);
                 }
-            } else if (sounds[key]) { 
+            } else if (sounds[key]) {
                 return sounds[key](options); 
             } 
             return null; 
@@ -4835,8 +5450,25 @@
         initAllPads();
         updateAllPadNumberBadges();
         updateAllPadRepeatButtons();
+        applySubdivisions();
         setVoiceCount(currentVoiceCount);
         updatePlayStopButton();
+
+        // What the studio may ask: play at the project's tempo in its meter; keep to its
+        // beat grid while it runs (withdrawn when it stops, and the pads stop with it);
+        // and let every sound go when another instrument is shown.
+        if (STUDIO) STUDIO.offer({
+            setTempo(bpm, compound) {
+                setBpm(bpm);
+                setMeter(compound ? 'compound' : 'simple');
+            },
+            setGrid(origin, beatMs) {
+                if (origin == null) { studioGrid = null; stopAllSounds(); return; }
+                studioGrid = { origin, beatMs };
+                realignRepeatersToGrid();
+            },
+            releaseAll() { stopAllSounds(); }
+        });
         
         function animatePad(key, soundInfo = null) {
             const pad = document.querySelector(`.drum-pad[data-key="${key}"]`);
