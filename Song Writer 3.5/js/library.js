@@ -206,7 +206,12 @@
     received: received
   });
 
+  /* A built-in is its text in songs.js or, when it has what the text cannot
+     hold, its whole score in PRELOADED_SCORES (a copy: the record is the
+     library's to change). */
   function defaultRecord(id) {
+    const score = typeof PRELOADED_SCORES !== 'undefined' && PRELOADED_SCORES[id];
+    if (score) return normalizeSong({ id, title: DEFAULT_TITLES[id], score: JSON.parse(JSON.stringify(score)), isCustom: false, createdAt: 0 });
     const text = (typeof PRELOADED_SONGS !== 'undefined' && PRELOADED_SONGS[id]) || NEW_SONG_TEXT;
     return normalizeSong({ id, title: DEFAULT_TITLES[id], content: text, isCustom: false, createdAt: 0 });
   }
@@ -223,7 +228,9 @@
      alone would reach new browsers only. A library still holding an OLD
      built-in, untouched, is given the new one at boot; a copy anyone has
      changed and saved is theirs and stays as it is. The old texts are
-     kept here only to recognise them. */
+     kept here only to recognise them. 2026-11-08: rewritten again, from the
+     user's 3.5 copy with its Chord Chart and chord track (songs.js
+     PRELOADED_SCORES), so 2026-10-26's text is retired too. */
   const RETIRED_DEFAULTS = {
     starspangledbanner: [`[Key of Ab]
 [A1]
@@ -242,6 +249,20 @@ Gave[F2] proof[M2] through[R2] the[D2] night[T1] That[L1] our[T1] flag[D2] was[M
 Oh,[S1] say,[D2] does[D2] that[D2] -[T1] Star[L1] Span-[L1] -gled[L1] Ban-[R2] -ner__[F2] ___[M2] yet[R2] -[D2] wave?[D2] ___[T1]
 [New Line]
 O'er[S1] the[S1] land[D2] -[R2] of[M2] the[F2] free[S2] And[D2] the[R2] home[M2] of[F2] the[R2] brave?[D2]
+`, `[Key of Ab]
+[Time 3/4]
+[A1]
+[Pickup q]
+Oh[S1:e.] -[M1:s] say[D1:q] can[M1:q] you[S1:q] see[D2:h] By[M2:e.] the[R2:s] dawn's[D2:q] ear-[M1:q] ly[F#1:q] light?[S1:h]
+What[S1:e.] so[S1:s] proud-[M2:q.] ly[R2:e] we[D2:q] hailed[T1:h] At[L1:e] the[T1:e] twi-[D2:q] lights[D2:q] last[S1:q] gleam-[M1:q] ing[D1:q]
+Whose[S1:e.] broad[M1:s] stripes[D1:q] and[M1:q] bright[S1:q] stars[D2:h] Through[M2:e.] the[R2:s] pe-[D2:q] ril-[M1:q] ous[F#1:q] fight[S1:h]
+O'er[S1:e.] the[S1:s] ram-[M2:q.] parts[R2:e] we[D2:q] watched,[T1:h] Were[L1:e] so[T1:e] gal-[D2:q] lant-[D2:q] ly[S1:q] stream-[M1:q] ing[D1:q]
+And[M2:e.] the[M2:s] roc-[M2:q] kets[F2:q] red[S2:q] glare[S2:h]
+The[F2:e] bombs[M2:e] burst-[R2:q] ing[M2:q] in[F2:q] air[F2:h]
+Gave[F2:q] proof[M2:q.] through[R2:e] the[D2:q] night[T1:h] That[L1:e] our[T1:e] flag[D2:q] was[M1:q] still[F#1:q] there[S1:h]
+Oh,[S1:q] say,[D2:q] does[D2:q] that[D2:e] -[T1:e] Star[L1:q] Span-[L1:q] gled[L1:q] Ban-[R2:q] ner__[F2:e] ___[M2:e] yet[R2:e] -[D2:e] wave?[D2:q] ___[T1:q]
+O'er[S1:e.] the[S1:s] land[D2:q.] -[R2:e] of[M2:e] the[F2:e] free[S2:h]
+And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
 `]
   };
   function upgradeDefaults() {
