@@ -39,7 +39,7 @@
       justify-content: center;
       transform-origin: center center;
     }
-    /* Three rows: the staff, the flute, the notes */
+    /* Three rows: the staff beside the printed chart's symbol, the flute, the notes. updateScale sets the gap between them. */
     .scaling-wrapper {
       width: 1100px;
       display: flex;
@@ -47,14 +47,30 @@
       align-items: center;
       gap: 6px;
     }
-    #staff {
+    .top-row {
       width: 1100px;
+      display: flex;
+      align-items: flex-start;
+    }
+    #staff {
+      width: 260px;
       height: 170px;
       display: block;
+      margin-left: 244px;
+    }
+    /* The chart is sized and placed by the staff: the tops of its five big circles (chart y 112) on the staff's top line,
+       the bottoms of the B♭ lever and trill keys (chart y 244) on its bottom line. Those 132 chart units = the 48 px
+       between the lines, so scale 4/11. */
+    #chart {
+      width: 328px;
+      height: 101.09px;
+      display: block;
+      margin-left: 23px;
+      margin-top: 56.36px;
     }
     #flute {
       width: 1100px;
-      height: 216px;
+      height: 140px;
       display: block;
     }
 
@@ -171,6 +187,7 @@
       color: #1f4d80;
       cursor: pointer;
       white-space: nowrap;
+      font-variant-numeric: tabular-nums;
     }
     .alt-btn:hover { background: #d7e6f7; }
 
@@ -195,6 +212,25 @@
       transition: background 0.2s, color 0.2s;
     }
     .gear-btn:hover, .gear-btn[aria-expanded="true"] { background: #334155; color: #74B9FF; }
+    /* Cycles what the flute's keys say: Keys (nothing), Fingers, Names */
+    .labels-btn {
+      position: absolute;
+      top: 50%;
+      right: 52px;
+      transform: translateY(-50%);
+      min-width: 76px;
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(30, 41, 59, 0.88);
+      color: #f1f5f9;
+      font: 600 13px/1 Montserrat, system-ui, -apple-system, sans-serif;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .labels-btn:hover { background: #334155; color: #74B9FF; }
+    @media (max-width: 360px) { .labels-btn { min-width: 62px; padding: 0 8px; right: 48px; } }
     .gear-btn svg { width: 19px; height: 19px; }
 
     .settings-panel {
@@ -336,6 +372,7 @@
           Virtual Flute
         </h1>
     </a>
+    <button type="button" class="labels-btn" id="labelsBtn" aria-label="Flute labels: Keys">Keys</button>
     <button type="button" class="gear-btn" id="settingsBtn" title="Settings" aria-label="Settings" aria-expanded="false" aria-controls="settingsPanel">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
@@ -344,8 +381,11 @@
   <div class="app-center-container">
     <div class="scaling-outer" id="scaling-outer">
       <div class="scaling-wrapper" id="scaling-wrapper">
-        <svg id="staff" viewBox="0 0 1100 170" role="img" aria-label="Staff"></svg>
-        <svg id="flute" viewBox="0 0 1120 220" role="img" aria-label="Flute"></svg>
+        <div class="top-row">
+          <svg id="staff" viewBox="0 0 260 170" role="img" aria-label="Staff"></svg>
+          <svg id="chart" viewBox="50 36 902 278" role="img" aria-label="Fingering chart"></svg>
+        </div>
+        <svg id="flute" viewBox="-34 56 1101 140" role="img" aria-label="Flute"></svg>
         <div class="note-pad" id="notePad"></div>
         <div class="tip-area" id="tipArea" aria-live="polite"></div>
       </div>
@@ -377,7 +417,7 @@
     // Fingerings for the Boehm flute (closed G♯, B foot) from the Woodwind Fingering Guide's basic
     // chart, low B to top C. Each one reads: thumb, left-hand fingers, right-hand fingers, then any
     // other keys:
-    //   T   thumb on the B key        Tb  thumb on the B♭ lever        -   thumb off
+    //   T   thumb on the B key        Tb  thumb on the B♭ key        -   thumb off
     //   123 fingers 1 2 3 of that hand down, - up
     //   G#  G♯ lever (left little finger)        Eb  E♭ key (right little finger)
     //   C# C B  the low C♯, C and B keys (right little finger)        giz  the gizmo (B foot)
@@ -494,10 +534,11 @@
       try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; }
     }
     function saveSettings() {
-      try { localStorage.setItem(STORE_KEY, JSON.stringify({ version: 1, view, sound: soundSettings })); } catch (e) { /* private window */ }
+      try { localStorage.setItem(STORE_KEY, JSON.stringify({ version: 1, view, labels: labelView, sound: soundSettings })); } catch (e) { /* private window */ }
     }
     const saved = loadSettings();
     let view = saved.view === 'first' ? 'first' : 'chromatic';
+    let labelView = ['fingers', 'names'].includes(saved.labels) ? saved.labels : 'keys';   // what the flute's keys say
     let keyMap = {};   // e.code -> pitch, for the view on screen
 
     // Which fingering each note shows, when it has more than one (kept while the page is open)
@@ -614,67 +655,85 @@
     }
 
     // ----- drawing the flute -----
-    // A Boehm flute with a closed G♯ and a B foot, seen the way the fingering charts show it: head
-    // joint at the left, foot at the right, the key cups along the tube, the levers the little
-    // fingers and the right hand's side keys work above it, the thumb keys (really on the back)
-    // below it. Everything is placed from real measurements: millimetres from the centre of the
-    // embouchure hole, a 20 mm tube, and tone holes spaced the way the notes are (each semitone
-    // lower is a little farther down the tube).
+    // A Boehm flute with a closed G♯, an offset G and a B foot, seen the way the fingering charts show it:
+    // head joint at the left, foot at the right, the key cups along the tube, the levers the little
+    // finger works above it and the right little finger's below it, the thumb keys (really on the back), the
+    // B♭ lever and the trill keys below it, where the charts put them. Everything else is placed from real measurements: millimetres
+    // from the centre of the embouchure hole (the crown is 72 mm above it) and a 20 mm tube. The row on the body is measured off Yamaha's
+    // labelled parts diagram and a photograph laid over the drawing, with Nelson's patent US4819538 for the spacing around the left index finger
+    // (the plate 41 mm from the left middle finger's cup, the cup between them 22 mm).
     const MM = 1.5;                                   // px per mm
     const px = d => Math.round((80 + MM * d) * 2) / 2; // d = mm from the embouchure hole
     const AXIS = 118;              // the tube's centre line
     const TUBE = 15;               // half its width (20 mm)
     const CUP = 14;                // a cup's radius (18 mm)
-    const ROD = AXIS - TUBE - 8;   // the rod the keys turn on, along the top edge
+    const ROD = AXIS - 6;          // the foot's rod, across the upper half of the tube
+    const ROD_BODY = AXIS + TUBE + 8;   // the body's rod, below the tube (on a real flute they swap sides at the joint)
+    const OFFSET_G = -6.5;         // the two G cups stand out of the row, toward the left hand's fingers
+    const ROD_G = AXIS + TUBE - 4; // and turn on a short rod of their own
+    const FOOT_DROP = 14;
+    const CROWN_X = px(-72);       // the end of the flute
+    const HEAD_TUBE_X = CROWN_X + 7;   // where the head joint's tube comes out of the crown's ring
     const EDGE = '#555b62';
 
     // Tone holes along the tube, named the way flute makers name them: by the note that sounds when
     // the hole is the highest one open. A finger's own cup sits on one hole; links close others.
+    // finger and name are what a cup says on the flute: who plays it, and what flutists call it, which is
+    // the note it makes as the last key down (the L3 cup is the G key though it sits on the A hole).
+    // Left 1 does not press a cup at all: it rests on a plate with no hole under it, and that plate closes the
+    // little C♯ cup farther up the tube.
     //   open at rest, on the front
     const OPEN_CUPS = {
-      Cs:  { mm: 213, finger: '1' },     // C♯ hole: left 1
-      Bb:  { mm: 258.6 },                // B hole: the B♭ cup (left 2, right 1, thumb B♭ or the B♭ lever)
-      As:  { mm: 283.5, finger: '2' },   // A♯ hole: left 2
-      A:   { mm: 310, finger: '3' },     // A hole: left 3
-      G:   { mm: 372 },                  // G hole: any right-hand finger (the F♯ mechanism)
-      Fs:  { mm: 398, finger: '1' },     // F♯ hole: right 1
-      F:   { mm: 432, finger: '2' },     // F hole: right 2
-      E:   { mm: 467, finger: '3' },     // E hole: right 3
-      D:   { mm: 544 },                  // D hole, on the foot: the C♯ key
-      CsF: { mm: 586 },                  // C♯ hole: the C roller
-      CF:  { mm: 630 },                  // C hole: the B roller, or the gizmo
+      Cs:  { mm: 227, r: 10, name: 'B' },     // C♯ hole: the small cup at the top of the row, closed from the left 1 plate
+      L1:  { mm: 261, r: 12, plate: true, finger: 'L1', name: 'B' },   // the plate itself
+      Bb:  { mm: 282, name: 'B♭' },      // B hole: the B♭ cup (left 2, right 1, thumb B♭ or the B♭ lever)
+      As:  { mm: 305, finger: 'L2', name: 'A' },    // A♯ hole: left 2
+      A:   { mm: 329, dy: OFFSET_G, finger: 'L3', name: 'G' },   // A hole: left 3
+      Gf:  { mm: 353.5, dy: OFFSET_G, name: 'G♯' },   // the second G♯ hole: left 3 closes this cup too (the "lower G")
+      G:   { mm: 378, name: 'F♯' },    // G hole: any right-hand finger (the F♯ mechanism)
+      Fs:  { mm: 406, finger: 'R1', name: 'F' },  // F♯ hole: right 1
+      F:   { mm: 436, finger: 'R2', name: 'E' },    // F hole: right 2
+      E:   { mm: 467, finger: 'R3', name: 'D' },    // E hole: right 3
+      // The foot joint is turned on the body, so in this view its cups hang off the tube's lower edge
+      D:   { mm: 534, dy: FOOT_DROP, nameDy: 3.5, name: 'C♯' },     // D hole, on the foot: the C♯ key
+      CsF: { mm: 570, dy: FOOT_DROP, nameDy: 3.5, name: 'C' },      // C♯ hole: the C roller
+      CF:  { mm: 608.5, dy: FOOT_DROP, nameDy: 3.5, name: 'B' },    // C hole: the B roller, or the gizmo
     };
-    //   closed at rest; their keys open them
-    const CLOSED_CUPS = {
-      trDs: { mm: 240, r: 7.5, back: true },   // the two trill holes, on the far side near the top of the body
-      trD:  { mm: 252, r: 7.5, back: true },
-      Gs:   { mm: 338, r: 11.5, back: true },  // G♯ hole, on the far side
-      Ds:   { mm: 504 },                       // D♯ hole, the first on the foot: the E♭ key
-    };
-    const THUMB_MM = 235;   // the C hole, under the thumb on the back
+    //   closed at rest, the E♭ key opens it: the D♯ hole, first on the foot and on the far side
+    // Seen nearly edge-on along the top of the tube.
+    const DS_CUP = { mm: 498, rx: 14.5, ry: 8, y: AXIS - TUBE - 1 };
+    // The holes on the back of the tube, head to foot: D♯ trill, D trill, and the first G♯ hole (the one the
+    // G♯ lever opens), behind the second. From the front only their edges show, below the tube. The trill
+    // holes are the highest on the flute, above the C♯ cup. The thumb's C hole is back here too, behind the
+    // left 1 plate.
+    const REAR_CUPS = [{ mm: 193, r: 7.5 }, { mm: 211, r: 7.5 }, { mm: 353.5, r: 11.5 }];
+    const THUMB_MM = 265;
 
-    // The levers and touch pieces: x and width in mm, drawn above the tube (or below for the thumb)
-    const LEVERS = {
-      Tb:   { mm: 214, w: 18, h: 16, below: true, noArm: true, cap: 'thumb B♭', finger: 'T' },   // its lever runs along the back
-      T:    { mm: 236, w: 30, h: 20, below: true, cap: 'thumb B', finger: 'T', capDy: 11 },
-      Gs:   { mm: 318, w: 16, h: 30, cap: 'G♯', finger: '4' },
-      BbL:  { mm: 383, w: 8, h: 22, cap: 'B♭ lever' },
-      trD:  { mm: 413, w: 8, h: 22, cap: 'D trill' },
-      trDs: { mm: 448, w: 8, h: 22, cap: 'D♯ trill' },
-      Eb:   { mm: 491, w: 20, h: 32, cap: 'E♭', finger: '4' },
-      Cs:   { mm: 516, w: 14, h: 24, cap: 'C♯' },
-      C:    { mm: 533, w: 8, h: 26, cap: 'C', roller: true },
-      B:    { mm: 544, w: 8, h: 26, cap: 'B', roller: true },
-      giz:  { mm: 554, w: 5.5, h: 18, cap: 'gizmo', capUp: true, capDx: 10 },
+    // The right little finger's cluster on the foot (littleFingerKeys below), in px, measured off a photograph of a
+    // B foot and the Flute World gizmo diagram, both seen from this side:
+    //   the E♭ touch comes first, right beside the socket, hanging below the rod;
+    //   the rollers lie ALONG the tube, the B roller next to the rod, the C roller beyond it;
+    //   the C♯ touch lies below them: flat against the rollers, a hump, then a tail that sweeps up to a strap;
+    //   the gizmo caps the rollers' far ends: a strap off its own rod that flares into a comma-shaped pad.
+    //     Its rod runs along the top of the tube and steps down at a collar onto the last cup's piece of the
+    //     main rod, and only that cup, so the whole piece takes the note's colour when it is pressed.
+    // The rollers and the pad are drawn about 1.3 times true size, so they can be told apart and labelled.
+    const LF = {
+      rollerL: 817.5, rollerR: 841, // a roller's barrel
+      B: 121, C: 130.5, R: 4.7,     // the rollers' centre lines and radius
+      lugL: 815.8, lugR: 845,       // the little arms that hold the rollers' axles
+      csStrap: 859.8,               // the strap from the C♯ touch up to the rod
+      rod2: 105,                    // the gizmo's own rod
+      collar: 960, rodEnd: 1010,    // where that rod steps down, and where the main rod ends
     };
 
     // What a fingering does to the cups, the way the mechanism links them
     function cupStates(keys) {
-      const closed = new Set(), opened = new Set();
+      const closed = new Set();
       const has = k => keys.has(k);
-      if (has('L1')) closed.add('Cs');
+      if (has('L1')) { closed.add('L1'); closed.add('Cs'); }
       if (has('L2')) { closed.add('As'); closed.add('Bb'); }
-      if (has('L3')) closed.add('A');
+      if (has('L3')) { closed.add('A'); closed.add('Gf'); }
       if (has('R1')) { closed.add('Fs'); closed.add('G'); closed.add('Bb'); }   // "1 and 1" B♭
       if (has('R2')) { closed.add('F'); closed.add('G'); }
       if (has('R3')) { closed.add('E'); closed.add('G'); }
@@ -683,20 +742,61 @@
       if (has('C')) { closed.add('D'); closed.add('CsF'); }
       if (has('B')) { closed.add('D'); closed.add('CsF'); closed.add('CF'); }
       if (has('giz')) closed.add('CF');
-      if (has('Gs')) opened.add('Gs');
-      if (has('Eb')) opened.add('Ds');
-      if (has('trD')) opened.add('trD');
-      if (has('trDs')) opened.add('trDs');
-      return { closed, opened, thumb: has('T') || has('Tb') };
+      return { closed, eFlatOpen: has('Eb'), thumb: has('T') || has('Tb') };
     }
 
     function tubeRect(x1, x2, r, fill, rx) {
       return `<rect fill="${fill}" x="${x1}" y="${AXIS - r}" width="${x2 - x1}" height="${2 * r}" rx="${rx || 0}" />`;
     }
 
-    function fluteBody() {
-      const headEnd = px(165), barrelEnd = px(195), bodyEnd = px(480), footStart = px(492), footEnd = px(677);
-      const posts = [200, 222, 247, 272, 297, 322, 355, 387, 418, 452, 475, 498, 527, 568, 609, 652].map(px);
+    // The crown: a low dome on a ridged ring that closes the end of the tube
+    function crownMarkup() {
+      const x = CROWN_X;
+      return `<path fill="url(#ring)" d="M${x + 5},${AXIS - 13} C${x + 1.6},${AXIS - 10.5} ${x},${AXIS - 5} ${x},${AXIS} C${x},${AXIS + 5} ${x + 1.6},${AXIS + 10.5} ${x + 5},${AXIS + 13} Z" />
+        <rect fill="url(#ring)" x="${x + 3.5}" y="${AXIS - 15.6}" width="7" height="31.2" rx="2" />
+        <line x1="${x + 7}" y1="${AXIS - 15}" x2="${x + 7}" y2="${AXIS + 15}" stroke="rgba(0,0,0,0.4)" stroke-width="0.9" />
+        <line x1="${x + 7.9}" y1="${AXIS - 15}" x2="${x + 7.9}" y2="${AXIS + 15}" stroke="rgba(255,255,255,0.8)" stroke-width="0.7" />`;
+    }
+
+    // One of the barrel's rings: a raised bead between two grooves, standing proud of the tube
+    function ridgedRingMarkup(cx) {
+      const line = (x, colour, w) => `<line x1="${x}" y1="${AXIS - 17}" x2="${x}" y2="${AXIS + 17}" stroke="${colour}" stroke-width="${w}" />`;
+      return `<rect fill="url(#ring)" x="${cx - 5.5}" y="${AXIS - 18}" width="11" height="36" rx="2" />
+        <rect fill="url(#ring)" x="${cx - 1.9}" y="${AXIS - 19.3}" width="3.8" height="38.6" rx="1.5" stroke-width="0.9" />
+        ${line(cx - 3.6, 'rgba(0,0,0,0.38)', 0.9)}${line(cx - 2.9, 'rgba(255,255,255,0.8)', 0.6)}
+        ${line(cx + 3.6, 'rgba(0,0,0,0.38)', 0.9)}${line(cx + 2.9, 'rgba(255,255,255,0.8)', 0.6)}`;
+    }
+
+    // The lip plate, looking straight down the hole, traced from a photograph: a loaf shape, arched on the far
+    // side, flat and a little longer on the player's side (the bottom in this view), standing past the tube on both
+    // sides. The hole sits toward the far side, where the blowing edge is, and the player's lip rests on the wide part
+    // below it. Inside the hole the riser's wall catches the light.
+    function lipPlateMarkup(tubeL, tubeR) {
+      const outline = `M42.5,122 C42.7,114 46.4,106.5 52.8,102.4 C59.6,99.5 68.9,98.6 79.3,98.6 C89.6,98.6 98.9,99.5 105.3,102.4 C110.2,106 114.4,114 117.5,122
+        C118.1,128 116.3,133 111.9,135.6 C108.3,137 104.6,137 101.6,137 L57.7,137 C53.9,137 50.2,137 47.2,135.6 C43.6,133 42.1,128 42.5,122 Z`;
+      const hole = 'x="69" y="107" width="22" height="16" rx="7.5" ry="7"';
+      return `
+        <clipPath id="headTubeClip"><rect x="${tubeL}" y="${AXIS - TUBE}" width="${tubeR - tubeL}" height="${2 * TUBE}" /></clipPath>
+        <clipPath id="holeClip"><rect ${hole} /></clipPath>
+        <path d="${outline}" fill="none" stroke="rgba(0,0,0,0.24)" stroke-width="5" clip-path="url(#headTubeClip)" />
+        <path d="${outline}" fill="url(#plate)" />
+        <path d="${outline}" fill="url(#plateEnds)" stroke="none" />
+        <path d="M53,104.2 C60.5,101.5 69,100.9 79.3,100.9 C89.5,100.9 98,101.5 105.5,104.2" fill="none" stroke="#5d6369" stroke-width="1.7" stroke-linecap="round" opacity="0.55" />
+        <path d="M47.5,131.6 C60,133.5 100,133.5 112.5,131.6" fill="none" stroke="#ffffff" stroke-width="1.3" stroke-linecap="round" opacity="0.85" />
+        <rect ${hole} fill="url(#riser)" stroke="none" />
+        <g clip-path="url(#holeClip)" stroke="none">
+          <rect x="69.5" y="105" width="21" height="14" rx="7" ry="6.6" fill="#17140f" />
+          <path d="M71.5,121 C76,122 84,122 88.5,121" fill="none" stroke="#efe8d6" stroke-width="0.9" stroke-linecap="round" opacity="0.8" />
+        </g>
+        <rect ${hole} fill="none" stroke="#3f444a" stroke-width="1" />
+        <path d="M73.5,105.9 C77.5,105.3 82.5,105.3 86.5,105.9" fill="none" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" />
+        <path d="M71.5,124.3 C76,125.3 84,125.3 88.5,124.3" fill="none" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="0.9" />`;
+    }
+
+    function fluteBody(underRods) {
+      const headEnd = px(118), barrelEnd = px(160), bodyEnd = px(480), footStart = px(492), footEnd = px(654);
+      const bodyRodStart = px(186);   // the keywork starts well below the socket
+      const bodyPosts = [189, 202, 219, 244, 272, 294, 317, 366, 392, 421, 452, 475].map(px);
       return `
         <defs>
           <linearGradient id="tube" x1="0" y1="${AXIS - TUBE}" x2="0" y2="${AXIS + TUBE}" gradientUnits="userSpaceOnUse">
@@ -711,36 +811,63 @@
           <linearGradient id="rod" x1="0" y1="${ROD - 3}" x2="0" y2="${ROD + 3}" gradientUnits="userSpaceOnUse">
             <stop offset="0" stop-color="#f2f3f5" /><stop offset="0.5" stop-color="#b6bbc1" /><stop offset="1" stop-color="#6b7178" />
           </linearGradient>
+          <linearGradient id="rodBody" x1="0" y1="${ROD_BODY - 3}" x2="0" y2="${ROD_BODY + 3}" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#f2f3f5" /><stop offset="0.5" stop-color="#b6bbc1" /><stop offset="1" stop-color="#6b7178" />
+          </linearGradient>
           <radialGradient id="cup" cx="0.4" cy="0.35" r="0.72">
             <stop offset="0" stop-color="#ffffff" /><stop offset="0.6" stop-color="#d3d7db" /><stop offset="1" stop-color="#858b92" />
           </radialGradient>
           <radialGradient id="dome" cx="0.42" cy="0.38" r="0.7">
             <stop offset="0" stop-color="#ffffff" /><stop offset="0.7" stop-color="#e3e6ea" /><stop offset="1" stop-color="#a9aeb4" />
           </radialGradient>
-          <linearGradient id="lever" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stop-color="#f6f7f8" /><stop offset="0.5" stop-color="#d6dade" /><stop offset="1" stop-color="#9ea4aa" />
+          <!-- the little finger's keys: shading laid over a roller in any colour, and the polished silver of the rest -->
+          <linearGradient id="barrelShade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#000" stop-opacity="0.16" /><stop offset="0.17" stop-color="#fff" stop-opacity="0.85" />
+            <stop offset="0.42" stop-color="#fff" stop-opacity="0.1" /><stop offset="0.72" stop-color="#000" stop-opacity="0.16" />
+            <stop offset="1" stop-color="#000" stop-opacity="0.4" />
           </linearGradient>
-          <linearGradient id="plate" x1="0" y1="${AXIS - 20}" x2="0" y2="${AXIS + 20}" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#d9dde1" /><stop offset="0.25" stop-color="#ffffff" />
-            <stop offset="0.6" stop-color="#c9cdd2" /><stop offset="1" stop-color="#7d838a" />
+          <linearGradient id="barrelSilver" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f4f5f6" /><stop offset="0.5" stop-color="#c2c6cb" /><stop offset="1" stop-color="#777d84" />
+          </linearGradient>
+          <linearGradient id="strapSilver" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#f7f8f9" /><stop offset="0.55" stop-color="#ced2d6" /><stop offset="1" stop-color="#868c93" />
+          </linearGradient>
+          <linearGradient id="touch" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ffffff" /><stop offset="0.5" stop-color="#e4e7ea" /><stop offset="1" stop-color="#b4b9bf" />
+          </linearGradient>
+          <linearGradient id="gizBody" gradientUnits="userSpaceOnUse" x1="845" y1="119" x2="859" y2="135">
+            <stop offset="0" stop-color="#ffffff" /><stop offset="0.4" stop-color="#e9ecef" />
+            <stop offset="0.75" stop-color="#c2c7cc" /><stop offset="1" stop-color="#8d939a" />
+          </linearGradient>
+          <radialGradient id="gizDome" cx="0.42" cy="0.38" r="0.62">
+            <stop offset="0" stop-color="#fff" stop-opacity="1" /><stop offset="1" stop-color="#fff" stop-opacity="0" />
+          </radialGradient>
+          <!-- the lip plate: polished silver, brightest on top, a reflection line across it below the hole -->
+          <linearGradient id="plate" x1="0" y1="98.6" x2="0" y2="137" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#d9dce0" /><stop offset="0.13" stop-color="#f3f4f6" /><stop offset="0.42" stop-color="#ffffff" />
+            <stop offset="0.56" stop-color="#e2e5e8" /><stop offset="0.6" stop-color="#c3c7cc" /><stop offset="0.66" stop-color="#eff1f3" />
+            <stop offset="0.86" stop-color="#d4d7db" /><stop offset="1" stop-color="#8d939a" />
+          </linearGradient>
+          <linearGradient id="plateEnds" x1="42" y1="0" x2="118" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#3c4146" stop-opacity="0.32" /><stop offset="0.09" stop-color="#3c4146" stop-opacity="0" />
+            <stop offset="0.9" stop-color="#3c4146" stop-opacity="0" /><stop offset="1" stop-color="#3c4146" stop-opacity="0.4" />
+          </linearGradient>
+          <!-- the riser: the metal wall inside the hole, catching the light -->
+          <linearGradient id="riser" x1="0" y1="107" x2="0" y2="123" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#4a4238" /><stop offset="0.55" stop-color="#8d8169" /><stop offset="1" stop-color="#c9bea6" />
           </linearGradient>
         </defs>
         <g stroke="${EDGE}" stroke-width="1.2" stroke-linejoin="round">
-          <!-- head joint: the tube tapers toward the crown; the lip plate sits on its riser -->
-          <path fill="url(#tube)" d="M44,${AXIS - 13.2} L${headEnd},${AXIS - TUBE} L${headEnd},${AXIS + TUBE} L44,${AXIS + 13.2} Z" />
-          <rect fill="url(#ring)" x="20" y="${AXIS - 16.5}" width="27" height="33" rx="6" />
-          <line x1="42" y1="${AXIS - 16}" x2="42" y2="${AXIS + 16}" stroke="rgba(0,0,0,0.35)" stroke-width="1" />
-          <path fill="url(#plate)" d="M${px(-26)},${AXIS} C${px(-26)},${AXIS - 14} ${px(-14)},${AXIS - 19.5} ${px(0)},${AXIS - 19.5}
-            C${px(14)},${AXIS - 19.5} ${px(26)},${AXIS - 14} ${px(26)},${AXIS} C${px(26)},${AXIS + 14} ${px(14)},${AXIS + 19.5} ${px(0)},${AXIS + 19.5}
-            C${px(-14)},${AXIS + 19.5} ${px(-26)},${AXIS + 14} ${px(-26)},${AXIS} Z" />
-          <ellipse fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1" cx="${px(0)}" cy="${AXIS - 2}" rx="30" ry="13" />
-          <rect fill="#1d2023" stroke="#b7bcc2" stroke-width="1.6" x="${px(0) - 9}" y="${AXIS - 8}" width="18" height="16" rx="6" />
-          <!-- the barrel: the socket the head joint slides into -->
-          ${tubeRect(headEnd - 1, barrelEnd, TUBE + 1.8, 'url(#ring)', 2.5)}
-          <line x1="${headEnd + 5}" y1="${AXIS - TUBE - 1}" x2="${headEnd + 5}" y2="${AXIS + TUBE + 1}" stroke="rgba(0,0,0,0.3)" stroke-width="1" />
-          <line x1="${barrelEnd - 5}" y1="${AXIS - TUBE - 1}" x2="${barrelEnd - 5}" y2="${AXIS + TUBE + 1}" stroke="rgba(0,0,0,0.3)" stroke-width="1" />
+          <!-- head joint: the tube narrows a little toward the crown -->
+          <path fill="url(#tube)" d="M${HEAD_TUBE_X},${AXIS - 14.2} L${headEnd},${AXIS - TUBE} L${headEnd},${AXIS + TUBE} L${HEAD_TUBE_X},${AXIS + 14.2} Z" />
+          ${crownMarkup()}
+          ${lipPlateMarkup(HEAD_TUBE_X, headEnd)}
+          <!-- the barrel: the socket the head joint slides into, a ridged ring at each end -->
+          ${tubeRect(headEnd, barrelEnd, TUBE + 0.6, 'url(#tube)')}
+          ${ridgedRingMarkup(headEnd)}
           <!-- body, with its lower ring -->
           ${tubeRect(barrelEnd, bodyEnd, TUBE, 'url(#tube)')}
+          ${ridgedRingMarkup(barrelEnd)}
           ${tubeRect(bodyEnd - 5, bodyEnd, TUBE + 0.8, 'url(#ring)', 1.5)}
           <!-- foot joint (B foot): its socket over the body's tenon, then the tube to the open end -->
           ${tubeRect(bodyEnd, footStart, TUBE + 1.8, 'url(#ring)', 2.5)}
@@ -749,78 +876,279 @@
         </g>
         <!-- ribs along the tube, the posts on them, and the rods the keys turn on -->
         <g stroke="${EDGE}" stroke-width="0.8">
-          <rect fill="#9aa0a6" x="${barrelEnd + 4}" y="${AXIS - TUBE - 1}" width="${bodyEnd - barrelEnd - 8}" height="3" rx="1" />
-          <rect fill="#9aa0a6" x="${footStart + 4}" y="${AXIS - TUBE - 1}" width="${footEnd - footStart - 16}" height="3" rx="1" />
-          ${posts.map(x => `<rect fill="#aeb3b9" x="${x - 2.5}" y="${ROD - 1}" width="5" height="${AXIS - TUBE - ROD + 1}" rx="1" />`).join('')}
-          <rect fill="url(#rod)" x="${barrelEnd + 6}" y="${ROD - 2.8}" width="${bodyEnd - barrelEnd - 12}" height="5.6" rx="2.8" />
-          <rect fill="url(#rod)" x="${footStart + 6}" y="${ROD - 2.8}" width="${footEnd - footStart - 20}" height="5.6" rx="2.8" />
+          <rect fill="#9aa0a6" x="${bodyRodStart}" y="${AXIS + TUBE - 2}" width="${bodyEnd - bodyRodStart - 4}" height="3" rx="1" />
+          ${bodyPosts.map(x => `<rect fill="#aeb3b9" x="${x - 2.5}" y="${AXIS + TUBE - 1}" width="5" height="${ROD_BODY - AXIS - TUBE + 2}" rx="1" />`).join('')}
         </g>
-        <g font-family="Arial, Helvetica, sans-serif" font-weight="bold" text-anchor="middle" font-size="15">
-          <text x="${(px(213) + px(310)) / 2}" y="22" fill="#9900cc">Left hand</text>
-          <text x="${(px(372) + px(467)) / 2}" y="22" fill="#009900">Right hand</text>
-        </g>`;
+        ${underRods}
+        <g stroke="${EDGE}" stroke-width="0.8">
+          <rect fill="url(#rodBody)" x="${bodyRodStart}" y="${ROD_BODY - 2.8}" width="${bodyEnd - bodyRodStart - 6}" height="5.6" rx="2.8" />
+        </g>
+        ${labelView === 'fingers' ? `<g font-family="Arial, Helvetica, sans-serif" font-weight="bold" text-anchor="middle" font-size="15">
+          <text x="${(px(OPEN_CUPS.L1.mm) + px(OPEN_CUPS.A.mm)) / 2}" y="78" fill="#9900cc">Left hand</text>
+          <text x="${(px(OPEN_CUPS.Fs.mm) + px(OPEN_CUPS.E.mm)) / 2}" y="78" fill="#009900">Right hand</text>
+        </g>` : ''}`;
     }
 
-    // The arm from the rod down to a cup
-    function armMarkup(x, cy, r) {
-      return `<rect fill="#aeb3b9" stroke="${EDGE}" stroke-width="0.7" x="${x - 2}" y="${ROD}" width="4" height="${cy - r - ROD + 3}" rx="1.5" />`;
+    // The pointed arm from a body cup down to its rod. It is part of the key, so it takes the colour when the cup is down.
+    function armMarkup(c, paint) {
+      const x = px(c.mm), r = c.r || CUP, cy = AXIS + (c.dy || 0);
+      const top = cy + r * 0.55, end = c.dy ? ROD_G : ROD_BODY;
+      return `<path fill="${paint ? paint.fill : '#aeb3b9'}" stroke="${paint ? paint.edge : EDGE}" stroke-width="0.7" stroke-linejoin="round"
+        d="M${x - r * 0.62},${top} L${x + r * 0.62},${top} L${x + 1.7},${end} L${x - 1.7},${end} Z" />`;
+    }
+
+    // A foot cup's arm: a long point from the rod onto the cup. It lies on top of the cup, and stops short of the
+    // cup's name in the Names view.
+    function footArmMarkup(c, paint) {
+      const x = px(c.mm), tip = labelView === 'names' ? 122 : AXIS + c.dy - 1;
+      return `<path fill="${paint ? paint.fill : 'url(#strapSilver)'}" stroke="${paint ? paint.edge : EDGE}" stroke-width="0.8" stroke-linejoin="round"
+        d="M${x - 2.4},${ROD - 4} L${x + 2.4},${ROD - 4} L${x + 2.1},${ROD + 3} L${x + 0.9},${tip - 3} L${x},${tip} L${x - 0.9},${tip - 3} L${x - 2.1},${ROD + 3} Z" />`;
+    }
+
+    // A length of rod, in silver or in the note's colour
+    function barMarkup(x1, x2, y, r, paint) {
+      const attrs = `x="${x1}" y="${y - r}" width="${x2 - x1}" height="${2 * r}" rx="${r}"`;
+      return `<rect ${attrs} fill="${paint ? paint.fill : '#d4d7db'}" stroke="${paint ? paint.edge : EDGE}" stroke-width="${paint ? 1.2 : 0.8}" />
+        <rect ${attrs} fill="url(#barrelShade)" />`;
+    }
+
+    // The links the eye needs to see: the G cups' own short rod, and the stretch of rod between the left 1 plate
+    // and the C♯ cup it closes, both in the note's colour while they are down
+    function linkMarkup(closed, paint) {
+      const g1 = px(OPEN_CUPS.A.mm) - 9, g2 = px(OPEN_CUPS.Gf.mm) + 9;
+      let out = barMarkup(g1, g2, ROD_G, 2.4, closed.has('A') ? paint : null);
+      [g1, g2 - 2.4].forEach(x => {
+        out += `<rect x="${x}" y="${ROD_G - 3.6}" width="2.4" height="7.2" rx="1" fill="url(#barrelSilver)" stroke="${EDGE}" stroke-width="0.6" />`;
+      });
+      if (closed.has('L1')) out += barMarkup(px(OPEN_CUPS.Cs.mm) - 3, px(OPEN_CUPS.L1.mm) + 3, ROD_BODY, 2.8, paint);
+      return out;
     }
 
     // A cup on its hole (silver, or the note's colour while a finger holds it there), or lifted off it
-    function cupMarkup(c, isClosed, paint, label) {
+    function cupMarkup(c, isClosed, paint) {
       const x = px(c.mm), r = c.r || CUP;
-      const y = c.back ? AXIS - TUBE - 2 : AXIS;    // far-side cups show above the tube
+      const y = AXIS + (c.dy || 0);
+      // Its name always in the Names view; the finger's name only while pressed in the Fingers view
+      const label = labelView === 'names' ? c.name : (labelView === 'fingers' && paint && c.finger) || '';
+      const size = c.nameSize || Math.max(r * 0.88, 7.5);
+      const labelAt = cy => label ? `<text x="${x}" y="${cy + (c.nameDy || 0) + size * 0.36}" font-family="Arial, Helvetica, sans-serif" font-weight="bold"
+        font-size="${size}" text-anchor="middle" fill="${paint ? paint.text : '#4b5563'}">${closeFlat(label, size)}</text>` : '';
       let out = '';
-      if (isClosed) {
+      if (isClosed || c.plate) {   // a plate has no hole: it sits the same whether it is down or not
         out += `<circle cx="${x}" cy="${y + 1.5}" r="${r}" fill="rgba(0,0,0,0.25)" />`;   // its shadow on the tube
         out += `<circle cx="${x}" cy="${y}" r="${r}" fill="${paint ? paint.fill : 'url(#cup)'}" stroke="${paint ? paint.edge : EDGE}" stroke-width="${paint ? 2 : 1.2}" />`;
         out += paint
           ? `<circle cx="${x}" cy="${y}" r="${r * 0.68}" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="1" />`
           : `<circle cx="${x}" cy="${y}" r="${r * 0.68}" fill="url(#dome)" stroke="rgba(0,0,0,0.16)" stroke-width="0.8" />
              <ellipse cx="${x - r * 0.28}" cy="${y - r * 0.3}" rx="${r * 0.24}" ry="${r * 0.13}" fill="#ffffff" opacity="0.8" />`;
-        if (label) out += `<text x="${x}" y="${y + r * 0.38}" font-family="Arial, Helvetica, sans-serif" font-weight="bold"
-          font-size="${r * 1.05}" text-anchor="middle" fill="${paint ? paint.text : '#6b7280'}">${label}</text>`;
+        out += labelAt(y);
       } else {
-        // lifted off its hole, swinging up on the rod: the hole shows under its lower edge
+        // lifted off its hole, swinging up on its rod: seen from above it leans toward the rod, and the hole
+        // shows along the edge away from it (the top edge on the body, the bottom edge on the foot)
+        const lean = c.mm < 480 ? y + 5 : y - 5;
         out += `<circle cx="${x}" cy="${y}" r="${r * 0.8}" fill="#2b2e33" stroke="#9aa0a6" stroke-width="1.2" />`;
-        out += `<ellipse cx="${x}" cy="${y - 5}" rx="${r}" ry="${r * 0.84}" fill="url(#cup)" stroke="${EDGE}" stroke-width="1.2" />
-          <ellipse cx="${x}" cy="${y - 5.5}" rx="${r * 0.68}" ry="${r * 0.56}" fill="url(#dome)" stroke="rgba(0,0,0,0.16)" stroke-width="0.8" />
-          <ellipse cx="${x - r * 0.28}" cy="${y - 5 - r * 0.3}" rx="${r * 0.24}" ry="${r * 0.11}" fill="#ffffff" opacity="0.8" />`;
+        out += `<ellipse cx="${x}" cy="${lean}" rx="${r}" ry="${r * 0.84}" fill="url(#cup)" stroke="${EDGE}" stroke-width="1.2" />
+          <ellipse cx="${x}" cy="${lean - 0.5}" rx="${r * 0.68}" ry="${r * 0.56}" fill="url(#dome)" stroke="rgba(0,0,0,0.16)" stroke-width="0.8" />
+          <ellipse cx="${x - r * 0.28}" cy="${lean - r * 0.3}" rx="${r * 0.24}" ry="${r * 0.11}" fill="#ffffff" opacity="0.8" />`;
+        out += labelAt(lean - 0.5);
       }
       return out;
     }
 
-    function leverMarkup(l, pressed, paint) {
-      const w = l.w * MM, h = l.h, x = px(l.mm) - w / 2;
-      const y = l.below ? AXIS + TUBE + 21 : ROD - 3 - h;
-      const fill = pressed ? paint.fill : 'url(#lever)';
-      const edge = pressed ? paint.edge : EDGE;
-      let out = '';
-      if (l.below && !l.noArm) {
-        // the arm from under the tube to the touch piece
-        out += `<rect fill="#aeb3b9" stroke="${EDGE}" stroke-width="0.7" x="${x + w / 2 - 2}" y="${AXIS + TUBE - 2}" width="4" height="${y - AXIS - TUBE + 4}" rx="1.5" />`;
-      } else if (!l.below && !l.roller) {
-        out += `<rect fill="#aeb3b9" stroke="${EDGE}" stroke-width="0.7" x="${x + w / 2 - 2}" y="${y + h - 2}" width="4" height="${ROD - y - h + 4}" rx="1.5" />`;
-      }
-      out += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${l.roller ? w / 2 : Math.min(w, h) * 0.38}" fill="${fill}" stroke="${edge}" stroke-width="${pressed ? 2 : 1.1}" />`;
-      if (l.roller) {
-        out += [0.25, 0.42, 0.58, 0.75].map(t => `<line x1="${x + 1.5}" y1="${y + h * t}" x2="${x + w - 1.5}" y2="${y + h * t}" stroke="rgba(0,0,0,0.3)" stroke-width="0.9" />`).join('');
-      } else if (!pressed) {
-        out += `<rect x="${x + 2}" y="${y + 2}" width="${Math.max(2, w * 0.3)}" height="${h - 4}" rx="1.5" fill="#ffffff" opacity="0.55" />`;
-      }
-      const capY = (l.below ? y + h + 12 : (l.capUp ? y - 16 : y - 5)) + (l.capDy || 0);
-      out += `<text x="${x + w / 2 + (l.capDx || 0)}" y="${capY}" font-family="Arial, Helvetica, sans-serif" font-size="9" text-anchor="middle" fill="#6b7280">${l.cap}</text>`;
-      if (pressed && l.finger) {
-        out += `<text x="${x + w / 2}" y="${y + h / 2 + 4.5}" font-family="Arial, Helvetica, sans-serif" font-weight="bold"
-          font-size="12" text-anchor="middle" fill="${paint.text}">${l.finger}</text>`;
-      }
+    // What the touch pieces say: nothing in the Keys view, who plays them in Fingers, what they are called in Names.
+    // A touch and the cup it moves share a name.
+    const TOUCHES = {
+      Gs:   { finger: 'L4', name: 'G♯' },
+      Tb:   { finger: 'LT', name: 'thumb B♭' },
+      T:    { finger: 'LT', name: 'thumb B' },
+      BbL:  { finger: 'R1', name: 'B♭ lever' },
+      trD:  { finger: 'R2', name: 'D trill' },
+      trDs: { finger: 'R3', name: 'D♯ trill' },
+      Eb:   { finger: 'R4', name: 'E♭' },
+      Cs:   { finger: 'R4', name: 'C♯' },
+      C:    { finger: 'R4', name: 'C' },
+      B:    { finger: 'R4', name: 'B' },
+      giz:  { finger: 'R4', name: 'gizmo' },
+    };
+    const touchCaption = id => labelView === 'keys' ? '' : TOUCHES[id][labelView === 'fingers' ? 'finger' : 'name'];
+
+    // The finger's name on a key while it is pressed, in the Fingers view
+    function fingerOnKey(id, pressed, paint, x, y, size = 12) {
+      if (!pressed || labelView !== 'fingers') return '';
+      return `<text x="${x}" y="${y}" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="${size}" text-anchor="middle" fill="${paint.text}">${TOUCHES[id].finger}</text>`;
+    }
+
+    // The ♭ comes with a wide gap in front of it: close it up, as the note buttons do
+    const closeFlat = (text, size) => text.replace('♭', `<tspan dx="${(-0.18 * size).toFixed(1)}">♭</tspan>`);
+
+    function capText(x, y, text, anchor) {
+      if (!text) return '';
+      return `<text x="${x}" y="${y}" font-family="Arial, Helvetica, sans-serif" font-size="9" text-anchor="${anchor || 'middle'}" fill="#6b7280">${closeFlat(text, 9)}</text>`;
+    }
+
+    // The G♯ key, the thumb keys, the B♭ lever and the trill keys keep the shapes and places flutists know them
+    // by from the fingering charts, rather than showing their linkage (the G♯ really does reach its rod):
+    //   G♯: a ⌐, its rounded touch reaching headward above the left ring finger's cup, a straight leg on the foot
+    //     side that crosses the tube between the two G cups, the way it does on a real flute
+    //   thumb B♭: a hook, its rounded foot toward the head and a long bar running footward along the tube
+    //   thumb B: nested under that bar, a bump toward the head and a tail running footward
+    //   B♭ lever: a bulge just head-side of the right index finger's cup, its bar running headward
+    //   trill keys: small upright pills, between the right hand's cups at the rod
+    function chartKeyMarkup(d, shine, pressed, paint) {
+      return `<path d="${d}" transform="translate(0.6 1)" fill="rgba(0,0,0,0.2)" />
+        <path d="${d}" fill="${pressed ? paint.fill : 'url(#touch)'}" stroke="${pressed ? paint.edge : EDGE}" stroke-width="${pressed ? 1.8 : 1.1}" stroke-linejoin="round" />
+        <path d="${shine}" fill="none" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" opacity="${pressed ? 0.55 : 0.95}" />`;
+    }
+
+    function gSharpMarkup(pressed, paint) {
+      let out = chartKeyMarkup(
+        'M573,72 L589,72 C593.4,72 596,74.6 596,79 L596,138 C596,139.5 595,140.5 593.5,140.5 L591.5,140.5 C590,140.5 589,139.5 589,138 L589,87 L573,87 C568.6,87 565,83.6 565,79.5 C565,75.4 568.6,72 573,72 Z',
+        'M569.5,77.2 C570.6,76 572,75.4 573.5,75.4 L588,75.4 C590.8,75.4 592.6,77 592.6,79.6 L592.6,136', pressed, paint);
+      return out + fingerOnKey('Gs', pressed, paint, 579, 84, 11) + capText(580.5, 67, touchCaption('Gs'));
+    }
+
+    function thumbKeysMarkup(keys, paint) {
+      // Under the left 1 plate and the B♭ cup, clear of the rod
+      let out = '<g transform="translate(35 4)">' + chartKeyMarkup(
+        'M488,143 L417,143 C412.6,143 410,145.8 410,150 L410,171 C410,175 412.4,177 416,177 L421,177 C424.6,177 427,175 427,171 L427,154.5 C427,152.6 428,151.5 430,151.5 L488,151.5 Z',
+        'M413.6,160 L413.6,150.5 C413.6,148 415.2,146.6 417.6,146.6 L484,146.6', keys.has('Tb'), paint);
+      out += chartKeyMarkup(
+        'M488,157.7 L434.5,157.7 C433,157.7 432,158.7 432,160.2 L432,170 C432,174.4 434.6,177 439,177 L451,177 C455,177 458,174.4 458.6,170.5 C459,168 460.4,167 463,167 L488,167 Z',
+        'M435.6,168 L435.6,162.6 C435.6,161.6 436.2,161 437.2,161 L484,161', keys.has('T'), paint);
+      out += fingerOnKey('Tb', keys.has('Tb'), paint, 418.5, 169.5, 10.5) + fingerOnKey('T', keys.has('T'), paint, 445, 172.5);
+      return out + capText(418.5, 188, touchCaption('Tb')) + capText(462, 188, touchCaption('T')) + '</g>';
+    }
+
+    function sideKeysMarkup(keys, paint) {
+      const pill = (x, top, bottom, r) => `M${x - r},${top + r} A${r},${r} 0 0 1 ${x + r},${top + r} L${x + r},${bottom - r} A${r},${r} 0 0 1 ${x - r},${bottom - r} Z`;
+      const between = (a, b) => (px(OPEN_CUPS[a].mm) + px(OPEN_CUPS[b].mm)) / 2;
+      const trD = between('Fs', 'F'), trDs = between('F', 'E');
+      // The B♭ lever is drawn for a place 12 px head-side of here and 4 px higher
+      let out = '<g transform="translate(12 4)">' + chartKeyMarkup(
+        'M632.5,141 L649.5,141 C652,141 653,139.8 653.4,137.6 C654,133.6 656.6,131 660.2,131 C664,131 666.6,133.8 666.6,137.6 L666.6,141 C666.6,144 664.6,146 661.6,146 L632.5,146 C631,146 630,145 630,143.5 C630,142 631,141 632.5,141 Z',
+        'M633,143.2 L650.4,143.2 C654,143.2 655.4,141 656,138 C656.4,135.8 657.6,134.2 659.4,133.8', keys.has('BbL'), paint)
+        + capText(648, 156, touchCaption('BbL')) + '</g>';
+      [[trD, 'trD'], [trDs, 'trDs']].forEach(([x, id]) => {
+        out += chartKeyMarkup(pill(x, 127, 143, 3.7), `M${x - 1.4},${130.6} L${x - 1.4},${139.4}`, keys.has(id), paint);
+        out += capText(x, 156, touchCaption(id));
+      });
+      return out;
+    }
+
+    // A roller: a polished barrel along the tube, a collar at its far end, its axle between two little arms,
+    // and its label on the barrel
+    function rollerMarkup(cy, pressed, paint, label) {
+      const { rollerL: a, rollerR: b, R: r, lugL, lugR } = LF;
+      const barrel = `M${a + 3},${cy - r + 0.5} C${a + 9},${cy - r - 0.4} ${b - 9},${cy - r - 0.4} ${b - 3},${cy - r + 0.5}
+        C${b - 0.6},${cy - r + 1} ${b},${cy - r * 0.6} ${b},${cy} C${b},${cy + r * 0.6} ${b - 0.6},${cy + r - 1} ${b - 3},${cy + r - 0.5}
+        C${b - 9},${cy + r + 0.4} ${a + 9},${cy + r + 0.4} ${a + 3},${cy + r - 0.5}
+        C${a + 0.6},${cy + r - 1} ${a},${cy + r * 0.6} ${a},${cy} C${a},${cy - r * 0.6} ${a + 0.6},${cy - r + 1} ${a + 3},${cy - r + 0.5} Z`;
+      return `<rect fill="#c4c8cd" stroke="${EDGE}" stroke-width="0.5" x="${lugL}" y="${cy - 1.1}" width="${lugR - lugL}" height="2.2" />
+        <rect fill="url(#barrelSilver)" stroke="${EDGE}" stroke-width="0.6" x="${b + 0.7}" y="${cy - r * 0.68}" width="2.2" height="${r * 1.36}" rx="0.9" />
+        <path d="${barrel}" fill="${pressed ? paint.fill : '#e3e6e9'}" stroke="${pressed ? paint.edge : EDGE}" stroke-width="${pressed ? 1.6 : 1}" />
+        <path d="${barrel}" fill="url(#barrelShade)" />
+        <path d="M${a + 4},${cy - r * 0.46} L${b - 5},${cy - r * 0.46}" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="${pressed ? 0.55 : 0.9}" fill="none" />
+        ${label ? `<text x="${(a + b) / 2}" y="${cy + 2.9}" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="8" text-anchor="middle"
+          fill="${pressed ? paint.text : '#4b5563'}">${label}</text>` : ''}`;
+    }
+
+    // A ball-topped post on the rod
+    function ballMarkup(x, y, r) {
+      return `<circle cx="${x}" cy="${y}" r="${r}" fill="url(#cup)" stroke="${EDGE}" stroke-width="0.9" />
+        <ellipse cx="${x - r * 0.3}" cy="${y - r * 0.35}" rx="${r * 0.32}" ry="${r * 0.22}" fill="#ffffff" opacity="0.9" />`;
+    }
+
+    // The foot's rods. The main one carries the keys; past the collar it belongs to the last cup alone, and the gizmo
+    // reaches that piece along its own rod at the top of the tube.
+    function footRodsMarkup(gizmoDown, paint) {
+      const { rod2, collar, rodEnd } = LF, giz = gizmoDown ? paint : null;
+      return barMarkup(842, collar - 2, ROD, 2.8, null) + barMarkup(collar + 2, rodEnd, ROD, 2.8, giz) + barMarkup(847, collar, rod2, 2.4, giz)
+        + `<rect x="${collar - 2.2}" y="${rod2 - 3.4}" width="4.4" height="${ROD - rod2 + 6.8}" rx="1.4" fill="${giz ? giz.fill : 'url(#barrelSilver)'}" stroke="${giz ? giz.edge : EDGE}" stroke-width="${giz ? 1.2 : 0.8}" />`
+        + ballMarkup(894, ROD, 3.2) + ballMarkup(948, ROD, 3.2) + ballMarkup(rodEnd + 1, ROD, 3.2);
+    }
+
+    // The gizmo's touch: a strap off its rod that flares into a comma-shaped pad at the end of the rollers
+    function gizmoPadMarkup(pressed, paint) {
+      const fill = pressed ? paint.fill : null, edge = pressed ? paint.edge : EDGE;
+      const comma = `M847,106.5 L851.8,106.5 L851.8,117.5 C851.9,119.8 853.2,121 855,122 C857.4,123.4 858.4,125.7 858,128.2
+        C857.4,131.9 854,134.2 850,134 C846.7,133.8 844.6,131.4 844.6,128.2 C844.6,125.2 846,122.6 846.5,119.5 Z`;
+      const dome = `M847.4,127.6 C847.2,125.2 849.2,123.6 851.6,123.8 C854.4,124 856.2,126 855.8,128.2 C855.4,130.6 853,132.2 850.6,131.9 C848.6,131.7 847.5,130 847.4,127.6 Z`;
+      return `
+          <path d="${comma}" transform="translate(0.9 1.5)" fill="rgba(0,0,0,0.3)" />
+          <path d="${comma}" fill="${fill || 'url(#gizBody)'}" stroke="${edge}" stroke-width="${pressed ? 1.5 : 1}" stroke-linejoin="round" />
+          <path d="${dome}" fill="url(#gizDome)" stroke="rgba(0,0,0,0.16)" stroke-width="0.6" opacity="${pressed ? 0.5 : 1}" />
+          <path d="M846.4,128 C846.6,125.6 848,123.6 850,122.9" fill="none" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" opacity="${pressed ? 0.65 : 1}" />
+          <path d="M856.9,129.6 C856,131.8 853.8,133 851.4,133" fill="none" stroke="rgba(0,0,0,0.28)" stroke-width="1" stroke-linecap="round" />
+          <path d="M848.5,109 L848.5,119" fill="none" stroke="#ffffff" stroke-width="0.9" stroke-linecap="round" opacity="${pressed ? 0.55 : 0.95}" />`;
+    }
+
+    // The D♯ cup, on the far side of the tube: nearly edge-on along its top, and it rises when the E♭ key opens it.
+    // Under the rods.
+    function eFlatCupMarkup(open) {
+      const x = px(DS_CUP.mm), { rx, ry, y } = DS_CUP, cy = open ? y - 4 : y;
+      let out = open ? `<ellipse cx="${x}" cy="${y + 1}" rx="${rx * 0.82}" ry="${ry * 0.82}" fill="#2b2e33" stroke="#9aa0a6" stroke-width="1" />`
+        : `<ellipse cx="${x}" cy="${y + 1.2}" rx="${rx}" ry="${ry}" fill="rgba(0,0,0,0.25)" />`;
+      out += `<ellipse cx="${x}" cy="${cy}" rx="${rx}" ry="${ry}" fill="url(#cup)" stroke="${EDGE}" stroke-width="1.2" />
+        <ellipse cx="${x}" cy="${cy - 0.3}" rx="${rx * 0.68}" ry="${ry * 0.62}" fill="url(#dome)" stroke="rgba(0,0,0,0.16)" stroke-width="0.8" />
+        <ellipse cx="${x - rx * 0.3}" cy="${cy - ry * 0.34}" rx="${rx * 0.22}" ry="${ry * 0.14}" fill="#ffffff" opacity="0.8" />`;
+      if (labelView === 'names') out += `<text x="${x}" y="${cy + 2.2}" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="9" text-anchor="middle" fill="#4b5563">${closeFlat('E♭', 9)}</text>`;
+      return out;
+    }
+
+    // The E♭ key: a ball-topped post beside the socket and a short hinge tube, with a pointed arm up onto the D♯ cup;
+    // a strap off the tube, running down the foot side of the touch as a raised rib; and the touch itself, narrow at
+    // the top and rounding out toward the head side (flat on the foot side, toward the rollers).
+    function eFlatMarkup(pressed, paint, cupOpen) {
+      const post = 798, csp = px(DS_CUP.mm), strap = 813.4;
+      const fill = pressed ? paint.fill : null, edge = pressed ? paint.edge : EDGE;
+      const touch = `M815.6,120 L815.6,146 C815.6,150.6 812.2,153 807.5,153 C800.8,153 796,147.5 796,140 C796,134 799,130.5 803,127.6 C806,125.4 808.6,123.6 809.4,120 Z`;
+      // The arm rides up with the cup, and stops short of the cup's name in the Names view
+      const tip = labelView === 'names' ? 107 : (cupOpen ? 98 : 102);
+      return `
+        <path d="M${csp - 2.2},${ROD} L${csp + 2.2},${ROD} L${csp + 1.4},${tip + 3} L${csp},${tip} L${csp - 1.4},${tip + 3} Z"
+          fill="${fill || 'url(#strapSilver)'}" stroke="${edge}" stroke-width="0.8" stroke-linejoin="round" />
+        <rect x="${post}" y="${ROD - 3.3}" width="${840 - post}" height="6.6" rx="2" fill="${fill || 'url(#rod)'}" stroke="${edge}" stroke-width="${pressed ? 1.2 : 0.9}" />
+        ${pressed ? `<rect x="${post}" y="${ROD - 3.3}" width="${840 - post}" height="6.6" rx="2" fill="url(#barrelShade)" />` : ''}
+        ${ballMarkup(post, ROD, 4.2)}
+        <path d="${touch}" transform="translate(0.6 1)" fill="rgba(0,0,0,0.2)" />
+        <path d="${touch}" fill="${fill || 'url(#touch)'}" stroke="${edge}" stroke-width="${pressed ? 1.8 : 1.1}" stroke-linejoin="round" />
+        <path d="M799.2,141 C799,136.8 801.2,133.6 804.4,131.2" fill="none" stroke="#ffffff" stroke-width="1.3" stroke-linecap="round" opacity="${pressed ? 0.55 : 0.95}" />
+        <path d="M800.6,148 C803,150.4 806.4,151 809.6,150.6" fill="none" stroke="rgba(0,0,0,0.16)" stroke-width="0.9" stroke-linecap="round" />
+        <path d="M811.2,${ROD} L815.6,${ROD} L815.6,148.8 A2.2,2.2 0 0 1 811.2,148.8 Z" fill="${fill || 'url(#strapSilver)'}"
+          stroke="${edge}" stroke-width="${pressed ? 1.2 : 0.7}" stroke-linejoin="round" />
+        <path d="M812.5,${ROD + 3} L812.5,147" fill="none" stroke="#ffffff" stroke-width="0.8" stroke-linecap="round" opacity="${pressed ? 0.5 : 0.9}" />
+        ${ballMarkup(strap, ROD, 3.2)}
+        ${capText(805, 166, touchCaption('Eb'))}
+        ${fingerOnKey('Eb', pressed, paint, 804.5, 145, 11)}`;
+    }
+
+    // Everything the right little finger works beyond the E♭ key
+    function littleFingerKeys(keys, paint) {
+      const on = id => keys.has(id);
+      const { csStrap, lugL, lugR, C, rod2 } = LF;
+      const csFill = on('Cs') ? paint.fill : 'url(#touch)', csEdge = on('Cs') ? paint.edge : EDGE;
+      const touch = `M818.5,136.6 L859.6,136.6 C861,136.6 861.7,137.3 861.7,138.7 L861.7,141.2 C861.7,142.5 861,143.2 859.6,143.2 L851,143.2
+        C846.4,143.2 843.6,145.4 841,149 C838,153.2 834,155.6 828,155.6 C821.6,155.6 816.2,152.4 816,146 L816,139.2 C816,137.6 817,136.6 818.5,136.6 Z`;
+      // Bottom to top: the arms and straps off the rod, the rollers, the C♯ touch; the gizmo's pad rides over them all
+      let out = `<rect fill="url(#strapSilver)" stroke="${EDGE}" stroke-width="0.7" x="${lugL}" y="${ROD}" width="2.4" height="${C + 3 - ROD}" rx="1" />
+        <rect fill="url(#strapSilver)" stroke="${EDGE}" stroke-width="0.7" x="${lugR}" y="${ROD}" width="2.2" height="${C + 3 - ROD}" rx="1" />
+        <rect fill="${on('Cs') ? paint.fill : 'url(#strapSilver)'}" stroke="${csEdge}" stroke-width="0.8" x="${csStrap - 1.9}" y="${ROD}" width="3.8" height="${139 - ROD}" />`;
+      out += rollerMarkup(C, on('C'), paint, touchCaption('C')) + rollerMarkup(LF.B, on('B'), paint, touchCaption('B'));
+      out += `<path d="${touch}" transform="translate(0.6 1)" fill="rgba(0,0,0,0.2)" />
+        <path d="${touch}" fill="${csFill}" stroke="${csEdge}" stroke-width="${on('Cs') ? 1.8 : 1.1}" stroke-linejoin="round" />
+        <path d="M819.5,139.6 L842,139.6" fill="none" stroke="#ffffff" stroke-width="1.3" stroke-linecap="round" opacity="${on('Cs') ? 0.55 : 0.95}" />
+        <path d="M822,152.6 C826,153.8 831,153.6 835,151.6" fill="none" stroke="rgba(0,0,0,0.16)" stroke-width="0.9" stroke-linecap="round" />`;
+      out += gizmoPadMarkup(on('giz'), paint);
+      out += fingerOnKey('Cs', on('Cs'), paint, 829, 150) + capText(832, 166, touchCaption('Cs'));
+      // The gizmo's name goes above the tube, on a line down to its strap
+      if (labelView !== 'keys') out += `<line x1="849.4" y1="94" x2="849.4" y2="${rod2 - 3}" stroke="#9aa0a6" stroke-width="0.8" />` + capText(849.4, 91, touchCaption('giz'));
       return out;
     }
 
     function drawFlute(note, keys) {
       const svg = document.getElementById('flute');
       keys = keys || new Set();
-      const { closed, opened, thumb } = cupStates(keys);
+      const { closed, eFlatOpen, thumb } = cupStates(keys);
       let out = '';
       // The note's colour on every key that is down for it
       let paint = null;
@@ -829,36 +1157,83 @@
         paint = { fill: note.color, edge: darken(mid, 0.62), text: textColorOn(mid) };
         if (note.sharp) {
           // One blend along the flute: the lower letter's colour toward the head, the upper's toward the foot
-          out += `<defs><linearGradient id="noteFill" gradientUnits="userSpaceOnUse" x1="${px(200)}" y1="0" x2="${px(640)}" y2="0">
+          out += `<defs><linearGradient id="noteFill" gradientUnits="userSpaceOnUse" x1="${px(200)}" y1="0" x2="${px(620)}" y2="0">
             <stop offset="0" stop-color="${note.color}" /><stop offset="1" stop-color="${note.upperColor}" /></linearGradient></defs>`;
           paint.fill = 'url(#noteFill)';
         }
       }
-      // The thumb's cup is on the back: only its lower edge shows under the tube
-      out += `<circle cx="${px(THUMB_MM)}" cy="${AXIS + 7}" r="${CUP}" fill="${thumb && paint ? paint.fill : '#8d939a'}" stroke="${thumb && paint ? paint.edge : EDGE}" stroke-width="1.2" />`;
-      out += fluteBody();
-      // Arms, then the cups along the tube
-      Object.values(OPEN_CUPS).forEach(c => { out += armMarkup(px(c.mm), AXIS, CUP); });
-      out += armMarkup(px(CLOSED_CUPS.Ds.mm), AXIS, CUP);
-      Object.entries(CLOSED_CUPS).forEach(([id, c]) => {
-        out += cupMarkup(c, !opened.has(id), null, '');
+      // The cups on the back: only their lower edges show under the tube
+      REAR_CUPS.forEach(c => {
+        out += `<circle cx="${px(c.mm)}" cy="${AXIS + TUBE + 5 - c.r}" r="${c.r}" fill="#8d939a" stroke="${EDGE}" stroke-width="1.2" />`;
       });
+      out += `<circle cx="${px(THUMB_MM)}" cy="${AXIS + TUBE + 5 - CUP}" r="${CUP}" fill="${thumb && paint ? paint.fill : '#8d939a'}" stroke="${thumb && paint ? paint.edge : EDGE}" stroke-width="1.2" />`;
+      out += fluteBody(eFlatCupMarkup(eFlatOpen));
+      // The links and arms, then the cups along the tube
+      out += linkMarkup(closed, paint);
+      const onFoot = c => c.mm > 480;
+      Object.entries(OPEN_CUPS).forEach(([id, c]) => { if (!onFoot(c)) out += armMarkup(c, closed.has(id) ? paint : null); });
       Object.entries(OPEN_CUPS).forEach(([id, c]) => {
         const down = closed.has(id);
-        out += cupMarkup(c, down, down ? paint : null, c.finger || '');
+        out += cupMarkup(c, down, down ? paint : null);
       });
-      // Finger numbers under the cups the fingers press
-      out += '<g font-family="Arial, Helvetica, sans-serif" font-size="10" text-anchor="middle" fill="#6b7280">';
-      Object.values(OPEN_CUPS).filter(c => c.finger).forEach(c => {
-        out += `<text x="${px(c.mm)}" y="${AXIS + TUBE + 14}">${c.finger}</text>`;
-      });
-      out += '</g>';
-      // Levers and touch pieces
-      Object.entries(LEVERS).forEach(([id, l]) => {
-        out += leverMarkup(l, keys.has(id), paint);
-      });
+      // The Fingers view: finger names (L1, R1 ...) beside the cups the fingers press, on the side each hand
+      // comes from: the left hand's fingers reach over from above in this view, the right hand's from below
+      if (labelView === 'fingers') {
+        out += '<g font-family="Arial, Helvetica, sans-serif" font-size="10" text-anchor="middle" fill="#6b7280">';
+        Object.values(OPEN_CUPS).filter(c => c.finger).forEach(c => {
+          const y = c.finger[0] === 'L' ? AXIS + (c.dy || 0) - (c.r || CUP) - 4 : ROD_BODY + 15;
+          out += `<text x="${px(c.mm)}" y="${y}">${c.finger}</text>`;
+        });
+        out += '</g>';
+      }
+      // The foot's rods and arms lie on top of its cups
+      out += footRodsMarkup(keys.has('giz'), paint);
+      Object.entries(OPEN_CUPS).forEach(([id, c]) => { if (onFoot(c)) out += footArmMarkup(c, closed.has(id) ? paint : null); });
+      // The touch pieces
+      out += gSharpMarkup(keys.has('Gs'), paint) + thumbKeysMarkup(keys, paint) + sideKeysMarkup(keys, paint);
+      out += eFlatMarkup(keys.has('Eb'), paint, eFlatOpen) + littleFingerKeys(keys, paint);
       svg.innerHTML = out;
       svg.setAttribute('aria-label', note ? `Fingering for ${note.name}` : 'Flute');
+    }
+
+    // ----- the printed chart's symbol for the same fingering -----
+    // The common flute fingering chart, in the units of the chart the app was designed from (it lies the way the flute
+    // does, head at the left, so each key can be found straight below): left hand with the thumb keys under it, the G♯
+    // flag, the B♭ lever, right hand with the trills under it, the E♭ key, then the foot's B roller, C roller and C♯
+    // stacked in that order with the gizmo beside them.
+    const CHART_CIRCLES = { L1: [119, 33], L2: [225, 43], L3: [325, 43], R1: [500, 43], R2: [607, 43], R3: [715, 43] };
+    const CHART_Y = 155;
+    const chartPill = (cx, cy, rx, ry) => `M${cx - rx} ${cy - ry + rx}A${rx} ${rx} 0 0 1 ${cx + rx} ${cy - ry + rx}L${cx + rx} ${cy + ry - rx}A${rx} ${rx} 0 0 1 ${cx - rx} ${cy + ry - rx}Z`;
+    const CHART_SHAPES = {
+      Tb: 'M57 226Q57 212 71 212L212 212A10 10 0 0 1 212 232L110 232L110 272A26.5 26.5 0 0 1 57 272Z',
+      T: 'M143 252L255 252A56 56 0 0 1 143 252Z',
+      Gs: 'M355 42L406 42L406 158L392 158L392 73L355 73A15.5 15.5 0 0 1 355 42Z',
+      BbL: 'M375 227L418 227C424 227 426 222 430 216C434 209 440 205 447 205C459 205 467 214 467 225C467 236 460 244 449 244L375 244Z',
+      trD: chartPill(553, 221, 14, 23),
+      trDs: chartPill(661, 221, 14, 23),
+      Eb: 'M785 158L803 158L803 285L789 285C771 285 757 268 757 247C757 229 768 214 785 204Z',
+      B: 'M831 140L907 140Q910 140 910 143L910 155Q910 158 907 158L831 158Q828 158 828 155L828 143Q828 140 831 140Z',
+      C: 'M831 177L907 177Q910 177 910 180L910 193Q910 196 907 196L831 196Q828 196 828 193L828 180Q828 177 831 177Z',
+      Cs: 'M828 212L912 212C912 234 892 248 870 248C848 248 828 234 828 212Z',
+      giz: 'M931 148C935 158 945 168 945 181C945 190 939 197 931 197C923 197 917 190 917 181C917 168 927 158 931 148Z',
+    };
+    // A printed chart fills the keys that are closed, so the foot's keys add up: low C shows the C roller and the
+    // C♯ key together, and low B all three.
+    function chartKeysDown(keys) {
+      const down = new Set(keys);
+      if (down.has('B')) down.add('C');
+      if (down.has('C')) down.add('Cs');
+      return down;
+    }
+    function drawChart(note, keys) {
+      const down = chartKeysDown(keys || []);
+      const paint = on => `fill="${on ? '#1f2937' : '#fff'}" stroke="${on ? '#1f2937' : '#6b7280'}" stroke-width="3.6" stroke-linejoin="round"`;
+      let out = '';
+      Object.entries(CHART_CIRCLES).forEach(([k, [cx, r]]) => { out += `<circle cx="${cx}" cy="${CHART_Y}" r="${r}" ${paint(down.has(k))} />`; });
+      Object.entries(CHART_SHAPES).forEach(([k, d]) => { out += `<path d="${d}" ${paint(down.has(k))} />`; });
+      const svg = document.getElementById('chart');
+      svg.innerHTML = out;
+      svg.setAttribute('aria-label', note ? `Fingering chart for ${note.name}` : 'Fingering chart');
     }
 
     // ----- drawing the staff -----
@@ -871,7 +1246,8 @@
     };
     const SS = 12;                       // one staff space
     const GS = SS / 360;                 // glyph units -> px
-    const STAFF_LEFT = 300, STAFF_RIGHT = 800;
+    const STAFF_LEFT = 4, STAFF_RIGHT = 256;   // just room for the clef, one note with its accidental, and its name
+    const NOTE_X = STAFF_LEFT + 100;
     const BOTTOM_LINE = 132;             // E4's line
     const yOfStep = step => BOTTOM_LINE - (step - 2) * (SS / 2);   // step: C4 = 0, D4 = 1 ...
 
@@ -887,7 +1263,7 @@
       out += '</g>';
       out += `<path fill="#1f2937" transform="translate(${STAFF_LEFT + 12} ${yOfStep(4)}) scale(${GS})" d="${GLYPHS.gClef}" />`;
       if (note) {
-        const x = (STAFF_LEFT + STAFF_RIGHT) / 2 + 20, y = yOfStep(note.step);
+        const x = NOTE_X, y = yOfStep(note.step);
         const headW = 468 * GS;
         // Ledger lines, out from the staff as far as the note
         out += '<g stroke="#1f2937" stroke-width="1.1">';
@@ -929,22 +1305,24 @@
         tipArea.innerHTML = '<span class="hint">Press a note to see how to play it. Hold Shift to play the computer keys an octave higher.</span>';
         return;
       }
-      const which = chosenFingering[note.pitch] || 0;
-      const keys = note.fingerings[which];
+      // A note with several fingerings shows the button and nothing else, the same button in the same place each
+      // time, so pressing it again and again changes only the fingers
+      if (note.fingerings.length > 1) {
+        const which = chosenFingering[note.pitch] || 0;
+        const label = `⇄ Other fingering (${which + 1} of ${note.fingerings.length})`;
+        const button = document.getElementById('altBtn');
+        if (button) button.textContent = label;
+        else tipArea.innerHTML = `<button type="button" class="alt-btn" id="altBtn">${label}</button>`;
+        return;
+      }
+      const keys = note.fingerings[0];
       const tips = [];
-      if (keys.has('Tb')) tips.push('<b>Thumb B♭:</b> the thumb slides up onto the B♭ lever. Use it when the music has no B naturals.');
-      if (keys.has('BbL')) tips.push('<b>B♭ lever:</b> the right index finger presses the side lever above its key.');
-      if (keys.has('R1') && keys.has('L1') && !keys.has('L2') && note.pitch.startsWith('A#')) tips.push('<b>1 and 1:</b> the first finger of each hand.');
       if (keys.has('trD')) tips.push('<b>D trill key:</b> the right middle finger presses the small key between its key and the first.');
       if (keys.has('trDs')) tips.push('<b>D♯ trill key:</b> the right ring finger presses the small key between its key and the middle finger\'s.');
       if (keys.has('giz')) tips.push('<b>Gizmo:</b> the right little finger closes just the low B cup (B foot only). On a C foot, leave it out.');
       if (keys.has('C') || keys.has('B') || keys.has('Cs')) tips.push('<b>Right little finger</b> on the foot keys, and <b>off</b> the E♭ key.');
       if (/^D[45]$/.test(note.pitch)) tips.push('The E♭ key stays <b>up</b> for D.');
-      let html = tips.map(t => `<div>${t}</div>`).join('');
-      if (note.fingerings.length > 1) {
-        html += `<button type="button" class="alt-btn" id="altBtn">⇄ Other fingering (${which + 1} of ${note.fingerings.length})</button>`;
-      }
-      tipArea.innerHTML = html;
+      tipArea.innerHTML = tips.map(t => `<div>${t}</div>`).join('');
     }
 
     tipArea.addEventListener('click', e => {
@@ -956,7 +1334,9 @@
 
     function showNote(note) {
       shownNote = note;
-      drawFlute(note, note ? note.fingerings[chosenFingering[note.pitch] || 0] : null);
+      const fingering = note ? note.fingerings[chosenFingering[note.pitch] || 0] : null;
+      drawFlute(note, fingering);
+      drawChart(note, fingering);
       drawStaff(note);
       showTips(note);
       document.querySelectorAll('.note-btn.selected').forEach(b => b.classList.remove('selected'));
@@ -1145,6 +1525,22 @@
       if (!e.target.closest('.note-btn, .alt-btn')) showNote(null);
     });
 
+    // ----- the Keys / Fingers / Names button -----
+    const LABEL_VIEWS = { keys: 'Keys', fingers: 'Fingers', names: 'Names' };
+    const labelsBtn = document.getElementById('labelsBtn');
+    function showLabelButton() {
+      labelsBtn.textContent = LABEL_VIEWS[labelView];
+      labelsBtn.setAttribute('aria-label', `Flute labels: ${LABEL_VIEWS[labelView]}`);
+    }
+    labelsBtn.addEventListener('click', () => {
+      const order = Object.keys(LABEL_VIEWS);
+      labelView = order[(order.indexOf(labelView) + 1) % order.length];
+      showLabelButton();
+      saveSettings();
+      showNote(shownNote);
+    });
+    showLabelButton();
+
     // ----- the settings panel -----
     const settingsPanel = document.getElementById('settingsPanel');
     const settingsBtn = document.getElementById('settingsBtn');
@@ -1273,7 +1669,10 @@
     buildNotePad();
     showNote(null);
 
-    // Responsive scaling: shrink (or grow) the whole app proportionally to fit the window
+    // Responsive scaling: shrink (or grow) the whole app proportionally to fit the window.
+    // The rows close up when the window is short, so the instrument stays as big as it can be, and share out
+    // whatever height is left over when the width is what limits the size.
+    const ROW_GAP_MIN = 6, ROW_GAP_EXTRA = 22;
     function updateScale() {
       const outer = document.getElementById('scaling-outer');
       const wrapper = document.getElementById('scaling-wrapper');
@@ -1283,11 +1682,14 @@
       if (container) container.style.paddingTop = headerHeight + 'px';
       document.getElementById('settingsPanel').style.top = headerHeight + 'px';
 
+      wrapper.style.gap = ROW_GAP_MIN + 'px';
       const designHeight = wrapper.offsetHeight || 540;
       const designWidth = wrapper.offsetWidth || 1100;
       const availableHeight = window.innerHeight - headerHeight - 16;
       const availableWidth = window.innerWidth - 16;
       const scale = Math.min(availableHeight / designHeight, availableWidth / designWidth);
+      const spare = availableHeight / scale - designHeight;
+      wrapper.style.gap = ROW_GAP_MIN + Math.min(spare / (wrapper.children.length - 1), ROW_GAP_EXTRA) + 'px';
       outer.style.transform = `scale(${Math.max(0.1, scale)})`;
     }
     window.addEventListener('resize', updateScale);

@@ -298,7 +298,7 @@
     r.setAttribute('aria-label', r.title);
     const play = $('#btn-play');
     if (kb) play.disabled = true;
-    else if (!G.hearing) play.title = 'Listen — round and round until you press it again' + (G.metroOn() ? ', with the metronome' : '');
+    else if (!G.hearing && !G.metroGoing()) play.title = 'Listen — round and round until you press it again' + (G.metroOn() ? ', with the metronome' : '');
   };
 
   /* the exercises at the top: a gold star, a check, or not yet — a tap goes to any one. More than twelve

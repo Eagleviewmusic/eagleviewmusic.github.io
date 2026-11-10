@@ -741,7 +741,12 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
     user's): the card's beats, the bar's first higher, a nod of the button
     on each, for as long as the card is in Practice with the metronome on
     (a window or the home page stops it; closing the window brings it
-    back). Listen joins the click, coming in on its next bar line. Test
+    back). **While it goes, ▶ Listen is a ■ stop button** (2026-10-14, the
+    user's: "let users stop it easily" — it was only in Tools): pressing it,
+    or Space, turns the metronome off and ▶ is Listen again. The same in
+    Practice lessons and Songs while the play-along goes round and round; a
+    Test's count-in run is left alone (it ends with the melody). So Listen no
+    longer joins a running click — stop it first (`metroGoing`, game.js). Test
     stops the click and counts in, as before (`syncTick`, game.js; the
     click itself is beat.js's `tickStart`). The
     label under it says which, it lights green, and its weight sits higher
@@ -805,8 +810,11 @@ built by `EVM Library/teacher-library/.github/scripts/build-teacher-index.js`
   testing, within about 1 point of each other on a scale where a battle runs
   ~15 → ~40). Battles make up their melodies (no Songbook cards) unless a My
   melodies set is played. The plan is saved with the battle, so Carry on
-  after a reload stays fair; changing the notes or rhythms part-way re-plans
-  only the rounds still to come. While it runs the music card wears the team's colour, its name
+  after a reload stays fair; changing the notes, rhythms, bars or Melody
+  Source part-way (2026-10-14, the user's: one note picked mid-battle still
+  showed a melody of several until a reload) re-plans **every melody not yet
+  played — the one on the stand too** — the moment the window closes; the
+  melodies played and the teams' scores stay. While it runs the music card wears the team's colour, its name
   sits with the turn's dots at the top, the level box says "Round 2 of 5",
   and the **score chip becomes the teams' scores** (the team playing
   ringed; a phone shows dots and numbers). The **Score board** shows the
@@ -1382,5 +1390,10 @@ falls back to defaults; a change of shape gets a new `_v2` key.
   rules again (`cellsOk`) before it is used. The battle's own `G.setup.game` is forced to a
   round (never Song or the clock). Progress is saved after every finish or
   skip and cleared at the end; `newRound` resumes it only when the session
-  id and the shape (teams-per-rounds) still match. Plain ⚔ draws as a thin
+  id and the shape (teams-per-rounds) still match. The save also keeps
+  `key` — the settings the melodies are made from (`G.CONTENT`, the same
+  list settings.js treats as a content change); a resume whose key differs
+  (a Melody Source change goes through `newRound`, not `replanBattle`, and
+  saves from before 2026-10-14 have none) re-plans the melodies not yet
+  played, so a stale plan is never carried on. Plain ⚔ draws as a thin
   "x" in Fredoka — use the emoji form ⚔️ (with U+FE0F).

@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walby's PDF Generator</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='3' width='20' height='26' rx='3' fill='%232f55d4'/%3E%3Cpath d='M11 11h10M11 16h10M11 21h6' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<script src="lib/pdf-lib.min.js"></script>
+<script type="module" src="js/main.js"></script>
+<style>
+  /* Eagle View Music back button (hidden when the app is framed) */
+  .evm-home{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:9999px;background:rgba(30,41,59,.88);color:#f1f5f9;border:1px solid rgba(255,255,255,.22);font:600 13px/1 system-ui,-apple-system,sans-serif;text-decoration:none;white-space:nowrap;flex:none}
+  .evm-home:hover{background:#334155;color:#cdb4f0}
+  @media (max-width:640px){.evm-home .evm-home-label{display:none}}
+  .in-iframe .evm-home{display:none!important}
+</style>
+<script>try{if(window.self!==window.top)document.documentElement.classList.add('in-iframe')}catch(e){document.documentElement.classList.add('in-iframe')}</script>
+  <!-- EVM visit counter: one anonymous count each time an app is opened. What is sent, and what never is: /what-we-count.html -->
+  <script>
+    (function () {
+      var off = false;
+      try { off = localStorage.getItem('skipgc') === 't'; } catch (e) {}
+      if (location.hash === '#toggle-goatcounter') {   // the teacher's own browsers opt out here (and back in)
+        try { off ? localStorage.removeItem('skipgc') : localStorage.setItem('skipgc', 't'); } catch (e) {}
+        alert(off ? 'Visits from this browser will be counted again.' : 'Visits from this browser will no longer be counted.');
+        return;
+      }
+      if (off || navigator.webdriver) return;
+      if (navigator.globalPrivacyControl || navigator.doNotTrack === '1' || window.doNotTrack === '1') return;   // the visitor asked not to be counted
+      if (!/(^|\.)eagleviewmusic\.com$/.test(location.hostname)) return;   // testing, or a copy on another site
+      try { if (window.top !== window && parent.location.host) return; } catch (e) {}   // framed by another of our apps (the Music Stand), which counts itself
+      try {
+        var p = decodeURIComponent(location.pathname).replace(/index\.html$/, '');
+        var r = document.referrer.split(/[?#]/)[0];   // where the visit came from, never the rest of a link
+        var u = 'https://eagleviewmusic.goatcounter.com/count?p=' + encodeURIComponent(p) +
+          (r ? '&r=' + encodeURIComponent(r) : '') + '&s=' + screen.width + '&rnd=' + Math.random().toString(36).slice(2, 7);
+        if (!(navigator.sendBeacon && navigator.sendBeacon(u))) new Image().src = u;
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-select" viewBox="0 0 24 24"><path d="M5 3l14 8-6 1.6L10 19z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M3 20c3-1 4-4 6-7s5-6 8-5-1 5-4 7-6 3-6 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-line" viewBox="0 0 24 24"><path d="M5 19L19 5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 19L18 6M10 6h8v8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-rect" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-ellipse" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8.5" ry="6.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-add" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 16l5-5 4 4 3-3 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="16" cy="9" r="1.6" fill="currentColor"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 010 11H11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H9.5a5.5 5.5 0 000 11H13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-portrait" viewBox="0 0 24 24"><rect x="6.5" y="3" width="11" height="18" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-landscape" viewBox="0 0 24 24"><rect x="3" y="6.5" width="18" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-dup" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-front" viewBox="0 0 24 24"><rect x="3" y="3" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="9" y="9" width="12" height="12" rx="1.5" fill="currentColor"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="3" width="11" height="11" rx="1.5" fill="currentColor"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V8a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-3-6.2M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <a href="../index.html" class="evm-home" title="Back to Eagle View Music" aria-label="Back to Eagle View Music"><span aria-hidden="true">←</span><span class="evm-home-label">Eagle View Music</span></a>
+  <div class="brand">
+    <svg viewBox="0 0 32 32" class="brand-mark" aria-hidden="true"><rect x="6" y="3" width="20" height="26" rx="3" fill="currentColor"/><path d="M11 11h10M11 16h10M11 21h6" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>
+    <span>Walby's PDF Generator</span>
+  </div>
+  <input id="docName" class="doc-name" value="Untitled" spellcheck="false" aria-label="Document name" title="Document name — used for the PDF's file name">
+  <div class="spacer"></div>
+
+  <div class="bar-group">
+    <label class="paper-pick" title="Paper size (every page)">
+      <select id="paper" aria-label="Paper size"></select>
+    </label>
+    <div class="seg" id="orient" role="group" aria-label="Orientation of this page">
+      <button data-o="portrait" title="Portrait (this page)"><svg><use href="#i-portrait"/></svg></button>
+      <button data-o="landscape" title="Landscape (this page)"><svg><use href="#i-landscape"/></svg></button>
+    </div>
+  </div>
+
+  <div class="bar-group">
+    <button id="undoBtn" class="icon-btn" title="Undo (⌘Z)"><svg><use href="#i-undo"/></svg></button>
+    <button id="redoBtn" class="icon-btn" title="Redo (⇧⌘Z)"><svg><use href="#i-redo"/></svg></button>
+  </div>
+
+  <div class="bar-group menu-wrap">
+    <button id="fileBtn" class="ghost-btn" aria-haspopup="menu" aria-expanded="false">File</button>
+    <div id="fileMenu" class="menu" role="menu" hidden>
+      <button data-act="new" role="menuitem">New document</button>
+      <button data-act="open" role="menuitem">Open project…</button>
+      <button data-act="save" role="menuitem">Save project…</button>
+      <hr>
+      <button data-act="preview" role="menuitem">Preview PDF in a new tab</button>
+    </div>
+  </div>
+  <button id="exportBtn" class="primary-btn">Export PDF</button>
+</header>
+
+<div class="main">
+  <aside class="pages" aria-label="Pages">
+    <div class="side-head">Pages <span id="pageCount"></span></div>
+    <div id="thumbs" class="thumbs"></div>
+    <button id="addPageBtn" class="add-page"><svg><use href="#i-plus"/></svg> Add page</button>
+  </aside>
+
+  <nav class="tools" id="tools" aria-label="Tools">
+    <button data-tool="select" title="Select & move (V)"><svg><use href="#i-select"/></svg></button>
+    <button data-tool="pen" title="Draw freehand (P)"><svg><use href="#i-pen"/></svg></button>
+    <button data-tool="line" title="Line (L) — hold Shift for straight angles"><svg><use href="#i-line"/></svg></button>
+    <button data-tool="arrow" title="Arrow (A)"><svg><use href="#i-arrow"/></svg></button>
+    <button data-tool="rect" title="Rectangle (R) — hold Shift for a square"><svg><use href="#i-rect"/></svg></button>
+    <button data-tool="ellipse" title="Ellipse (O) — hold Shift for a circle"><svg><use href="#i-ellipse"/></svg></button>
+    <button data-tool="text" title="Text (T)"><svg><use href="#i-text"/></svg></button>
+    <div class="tool-sep"></div>
+    <button id="addFileBtn" title="Add photos or a PDF"><svg><use href="#i-add"/></svg></button>
+    <input type="file" id="fileInput" multiple accept="image/*,application/pdf,.pdf,.heic" hidden>
+    <input type="file" id="projectInput" accept=".wpdf,application/json" hidden>
+  </nav>
+
+  <section class="stage-area">
+    <div id="stageWrap" class="stage-wrap">
+      <div id="paperHolder" class="paper-holder">
+        <svg id="stage" xmlns="http://www.w3.org/2000/svg">
+          <defs><clipPath id="stageClip"><rect id="stageClipRect"/></clipPath></defs>
+          <rect id="paperBg" fill="#fff"/>
+          <g id="items" clip-path="url(#stageClip)"></g>
+          <g id="overlay"></g>
+        </svg>
+        <textarea id="textEditor" class="text-editor" spellcheck="true" hidden></textarea>
+      </div>
+    </div>
+    <div id="emptyHint" class="empty-hint" hidden>
+      <strong>Drop photos or PDFs onto the page</strong>
+      <span>or pick a tool on the left to draw lines, shapes and text.</span>
+    </div>
+    <div class="stage-foot">
+      <span id="pageLabel" class="page-label"></span>
+      <div class="spacer"></div>
+      <button id="guidesBtn" class="chip" aria-pressed="true" title="Show the ½-inch margin and snap to it">Guides</button>
+      <div class="zoom">
+        <button id="zoomOut" class="icon-btn small" title="Zoom out">−</button>
+        <button id="zoomLabel" class="zoom-label" title="Fit page to window">100%</button>
+        <button id="zoomIn" class="icon-btn small" title="Zoom in">+</button>
+      </div>
+    </div>
+  </section>
+
+  <aside id="inspector" class="inspector" aria-label="Properties">
+    <div class="side-head" id="inspTitle">Page</div>
+
+    <section class="insp" data-show="page">
+      <p class="hint">Nothing selected. Click something on the page to change it, or drag photos and PDFs in.</p>
+      <div class="row">
+        <button class="wide-btn" data-act="dupPage"><svg><use href="#i-dup"/></svg>Duplicate page</button>
+      </div>
+      <div class="row">
+        <button class="wide-btn danger" data-act="delPage"><svg><use href="#i-trash"/></svg>Delete page</button>
+      </div>
+    </section>
+
+    <section class="insp" data-show="picture">
+      <h4>Picture</h4>
+      <div class="btn-grid">
+        <button data-act="fitPage" title="As big as fits on the page">Fit page</button>
+        <button data-act="fillPage" title="Cover the whole page (edges may be cut off)">Fill page</button>
+        <button data-act="fitMargins" title="As big as fits inside the ½-inch margin">Fit margins</button>
+        <button data-act="rotate90" title="Turn a quarter turn"><svg><use href="#i-rotate"/></svg>Turn 90°</button>
+      </div>
+      <p class="hint small">Drag a corner to resize. Hold Shift to stretch.</p>
+    </section>
+
+    <section class="insp" data-show="stroke">
+      <h4 id="strokeTitle">Line</h4>
+      <div class="swatches" data-for="stroke"></div>
+      <div class="row">
+        <label class="lbl">Width</label>
+        <input type="range" id="widthRange" min="0.5" max="24" step="0.5">
+        <span id="widthVal" class="val"></span>
+      </div>
+      <div class="row">
+        <label class="lbl">Style</label>
+        <div class="seg small" id="dashSeg">
+          <button data-dash="solid" title="Solid"><svg viewBox="0 0 30 10"><path d="M2 5h26" stroke="currentColor" stroke-width="2.4"/></svg></button>
+          <button data-dash="dashed" title="Dashed"><svg viewBox="0 0 30 10"><path d="M2 5h26" stroke="currentColor" stroke-width="2.4" stroke-dasharray="6 4"/></svg></button>
+          <button data-dash="dotted" title="Dotted"><svg viewBox="0 0 30 10"><path d="M3 5h25" stroke="currentColor" stroke-width="3" stroke-dasharray="0.01 5" stroke-linecap="round"/></svg></button>
+        </div>
+      </div>
+      <div class="row" data-show="arrows">
+        <label class="lbl">Arrows</label>
+        <div class="seg small" id="arrowSeg">
+          <button data-arrow="none" title="No arrowheads"><svg viewBox="0 0 30 10"><path d="M3 5h24" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+          <button data-arrow="end" title="Arrow at the end"><svg viewBox="0 0 30 10"><path d="M3 5h20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M28 5l-7-4v8z" fill="currentColor"/></svg></button>
+          <button data-arrow="both" title="Arrows at both ends"><svg viewBox="0 0 30 10"><path d="M7 5h16" stroke="currentColor" stroke-width="2.2"/><path d="M28 5l-7-4v8zM2 5l7-4v8z" fill="currentColor"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="insp" data-show="fill">
+      <h4>Fill</h4>
+      <div class="swatches" data-for="fill"></div>
+      <div class="row" data-show="corner">
+        <label class="lbl">Corners</label>
+        <input type="range" id="radiusRange" min="0" max="60" step="1">
+        <span id="radiusVal" class="val"></span>
+      </div>
+    </section>
+
+    <section class="insp" data-show="text">
+      <h4>Text</h4>
+      <div class="row">
+        <select id="fontSel" aria-label="Font">
+          <option value="sans">Sans (Helvetica)</option>
+          <option value="serif">Serif (Times)</option>
+          <option value="mono">Typewriter (Courier)</option>
+        </select>
+      </div>
+      <div class="row">
+        <label class="lbl">Size</label>
+        <input type="number" id="sizeNum" min="4" max="400" step="1" class="num-input">
+        <div class="seg small" id="styleSeg">
+          <button data-style="bold" title="Bold (⌘B)"><b>B</b></button>
+          <button data-style="italic" title="Italic (⌘I)"><i>I</i></button>
+        </div>
+      </div>
+      <div class="row">
+        <label class="lbl">Align</label>
+        <div class="seg small" id="alignSeg">
+          <button data-align="left" title="Left"><svg viewBox="0 0 20 16"><path d="M2 3h16M2 8h10M2 13h13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+          <button data-align="center" title="Centre"><svg viewBox="0 0 20 16"><path d="M2 3h16M5 8h10M3.5 13h13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+          <button data-align="right" title="Right"><svg viewBox="0 0 20 16"><path d="M2 3h16M8 8h10M5 13h13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        </div>
+      </div>
+      <div class="swatches" data-for="color"></div>
+      <p class="hint small">Double-click text to edit it.</p>
+    </section>
+
+    <section class="insp" data-show="common">
+      <h4>Arrange</h4>
+      <div class="row">
+        <label class="lbl">Opacity</label>
+        <input type="range" id="opacityRange" min="0.05" max="1" step="0.05">
+        <span id="opacityVal" class="val"></span>
+      </div>
+      <div class="btn-grid">
+        <button data-act="front" title="Bring to front"><svg><use href="#i-front"/></svg>To front</button>
+        <button data-act="back" title="Send to back"><svg><use href="#i-back"/></svg>To back</button>
+        <button data-act="duplicate" title="Duplicate (⌘D)"><svg><use href="#i-dup"/></svg>Duplicate</button>
+        <button data-act="lock" id="lockBtn" title="Lock in place, so clicks and drags go to what's on top"><svg><use href="#i-lock"/></svg><span>Lock</span></button>
+      </div>
+      <div class="row">
+        <button class="wide-btn danger" data-act="delete"><svg><use href="#i-trash"/></svg>Delete</button>
+      </div>
+    </section>
+
+    <div class="insp-foot">
+      <details>
+        <summary>Shortcuts</summary>
+        <dl class="keys">
+          <dt>V P L A R O T</dt><dd>Tools</dd>
+          <dt>⌘Z / ⇧⌘Z</dt><dd>Undo / redo</dd>
+          <dt>⌘C ⌘X ⌘V</dt><dd>Copy, cut, paste (photos too)</dd>
+          <dt>⌘D</dt><dd>Duplicate</dd>
+          <dt>⌫</dt><dd>Delete</dd>
+          <dt>Arrows</dt><dd>Nudge (Shift = more)</dd>
+          <dt>Shift</dt><dd>Square / straight / keep shape</dd>
+          <dt>⌘ + scroll</dt><dd>Zoom</dd>
+          <dt>Page ↑ ↓</dt><dd>Change page</dd>
+        </dl>
+      </details>
+    </div>
+  </aside>
+</div>
+
+<div id="dropHint" class="drop-hint" hidden><div>Drop to add to the page</div></div>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h3 id="modalTitle"></h3>
+    <div id="modalBody"></div>
+    <div id="modalBtns" class="modal-btns"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

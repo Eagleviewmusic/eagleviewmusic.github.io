@@ -324,7 +324,7 @@
     else if (G.contentChanged) { G.contentChanged = false; G.queue = []; if (G.battle) G.replanBattle(); G.nextCard(); }
   }
 
-  const CONTENT = ['notes', 'rhythms', 'time', 'times', 'pickup', 'leaps', 'bars', 'moves', 'endDo', 'endLong', 'from', 'set'];
+  const CONTENT = G.CONTENT;               // game.js: what a melody is made from
   const ROUND = ['game', 'clockSecs', 'song', 'songPicks'];
   /* a change on the ✎ page goes into the level's or session's own settings (G.base) and is saved there
      (G.saveSetup) — a level keeps it as your Level n, a session as itself (2026-10-08). Anything played

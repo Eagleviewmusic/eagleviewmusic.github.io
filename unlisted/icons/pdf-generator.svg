@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#ede9fe"/><stop offset="1" stop-color="#ddd6fe"/></linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset=".55" stop-color="#cbd5e1"/><stop offset="1" stop-color="#94a3b8"/></linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3d9b1"/><stop offset="1" stop-color="#d6a46b"/></linearGradient>
+    <linearGradient id="ebony" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#475569"/><stop offset=".45" stop-color="#1e293b"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg)"/>
+  <circle cx="330" cy="70" r="90" fill="#fff" opacity=".35"/>
+  <circle cx="60" cy="350" r="70" fill="#fff" opacity=".25"/>
+  <g stroke-linejoin="round" stroke-linecap="round">
+
+    <path d="M110 60 h130 l60 60 v220 a12 12 0 0 1 -12 12 h-178 a12 12 0 0 1 -12 -12 v-268 a12 12 0 0 1 12 -12z" fill="#fff" stroke="#3b0764" stroke-width="8"/>
+    <path d="M240 60 v48 a12 12 0 0 0 12 12 h48" fill="#e2e8f0" stroke="#3b0764" stroke-width="8"/>
+    <rect x="130" y="120" width="70" height="56" rx="6" fill="#bfdbfe" stroke="#3b0764" stroke-width="4"/>
+    <path d="M136 168 l18 -20 l14 14 l10 -10 l16 16" fill="none" stroke="#1d4ed8" stroke-width="4"/>
+    <circle cx="246" cy="152" r="22" fill="#fde68a" stroke="#3b0764" stroke-width="4"/>
+    <path d="M130 204 h140 M130 226 h140 M130 248 h96" stroke="#94a3b8" stroke-width="7"/>
+    <rect x="72" y="270" width="150" height="56" rx="12" fill="#dc2626" stroke="#3b0764" stroke-width="6"/>
+    <text x="147" y="310" text-anchor="middle" font-family="Arial Rounded MT Bold, Helvetica, Arial, sans-serif" font-weight="800" font-size="34" fill="#fff" letter-spacing="2">PDF</text>
+  </g>
+</svg>

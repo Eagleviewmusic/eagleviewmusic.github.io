@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#e0f2fe"/><stop offset="1" stop-color="#bae6fd"/></linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset=".55" stop-color="#cbd5e1"/><stop offset="1" stop-color="#94a3b8"/></linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3d9b1"/><stop offset="1" stop-color="#d6a46b"/></linearGradient>
+    <linearGradient id="ebony" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#475569"/><stop offset=".45" stop-color="#1e293b"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg)"/>
+  <circle cx="330" cy="70" r="90" fill="#fff" opacity=".35"/>
+  <circle cx="60" cy="350" r="70" fill="#fff" opacity=".25"/>
+  <g stroke-linejoin="round" stroke-linecap="round">
+
+    <g transform="rotate(-28 200 200)">
+      <rect x="36" y="184" width="330" height="32" rx="16" fill="url(#metal)" stroke="#0c4a6e" stroke-width="7"/>
+      <path d="M122 184v32M340 184v32" stroke="#64748b" stroke-width="5"/>
+      <ellipse cx="80" cy="200" rx="20" ry="12" fill="#e2e8f0" stroke="#0c4a6e" stroke-width="5"/>
+      <ellipse cx="80" cy="200" rx="8" ry="5" fill="#0c4a6e"/>
+      <path d="M150 178h170" stroke="#64748b" stroke-width="4"/>
+      <circle cx="155" cy="200" r="11" fill="#f8fafc" stroke="#475569" stroke-width="4"/><circle cx="183" cy="200" r="11" fill="#f8fafc" stroke="#475569" stroke-width="4"/><circle cx="211" cy="200" r="11" fill="#f8fafc" stroke="#475569" stroke-width="4"/><circle cx="258" cy="200" r="11" fill="#f8fafc" stroke="#475569" stroke-width="4"/><circle cx="286" cy="200" r="11" fill="#f8fafc" stroke="#475569" stroke-width="4"/><circle cx="314" cy="200" r="11" fill="#f8fafc" stroke="#475569" stroke-width="4"/>
+    </g>
+    <g transform="translate(300 320) scale(1.1)"><ellipse cx="0" cy="0" rx="15" ry="11" transform="rotate(-20)" fill="#0284c7"/><path d="M13 -4 V-62 q18 8 24 26" fill="none" stroke="#0284c7" stroke-width="7"/></g><g transform="translate(90 120) scale(0.85)"><ellipse cx="0" cy="0" rx="15" ry="11" transform="rotate(-20)" fill="#0284c7"/><path d="M13 -4 V-62 q18 8 24 26" fill="none" stroke="#0284c7" stroke-width="7"/></g>
+  </g>
+</svg>

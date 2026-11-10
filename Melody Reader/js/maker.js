@@ -5,7 +5,8 @@
    editor and the real xylophone below writes the notes:
 
      pick a value      ta-a-a-a · ta-a-a · ta-a · ta-i · ta · ti · ka
-     strike a bar      adds that note (keys 1–0 − = too); Rest adds a rest
+     strike a bar      adds that note (keys 1–0 − = too); Rest adds a rest;
+                       a slide across the bars rings them, writes only the first
      ⌫ (or Backspace)  takes the last one back
      ▶ (or Space)      hears what is written
      Save              into the set it was opened from, and back to it
@@ -326,8 +327,23 @@
   }
 
   /* ---------------- wiring ---------------- */
+  /* One touch writes one note: a finger (or held mouse) sliding on across
+     the bars still rings each one, but only the first bar it touched is
+     written — on a phone the bars are about 20 px wide, so a tap that
+     wobbles, or a slide, would otherwise write a run of notes. */
+  const wrote = new Set();                           // pointers that have written their note
   const gameHit = RR.Xylo.onHit;
-  RR.Xylo.onHit = (id, e) => { if (M.active) add(id); else gameHit(id, e); };
+  RR.Xylo.onHit = (id, e) => {
+    if (!M.active) { gameHit(id, e); return; }
+    const pid = e && e.pointerId;
+    if (pid !== undefined) {
+      if (e.type === 'pointerdown') wrote.delete(pid);
+      if (wrote.has(pid)) return;
+      wrote.add(pid);
+    }
+    add(id);
+  };
+  ['pointerup', 'pointercancel'].forEach(t => $('#xylo').addEventListener(t, e => wrote.delete(e.pointerId)));
   $('#mk-values').addEventListener('click', e => {
     const b = e.target.closest('[data-t]'); if (!b) return;
     const t = +b.dataset.t;

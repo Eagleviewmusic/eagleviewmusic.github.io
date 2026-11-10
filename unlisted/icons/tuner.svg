@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#dcfce7"/><stop offset="1" stop-color="#bbf7d0"/></linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset=".55" stop-color="#cbd5e1"/><stop offset="1" stop-color="#94a3b8"/></linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3d9b1"/><stop offset="1" stop-color="#d6a46b"/></linearGradient>
+    <linearGradient id="ebony" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#475569"/><stop offset=".45" stop-color="#1e293b"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg)"/>
+  <circle cx="330" cy="70" r="90" fill="#fff" opacity=".35"/>
+  <circle cx="60" cy="350" r="70" fill="#fff" opacity=".25"/>
+  <g stroke-linejoin="round" stroke-linecap="round">
+
+    <path d="M60 250 a140 140 0 0 1 280 0 z" fill="#fff" stroke="#14532d" stroke-width="8"/>
+    <path d="M176 112 a140 140 0 0 1 48 0 l-6 28 a112 112 0 0 0 -36 0z" fill="#86efac"/>
+    <path d="M88.0 250.0 L108.0 250.0" stroke="#14532d" stroke-width="5"/><path d="M91.8 221.0 L103.4 224.1" stroke="#64748b" stroke-width="5"/><path d="M103.0 194.0 L113.4 200.0" stroke="#64748b" stroke-width="5"/><path d="M120.8 170.8 L134.9 184.9" stroke="#14532d" stroke-width="5"/><path d="M144.0 153.0 L150.0 163.4" stroke="#64748b" stroke-width="5"/><path d="M171.0 141.8 L174.1 153.4" stroke="#64748b" stroke-width="5"/><path d="M200.0 138.0 L200.0 158.0" stroke="#16a34a" stroke-width="8"/><path d="M229.0 141.8 L225.9 153.4" stroke="#64748b" stroke-width="5"/><path d="M256.0 153.0 L250.0 163.4" stroke="#64748b" stroke-width="5"/><path d="M279.2 170.8 L265.1 184.9" stroke="#14532d" stroke-width="5"/><path d="M297.0 194.0 L286.6 200.0" stroke="#64748b" stroke-width="5"/><path d="M308.2 221.0 L296.6 224.1" stroke="#64748b" stroke-width="5"/><path d="M312.0 250.0 L292.0 250.0" stroke="#14532d" stroke-width="5"/>
+    <path d="M200 250 L214 132" stroke="#ef4444" stroke-width="7"/>
+    <circle cx="200" cy="250" r="14" fill="#14532d"/>
+    <text x="96" y="236" text-anchor="middle" font-family="Georgia, serif" font-size="34" fill="#64748b">♭</text>
+    <text x="304" y="236" text-anchor="middle" font-family="Georgia, serif" font-size="34" fill="#64748b">♯</text>
+    <rect x="150" y="282" width="100" height="74" rx="18" fill="#16a34a" stroke="#14532d" stroke-width="7"/>
+    <text x="200" y="338" text-anchor="middle" font-family="Arial Rounded MT Bold, Helvetica, Arial, sans-serif" font-weight="800" font-size="52" fill="#fff">A</text>
+  </g>
+</svg>

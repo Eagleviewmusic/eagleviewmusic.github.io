@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#ede9fe"/><stop offset="1" stop-color="#ddd6fe"/></linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset=".55" stop-color="#cbd5e1"/><stop offset="1" stop-color="#94a3b8"/></linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3d9b1"/><stop offset="1" stop-color="#d6a46b"/></linearGradient>
+    <linearGradient id="ebony" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#475569"/><stop offset=".45" stop-color="#1e293b"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg)"/>
+  <circle cx="330" cy="70" r="90" fill="#fff" opacity=".35"/>
+  <circle cx="60" cy="350" r="70" fill="#fff" opacity=".25"/>
+  <g stroke-linejoin="round" stroke-linecap="round">
+
+    <rect x="70" y="70" width="140" height="270" rx="10" fill="#c08457" stroke="#3b0764" stroke-width="8"/>
+    <rect x="92" y="94" width="96" height="100" rx="6" fill="#d6a46b" stroke="#7c4a1e" stroke-width="4"/>
+    <rect x="92" y="214" width="96" height="100" rx="6" fill="#d6a46b" stroke="#7c4a1e" stroke-width="4"/>
+    <circle cx="186" cy="206" r="9" fill="#fde68a" stroke="#3b0764" stroke-width="4"/>
+    <path d="M262 60 q-20 50 10 92 M262 60 q30 46 10 92" fill="none" stroke="#7c3aed" stroke-width="6"/>
+    <rect x="214" y="150" width="120" height="160" rx="18" fill="#fff" stroke="#3b0764" stroke-width="8" transform="rotate(6 274 230)"/>
+    <circle cx="272" cy="168" r="8" fill="none" stroke="#3b0764" stroke-width="5"/>
+    <text x="274" y="242" text-anchor="middle" font-family="Arial Rounded MT Bold, Helvetica, Arial, sans-serif" font-weight="800" font-size="34" fill="#7c3aed" transform="rotate(6 274 230)">PASS</text>
+    <path d="M240 270 h66" stroke="#94a3b8" stroke-width="6" transform="rotate(6 274 230)"/>
+  </g>
+</svg>

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walby's Basic Video Editor</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  /* Eagle View Music back button (hidden when the app is framed) */
+  .evm-home{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:9999px;background:rgba(30,41,59,.88);color:#f1f5f9;border:1px solid rgba(255,255,255,.22);font:600 13px/1 system-ui,-apple-system,sans-serif;text-decoration:none;white-space:nowrap;flex:none}
+  .evm-home:hover{background:#334155;color:#cdb4f0}
+  @media (max-width:640px){.evm-home .evm-home-label{display:none}}
+  .in-iframe .evm-home{display:none!important}
+</style>
+<script>try{if(window.self!==window.top)document.documentElement.classList.add('in-iframe')}catch(e){document.documentElement.classList.add('in-iframe')}</script>
+  <!-- EVM visit counter: one anonymous count each time an app is opened. What is sent, and what never is: /what-we-count.html -->
+  <script>
+    (function () {
+      var off = false;
+      try { off = localStorage.getItem('skipgc') === 't'; } catch (e) {}
+      if (location.hash === '#toggle-goatcounter') {   // the teacher's own browsers opt out here (and back in)
+        try { off ? localStorage.removeItem('skipgc') : localStorage.setItem('skipgc', 't'); } catch (e) {}
+        alert(off ? 'Visits from this browser will be counted again.' : 'Visits from this browser will no longer be counted.');
+        return;
+      }
+      if (off || navigator.webdriver) return;
+      if (navigator.globalPrivacyControl || navigator.doNotTrack === '1' || window.doNotTrack === '1') return;   // the visitor asked not to be counted
+      if (!/(^|\.)eagleviewmusic\.com$/.test(location.hostname)) return;   // testing, or a copy on another site
+      try { if (window.top !== window && parent.location.host) return; } catch (e) {}   // framed by another of our apps (the Music Stand), which counts itself
+      try {
+        var p = decodeURIComponent(location.pathname).replace(/index\.html$/, '');
+        var r = document.referrer.split(/[?#]/)[0];   // where the visit came from, never the rest of a link
+        var u = 'https://eagleviewmusic.goatcounter.com/count?p=' + encodeURIComponent(p) +
+          (r ? '&r=' + encodeURIComponent(r) : '') + '&s=' + screen.width + '&rnd=' + Math.random().toString(36).slice(2, 7);
+        if (!(navigator.sendBeacon && navigator.sendBeacon(u))) new Image().src = u;
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+<noscript>This editor needs JavaScript.</noscript>
+<div id="file-warning" hidden>
+  This page can't run as a plain file. Open it with <b>Walby's Basic Video Editor.app</b> in
+  Documents › Walby's Basic Video Editor (or double-click <b>Open Walby's Basic Video Editor.command</b>).
+</div>
+
+<!-- ============ the top bar ============ -->
+<header id="top">
+  <a href="../index.html" class="evm-home" title="Back to Eagle View Music" aria-label="Back to Eagle View Music"><span aria-hidden="true">←</span><span class="evm-home-label">Eagle View Music</span></a>
+  <button id="b-home" class="ghost" title="All projects">⌂ Projects</button>
+  <div id="title-wrap"><span id="p-title">Untitled</span><span id="save-state"></span></div>
+  <div class="grow"></div>
+  <button id="b-undo" title="Undo (⌘Z)">↶</button>
+  <button id="b-redo" title="Redo (⇧⌘Z)">↷</button>
+  <span class="sep"></span>
+  <button id="b-add" title="Add pictures or sound files">＋ Add media</button>
+  <button id="b-text" title="Add a text box at the playhead (T)">＋ Text</button>
+  <span class="sep"></span>
+  <button id="b-shot" title="Save a picture of the canvas right now (⇧⌘S)">📷 Screenshot</button>
+  <button id="b-export" class="primary" title="Make the MP4 (⌘E)">Export MP4</button>
+  <input id="file-in" type="file" multiple accept="image/*,audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.aif,.aiff" hidden>
+</header>
+
+<!-- ============ the work area ============ -->
+<main id="work">
+  <aside id="bin">
+    <div class="pane-head">Media <span class="hint">drag onto the timeline</span></div>
+    <div id="bin-list"></div>
+    <div id="bin-empty">Drop pictures and sound files here, or use <b>＋ Add media</b>.</div>
+  </aside>
+
+  <section id="center">
+    <div id="stage">
+      <canvas id="view"></canvas>
+      <div id="overlay"></div>
+      <div id="crop-bar" hidden>Cropping — drag the edges, or drag inside to move the picture. <button id="b-crop-done" class="primary small">Done</button></div>
+    </div>
+    <div id="transport">
+      <button id="b-start" title="Go to start (Home)">⏮</button>
+      <button id="b-play" class="play" title="Play / pause (Space)">▶</button>
+      <button id="b-end" title="Go to end (End)">⏭</button>
+      <span id="t-now">0:00.00</span><span class="dim">/</span><span id="t-len" class="dim">0:00.00</span>
+      <div class="grow"></div>
+      <label class="dim small"><input type="checkbox" id="snap-on" checked> Snap</label>
+    </div>
+  </section>
+
+  <aside id="inspector"></aside>
+</main>
+
+<div id="splitter" title="Drag to resize the timeline"></div>
+
+<!-- ============ the timeline ============ -->
+<section id="timeline">
+  <div id="tl-bar">
+    <button id="b-add-img-track" class="small">＋ Picture track</button>
+    <button id="b-add-aud-track" class="small">＋ Audio track</button>
+    <span class="sep"></span>
+    <button id="b-split" class="small" title="Split the selected clip at the playhead (S)">✂ Split</button>
+    <button id="b-dup" class="small" title="Duplicate (⌘D)">⧉ Duplicate</button>
+    <button id="b-del" class="small" title="Delete (⌫)">🗑 Delete</button>
+    <div class="grow"></div>
+    <span class="dim small">Zoom</span>
+    <button id="b-zoom-out" class="small" title="Zoom out (−)">−</button>
+    <input id="zoom" type="range" min="0" max="1000" value="500">
+    <button id="b-zoom-in" class="small" title="Zoom in (=)">＋</button>
+    <button id="b-zoom-fit" class="small" title="Show the whole project">Fit</button>
+  </div>
+  <div id="tl-scroll">
+    <div id="tl-content">
+      <div id="tl-ruler-row"><div class="head ruler-head" id="tl-time"></div><div class="lane" id="tl-ruler-lane"><canvas id="ruler"></canvas></div></div>
+      <div id="tl-rows"></div>
+      <div id="playhead"></div>
+      <div id="snapline" hidden></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ the projects screen ============ -->
+<div id="home" class="screen" hidden>
+  <div class="card home-card">
+    <h1>Walby's Basic Video Editor</h1>
+    <div id="home-body"></div>
+  </div>
+</div>
+
+<!-- ============ dialogs ============ -->
+<dialog id="dlg-new">
+  <form method="dialog">
+    <h2>New project</h2>
+    <label>Name <input id="n-title" required value="My video"></label>
+    <label>Canvas
+      <select id="n-size">
+        <option value="1920x1080">1920 × 1080 — HD, wide (YouTube)</option>
+        <option value="1280x720">1280 × 720 — smaller wide</option>
+        <option value="3840x2160">3840 × 2160 — 4K wide</option>
+        <option value="1080x1920">1080 × 1920 — tall (phone)</option>
+        <option value="1080x1080">1080 × 1080 — square</option>
+      </select>
+    </label>
+    <menu><button value="cancel" formnovalidate>Cancel</button><button value="ok" class="primary">Make it</button></menu>
+  </form>
+</dialog>
+
+<dialog id="dlg-export">
+  <form method="dialog">
+    <h2>Export MP4</h2>
+    <label>File name <input id="x-name"></label>
+    <label>Size <select id="x-size"></select></label>
+    <label>Frames a second
+      <select id="x-fps"><option>24</option><option>25</option><option selected>30</option><option>60</option></select>
+    </label>
+    <label>Quality
+      <select id="x-quality"><option value="1">Standard</option><option value="2" selected>High</option><option value="3">Highest (big file)</option></select>
+    </label>
+    <p class="dim small" id="x-where"></p>
+    <div id="x-progress" hidden><progress id="x-bar" max="1" value="0"></progress><span id="x-msg" class="small"></span></div>
+    <menu><button value="cancel" id="x-cancel" formnovalidate>Cancel</button><button value="ok" id="x-go" class="primary">Export</button></menu>
+  </form>
+</dialog>
+
+<div id="toast" hidden></div>
+<div id="drop-cover" hidden><div>Drop to add to the project</div></div>
+
+<script src="js/model.js"></script>
+<script src="js/store.js"></script>
+<script src="js/media.js"></script>
+<script src="js/render.js"></script>
+<script src="js/stage.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/player.js"></script>
+<script src="js/inspector.js"></script>
+<script src="js/export.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

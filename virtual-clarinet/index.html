@@ -1,0 +1,1508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Virtual Clarinet</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+      background: white;
+      width: 100vw;
+      min-height: 100vh;
+    }
+    body {
+      min-height: 100vh;
+      min-width: 100vw;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .app-center-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+      min-width: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .scaling-outer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform-origin: center center;
+    }
+    /* Three columns: the staff and the chart, the clarinet, the notes */
+    .scaling-wrapper {
+      width: 1200px;
+      height: 800px;
+      display: grid;
+      grid-template-columns: 390px 570px 240px;
+      align-items: stretch;
+    }
+    .left-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-width: 0;
+    }
+    #staff { width: 390px; height: 300px; display: block; }
+    #chart { width: 390px; height: 330px; display: block; }
+    .centre-col { position: relative; min-width: 0; }
+    #clarinet { width: 570px; height: 800px; display: block; overflow: hidden; }   /* the close view crops the instrument at its own edges */
+    .right-col { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
+    /* The notes, laid out like a piano standing on its end: low E at the bottom,
+       the sharps and flats in their own column between the letters they sit between */
+    .note-pad {
+      position: relative;
+      width: 214px;
+      height: 792px;
+    }
+    .note-btn {
+      position: absolute;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 7px 0 9px;
+      border: 1px solid rgba(0, 0, 0, 0.28);
+      border-radius: 7px;
+      box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+      font-family: inherit;
+      font-weight: bold;
+      cursor: pointer;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      transition: transform 0.08s ease, filter 0.08s ease;
+    }
+    .note-btn.natural {
+      left: 0;
+      width: 112px;
+      height: 31px;
+      font-size: 18px;
+    }
+    .note-btn.sharp {
+      left: 120px;
+      width: 94px;
+      height: 27px;
+      padding-left: 7px;
+    }
+    .note-btn .names {
+      display: flex;
+      align-items: baseline;
+      gap: 5px;
+      line-height: 1;
+    }
+    .note-btn.sharp .names b { font-size: 14px; }
+    .note-btn.sharp .names small { font-size: 11px; opacity: 0.8; }
+    .note-btn .acc { margin-left: -0.16em; }
+    .note-btn .key {
+      font: 11px monospace;
+      opacity: 0.6;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .note-btn.selected {
+      outline: 3px solid #1f2937;
+      outline-offset: 1px;
+      z-index: 2;
+    }
+    .note-btn.active {
+      transform: scale(1.06);
+      filter: brightness(1.12);
+      z-index: 3;
+    }
+    .note-btn:focus { outline: none; }
+    .note-btn:focus-visible { outline: 3px solid #2563eb; outline-offset: 1px; }
+    .note-btn.selected:focus-visible { outline-color: #1f2937; }
+    @media (hover: none) and (pointer: coarse) {
+      .note-btn .key { display: none; }
+    }
+
+    /* First notes: ten big buttons in one column */
+    .note-pad.first {
+      width: 170px;
+      height: 760px;
+    }
+    .note-btn.scale-note {
+      left: 0;
+      width: 170px;
+      height: 70px;
+      font-size: 26px;
+      padding: 0 14px;
+    }
+    .note-btn.scale-note .names b { font-size: 26px; }
+    .note-btn.scale-note .names small { font-size: 15px; }
+
+    .tip-area {
+      width: 370px;
+      min-height: 110px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+      text-align: center;
+      font-size: 13.5px;
+      line-height: 1.35;
+      color: #374151;
+    }
+    /* A tall window (a phone held upright, a tablet): the staff and the chart across the top, the clarinet and the notes below */
+    @media (max-aspect-ratio: 1/1) {
+      .scaling-wrapper { width: 640px; height: 1316px; grid-template-columns: 410px 230px; grid-template-rows: 356px 960px; }
+      .left-col { grid-column: 1 / 3; display: grid; grid-template-columns: 320px 320px; grid-template-rows: 246px 110px; justify-items: center; align-items: start; }
+      #staff { width: 320px; height: 246px; grid-column: 1; grid-row: 1; }
+      #chart { width: 320px; height: 271px; grid-column: 2; grid-row: 1 / 3; }
+      .tip-area { width: 310px; min-height: 0; grid-column: 1; grid-row: 2; font-size: 13.5px; gap: 5px; }
+      #clarinet { width: 410px; height: 960px; }
+      .note-pad { height: 960px; }
+      .note-btn.natural { height: 38px; font-size: 20px; }
+      .note-btn.sharp { height: 33px; }
+      .note-pad.first { height: 760px; }
+    }
+    /* The middle of the header: "Virtual" and the dial that picks the clarinet. It keeps clear of the buttons at each side */
+    .title-group {
+      position: absolute;
+      top: 0; bottom: 0; left: 216px; right: 216px;
+      display: flex; align-items: center; justify-content: center; gap: 9px;
+      pointer-events: none;
+    }
+    .title-group > * { pointer-events: auto; }
+    .title-group h1 { font-family: 'Lobster', cursive; margin: 0; font-size: 24px; white-space: nowrap; font-weight: normal; color: #fff; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .model-dial {
+      position: relative;
+      display: flex; align-items: center;
+      width: 268px; height: 34px;
+      box-sizing: border-box;
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: linear-gradient(to bottom, #172033, #2b3650 46%, #1b2438);
+      box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.12);
+      user-select: none; -webkit-user-select: none;
+      touch-action: pan-y;
+      outline: none;
+    }
+    .model-dial:focus-visible { box-shadow: 0 0 0 3px #cdb4f0, inset 0 1px 4px rgba(0, 0, 0, 0.55); }
+    .dial-window {
+      position: relative; flex: 1; height: 100%; overflow: hidden; cursor: grab;
+      -webkit-mask-image: linear-gradient(to right, transparent 2%, #000 22%, #000 78%, transparent 98%);
+              mask-image: linear-gradient(to right, transparent 2%, #000 22%, #000 78%, transparent 98%);
+    }
+    .dial-window.dragging { cursor: grabbing; }
+    .dial-track {
+      position: absolute; top: 0; bottom: 0; left: 50%;
+      display: flex; align-items: center;
+      transition: transform 0.3s cubic-bezier(.2, .8, .2, 1);
+    }
+    .dial-track.dragging, .dial-ticks.dragging { transition: none; }
+    .dial-item {
+      flex: 0 0 var(--item, 114px);
+      text-align: center;
+      font: 21px/1 'Lobster', cursive;
+      color: rgba(226, 232, 240, 0.5);
+      white-space: nowrap;
+      transform: scale(0.72);
+      transition: transform 0.3s, color 0.3s;
+      cursor: pointer;
+    }
+    .dial-item.on { color: #ffffff; transform: none; cursor: grab; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+    .dial-item .acc { font: bold 0.78em Arial, Helvetica, sans-serif; margin: 0 0.08em 0 -0.06em; position: relative; top: -0.05em; }
+    /* The knurled edge of a thumbwheel: fine ridges that roll past as it turns */
+    .dial-ticks {
+      position: absolute; left: -400px; right: -400px; bottom: 0; height: 5px;
+      background: repeating-linear-gradient(90deg, rgba(205, 180, 240, 0.55) 0 1px, transparent 1px 7px);
+      transition: transform 0.3s cubic-bezier(.2, .8, .2, 1);
+      pointer-events: none;
+    }
+    .dial-ticks.top { top: 0; bottom: auto; height: 4px; opacity: 0.55; }
+    .dial-arrow {
+      flex: 0 0 26px; height: 100%;
+      border: 0; padding: 0; background: none;
+      color: #cbd5e1; font: 700 20px/1 system-ui, sans-serif;
+      cursor: pointer;
+    }
+    .dial-arrow:hover { color: #cdb4f0; }
+    .dial-arrow:disabled { opacity: 0.25; cursor: default; }
+    .dial-arrow.prev { padding-left: 4px; }
+    .dial-arrow.next { padding-right: 4px; }
+    /* Narrower windows: just the clarinet's name on the dial, no "Virtual" */
+    @media (max-width: 899px) {
+      .title-group h1 { display: none; }
+      .model-dial { width: 182px; --item: 170px; }
+      .dial-window { -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent); }
+      .dial-item { font-size: 19px; }
+    }
+    @media (max-width: 640px) { .title-group { left: 54px; } }
+    @media (max-width: 460px) {
+      .title-group { right: 166px; left: 50px; }
+      .model-dial { width: 152px; --item: 150px; }
+      .dial-arrow { flex-basis: 20px; font-size: 18px; }
+      .dial-item { font-size: 16.5px; }
+    }
+    .tip-area .hint { color: #6b7280; }
+    .tip-area .fl { margin-left: -0.22em; }
+    .alt-btn {
+      font: 700 12px/1 sans-serif;
+      padding: 6px 11px;
+      border-radius: 9999px;
+      border: 1.5px solid #6a4c93;
+      background: #f1ebf8;
+      color: #4b3470;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .alt-btn:hover { background: #e3d8f1; }
+
+    /* ----- settings ----- */
+    #app-header { box-sizing: border-box; }
+    .gear-btn {
+      position: absolute;
+      top: 50%;
+      right: 10px;
+      transform: translateY(-50%);
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(30, 41, 59, 0.88);
+      color: #f1f5f9;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .gear-btn:hover, .gear-btn[aria-expanded="true"] { background: #334155; color: #cdb4f0; }
+    /* Cycles what the clarinet's keys say: Keys (nothing), Fingers, Names; and the whole instrument or close on the keys */
+    .labels-btn {
+      position: absolute;
+      top: 50%;
+      right: 52px;
+      transform: translateY(-50%);
+      min-width: 76px;
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(30, 41, 59, 0.88);
+      color: #f1f5f9;
+      font: 600 13px/1 Montserrat, system-ui, -apple-system, sans-serif;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .labels-btn:hover { background: #334155; color: #cdb4f0; }
+    .view-btn { right: 136px; min-width: 70px; }
+    @media (max-width: 460px) { .labels-btn { min-width: 58px; padding: 0 8px; right: 48px; } .view-btn { right: 110px; min-width: 52px; } }
+    .gear-btn svg { width: 19px; height: 19px; }
+
+    .settings-panel {
+      position: fixed;
+      top: 44px;
+      right: 0;
+      bottom: 0;
+      width: min(360px, 100vw);
+      z-index: 9998;
+      box-sizing: border-box;
+      padding: 12px 16px 28px;
+      overflow-y: auto;
+      background: #ffffff;
+      border-left: 1px solid #e5e7eb;
+      box-shadow: -6px 0 24px rgba(0, 0, 0, 0.15);
+      font: 14px/1.4 system-ui, -apple-system, sans-serif;
+      color: #1f2937;
+      visibility: hidden;
+      transform: translateX(105%);
+      transition: transform 0.2s ease, visibility 0s 0.2s;
+    }
+    .settings-panel.open {
+      visibility: visible;
+      transform: none;
+      transition: transform 0.2s ease;
+    }
+    .sp-head { display: flex; align-items: center; justify-content: space-between; }
+    .sp-head h2 { margin: 0; font: normal 24px 'Lobster', cursive; color: #6a4c93; }
+    .sp-close { border: 0; background: none; padding: 2px 6px; font-size: 28px; line-height: 1; color: #6b7280; cursor: pointer; }
+    .sp-section { margin-top: 16px; }
+    .sp-section h3 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #6b7280;
+    }
+    .sp-group {
+      margin: 18px 0 4px;
+      padding-top: 10px;
+      border-top: 1px solid #f3f4f6;
+      font-weight: 800;
+      font-size: 13px;
+      color: #4b3470;
+    }
+    .view-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .view-choice button {
+      padding: 10px;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      background: #ffffff;
+      font: inherit;
+      text-align: left;
+      color: inherit;
+      cursor: pointer;
+    }
+    .view-choice button b { display: block; font-size: 15px; }
+    .view-choice button small { display: block; margin-top: 2px; font-size: 12px; color: #6b7280; }
+    .view-choice button[aria-checked="true"] { border-color: #6a4c93; background: #f1ebf8; }
+    .sp-row { margin: 12px 0; }
+    .sp-row.off { opacity: 0.45; }
+    .sp-label { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 13.5px; }
+    .sp-value { font-weight: 600; color: #4b3470; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .sp-row input[type="range"] { width: 100%; margin: 6px 0 1px; accent-color: #6a4c93; }
+    .sp-ends { display: flex; justify-content: space-between; font-size: 11px; color: #9ca3af; }
+    .sp-hint { margin-top: 3px; font-size: 11.5px; color: #6b7280; }
+    .seg { display: flex; margin-top: 6px; border: 1.5px solid #d1d5db; border-radius: 9px; overflow: hidden; }
+    .seg button {
+      flex: 1;
+      padding: 7px 4px;
+      border: 0;
+      border-left: 1px solid #e5e7eb;
+      background: #ffffff;
+      font: 600 13px system-ui, -apple-system, sans-serif;
+      color: #374151;
+      cursor: pointer;
+    }
+    .seg button:first-child { border-left: 0; }
+    .seg button[aria-checked="true"] { background: #6a4c93; color: #ffffff; }
+    .sp-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .sp-btn {
+      padding: 7px 13px;
+      border-radius: 9999px;
+      border: 1.5px solid #6a4c93;
+      background: #f1ebf8;
+      font: 700 13px system-ui, -apple-system, sans-serif;
+      color: #4b3470;
+      cursor: pointer;
+    }
+    .sp-btn:hover { background: #e3d8f1; }
+    .sp-btn.primary { background: #6a4c93; color: #ffffff; }
+    .sp-btn.primary:hover { background: #57397f; }
+  </style>
+
+<!-- Eagle View Music: the way back to the hub. Hidden when the app is embedded in a frame (a Google Site, an LMS). -->
+<style>
+  .back-home-btn{position:fixed;top:12px;left:12px;z-index:10000;display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:9999px;background:rgba(30,41,59,.88);color:#f1f5f9;border:1px solid rgba(255,255,255,.22);font:600 13px/1 Montserrat,system-ui,-apple-system,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25);backdrop-filter:blur(6px);transition:background .2s,color .2s}
+  .back-home-btn:hover{background:#334155;color:#cdb4f0}
+  .back-home-btn.in-bar{position:absolute;top:50%;left:10px;transform:translateY(-50%);box-shadow:none}
+  @media (max-width:640px){.back-home-btn .back-label{display:none}}
+  .in-iframe .back-home-btn{display:none!important}
+</style>
+<script>try{if(window.self!==window.top)document.documentElement.classList.add('in-iframe')}catch(e){document.documentElement.classList.add('in-iframe')}</script>
+  <!-- EVM visit counter: one anonymous count each time an app is opened. What is sent, and what never is: /what-we-count.html -->
+  <script>
+    (function () {
+      var off = false;
+      try { off = localStorage.getItem('skipgc') === 't'; } catch (e) {}
+      if (location.hash === '#toggle-goatcounter') {   // the teacher's own browsers opt out here (and back in)
+        try { off ? localStorage.removeItem('skipgc') : localStorage.setItem('skipgc', 't'); } catch (e) {}
+        alert(off ? 'Visits from this browser will be counted again.' : 'Visits from this browser will no longer be counted.');
+        return;
+      }
+      if (off || navigator.webdriver) return;
+      if (navigator.globalPrivacyControl || navigator.doNotTrack === '1' || window.doNotTrack === '1') return;   // the visitor asked not to be counted
+      if (!/(^|\.)eagleviewmusic\.com$/.test(location.hostname)) return;   // testing, or a copy on another site
+      try { if (window.top !== window && parent.location.host) return; } catch (e) {}   // framed by another of our apps (the Music Stand), which counts itself
+      try {
+        var p = decodeURIComponent(location.pathname).replace(/index\.html$/, '');
+        var r = document.referrer.split(/[?#]/)[0];   // where the visit came from, never the rest of a link
+        var u = 'https://eagleviewmusic.goatcounter.com/count?p=' + encodeURIComponent(p) +
+          (r ? '&r=' + encodeURIComponent(r) : '') + '&s=' + screen.width + '&rnd=' + Math.random().toString(36).slice(2, 7);
+        if (!(navigator.sendBeacon && navigator.sendBeacon(u))) new Image().src = u;
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+<!-- ===== App Header Start ===== -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lobster&display=swap" rel="stylesheet">
+
+<div id="app-header" style="position: fixed; top: 0; left: 0; right: 0; width: 100%; height: 40px; z-index: 9999; background-color: #6a4c93; padding: 5px 10px; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+    <a href="../index.html" class="back-home-btn in-bar" title="Back to Eagle View Music" aria-label="Back to Eagle View Music"><span class="back-arrow">←</span><span class="back-label">Eagle View Music</span></a>
+    <div class="title-group">
+      <h1>Virtual<span class="sr-only" id="titleRest"> Clarinet</span></h1>
+      <div class="model-dial" id="modelDial" role="slider" tabindex="0" aria-label="Which clarinet" aria-valuemin="0" aria-valuemax="2" aria-valuenow="1" aria-valuetext="B♭ clarinet"
+        title="Turn the dial (scroll, drag or use the arrows) to change clarinets">
+        <button type="button" class="dial-arrow prev" id="dialPrev" tabindex="-1" aria-hidden="true">‹</button>
+        <div class="dial-window" id="dialWindow">
+          <div class="dial-ticks top" id="dialTicksTop"></div>
+          <div class="dial-track" id="dialTrack"></div>
+          <div class="dial-ticks" id="dialTicks"></div>
+        </div>
+        <button type="button" class="dial-arrow next" id="dialNext" tabindex="-1" aria-hidden="true">›</button>
+      </div>
+    </div>
+    <button type="button" class="labels-btn view-btn" id="viewBtn" aria-label="Clarinet view: Whole">Whole</button>
+    <button type="button" class="labels-btn" id="labelsBtn" aria-label="Clarinet labels: Keys">Keys</button>
+    <button type="button" class="gear-btn" id="settingsBtn" title="Settings" aria-label="Settings" aria-expanded="false" aria-controls="settingsPanel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+</div>
+<!-- ===== App Header End ===== -->
+  <div class="app-center-container">
+    <div class="scaling-outer" id="scaling-outer">
+      <div class="scaling-wrapper" id="scaling-wrapper">
+        <div class="left-col">
+          <svg id="staff" viewBox="0 0 390 300" role="img" aria-label="Staff"></svg>
+          <svg id="chart" viewBox="0 0 390 330" role="img" aria-label="Fingering chart"></svg>
+          <div class="tip-area" id="tipArea" aria-live="polite"></div>
+        </div>
+        <div class="centre-col">
+          <svg id="clarinet" viewBox="-112 -3 224 684" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Clarinet"></svg>
+        </div>
+        <div class="right-col"><div class="note-pad" id="notePad"></div></div>
+      </div>
+    </div>
+  </div>
+  <aside class="settings-panel" id="settingsPanel" role="dialog" aria-label="Settings">
+    <div class="sp-head">
+      <h2>Settings</h2>
+      <button type="button" class="sp-close" id="settingsClose" aria-label="Close settings">×</button>
+    </div>
+    <div class="sp-section">
+      <h3>Notes to show</h3>
+      <div class="view-choice" role="radiogroup" aria-label="Notes to show">
+        <button type="button" role="radio" data-view="first"><b>First notes</b><small>Low G to throat B♭, below the break, keys 1 to 0</small></button>
+        <button type="button" role="radio" data-view="chromatic"><b>Every note</b><small id="everyNoteHint">Low E to high G, with every sharp and flat</small></button>
+      </div>
+    </div>
+    <div class="sp-section">
+      <h3>Sound</h3>
+      <div class="sp-actions">
+        <button type="button" class="sp-btn primary" id="tuneBtn">▶ Try it: Hot Cross Buns</button>
+        <button type="button" class="sp-btn" id="resetSoundBtn">Reset sound</button>
+      </div>
+      <div id="soundControls"></div>
+    </div>
+  </aside>
+  <script src="clarinet-art.js"></script>
+  <script src="clarinet-eb.js"></script>
+  <script src="clarinet-bass.js"></script>
+  <script src="clarinet-synth.js"></script>
+  <script>
+    // Fingerings for the Boehm B♭ clarinet, written pitch, from the fingering chart the app was designed with,
+    // checked against the Woodwind Fingering Guide (wfg.woodwind.org/clarinet). The first fingering is the common
+    // one, the others alternates, in the chart's order. Each one reads: register and thumb, left-hand fingers |
+    // right-hand fingers, then any other keys:
+    //   R  register key    T  thumb on its ring    -  neither
+    //   123 the fingers of that hand down, - up
+    //   A  the A key    Gs  the side G♯ key    Eb  the left-hand sliver (E♭/B♭)
+    //   S1 S2 S3 S4  the side keys, top to bottom    BF  the right-hand sliver (B/F♯)
+    //   LE LF LFs LCs  left little finger: E/B, F/C, F♯/C♯, C♯/G♯
+    //   RE RF RFs RGs  right little finger: E/B, F/C, F♯/C♯, G♯/D♯
+    //   LAb  E♭ clarinet: the left little finger's A♭/E♭ lever     REb  bass: the right little finger's low E♭
+    //   0    bass: the first finger's plate down with its vent open (the half-hole)
+    const CHART_BB = [
+      ['E3',  'T 123|123 LE RF', 'T 123|123 LE', 'T 123|123 RE'],
+      ['F3',  'T 123|123 RF', 'T 123|123 LF'],
+      ['F#3', 'T 123|123 LFs RF', 'T 123|123 LFs', 'T 123|123 RFs'],
+      ['G3',  'T 123|123'],
+      ['G#3', 'T 123|123 RGs'],
+      ['A3',  'T 123|12-'],
+      ['A#3', 'T 123|1--'],
+      ['B3',  'T 123|-2-', 'T 123|1-- BF'],
+      ['C4',  'T 123|---'],
+      ['C#4', 'T 123|--- LCs'],
+      ['D4',  'T 12-|---'],
+      ['D#4', 'T 12-|--- S4', 'T 12-|--- Eb'],
+      ['E4',  'T 1--|---'],
+      ['F4',  'T ---|---'],
+      ['F#4', '- 1--|---', 'T ---|--- S3 S4'],
+      ['G4',  '- ---|---', '- ---|123'],
+      ['G#4', '- ---|--- Gs', '- ---|123 Gs'],
+      ['A4',  '- ---|--- A', '- ---|123 A'],
+      ['A#4', 'R ---|--- A', 'R ---|123 A', '- ---|--- A S2'],
+      ['B4',  'RT 123|123 LE RF', 'RT 123|123 LE', 'RT 123|123 RE'],
+      ['C5',  'RT 123|123 RF', 'RT 123|123 LF'],
+      ['C#5', 'RT 123|123 LFs', 'RT 123|123 RFs'],
+      ['D5',  'RT 123|123'],
+      ['D#5', 'RT 123|123 RGs'],
+      ['E5',  'RT 123|12-'],
+      ['F5',  'RT 123|1--'],
+      ['F#5', 'RT 123|-2-', 'RT 123|1-- BF'],
+      ['G5',  'RT 123|---'],
+      ['G#5', 'RT 123|--- LCs'],
+      ['A5',  'RT 12-|---'],
+      ['A#5', 'RT 12-|--- S4', 'RT 12-|--- Eb'],
+      ['B5',  'RT 1--|---'],
+      ['C6',  'RT ---|---'],
+      ['C#6', 'RT -23|12-'],
+      ['D6',  'RT -23|1-- RGs'],
+      ['D#6', 'RT -23|1-- BF RGs', 'RT -23|-2- RGs'],
+      ['E6',  'RT -23|--- RGs'],
+      ['F6',  'RT -23|--- LCs RGs'],
+      ['F#6', 'RT -2-|--- RGs'],
+      ['G6',  'RT -2-|12- RGs'],
+    ];
+
+    // E♭ clarinet: the same Boehm fingerings, plus the left little finger's A♭/E♭ lever where the right one's G♯/D♯ key is used
+    // (Woodwind Fingering Guide: "for models with LH G♯ key")
+    const CHART_EB = CHART_BB.map(row => {
+      if (row[0] === 'G#3') return [...row, 'T 123|123 LAb'];
+      if (row[0] === 'D#5') return [...row, 'RT 123|123 LAb'];
+      return row;
+    });
+
+    // Bass clarinet (treble clef, low E♭ model): the B♭'s fingerings from low E to high C, the low E♭ key below them, and in the
+    // altissimo the first finger's plate goes down with its vent open instead of lifting (WFG, alto and bass clarinet altissimo)
+    const BASS_HIGH = {
+      'C#6': ['RT -23|12-', 'RT 023|12-'],
+      'D6': ['RT 023|1-- RGs'],
+      'D#6': ['RT 023|1-- BF RGs'],
+      'E6': ['RT 023|--- RGs'],
+      'F6': ['RT 023|--- LCs RGs'],
+      'F#6': ['RT 02-|--- BF RGs'],
+      'G6': ['RT 02-|12- RGs'],
+    };
+    const CHART_BASS = [['D#3', 'T 123|123 REb'], ...CHART_BB.map(row => BASS_HIGH[row[0]] ? [row[0], ...BASS_HIGH[row[0]]] : row)];
+
+    // The three clarinets the dial turns between, smallest first
+    const MODELS = {
+      eb: {
+        id: 'eb', name: 'E♭ Clarinet', short: 'E♭', on: 'on an E♭ clarinet', chart: CHART_EB, offset: 3,   // sounds a minor third above the written note
+        size: 'clarinetEb', timbres: { grenadilla: 'ebGrenadilla', student: 'ebStudent' }, thumb: 'ring',
+        everyNote: 'Low E to high G, with every sharp and flat',
+      },
+      bb: {
+        id: 'bb', name: 'B♭ Clarinet', short: 'B♭', on: 'on a B♭ clarinet', chart: CHART_BB, offset: -2,   // a whole step below
+        size: 'clarinet', timbres: { grenadilla: 'grenadilla', student: 'student' }, thumb: 'ring',
+        everyNote: 'Low E to high G, with every sharp and flat',
+      },
+      bass: {
+        id: 'bass', name: 'Bass Clarinet', short: 'Bass', on: 'on a bass clarinet, an octave below the B♭ clarinet', chart: CHART_BASS, offset: -14,   // an octave and a step below
+        size: 'clarinetBass', timbres: { grenadilla: 'bassGrenadilla', student: 'bassStudent' }, thumb: 'plate',
+        everyNote: 'Low E♭ to high G, with every sharp and flat',
+        keyCodes: { KeyD: 'D#3' },
+      },
+    };
+    const MODEL_ORDER = ['eb', 'bb', 'bass'];
+
+    // Computer keys (by position, so they work on any keyboard layout): the bottom row plays the low octave
+    // from E, the top row the next one, and Shift moves either row up an octave.
+    const KEY_CODES = {
+      KeyC: 'E3', KeyV: 'F3', KeyG: 'F#3', KeyB: 'G3', KeyH: 'G#3', KeyN: 'A3', KeyJ: 'A#3', KeyM: 'B3',
+      KeyQ: 'C4', Digit2: 'C#4', KeyW: 'D4', Digit3: 'D#4', KeyE: 'E4', KeyR: 'F4', Digit5: 'F#4',
+      KeyT: 'G4', Digit6: 'G#4', KeyY: 'A4', Digit7: 'A#4', KeyU: 'B4',
+      KeyI: 'C5', Digit9: 'C#5', KeyO: 'D5', Digit0: 'D#5', KeyP: 'E5', BracketLeft: 'F5', Equal: 'F#5', BracketRight: 'G5',
+      Comma: 'C4', KeyL: 'C#4', Period: 'D4', Semicolon: 'D#4', Slash: 'E4',   // the bottom row carries on too
+    };
+    const KEY_LABELS = {
+      KeyD: 'd', KeyC: 'c', KeyV: 'v', KeyG: 'g', KeyB: 'b', KeyH: 'h', KeyN: 'n', KeyJ: 'j', KeyM: 'm',
+      Comma: ',', KeyL: 'l', Period: '.', Semicolon: ';', Slash: '/',
+      KeyQ: 'q', Digit2: '2', KeyW: 'w', Digit3: '3', KeyE: 'e', KeyR: 'r', Digit5: '5', KeyT: 't', Digit6: '6',
+      KeyY: 'y', Digit7: '7', KeyU: 'u', KeyI: 'i', Digit9: '9', KeyO: 'o', Digit0: '0', KeyP: 'p',
+      BracketLeft: '[', Equal: '=', BracketRight: ']',
+    };
+
+    const LETTER_COLORS = {
+      C: '#FF3B30', D: '#FF8A00', E: '#FFF200', F: '#34C759',
+      G: '#30C0C6', A: '#007AFF', B: '#AF52DE'
+    };
+    const LETTERS = 'CDEFGAB';
+    // Sharps and flats: the name most band music uses first, then the other name
+    const ACCIDENTAL_NAMES = {
+      C: ['C♯', 'D♭'], D: ['E♭', 'D♯'], F: ['F♯', 'G♭'], G: ['A♭', 'G♯'], A: ['B♭', 'A♯']
+    };
+
+    function makeNotes(chart) { return chart.map(([pitch, ...fingerings]) => {
+      const letter = pitch[0];
+      const sharp = pitch[1] === '#';
+      const octave = Number(pitch.slice(-1));
+      const upper = LETTERS[(LETTERS.indexOf(letter) + 1) % 7];
+      const name = sharp ? ACCIDENTAL_NAMES[letter][0] : letter;
+      return {
+        pitch, fingerings: fingerings.map(parseFingering), sharp, octave,
+        name, otherName: sharp ? ACCIDENTAL_NAMES[letter][1] : '',
+        // Where it sits on the staff: the letter of its first name (E♭ on E's line), in steps from C4
+        step: (octave - 4) * 7 + LETTERS.indexOf(name[0]),
+        accidental: name[1] || '',
+        // A sharp's colour runs from the letter below it to the letter above it
+        color: LETTER_COLORS[letter],
+        upperColor: sharp ? LETTER_COLORS[upper] : LETTER_COLORS[letter],
+      };
+    }); }
+
+    // The first-notes view: the notes below the break that beginners meet first, on the number keys
+    const FIRST = ['G3', 'A3', 'B3', 'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'A#4'];
+    const FIRST_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0'];
+    const FIRST_LABELS = '1234567890';
+
+    function parseFingering(code) {
+      const [first, hands, ...extra] = code.split(/\s+/);
+      const keys = new Set();
+      if (first.includes('R')) keys.add('R');
+      if (first.includes('T')) keys.add('T');
+      const [left, right] = hands.split('|');
+      [...left].forEach(c => {
+        if (c === '0') { keys.add('L1'); keys.add('HH'); }   // the bass's half-hole: the plate down, its vent open
+        else if (c !== '-') keys.add('L' + c);
+      });
+      [...right].forEach(c => { if (c !== '-') keys.add('R' + c); });
+      extra.forEach(k => keys.add(k));
+      return keys;
+    }
+
+    // ----- saved settings (this browser only) -----
+    const STORE_KEY = 'virtual-clarinet-settings';
+    function loadSettings() {
+      try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; }
+    }
+    function saveSettings() {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify({ version: 1, model: model.id, view, labels: labelView, zoom: zoomView, sound: soundSettings })); } catch (e) { /* private window */ }
+    }
+    const saved = loadSettings();
+    let model = MODELS[saved.model] || MODELS.bb;
+    let notes = makeNotes(model.chart);
+    let notesByPitch = Object.fromEntries(notes.map(n => [n.pitch, n]));
+    let keyCodes = Object.assign({}, KEY_CODES, model.keyCodes);   // this clarinet's computer keys
+    let view = saved.view === 'first' ? 'first' : 'chromatic';
+    let labelView = ['fingers', 'names'].includes(saved.labels) ? saved.labels : 'keys';   // what the clarinet's keys say
+    let zoomView = saved.zoom === 'close' ? 'close' : 'whole';   // the whole instrument, or close on the keys
+    let keyMap = {};   // e.code -> pitch, for the view on screen
+
+    // Which fingering each note shows, when it has more than one (kept while the page is open, for this clarinet)
+    let chosenFingering = {};
+    let shownNote = null;
+
+    // ----- colours -----
+    function hexToRgb(hex) {
+      const n = parseInt(hex.slice(1), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    function rgbToHex(rgb) {
+      return '#' + rgb.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+    }
+    function mix(a, b, t) {
+      const ra = hexToRgb(a), rb = hexToRgb(b);
+      return rgbToHex(ra.map((v, i) => v + (rb[i] - v) * t));
+    }
+    function darken(hex, amount) {
+      return rgbToHex(hexToRgb(hex).map(v => v * (1 - amount)));
+    }
+    function luminance(hex) {
+      const [r, g, b] = hexToRgb(hex).map(v => {
+        v /= 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+    function textColorOn(hex) {
+      return luminance(hex) > 0.3 ? '#1f2937' : '#ffffff';
+    }
+    function noteMid(note) {
+      return note.sharp ? mix(note.color, note.upperColor, 0.5) : note.color;
+    }
+
+    // ----- the note buttons -----
+    const notePad = document.getElementById('notePad');
+
+    // Pulls ♯ / ♭ in against the letter (their fallback font leaves a gap)
+    function accidentalHtml(name) {
+      return `${name[0]}<span class="acc">${name[1]}</span>`;
+    }
+    const tallWindow = window.matchMedia('(max-aspect-ratio: 1/1)');
+    const ROW = () => tallWindow.matches ? 40 : 33;   // one letter's height, gap included
+
+    function addNoteButton(note, label, kind, top) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'note-btn ' + kind;
+      btn.dataset.pitch = note.pitch;
+      btn.style.top = top + 'px';
+      btn.setAttribute('aria-label', note.sharp
+        ? `${note.name} / ${note.otherName} (${note.pitch.replace('#', '♯')})`
+        : note.pitch);
+      btn.title = label ? `Press ${label.toUpperCase()} to play ${note.sharp ? note.name + ' / ' + note.otherName : note.name}` : note.name;
+      if (note.sharp) {
+        btn.style.background = `linear-gradient(to right, ${note.color}, ${note.upperColor})`;
+        btn.style.color = textColorOn(noteMid(note));
+      } else {
+        btn.style.background = note.color;
+        btn.style.color = textColorOn(note.color);
+      }
+      const names = note.sharp
+        ? `<b>${accidentalHtml(note.name)}</b><small>${accidentalHtml(note.otherName)}</small>`
+        : note.name;
+      btn.innerHTML = `<span class="names">${names}</span>` + (label ? `<span class="key">${label}</span>` : '');
+
+      btn.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        press(note);
+      });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(type =>
+        btn.addEventListener(type, () => release(note)));
+      // Enter or Space on a focused button plays a short note
+      btn.addEventListener('click', e => {
+        if (e.detail !== 0) return;
+        press(note);
+        setTimeout(() => release(note), 400);
+      });
+      btn.addEventListener('contextmenu', e => e.preventDefault());
+      notePad.appendChild(btn);
+    }
+
+    // The label shown on a note's button: its first key, or ⇧ plus the key an octave below
+    function chromaticLabel(pitch) {
+      const code = Object.keys(keyCodes).find(c => keyCodes[c] === pitch);
+      if (code) return KEY_LABELS[code];
+      const below = pitch.slice(0, -1) + (Number(pitch.slice(-1)) - 1);
+      const lower = Object.keys(keyCodes).find(c => keyCodes[c] === below);
+      return lower ? '⇧' + KEY_LABELS[lower] : '';
+    }
+
+    function buildNotePad() {
+      notePad.innerHTML = '';
+      notePad.className = 'note-pad ' + view;
+      keyMap = {};
+      if (view === 'first') {
+        // Low notes at the bottom
+        FIRST.forEach((pitch, i) => {
+          addNoteButton(notesByPitch[pitch], FIRST_LABELS[i], 'scale-note', (FIRST.length - 1 - i) * 76);
+          keyMap[FIRST_CODES[i]] = pitch;
+        });
+      } else {
+        const naturals = notes.filter(n => !n.sharp).length;
+        const row = ROW(), halfSharp = tallWindow.matches ? 17 : 14;
+        // The bass's low E♭ sits below low E, half a row lower than the pad's last letter
+        const below = notes[0].sharp ? halfSharp + 2 : 0;
+        const padHeight = naturals * row;
+        notePad.style.height = (padHeight + below) + 'px';
+        let naturalIndex = -1;
+        notes.forEach(note => {
+          if (note.sharp) {
+            // Sits over the line between the letter below and the letter above
+            addNoteButton(note, chromaticLabel(note.pitch), 'sharp', padHeight - (naturalIndex + 1) * row - halfSharp - 1);
+          } else {
+            naturalIndex++;
+            addNoteButton(note, chromaticLabel(note.pitch), 'natural', padHeight - (naturalIndex + 1) * row);
+          }
+        });
+        Object.assign(keyMap, keyCodes);
+      }
+      if (view === 'first') notePad.style.height = '';
+    }
+
+    // ----- the clarinet (clarinet-art.js) -----
+    const art = ClarinetArt.create(document.getElementById('clarinet'), model.id);
+    function drawClarinet(note, keys) {
+      let paint = null;
+      if (note) {
+        paint = { color: note.color, upperColor: note.upperColor, edge: darken(noteMid(note), 0.62) };
+      }
+      art.setKeys(keys || new Set(), paint);
+      document.getElementById('clarinet').setAttribute('aria-label', note ? `${model.name}: fingering for ${note.name}` : model.name);
+    }
+
+    // ----- the printed chart's symbol for the same fingering -----
+    // Laid out the way clarinet fingering charts draw it: register key and thumb up at the left, the A and G♯ keys over the
+    // six holes, the side keys beside the gap, the left little finger's keys to the right of it, the right little finger's below.
+    const CH = (() => {
+      const k = 1.04, x = 183, top = 78, gap = 33.5 * k, mid = 55 * k;
+      const y = [top, top + gap, top + 2 * gap, top + 2 * gap + mid, top + 3 * gap + mid, top + 4 * gap + mid];
+      return { k, x, y, hole: 13 * k, thumb: [x - 33.5 * k, top - 25.6 * k], thumbR: 9.5 * k };
+    })();
+    // A teardrop, point up
+    function dropPath(cx, top, w, h) {
+      const r = w / 2, b = top + h - r;
+      return `M${cx} ${top}C${cx + r * .5} ${top + h * .3} ${cx + r} ${b - r * .9} ${cx + r} ${b}A${r} ${r} 0 0 1 ${cx - r} ${b}C${cx - r} ${b - r * .9} ${cx - r * .5} ${top + h * .3} ${cx} ${top}Z`;
+    }
+    const CHART_KEYS = (() => {
+      const { k, x, y, thumb } = CH;
+      const L3 = y[2], R3 = y[5];
+      const oval = (dx, dy, rx, ry) => [x + dx * k, dy * k, rx * k, ry * k];
+      const leaf = (pts) => pts.map(([c, ...v]) => c + v.map((d, i) => i % 2 ? L3 + d * k : x + d * k).join(' ')).join('') + 'Z';
+      return {
+        // Register key above the thumb; A over the holes and the side G♯ beside it
+        R: { path: dropPath(thumb[0], thumb[1] - 41 * k, 14 * k, 27 * k) },
+        A: { path: dropPath(x, y[0] - 44 * k, 14 * k, 25 * k) },
+        Gs: { path: dropPath(x + 22 * k, y[0] - 44 * k, 14 * k, 25 * k) },
+        // Side keys beside the gap in the holes, side key 1 on top
+        S1: { o: [x - 32 * k, L3 + 13 * k, 7 * k, 4.2 * k] }, S2: { o: [x - 32 * k, L3 + 23 * k, 7 * k, 4.2 * k] },
+        S3: { o: [x - 32 * k, L3 + 33 * k, 7 * k, 4.2 * k] }, S4: { o: [x - 32 * k, L3 + 43 * k, 7 * k, 4.2 * k] },
+        // Left little finger: C♯/G♯ the small tilted leaf, F/C the flat one, then E/B and F♯/C♯ hanging below
+        LCs: { rot: -20, o: [x + 19 * k, L3 + 10 * k, 13 * k, 6 * k] },
+        LF: { rot: -8, o: [x + 37.5 * k, L3 + 21.5 * k, 12 * k, 5 * k] },
+        LE: { path: leaf([['M', 28.5, 26], ['C', 17, 27, 12, 37, 15, 44], ['C', 19, 49, 23, 52, 29.5, 72], ['C', 28, 58, 28.5, 40, 28.5, 26]]) },
+        LFs: { path: leaf([['M', 31.5, 26], ['C', 40, 26, 42, 36, 39.5, 46], ['C', 38, 54, 34, 64, 30.5, 75], ['C', 30, 60, 30, 42, 31.5, 26]]) },
+        // Right little finger: four ovals under the holes
+        RFs: { o: [x - 15.5 * k, R3 + 25 * k, 9.5 * k, 6.2 * k] }, RGs: { o: [x + .5 * k, R3 + 25 * k, 9.5 * k, 6.2 * k] },
+        RE: { o: [x - 15.5 * k, R3 + 38.6 * k, 9.5 * k, 6.2 * k] }, RF: { o: [x + .5 * k, R3 + 38.6 * k, 9.5 * k, 6.2 * k] },
+        // E♭ clarinet: the A♭/E♭ lever, a fifth small key for the left little finger, above F/C and beside C♯/G♯
+        LAb: { only: 'eb', rot: -14, o: [x + 43 * k, L3 + 7 * k, 8.5 * k, 4.4 * k] },
+        // Bass: the low E♭ key, a fifth oval under the right little finger's four
+        REb: { only: 'bass', o: [x - 7.5 * k, R3 + 52.2 * k, 9.5 * k, 6.2 * k] },
+      };
+    })();
+    function drawChart(keys) {
+      keys = keys || new Set();
+      const ink = '#1f2937', line = '#6b7280';
+      const paint = on => `fill="${on ? ink : '#fff'}" stroke="${on ? ink : line}"`;
+      let out = '';
+      // Thumb
+      out += `<circle cx="${CH.thumb[0]}" cy="${CH.thumb[1]}" r="${CH.thumbR}" ${paint(keys.has('T'))} stroke-width="1.5"/>`;
+      // The six holes
+      ['L1', 'L2', 'L3', 'R1', 'R2', 'R3'].forEach((k, i) => {
+        out += `<circle cx="${CH.x}" cy="${CH.y[i]}" r="${CH.hole}" ${paint(keys.has(k))} stroke-width="1.5"/>`;
+      });
+      // The bass's half-hole: the first finger's plate down, the small vent in it open
+      if (keys.has('HH')) out += `<circle cx="${CH.x}" cy="${CH.y[0]}" r="${CH.hole * .3}" fill="#fff" stroke="${ink}" stroke-width="1"/>`;
+      // The slivers: small curves under the hole they sit by, shown when they are used
+      const sliver = (y, on) => on ? `<path d="M${CH.x - 15} ${y + 2}C${CH.x - 6} ${y + 6} ${CH.x + 8} ${y + 4} ${CH.x + 15} ${y - 2}" fill="none" stroke="${ink}" stroke-width="3" stroke-linecap="round"/>` : '';
+      out += sliver(CH.y[1] + 15, keys.has('Eb'));
+      out += sliver(CH.y[4] + 15, keys.has('BF'));
+      // Everything else
+      Object.entries(CHART_KEYS).forEach(([k, v]) => {
+        if (v.only && v.only !== model.id) return;
+        const on = keys.has(k);
+        if (v.path) out += `<path d="${v.path}" ${paint(on)} stroke-width="1.3" stroke-linejoin="round"/>`;
+        else {
+          const [cx, cy, rx, ry] = v.o;
+          out += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" ${paint(on)} stroke-width="1.3"${v.rot ? ` transform="rotate(${v.rot} ${cx} ${cy})"` : ''}/>`;
+        }
+      });
+      // The bass's chart has a fifth key at the bottom, so it sits a little higher
+      document.getElementById('chart').innerHTML = model.id === 'bass' ? `<g transform="translate(5.5 -4) scale(.97)">${out}</g>` : out;
+    }
+
+    // ----- drawing the staff -----
+    // Leland music glyphs (SIL Open Font Licence), 360 units to a staff space
+    const GLYPHS = {
+      gClef: 'M 809 30 C 809 132 768 238 665 279 C 635 107 596 -122 586 -186 C 716 -186 809 -98 809 30 Z M 605 297 C 576 302 549 305 521 305 C 315 305 140 161 140 -56 C 140 -232 264 -389 390 -498 C 415 -520 438 -540 459 -562 C 472 -484 482 -416 492 -357 C 361 -318 272 -180 272 -45 C 272 56 351 194 467 194 C 478 194 491 189 491 176 C 491 163 477 156 459 144 C 403 109 372 72 372 1 C 372 -86 436 -157 521 -177 Z M 478 -1184 C 491 -1241 557 -1392 632 -1392 C 654 -1392 688 -1322 688 -1223 C 688 -1073 577 -960 478 -863 C 469 -920 462 -976 462 -1037 C 462 -1090 467 -1139 478 -1184 Z M 176 739 C 176 834 249 959 444 959 C 511 959 570 942 622 910 C 700 855 720 760 720 670 C 720 613 711 549 697 467 C 693 438 684 395 675 338 C 816 292 922 145 922 -3 C 922 -220 768 -367 557 -367 C 543 -454 528 -539 516 -619 C 668 -779 773 -959 773 -1188 C 773 -1319 733 -1426 710 -1477 C 675 -1551 634 -1601 608 -1601 C 598 -1601 553 -1584 505 -1528 C 413 -1418 387 -1234 387 -1113 C 387 -1035 395 -965 419 -804 C 418 -802 343 -726 312 -701 C 181 -579 0 -405 0 -117 C 0 153 235 364 503 364 C 544 364 583 360 616 354 C 644 492 660 593 660 670 C 660 819 583 899 438 899 C 403 899 373 891 370 891 C 369 890 366 888 366 887 C 366 884 369 883 373 881 C 441 871 508 814 508 721 C 508 644 449 562 341 562 C 240 562 176 644 176 739 Z',
+      noteheadBlack: 'M 0 60 C 0 122 45 192 161 192 C 311 192 468 69 468 -58 C 468 -143 396 -190 307 -190 C 167 -190 0 -72 0 60 Z',
+      sharp: 'M 336 -151 C 344 -153 351 -163 351 -171 L 351 -256 C 351 -268 343 -276 331 -276 C 330 -276 330 -276 328 -276 L 281 -266 L 281 -481 L 240 -481 L 240 -258 L 112 -232 L 112 -435 L 72 -435 L 72 -223 L 16 -212 C 7 -210 0 -200 0 -192 L 0 -189 L 0 -105 L 0 -108 C 0 -96 9 -88 20 -88 C 22 -88 23 -88 24 -88 L 72 -98 L 72 140 L 16 151 C 7 153 0 163 0 171 L 0 255 C 0 266 9 275 20 275 C 22 275 23 275 24 275 L 72 265 L 72 480 L 112 480 L 112 256 L 240 230 L 240 433 L 281 433 L 281 222 L 336 212 C 344 210 351 200 351 192 L 351 107 C 351 95 343 86 331 86 C 330 86 330 86 328 86 L 281 96 L 281 -141 Z M 112 -107 L 240 -132 L 240 105 L 112 132 Z',
+      flat: 'M 289 -114 C 281 -170 246 -223 173 -223 C 101 -223 59 -179 52 -170 L 58 -632 C 58 -644 49 -652 37 -652 L 20 -652 C 9 -652 0 -644 0 -632 L 7 233 C 7 245 16 253 27 253 C 30 253 36 252 39 251 C 45 248 138 202 216 114 C 271 52 292 -19 292 -78 C 292 -91 291 -102 289 -114 Z M 190 -58 C 190 -36 184 30 148 85 C 124 122 75 161 48 183 L 52 -98 C 55 -111 76 -153 134 -153 C 186 -153 190 -104 190 -73 C 190 -66 190 -62 190 -58 Z',
+    };
+    const SS = 13;                       // one staff space
+    const GS = SS / 360;                 // glyph units -> px
+    const STAFF_LEFT = 24, STAFF_RIGHT = 366;
+    const BOTTOM_LINE = 204;             // E4's line
+    const yOfStep = step => BOTTOM_LINE - (step - 2) * (SS / 2);   // step: C4 = 0, D4 = 1 ...
+
+    function drawStaff(note) {
+      const svg = document.getElementById('staff');
+      let out = '<g stroke="#1f2937" stroke-width="1.1">';
+      for (let i = 0; i < 5; i++) {
+        const y = BOTTOM_LINE - i * SS;
+        out += `<line x1="${STAFF_LEFT}" y1="${y}" x2="${STAFF_RIGHT}" y2="${y}" />`;
+      }
+      out += `<line x1="${STAFF_LEFT}" y1="${BOTTOM_LINE - 4 * SS}" x2="${STAFF_LEFT}" y2="${BOTTOM_LINE}" stroke-width="1.4" />`;
+      out += `<line x1="${STAFF_RIGHT}" y1="${BOTTOM_LINE - 4 * SS}" x2="${STAFF_RIGHT}" y2="${BOTTOM_LINE}" stroke-width="1.4" />`;
+      out += '</g>';
+      out += `<path fill="#1f2937" transform="translate(${STAFF_LEFT + 12} ${yOfStep(4)}) scale(${GS})" d="${GLYPHS.gClef}" />`;
+      if (note) {
+        const x = (STAFF_LEFT + STAFF_RIGHT) / 2 - 18, y = yOfStep(note.step);
+        const headW = 468 * GS;
+        // Ledger lines, out from the staff as far as the note
+        out += '<g stroke="#1f2937" stroke-width="1.1">';
+        for (let s = 12; s <= note.step; s += 2) out += `<line x1="${x - headW / 2 - 6}" y1="${yOfStep(s)}" x2="${x + headW / 2 + 6}" y2="${yOfStep(s)}" />`;
+        for (let s = 0; s >= note.step; s -= 2) out += `<line x1="${x - headW / 2 - 6}" y1="${yOfStep(s)}" x2="${x + headW / 2 + 6}" y2="${yOfStep(s)}" />`;
+        out += '</g>';
+        const mid = noteMid(note);
+        const fill = note.sharp
+          ? `url(#staffFill)` : note.color;
+        if (note.sharp) {
+          out += `<defs><linearGradient id="staffFill" gradientUnits="userSpaceOnUse" x1="${x - headW / 2}" y1="0" x2="${x + headW / 2}" y2="0">
+            <stop offset="0" stop-color="${note.color}" /><stop offset="1" stop-color="${note.upperColor}" /></linearGradient></defs>`;
+        }
+        // Stem up below the middle line, down from it
+        const stemUp = note.step < 6;
+        const stemX = stemUp ? x + headW / 2 - 0.8 : x - headW / 2 + 0.8;
+        out += `<line x1="${stemX}" y1="${y}" x2="${stemX}" y2="${stemUp ? y - 3.5 * SS : y + 3.5 * SS}" stroke="#1f2937" stroke-width="1.5" />`;
+        out += `<path fill="${fill}" stroke="${darken(mid, 0.62)}" stroke-width="${1 / GS * 0.9}" transform="translate(${x - headW / 2} ${y}) scale(${GS})" d="${GLYPHS.noteheadBlack}" />`;
+        if (note.accidental) {
+          const g = note.accidental === '♯' ? 'sharp' : 'flat';
+          const w = (g === 'sharp' ? 351 : 292) * GS;
+          out += `<path fill="#1f2937" transform="translate(${x - headW / 2 - w - 5} ${y}) scale(${GS})" d="${GLYPHS[g]}" />`;
+        }
+        // The note's name beside it
+        const tight = t => t.replace(/([♭♯])/g, '<tspan dx="-1.5">$1</tspan><tspan dx="1"></tspan>');
+        const label = note.sharp ? `${tight(note.name)}  ·  ${tight(note.otherName)}` : note.name;
+        const bw = note.sharp ? 86 : 40;
+        out += `<rect x="${x + 36}" y="${y - 13}" width="${bw}" height="26" rx="7" fill="${fill}" stroke="${darken(mid, 0.62)}" stroke-width="1.5" />
+          <text x="${x + 36 + bw / 2}" y="${y + 6}" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="16"
+          text-anchor="middle" fill="${textColorOn(mid)}">${label}</text>`;
+      }
+      svg.innerHTML = out;
+    }
+
+    // ----- what's shown under the notes -----
+    const tipArea = document.getElementById('tipArea');
+
+    // What a written note sounds as on this clarinet: B♭ a whole step lower, E♭ a minor third higher, bass an octave and a step lower
+    function concertName(pitch) {
+      const NAMES = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
+      return NAMES[(pitchToMidi(pitch) + model.offset + 120) % 12];
+    }
+
+    function showTips(note) {
+      if (!note) {
+        tipArea.innerHTML = view === 'first'
+          ? '<span class="hint">Press a note to see how to play it.</span>'
+          : '<span class="hint">Press a note to see how to play it. Hold Shift to play the computer keys an octave higher.</span>';
+        return;
+      }
+      const which = chosenFingering[note.pitch] || 0;
+      const keys = note.fingerings[which];
+      const tips = [];
+      const hole = model.thumb;   // what the fingers cover: rings, or the bass's plates
+      // The bass's one register key opens one of two vents, chosen by the right third finger
+      const vent = model.id !== 'bass' ? '' : keys.has('R3') ? ' With the right third finger down it opens the vent on the body.' : ' With the right third finger up it opens the vent on the neck.';
+      if (keys.has('R') && keys.has('T')) tips.push(`<b>Register key:</b> the thumb stays on its ${hole} and tips up onto the key behind it.${vent}`);
+      if (keys.has('R') && !keys.has('T')) tips.push(`<b>Register key:</b> the thumb lifts off the ${hole} and presses only the key.${vent}`);
+      if (keys.has('HH')) tips.push('<b>Half-hole:</b> the left first finger keeps its plate down but rolls up off the small vent in it, so the vent opens.');
+      if (keys.has('A')) tips.push(`<b>A key:</b> the left first finger rolls up onto the key above its ${hole}.`);
+      if (keys.has('Gs')) tips.push('<b>G♯ key:</b> the left first finger reaches to the long key at the side.');
+      if (keys.has('Eb')) tips.push('<b>Sliver key:</b> the left second finger rolls down onto the small key beside its hole.');
+      if (keys.has('BF')) tips.push('<b>Sliver key:</b> the right second finger rolls onto the small key between its hole and the third.');
+      const sides = ['S1', 'S2', 'S3', 'S4'].filter(k => keys.has(k)).map(k => k[1]);
+      if (sides.length) tips.push(`<b>Side key${sides.length > 1 ? 's' : ''} ${sides.join(' and ')}:</b> the right first finger's side, counted from the top.`);
+      if (keys.has('LE') && keys.has('RF')) tips.push('Both little fingers: left on E/B, right on F/C. Handy when the next note needs one of them.');
+      if (keys.has('LAb')) tips.push('<b>A♭ / E♭ lever:</b> the left little finger opens the same pad as the right little finger\'s G♯ / D♯ key.');
+      if (keys.has('REb')) tips.push('<b>Low E♭ key:</b> the right little finger\'s lowest key, below E / B. It closes every pad down to the bell.');
+      let html = tips.map(t => `<div>${t}</div>`).join('');
+      html += `<div class="hint">Sounds ${concertName(note.pitch)} ${model.on}.</div>`;
+      if (note.fingerings.length > 1) {
+        html += `<button type="button" class="alt-btn" id="altBtn">⇄ Other fingering (${which + 1} of ${note.fingerings.length})</button>`;
+      }
+      tipArea.innerHTML = html.replace(/♭/g, '<span class="fl">♭</span>');
+    }
+
+    tipArea.addEventListener('click', e => {
+      if (!e.target.closest('#altBtn') || !shownNote) return;
+      const count = shownNote.fingerings.length;
+      chosenFingering[shownNote.pitch] = ((chosenFingering[shownNote.pitch] || 0) + 1) % count;
+      showNote(shownNote);
+    });
+
+    function showNote(note) {
+      shownNote = note;
+      const keys = note ? note.fingerings[chosenFingering[note.pitch] || 0] : null;
+      drawClarinet(note, keys);
+      drawChart(keys);
+      drawStaff(note);
+      showTips(note);
+      document.querySelectorAll('.note-btn.selected').forEach(b => b.classList.remove('selected'));
+      if (note) buttonFor(note.pitch)?.classList.add('selected');
+    }
+
+    function buttonFor(pitch) {
+      return notePad.querySelector(`.note-btn[data-pitch='${pitch}']`);
+    }
+
+    // ----- sound -----
+    // clarinet-synth.js: the Virtual Flute's synth with a clarinet added: a reed on a closed pipe,
+    // low E to high G as written, sounding a whole step lower.
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+    const SOUND_DEFAULTS = Object.assign({}, window.RecorderSynth ? RecorderSynth.DEFAULTS : {}, {
+      engine: 'waveguide',
+      timbre: 'grenadilla',
+      size: 'clarinet',
+      writtenPitch: false,
+      mono: true,          // one note at a time; going from one note to the next slurs
+      breath: 0.7,
+      noise: 0.3,
+      vibrato: 0,          // clarinet players mostly play without vibrato
+      vibratoDelay: 0.3,
+      glide: 0.04,
+    });
+
+    const pct = v => Math.round(v * 100) + '%';
+    const ms = v => Math.round(v * 1000) + ' ms';
+    const SOUND_CHOICES = [
+      { key: 'engine', label: 'Sound model', options: [
+        ['waveguide', 'Waveguide', 'A physical model of the reed and the tube. The most natural.'],
+        ['spectral', 'Spectral', "Built from a clarinet's overtones."],
+        ['fm', 'FM', 'A bright, simple electronic sound.'],
+      ] },
+      { key: 'timbre', label: 'Clarinet', options: [
+        ['grenadilla', 'Wooden', 'Warm and dark, like a grenadilla clarinet.'],
+        ['student', 'Student', 'Brighter and more direct, like a resin school clarinet.'],
+      ] },
+      { key: 'mono', label: 'One note at a time', options: [
+        [true, 'On', 'Like a real clarinet. Going from one held key to the next slurs.'],
+        [false, 'Off', 'Hold several keys to play several notes at once.'],
+      ] },
+    ];
+    const SOUND_SLIDERS = [
+      { group: 'Breath and tone' },
+      { key: 'volume', label: 'Volume', min: 0, max: 1.5, step: 0.05, show: pct },
+      { key: 'breath', label: 'Breath', min: 0.1, max: 1, step: 0.01, show: pct, ends: ['Gentle', 'Strong'],
+        hint: 'Like a real clarinet: gentle is softer and darker, strong is louder and brighter.' },
+      { key: 'attack', label: 'Tonguing', min: 0.005, max: 0.12, step: 0.005, show: ms, ends: ['"Tu" (crisp)', '"Du" (soft)'] },
+      { key: 'chiff', label: 'Tongue', min: 0, max: 1, step: 0.01, show: pct,
+        hint: 'The little click of the tongue leaving the reed at the start of each note.' },
+      { key: 'noise', label: 'Breath noise', min: 0, max: 1, step: 0.01, show: pct,
+        hint: 'Air you can hear along with the tone.' },
+      { group: 'Vibrato' },
+      { key: 'vibrato', label: 'Vibrato', min: 0, max: 1, step: 0.01, show: pct, ends: ['None', 'Lots'] },
+      { key: 'vibratoRate', label: 'Vibrato speed', min: 2, max: 9, step: 0.1, show: v => v.toFixed(1) + ' per second' },
+      { key: 'vibratoDelay', label: 'Vibrato starts after', min: 0, max: 1, step: 0.05, show: v => v.toFixed(2) + ' s' },
+      { group: 'Room and feel' },
+      { key: 'reverb', label: 'Room', min: 0, max: 1, step: 0.01, show: pct, ends: ['Dry', 'Big room'] },
+      { key: 'drift', label: 'Wobble', min: 0, max: 1, step: 0.01, show: pct,
+        hint: 'Slow, tiny changes in pitch, like a real player.' },
+      { key: 'release', label: 'Note ending', min: 0.02, max: 0.5, step: 0.01, show: ms, ends: ['Short', 'Long'] },
+      { key: 'glide', label: 'Slur speed', min: 0.005, max: 0.2, step: 0.005, show: ms, onlyIf: s => s.mono,
+        hint: 'How quickly one note slides into the next. Needs "One note at a time".' },
+      { key: 'pitchFollow', label: 'Pitch follows breath', min: 0, max: 1, step: 0.01, show: pct,
+        onlyIf: s => s.engine !== 'waveguide', hint: 'Stronger breath bends the pitch up. The Waveguide does this by itself.' },
+    ];
+
+    // Saved values are only used when they are still one of the choices or inside a slider's range
+    const soundSettings = Object.assign({}, SOUND_DEFAULTS);
+    const savedSound = Object.assign({}, saved.sound);
+    SOUND_CHOICES.forEach(c => {
+      if (c.options.some(o => o[0] === savedSound[c.key])) soundSettings[c.key] = savedSound[c.key];
+    });
+    SOUND_SLIDERS.forEach(s => {
+      const v = savedSound[s.key];
+      if (s.key && typeof v === 'number' && v >= s.min && v <= s.max) soundSettings[s.key] = v;
+    });
+
+    let synth = null;
+    // The synth is told this clarinet's size and timbre; the settings keep only the choice (Wooden or Student)
+    function synthValue(key, value) {
+      if (key === 'size') return model.size;
+      if (key === 'timbre') return model.timbres[value] || model.timbres.grenadilla;
+      return value;
+    }
+    function synthParams() {
+      const p = Object.assign({}, soundSettings);
+      p.size = synthValue('size'); p.timbre = synthValue('timbre', soundSettings.timbre);
+      return p;
+    }
+    const synthReady = window.RecorderSynth
+      ? RecorderSynth.create(audioCtx, synthParams()).then(s => { s.connect(audioCtx.destination); synth = s; })
+      : new Promise(() => console.warn('[Virtual Clarinet] clarinet-synth.js is missing, so there is no sound'));
+    const heldNotes = new Map();   // pitch -> the note number the synth was given for it
+
+    // 'C#4' -> 61
+    function pitchToMidi(pitch) {
+      const semitones = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+      const [, letter, sharp, octave] = pitch.match(/^([A-G])(#?)(\d)$/);
+      return (Number(octave) + 1) * 12 + semitones[letter] + (sharp ? 1 : 0);
+    }
+
+    // How sharp each sound plays at the default breath, in cents, measured at the notes in TUNING_AT with vibrato and wobble off
+    const TUNING_AT = {
+      bb: [50, 56, 62, 68, 74, 80, 89],
+      eb: [55, 61, 67, 73, 79, 85, 94],
+      bass: [37, 43, 49, 55, 61, 67, 77],
+    };
+    const TUNING = {
+      'bb/waveguide/grenadilla': [.5, .4, .4, .3, .2, 0, 2.3],
+      'bb/waveguide/student':    [.5, .4, .4, .3, .2, 0, 2.3],
+      // measured 2026-11-08 by rendering each note offline (OfflineAudioContext) and timing its period
+      'eb/waveguide/grenadilla': [.4, .5, .7, .6, .5, .6, -2.1],
+      'eb/waveguide/student':    [.3, .3, .6, .4, .5, .6, -2.4],
+      'bass/waveguide/grenadilla': [.6, 1.1, .7, .5, .5, .5, .5],
+      'bass/waveguide/student':    [.4, .7, .5, .4, .5, .6, .4],
+    };
+    const OTHER_MODELS_SHARP = 2;   // Spectral and FM: 2 cents everywhere
+
+    function synthNote(pitch) {
+      const midi = pitchToMidi(pitch) + model.offset;   // the sounding note
+      const row = TUNING[`${model.id}/${soundSettings.engine}/${soundSettings.timbre}`];
+      const TUNING_AT_ = TUNING_AT[model.id];
+      let sharp = OTHER_MODELS_SHARP;
+      if (row) {
+        let i = TUNING_AT_.findIndex((m, k) => k + 1 < TUNING_AT_.length && midi <= TUNING_AT_[k + 1]);
+        if (i < 0) i = TUNING_AT_.length - 2;
+        const t = Math.min(1, Math.max(0, (midi - TUNING_AT_[i]) / (TUNING_AT_[i + 1] - TUNING_AT_[i])));
+        sharp = row[i] + (row[i + 1] - row[i]) * t;
+      }
+      return midi - sharp / 100;
+    }
+
+    function startNote(pitch) {
+      if (heldNotes.has(pitch)) return;
+      const n = synthNote(pitch);
+      heldNotes.set(pitch, n);
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      synthReady.then(() => synth.noteOn(n));
+    }
+
+    function stopNote(pitch) {
+      if (!heldNotes.has(pitch)) return;
+      const n = heldNotes.get(pitch);
+      heldNotes.delete(pitch);
+      synthReady.then(() => synth.noteOff(n));
+    }
+
+    function press(note) {
+      startNote(note.pitch);
+      showNote(note);
+      buttonFor(note.pitch)?.classList.add('active');
+    }
+
+    function release(note) {
+      stopNote(note.pitch);
+      buttonFor(note.pitch)?.classList.remove('active');
+    }
+
+    // ----- keys -----
+    const codesDown = {};   // e.code -> the pitch it started, so Shift can change mid-hold without stranding a note
+
+    function pitchForCode(code, shift) {
+      let pitch = keyMap[code];
+      if (!pitch) return null;
+      if (shift && view === 'chromatic') {
+        const up = pitch.slice(0, -1) + (Number(pitch.slice(-1)) + 1);
+        if (notesByPitch[up]) pitch = up;
+      }
+      return pitch;
+    }
+
+    window.addEventListener('keydown', e => {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'Escape') return closeSettings();
+      if (e.target.closest && e.target.closest('input, textarea')) return;
+      const pitch = pitchForCode(e.code, e.shiftKey);
+      if (!pitch) return;
+      e.preventDefault();
+      codesDown[e.code] = pitch;
+      press(notesByPitch[pitch]);
+    });
+
+    window.addEventListener('keyup', e => {
+      const pitch = codesDown[e.code];
+      if (!pitch) return;
+      delete codesDown[e.code];
+      release(notesByPitch[pitch]);
+    });
+
+    function releaseAll() {
+      Object.keys(codesDown).forEach(c => delete codesDown[c]);
+      notes.forEach(release);
+    }
+
+    // Let go of every note if the page loses focus mid-note
+    window.addEventListener('blur', releaseAll);
+
+    // Clicking anywhere else puts the clarinet back to rest (and closes the settings)
+    document.body.addEventListener('pointerdown', e => {
+      if (e.target.closest('.settings-panel, #app-header')) return;
+      if (!e.target.closest('.note-btn')) closeSettings();
+      if (!e.target.closest('.note-btn, .alt-btn')) showNote(null);
+    });
+
+    // ----- the Keys / Fingers / Names button -----
+    const LABEL_VIEWS = { keys: 'Keys', fingers: 'Fingers', names: 'Names' };
+    const labelsBtn = document.getElementById('labelsBtn');
+    function showLabelButton() {
+      labelsBtn.textContent = LABEL_VIEWS[labelView];
+      labelsBtn.setAttribute('aria-label', `Clarinet labels: ${LABEL_VIEWS[labelView]}`);
+    }
+    labelsBtn.addEventListener('click', () => {
+      const order = Object.keys(LABEL_VIEWS);
+      labelView = order[(order.indexOf(labelView) + 1) % order.length];
+      showLabelButton();
+      saveSettings();
+      art.setLabels(labelView);
+    });
+    showLabelButton();
+    art.setLabels(labelView);
+
+    // ----- the Whole / Close button -----
+    const viewBtn = document.getElementById('viewBtn');
+    function showViewButton() {
+      const text = zoomView === 'close' ? 'Close' : 'Whole';
+      viewBtn.textContent = text;
+      viewBtn.setAttribute('aria-label', `Clarinet view: ${text}`);
+    }
+    viewBtn.addEventListener('click', () => {
+      zoomView = zoomView === 'close' ? 'whole' : 'close';
+      showViewButton();
+      saveSettings();
+      art.setView(zoomView);
+    });
+    showViewButton();
+    art.setTall(tallWindow.matches);
+    art.setView(zoomView);
+    tallWindow.addEventListener('change', () => {
+      buildNotePad();
+      showNote(shownNote);
+      art.setTall(tallWindow.matches);
+      art.setView(zoomView);
+      updateScale();
+    });
+
+    // ----- the settings panel -----
+    const settingsPanel = document.getElementById('settingsPanel');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const soundControls = document.getElementById('soundControls');
+
+    function openSettings() {
+      settingsPanel.classList.add('open');
+      settingsBtn.setAttribute('aria-expanded', 'true');
+    }
+    function closeSettings() {
+      settingsPanel.classList.remove('open');
+      settingsBtn.setAttribute('aria-expanded', 'false');
+    }
+    settingsBtn.addEventListener('click', () =>
+      settingsPanel.classList.contains('open') ? closeSettings() : openSettings());
+    document.getElementById('settingsClose').addEventListener('click', closeSettings);
+
+    function setView(v) {
+      if (v === view) return;
+      releaseAll();
+      view = v;
+      saveSettings();
+      buildNotePad();
+      showNote(shownNote && buttonFor(shownNote.pitch) ? shownNote : null);
+      refreshViewChoice();
+      updateScale();
+    }
+    function refreshViewChoice() {
+      settingsPanel.querySelectorAll('[data-view]').forEach(b =>
+        b.setAttribute('aria-checked', String(b.dataset.view === view)));
+    }
+    settingsPanel.querySelectorAll('[data-view]').forEach(b =>
+      b.addEventListener('click', () => setView(b.dataset.view)));
+
+    function setSound(key, value) {
+      soundSettings[key] = value;
+      saveSettings();
+      if (synth) synth.set(key, synthValue(key, value));   // takes effect on the next note (volume and room right away)
+      refreshSoundControls();
+    }
+
+    function buildSoundControls() {
+      let html = '';
+      SOUND_CHOICES.forEach(c => {
+        html += `<div class="sp-row" data-row="${c.key}"><div class="sp-label">${c.label}</div>
+          <div class="seg" role="radiogroup" aria-label="${c.label}">` +
+          c.options.map(([value, label], i) =>
+            `<button type="button" role="radio" data-choice="${c.key}" data-index="${i}">${label}</button>`).join('') +
+          `</div><div class="sp-hint" data-hint="${c.key}"></div></div>`;
+      });
+      SOUND_SLIDERS.forEach(s => {
+        if (s.group) { html += `<div class="sp-group">${s.group}</div>`; return; }
+        html += `<div class="sp-row" data-row="${s.key}">
+          <label class="sp-label" for="sl-${s.key}">${s.label}<span class="sp-value" data-value="${s.key}"></span></label>
+          <input type="range" id="sl-${s.key}" data-slider="${s.key}" min="${s.min}" max="${s.max}" step="${s.step}">` +
+          (s.ends ? `<div class="sp-ends"><span>${s.ends[0]}</span><span>${s.ends[1]}</span></div>` : '') +
+          (s.hint ? `<div class="sp-hint">${s.hint}</div>` : '') + '</div>';
+      });
+      soundControls.innerHTML = html;
+
+      soundControls.querySelectorAll('[data-choice]').forEach(b => b.addEventListener('click', () => {
+        const c = SOUND_CHOICES.find(c => c.key === b.dataset.choice);
+        setSound(c.key, c.options[b.dataset.index][0]);
+      }));
+      soundControls.querySelectorAll('[data-slider]').forEach(input => input.addEventListener('input', () =>
+        setSound(input.dataset.slider, Number(input.value))));
+    }
+
+    function refreshSoundControls() {
+      SOUND_CHOICES.forEach(c => {
+        const current = c.options.find(o => o[0] === soundSettings[c.key]);
+        soundControls.querySelectorAll(`[data-choice="${c.key}"]`).forEach(b =>
+          b.setAttribute('aria-checked', String(c.options[b.dataset.index] === current)));
+        soundControls.querySelector(`[data-hint="${c.key}"]`).textContent = current ? current[2] : '';
+      });
+      SOUND_SLIDERS.forEach(s => {
+        if (s.group) return;
+        const v = soundSettings[s.key];
+        soundControls.querySelector(`[data-slider="${s.key}"]`).value = v;
+        soundControls.querySelector(`[data-value="${s.key}"]`).textContent = s.show(v);
+        soundControls.querySelector(`[data-row="${s.key}"]`).classList.toggle('off', !!s.onlyIf && !s.onlyIf(soundSettings));
+      });
+    }
+
+    document.getElementById('resetSoundBtn').addEventListener('click', () => {
+      Object.assign(soundSettings, SOUND_DEFAULTS);
+      saveSettings();
+      if (synth) Object.keys(SOUND_DEFAULTS).forEach(k => synth.set(k, synthValue(k, SOUND_DEFAULTS[k])));
+      refreshSoundControls();
+    });
+
+    // A short tune to hear the settings: Hot Cross Buns, in beats
+    const TEST_TUNE = [
+      ['E4', 1], ['D4', 1], ['C4', 2], ['E4', 1], ['D4', 1], ['C4', 2],
+      ['C4', 0.5], ['C4', 0.5], ['C4', 0.5], ['C4', 0.5], ['D4', 0.5], ['D4', 0.5], ['D4', 0.5], ['D4', 0.5],
+      ['E4', 1], ['D4', 1], ['C4', 2],
+    ];
+    const BEAT = 0.42;   // seconds
+    const tuneBtn = document.getElementById('tuneBtn');
+    const tuneLabel = tuneBtn.textContent;
+    let tuneTimers = [];
+
+    function stopTune() {
+      tuneTimers.forEach(clearTimeout);
+      tuneTimers = [];
+      releaseAll();
+      tuneBtn.textContent = tuneLabel;
+    }
+    function playTune() {
+      stopTune();
+      tuneBtn.textContent = '■ Stop';
+      let at = 0;
+      TEST_TUNE.forEach(([pitch, beats]) => {
+        const note = notesByPitch[pitch];
+        const start = at * BEAT * 1000, end = (at + beats * 0.85) * BEAT * 1000;   // a little gap to re-tongue
+        tuneTimers.push(setTimeout(() => press(note), start), setTimeout(() => release(note), end));
+        at += beats;
+      });
+      tuneTimers.push(setTimeout(stopTune, at * BEAT * 1000 + 100));
+    }
+    tuneBtn.addEventListener('click', () => tuneTimers.length ? stopTune() : playTune());
+
+    // ----- the dial: E♭, B♭ or bass clarinet -----
+    const dial = document.getElementById('modelDial');
+    const dialTrack = document.getElementById('dialTrack');
+    const dialWindow = document.getElementById('dialWindow');
+    const dialTicks = [document.getElementById('dialTicks'), document.getElementById('dialTicksTop')];
+    const dialPrev = document.getElementById('dialPrev'), dialNext = document.getElementById('dialNext');
+    MODEL_ORDER.forEach((id, i) => {
+      const item = document.createElement('span');
+      item.className = 'dial-item';
+      item.dataset.index = i;
+      item.innerHTML = MODELS[id].name.replace('♭', '<span class="acc">♭</span>');
+      dialTrack.appendChild(item);
+    });
+    const dialItems = [...dialTrack.children];
+    const itemWidth = () => dialItems[0].offsetWidth || 132;
+    function placeDial(drag = 0) {
+      const i = MODEL_ORDER.indexOf(model.id), w = itemWidth();
+      dialTrack.style.transform = `translateX(${-(i + .5) * w + drag}px)`;
+      dialTicks.forEach(t => { t.style.transform = `translateX(${(-(i + .5) * w + drag) * .5}px)`; });
+    }
+    function showDial() {
+      const i = MODEL_ORDER.indexOf(model.id);
+      dialItems.forEach((el, k) => el.classList.toggle('on', k === i));
+      dial.setAttribute('aria-valuenow', i);
+      dial.setAttribute('aria-valuetext', model.name.replace('Clarinet', 'clarinet'));
+      dialPrev.disabled = i === 0;
+      dialNext.disabled = i === MODEL_ORDER.length - 1;
+      placeDial();
+      document.getElementById('titleRest').textContent = ' ' + model.name;
+      document.title = model.id === 'bb' ? 'Virtual Clarinet' : `Virtual ${model.name}`;
+      document.getElementById('everyNoteHint').textContent = model.everyNote;
+    }
+    function turnDial(step) {
+      const i = Math.max(0, Math.min(MODEL_ORDER.length - 1, MODEL_ORDER.indexOf(model.id) + step));
+      setModel(MODEL_ORDER[i]);
+    }
+    function setModel(id) {
+      if (!MODELS[id] || id === model.id) { placeDial(); return; }
+      stopTune();
+      releaseAll();
+      const was = shownNote && shownNote.pitch;
+      model = MODELS[id];
+      notes = makeNotes(model.chart);
+      notesByPitch = Object.fromEntries(notes.map(n => [n.pitch, n]));
+      keyCodes = Object.assign({}, KEY_CODES, model.keyCodes);
+      chosenFingering = {};
+      saveSettings();
+      art.setModel(model.id);
+      if (synth) { synth.set('size', synthValue('size')); synth.set('timbre', synthValue('timbre', soundSettings.timbre)); }
+      buildNotePad();
+      showNote(was && notesByPitch[was] && buttonFor(was) ? notesByPitch[was] : null);
+      showDial();
+      updateScale();
+    }
+    dialPrev.addEventListener('click', () => turnDial(-1));
+    dialNext.addEventListener('click', () => turnDial(1));
+    dial.addEventListener('keydown', e => {
+      const step = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1 }[e.key];
+      if (step) { e.preventDefault(); e.stopPropagation(); turnDial(step); }
+      else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); e.stopPropagation(); setModel(MODEL_ORDER[e.key === 'Home' ? 0 : MODEL_ORDER.length - 1]); }
+    });
+    // Scrolling over the dial turns it one click at a time
+    let wheelSum = 0, wheelAt = 0, wheelIdle = 0;
+    dial.addEventListener('wheel', e => {
+      e.preventDefault();
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      wheelSum += e.deltaMode ? d * 30 : d;
+      clearTimeout(wheelIdle);
+      wheelIdle = setTimeout(() => { wheelSum = 0; }, 220);
+      const now = performance.now();
+      if (Math.abs(wheelSum) > 36 && now - wheelAt > 320) {
+        turnDial(Math.sign(wheelSum));
+        wheelSum = 0; wheelAt = now;
+      }
+    }, { passive: false });
+    // Dragging it turns it too, and a tap on a name beside the middle one goes there
+    let drag = null;
+    dialWindow.addEventListener('pointerdown', e => {
+      drag = { x: e.clientX, dx: 0, id: e.pointerId, item: e.target.closest('.dial-item') };
+      try { dialWindow.setPointerCapture(e.pointerId); } catch (err) { /* a synthetic pointer */ }
+      dialWindow.classList.add('dragging'); dialTrack.classList.add('dragging'); dialTicks.forEach(t => t.classList.add('dragging'));
+    });
+    dialWindow.addEventListener('pointermove', e => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const scale = dial.getBoundingClientRect().width / dial.offsetWidth || 1;
+      drag.dx = (e.clientX - drag.x) / scale;
+      placeDial(drag.dx);
+    });
+    const endDrag = e => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const d = drag; drag = null;
+      dialWindow.classList.remove('dragging'); dialTrack.classList.remove('dragging'); dialTicks.forEach(t => t.classList.remove('dragging'));
+      const w = itemWidth();
+      if (Math.abs(d.dx) > 18) turnDial(-Math.round(d.dx / w) || -Math.sign(d.dx));
+      else if (d.item && e.type === 'pointerup') setModel(MODEL_ORDER[d.item.dataset.index]);
+      else placeDial();
+    };
+    dialWindow.addEventListener('pointerup', endDrag);
+    dialWindow.addEventListener('pointercancel', endDrag);
+    window.addEventListener('resize', () => placeDial());
+
+    buildSoundControls();
+    refreshSoundControls();
+    refreshViewChoice();
+    buildNotePad();
+    showNote(null);
+    showDial();
+    if (document.fonts) document.fonts.ready.then(() => placeDial());
+
+    // Responsive scaling: shrink (or grow) the whole app proportionally to fit the window
+    function updateScale() {
+      const outer = document.getElementById('scaling-outer');
+      const wrapper = document.getElementById('scaling-wrapper');
+      const header = document.getElementById('app-header');
+      const container = document.querySelector('.app-center-container');
+      const headerHeight = header ? header.offsetHeight : 0;
+      if (container) container.style.paddingTop = headerHeight + 'px';
+      document.getElementById('settingsPanel').style.top = headerHeight + 'px';
+
+      const designHeight = wrapper.offsetHeight || 800;
+      const designWidth = wrapper.offsetWidth || 1200;
+      const availableHeight = window.innerHeight - headerHeight - 16;
+      const availableWidth = window.innerWidth - 16;
+      const scale = Math.min(availableHeight / designHeight, availableWidth / designWidth);
+      outer.style.transform = `scale(${Math.max(0.1, scale)})`;
+      if (typeof art !== 'undefined') art.fitLighting();
+    }
+    window.addEventListener('resize', updateScale);
+    window.addEventListener('load', updateScale);
+    updateScale();
+    art.fitLighting();
+  </script>
+</body>
+</html>

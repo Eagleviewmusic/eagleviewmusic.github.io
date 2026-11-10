@@ -457,8 +457,10 @@
         saved.round.length > 0 && saved.round.length < G.roundN) {
         G.round = saved.round.map(e => Object.assign({}, e));
         G.battleResume = true;
-        // the same melodies as before the reload, so the round stays fair
+        // the same melodies as before the reload, so the round stays fair — unless what they are made from has
+        // changed since (the ✎ page, the Melody Source): then the ones not yet played are planned again
         G.battlePlan = Array.isArray(saved.plan) && saved.plan.length === G.roundN ? saved.plan : planBattle();
+        if (saved.key !== planKey()) G.replanBattle();
       } else { clearBattle(); G.battlePlan = planBattle(); }
     }
     nextCard();
@@ -483,16 +485,22 @@
   const battleShape = () => G.battle.teams.length + '-' + G.battle.per + '-' + G.battle.rounds;
   /* the battle's melodies, planned at the start (melody.js) — none when a My melodies set is played */
   const planBattle = () => G.playingSet() ? null : RR.Melody.battlePlan(G.setup, G.battle);
-  /* the notes or rhythms changed part-way (Settings): the rounds to come are planned again; this one stays as it was */
+  /* the settings a melody is made from (settings.js: changing one is a content change); a saved battle keeps
+     them as its `key`, so a plan made from other settings is never carried on */
+  G.CONTENT = ['notes', 'rhythms', 'time', 'times', 'pickup', 'leaps', 'bars', 'moves', 'endDo', 'endLong', 'from', 'set'];
+  const planKey = () => JSON.stringify(G.CONTENT.map(k => G.setup[k] === undefined ? null : G.setup[k]));
+  /* the notes or rhythms changed part-way (Settings): every melody not yet played is planned again — the one
+     on the stand too, so the change shows the moment the window closes (2026-10-14, the user's: one note
+     picked mid-battle kept a round of old melodies until a reload). The melodies played stay as they were */
   G.replanBattle = function () {
     if (!G.battle) return;
-    const fresh = planBattle(), old = G.battlePlan, now = G.battleNow().round, per = G.battle.teams.length * G.battle.per;
-    G.battlePlan = fresh && old ? fresh.map((c, k) => Math.floor(k / per) <= now ? old[k] : c) : fresh;
+    const fresh = planBattle(), old = G.battlePlan, played = G.round.length;
+    G.battlePlan = fresh && old ? fresh.map((c, k) => k < played ? old[k] : c) : fresh;
     saveBattle();
   };
   function saveBattle() {
     if (!G.battle || G.mode.kind !== 'session') return;
-    RR.device.battle = { id: G.mode.id, shape: battleShape(), plan: G.battlePlan || null,
+    RR.device.battle = { id: G.mode.id, shape: battleShape(), key: planKey(), plan: G.battlePlan || null,
       round: G.round.map(e => ({ team: e.team, pts: e.pts, stars: e.stars, made: !!e.made, gold: !!e.gold, skip: !!e.skip, label: e.label })) };
     RR.saveDevice();
   }
@@ -716,16 +724,23 @@
 
   /* the practice metronome (2026-10-07, the user's): clicking whenever the card is in Practice with the
      metronome on, the music on screen and nothing over it — no count-in; a Test counts in instead */
+  const tickWanted = () => metroOn() && G.card && G.stage === 'practice' && !G.clock && !G.overlay && G.mode.kind !== 'teach' &&
+    G.phase !== 'countin' && G.phase !== 'running' && (!RR.View || RR.View.current === 'play') &&
+    !windowOpen() && !(RR.Maker && RR.Maker.active);
   function syncTick() {
     if (!RR.Beat || !RR.Beat.tickStart) return;
-    const want = metroOn() && G.card && G.stage === 'practice' && !G.clock && !G.overlay && G.mode.kind !== 'teach' &&
-      G.phase !== 'countin' && G.phase !== 'running' && (!RR.View || RR.View.current === 'play') &&
-      !windowOpen() && !(RR.Maker && RR.Maker.active);
+    const want = tickWanted();
     const now = RR.Beat.ticking();
     if (!want) { if (now) RR.Beat.tickStop(); }
     else if (now !== RR.Beat.keyNow()) RR.Beat.tickStart();     // not clicking, or at another tempo or sound
   }
   G.syncTick = syncTick;
+  /* the metronome going while you practise — Practice's click, or Practice (Teach Me to Read) and Songs playing
+     along round and round: ▶ Listen becomes ■ and stops it (2026-10-14, the user's: "let users stop it easily" —
+     it was only in Tools). A Test's count-in run is left alone: it ends with the melody */
+  const metroGoing = () => metroOn() && !G.overlay && !G.clock && (G.mode.kind === 'teach'
+    ? G.stage === 'game' && (RR.Beat.running() || G.phase === 'countin' || G.phase === 'running') : !!tickWanted());
+  G.metroGoing = metroGoing;
   /* each click: the metronome button gives a little nod (the bar's first beat a bigger one) */
   G.metroBeat = function (accent) {
     if (reduced()) return;
@@ -1023,6 +1038,7 @@
       if (teach && metroOn() && G.stage === 'game') $('#btn-restart').classList.add('ready');   // ↻ to play along again
       return;
     }
+    if (metroGoing()) { setMetro('off'); return; }      // ■ while the metronome goes: it stops
     if (G.overlay || (!teach && (G.phase === 'countin' || G.phase === 'running')) || !canHear()) return;
     if (!RR.Sound.ctx) return;
     // Teach Me to Read: Listen while playing along with the metronome — the play-along stops, Listen plays
@@ -1232,10 +1248,12 @@
     // the Get ready card takes a tap only while it counts (stopCountIn) — not in the last
     // half beat, when a bar under it may be struck early for the first note
     document.documentElement.classList.toggle('ci-tap', G.phase === 'countin');
-    // ▶ Listen
-    const play = $('#btn-play'), hear = canHear() || G.hearing;
+    // ▶ Listen — ■ while it plays, and while the metronome goes as you practise (it stops it)
+    const play = $('#btn-play'), going = !G.hearing && metroGoing(), hear = canHear() || G.hearing || going;
     play.disabled = !hear;
-    play.title = hear ? 'Listen' + (metroOn() ? ' — with the metronome' : '') : s.playHidden ? 'The Play button is off for this practice' : 'Listen comes back when the Test is done';
+    play.classList.toggle('metro-stop', going);
+    play.title = going ? 'Stop the metronome' : G.hearing ? 'Stop' : hear ? 'Listen' + (metroOn() ? ' — with the metronome' : '') : s.playHidden ? 'The Play button is off for this practice' : 'Listen comes back when the Test is done';
+    play.setAttribute('aria-label', going ? 'Stop the metronome' : G.hearing ? 'Stop' : 'Listen');
     // Practice (a blue pause) / Test (a red ball in a red ring — it pulses while a try is under way)
     const mode = $('#btn-mode');
     mode.classList.toggle('test', !practice);

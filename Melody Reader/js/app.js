@@ -73,7 +73,7 @@
     if ((e.key === ' ' || e.key === 'Enter') && tag === 'BUTTON') return;
     if (e.key === ' ') {
       e.preventDefault();
-      if (G.canHear() || G.hearing) G.hearIt();
+      if (G.canHear() || G.hearing || G.metroGoing()) G.hearIt();     // ■ the metronome too
       else G.roll();                               // a Test with the metronome on, waiting: count in
     } else if (e.key === 'Enter') {
       e.preventDefault();

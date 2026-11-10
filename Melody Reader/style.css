@@ -158,9 +158,9 @@ svg { display: block; }
 .round-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--gold-deep); }
 .round-btn.small { width: 54px; height: 54px; background: #fff; color: var(--ink-soft); box-shadow: 0 4px 0 #d9c9ad, 0 6px 12px rgba(62,39,35,.15); }
 .round-btn.small svg { width: 26px; height: 26px; fill: var(--ink-soft); }
-.round-btn.playing { background: #f59e0b; }
-.round-btn.playing svg { display: none; }
-.round-btn.playing::after { content: ''; width: 22px; height: 22px; border-radius: 4px; background: #fff; }
+.round-btn.playing, .round-btn.metro-stop { background: #f59e0b; }
+.round-btn.playing svg, .round-btn.metro-stop svg { display: none; }
+.round-btn.playing::after, .round-btn.metro-stop::after { content: ''; width: 22px; height: 22px; border-radius: 4px; background: #fff; }
 .round-btn.ctl-btn { width: 58px; height: 58px; }
 .round-btn.ctl-btn svg { width: 30px; height: 30px; }
 #btn-next.ready, #btn-mode.ready { animation: nudge 1.2s ease-in-out infinite; }
@@ -762,7 +762,7 @@ button:focus-visible, .bar:focus-visible { outline: 3px solid #2563eb; outline-o
    and keeps Rainbow Xylophone's look.
    ========================================================================== */
 .round-btn.play-btn svg, #btn-next.ready svg { fill: #3b2306; }
-.round-btn.playing::after { background: #3b2306; }
+.round-btn.playing::after, .round-btn.metro-stop::after { background: #3b2306; }
 .pill-btn.primary, .tab.on { color: #3b2306; }
 /* level numbers: dark on white, ringed in the band's colour — readable on every band */
 .lvl .n { background: #fff; color: #2b1d16; box-shadow: inset 0 0 0 3.5px var(--bc); }

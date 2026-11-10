@@ -32,7 +32,7 @@ does nothing. Contract: `Recording Studio/README.md`, "The instrument link".
 
 In the source, `App.tsx`: `joinStudio` near the top (after `IN_IFRAME`), and
 the one `studio?.hit(...)` line right after `xylophoneAudio.playNote` in
-`triggerCustomNote`. Not yet in the published copy in `Eagle View Music/`.
+`triggerCustomNote`. Live 2026-10-30 (27e7dc3).
 
 ## The Scales window (2026-10-24)
 
@@ -81,4 +81,4 @@ now hides the Eagle View back button as well as the gear, so the page has no
 links at all. On a phone the title still gives way (the header has no room), so
 a locked phone shows just the ? button on the left. In the source, `App.tsx`:
 `showBackLink = !IN_IFRAME && !isLocked`. The checkbox text and tutorial step 8
-say so. Not yet in the published copy in `Eagle View Music/`.
+say so. Live 2026-10-30 (27e7dc3).
