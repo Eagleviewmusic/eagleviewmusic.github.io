@@ -1,0 +1,201 @@
+const PRELOADED_SONGS = {
+    'new-song': `[Key of C]
+[A]
+Start[D1] Here[D1]`,
+    'twinkle': `[Key of C]
+[A]
+Twin[D1] kle,[D1] twin[S1] kle,[S1] lit[L1] tle[L1] star[S1] How[F1] I[F1] won[M1] der[M1] what[R1] you[R1] are[D1]
+[B]
+Up[S1] a-[S1] bove[F1] the[F1] world[M1] so[M1] high,[R1] Like[S1] a[S1] dia-[F1] mond[F1] in[M1] the[M1] sky.[R1]
+[A]
+Twin[D1] kle,[D1] twin[S1] kle,[S1] lit[L1] tle[L1] star,[S1] How[F1] I[F1] won[M1] der[M1] what[R1] you[R1] are.[D1]`,
+    'mary': `[Key of C]
+[A]
+Ma[M1] ry[R1] had[D1] a[R1] lit[M1] tle[M1] lamb,[M1] lit[R1] tle[R1] lamb,[R1] lit[M1] tle[S1] lamb.[S1]
+[B]
+Ma[M1] ry[R1] had[D1] a[R1] lit[M1] tle[M1] lamb,[M1] its[M1] fleece[R1] was[R1] white[M1] as[R1] snow.[D1]`
+};
+
+/* A built-in with more than the text format can hold (a Chord Chart and a
+   chord track) is its whole score here: the same JSON as `score` in a song
+   backup (JSON-FORMAT.md §2). js/library.js defaultRecord() looks here first.
+   2026-11-08 the Star Spangled Banner, from the user's own 3.5 copy. */
+const PRELOADED_SCORES = {
+  'starspangledbanner': {
+    "v": 2,
+    "key": "Ab",
+    "scale": "major",
+    "board": {},
+    "meter": "3/4",
+    "bpm": 100,
+    "lines": [
+      {
+        "label": "A1",
+        "pickup": "q",
+        "syllables": [
+          {"text":"Oh","cols":[{"notes":[{"n":"so"}],"v":"e."}]},
+          {"text":"-","cols":[{"notes":[{"n":"mi"}],"v":"s"}]},
+          {"text":"say","cols":[{"notes":[{"n":"do"}],"v":"q"}]},
+          {"text":"can","cols":[{"notes":[{"n":"mi"}],"v":"q"}]},
+          {"text":"you","cols":[{"notes":[{"n":"so"}],"v":"q"}]},
+          {"text":"see","cols":[{"notes":[{"n":"do-high"}],"v":"h"}]},
+          {"text":"By","cols":[{"notes":[{"n":"mi-high"}],"v":"e."}]},
+          {"text":"the","cols":[{"notes":[{"n":"re-high"}],"v":"s"}]},
+          {"text":"dawn's","cols":[{"notes":[{"n":"do-high"}],"v":"q"}]},
+          {"text":"ear-","cols":[{"notes":[{"n":"mi"}],"v":"q"}]},
+          {"text":"-ly","cols":[{"notes":[{"n":"fa","acc":"sharp"}],"v":"q"}]},
+          {"text":"light?","cols":[{"notes":[{"n":"so"}],"v":"h"}]},
+          {"text":"What","cols":[{"notes":[{"n":"so"}],"v":"e"}]},
+          {"text":"so","cols":[{"notes":[{"n":"so"}],"v":"e"}]},
+          {"text":"proud-","cols":[{"notes":[{"n":"mi-high"}],"v":"q."}]},
+          {"text":"-ly","cols":[{"notes":[{"n":"re-high"}],"v":"e"}]},
+          {"text":"we","cols":[{"notes":[{"n":"do-high"}],"v":"q"}]},
+          {"text":"hailed","cols":[{"notes":[{"n":"ti"}],"v":"h"}]},
+          {"text":"At","cols":[{"notes":[{"n":"la"}],"v":"e"}]},
+          {"text":"the","cols":[{"notes":[{"n":"ti"}],"v":"e"}]},
+          {"text":"twi-","cols":[{"notes":[{"n":"do-high"}],"v":"q"}]},
+          {"text":"lights","cols":[{"notes":[{"n":"do-high"}],"v":"q"}]},
+          {"text":"last","cols":[{"notes":[{"n":"so"}],"v":"q"}]},
+          {"text":"gleam-","cols":[{"notes":[{"n":"mi"}],"v":"q"}]},
+          {"text":"ing","cols":[{"notes":[{"n":"do"}],"v":"q"}]},
+          {"text":"Whose","cols":[{"notes":[{"n":"so"}],"v":"e."}]},
+          {"text":"broad","cols":[{"notes":[{"n":"mi"}],"v":"s"}]},
+          {"text":"stripes","cols":[{"notes":[{"n":"do"}],"v":"q"}]},
+          {"text":"and","cols":[{"notes":[{"n":"mi"}],"v":"q"}]},
+          {"text":"bright","cols":[{"notes":[{"n":"so"}],"v":"q"}]},
+          {"text":"stars","cols":[{"notes":[{"n":"do-high"}],"v":"h"}]},
+          {"text":"Through","cols":[{"notes":[{"n":"mi-high"}],"v":"e."}]},
+          {"text":"the","cols":[{"notes":[{"n":"re-high"}],"v":"s"}]},
+          {"text":"pe-","cols":[{"notes":[{"n":"do-high"}],"v":"q"}]},
+          {"text":"-ril-","cols":[{"notes":[{"n":"mi"}],"v":"q"}]},
+          {"text":"-ous","cols":[{"notes":[{"n":"fa","acc":"sharp"}],"v":"q"}]},
+          {"text":"fight","cols":[{"notes":[{"n":"so"}],"v":"h"}]},
+          {"text":"O'er","cols":[{"notes":[{"n":"so"}],"v":"e"}]},
+          {"text":"the","cols":[{"notes":[{"n":"so"}],"v":"e"}]},
+          {"text":"ram-","cols":[{"notes":[{"n":"mi-high"}],"v":"q."}]},
+          {"text":"-parts","cols":[{"notes":[{"n":"re-high"}],"v":"e"}]},
+          {"text":"we","cols":[{"notes":[{"n":"do-high"}],"v":"q"}]},
+          {"text":"watched,","cols":[{"notes":[{"n":"ti"}],"v":"h"}]},
+          {"text":"Were","cols":[{"notes":[{"n":"la"}],"v":"e"}]},
+          {"text":"so","cols":[{"notes":[{"n":"ti"}],"v":"e"}]},
+          {"text":"gal-","cols":[{"notes":[{"n":"do-high"}],"v":"q"}]},
+          {"text":"-lant-","cols":[{"notes":[{"n":"do-high"}],"v":"q"}]},
+          {"text":"-ly","cols":[{"notes":[{"n":"so"}],"v":"q"}]},
+          {"text":"stream-","cols":[{"notes":[{"n":"mi"}],"v":"q"}]},
+          {"text":"-ing","cols":[{"notes":[{"n":"do"}],"v":"q"}]},
+          {"text":"And","cols":[{"notes":[{"n":"mi-high"}],"v":"e."}]},
+          {"text":"the","cols":[{"notes":[{"n":"mi-high"}],"v":"s"}]},
+          {"text":"roc-","cols":[{"notes":[{"n":"mi-high"}],"v":"q"}]},
+          {"text":"-kets","cols":[{"notes":[{"n":"fa-high"}],"v":"q"}]},
+          {"text":"red","cols":[{"notes":[{"n":"so-high"}],"v":"q"}]},
+          {"text":"glare","cols":[{"notes":[{"n":"so-high"}],"v":"h"}]},
+          {"text":"The","cols":[{"notes":[{"n":"fa-high"}],"v":"e"}]},
+          {"text":"bombs","cols":[{"notes":[{"n":"mi-high"}],"v":"e"}]},
+          {"text":"burst-","cols":[{"notes":[{"n":"re-high"}],"v":"q"}]},
+          {"text":"-ing","cols":[{"notes":[{"n":"mi-high"}],"v":"q"}]},
+          {"text":"in","cols":[{"notes":[{"n":"fa-high"}],"v":"q"}]},
+          {"text":"air","cols":[{"notes":[{"n":"fa-high"}],"v":"h"}]},
+          {"text":"Gave","cols":[{"notes":[{"n":"fa-high"}],"v":"q"}]},
+          {"text":"proof","cols":[{"notes":[{"n":"mi-high"}],"v":"q."}]},
+          {"text":"through","cols":[{"notes":[{"n":"re-high"}],"v":"e"}]},
+          {"text":"the","cols":[{"notes":[{"n":"do-high"}],"v":"q"}]},
+          {"text":"night","cols":[{"notes":[{"n":"ti"}],"v":"h"}]},
+          {"text":"That","cols":[{"notes":[{"n":"la"}],"v":"e"}]},
+          {"text":"our","cols":[{"notes":[{"n":"ti"}],"v":"e"}]},
+          {"text":"flag","cols":[{"notes":[{"n":"do-high"}],"v":"q"}]},
+          {"text":"was","cols":[{"notes":[{"n":"mi"}],"v":"q"}]},
+          {"text":"still","cols":[{"notes":[{"n":"fa","acc":"sharp"}],"v":"q"}]},
+          {"text":"there","cols":[{"notes":[{"n":"so"}],"v":"h"}]},
+          {"text":"Oh,","cols":[{"notes":[{"n":"so"}],"v":"q"}]},
+          {"text":"say,","cols":[{"notes":[{"n":"do-high"}],"v":"q"}]},
+          {"text":"does","cols":[{"notes":[{"n":"do-high"}],"v":"q"}]},
+          {"text":"that","cols":[{"notes":[{"n":"do-high"}],"v":"e"}]},
+          {"text":"-","cols":[{"notes":[{"n":"ti"}],"v":"e"}]},
+          {"text":"Star","cols":[{"notes":[{"n":"la"}],"v":"q"}]},
+          {"text":"Span-","cols":[{"notes":[{"n":"la"}],"v":"q"}]},
+          {"text":"-gled","cols":[{"notes":[{"n":"la"}],"v":"q"}]},
+          {"text":"Ban-","cols":[{"notes":[{"n":"re-high"}],"v":"q"}]},
+          {"text":"-ner__","cols":[{"notes":[{"n":"fa-high"}],"v":"e"}]},
+          {"text":"___","cols":[{"notes":[{"n":"mi-high"}],"v":"e"}]},
+          {"text":"yet","cols":[{"notes":[{"n":"re-high"}],"v":"e"}]},
+          {"text":"-","cols":[{"notes":[{"n":"do-high"}],"v":"e"}]},
+          {"text":"wave?","cols":[{"notes":[{"n":"do-high"}],"v":"h."}]},
+          {"text":"___","cols":[{"notes":[{"n":"ti"}],"v":"h"}]},
+          {"text":"O'er","cols":[{"notes":[{"n":"so"}],"v":"e."}]},
+          {"text":"the","cols":[{"notes":[{"n":"so"}],"v":"s"}]},
+          {"text":"land","cols":[{"notes":[{"n":"do-high"}],"v":"q."}]},
+          {"text":"-","cols":[{"notes":[{"n":"re-high"}],"v":"e"}]},
+          {"text":"of","cols":[{"notes":[{"n":"mi-high"}],"v":"e"}]},
+          {"text":"the","cols":[{"notes":[{"n":"fa-high"}],"v":"e"}]},
+          {"text":"free","cols":[{"notes":[{"n":"so-high"}],"v":"h"}]},
+          {"text":"And","cols":[{"notes":[{"n":"do-high"}],"v":"e"}]},
+          {"text":"the","cols":[{"notes":[{"n":"re-high"}],"v":"e"}]},
+          {"text":"home","cols":[{"notes":[{"n":"mi-high"}],"v":"q."}]},
+          {"text":"of","cols":[{"notes":[{"n":"fa-high"}],"v":"e"}]},
+          {"text":"the","cols":[{"notes":[{"n":"re-high"}],"v":"q"}]},
+          {"text":"brave?","cols":[{"notes":[{"n":"do-high"}],"v":"h"}]}
+        ]
+      }
+    ],
+    "chart": [
+      {"id":"k1","chord":"I","place":"f","rhythm":"e e e e e e","arp":"alberti","by":"e"},
+      {"id":"k2","chord":"vi","place":"a","rhythm":"e e e e e e","arp":"alberti","by":"e"},
+      {"id":"k3","chord":"III","place":"q","rhythm":"e e e e e e","arp":"alberti","by":"e"},
+      {"id":"k4","chord":"II","place":"e","rhythm":"e e e e e e","arp":"alberti","by":"e"},
+      {"id":"k5","chord":"V","place":"d","rhythm":"e e e e e e","arp":"alberti","by":"e"},
+      {"id":"k6","chord":"IV","place":"s","rhythm":"e e e e e e","arp":"alberti","by":"e"},
+      {"id":"k7","chord":"ii","place":"g","rhythm":"e e e e e e","arp":"alberti","by":"e"},
+      {"id":"k8","chord":"iii","place":"r","rhythm":"e e e e e e","arp":"alberti","by":"e"}
+    ],
+    "track": [
+      {
+        "from": 1,
+        "to": 33,
+        "chords": [
+          {"chord":"I","place":"f","k":"k1","beats":2,"rhythm":"e e e e","arp":"alberti"},
+          {"chord":"V","place":"d","k":"k5","beats":1,"rhythm":"e e","arp":"alberti"},
+          {"chord":"vi","place":"a","k":"k2","beats":2,"rhythm":"e e e e","arp":"alberti"},
+          {"chord":"III","place":"q","k":"k3","beats":1,"rhythm":"e e","arp":"alberti"},
+          {"chord":"vi","place":"a","k":"k2","beats":2,"rhythm":"e e e e","arp":"alberti"},
+          {"chord":"II","place":"e","k":"k4","beats":1,"rhythm":"e e","arp":"alberti"},
+          {"chord":"V","place":"d","k":"k5","beats":3,"rhythm":"e e e e e e","arp":"alberti"},
+          {"chord":"I","place":"f","k":"k1","beats":3,"rhythm":"e e e e e e","arp":"alberti"},
+          {"chord":"V","place":"d","k":"k5","beats":2,"rhythm":"e e e e","arp":"alberti"},
+          {"chord":"IV","place":"s","k":"k6","beats":1,"rhythm":"e e","arp":"alberti"},
+          {"chord":"I","place":"f","k":"k1","beats":5,"rhythm":"e e e e e e e e e e","arp":"alberti"},
+          {"chord":"V","place":"d","k":"k5","beats":1,"rhythm":"e e","arp":"alberti"},
+          {"chord":"I","place":"f","k":"k1","beats":2,"rhythm":"e e e e","arp":"alberti"},
+          {"chord":"V","place":"d","k":"k5","beats":1,"rhythm":"e e","arp":"alberti"},
+          {"chord":"vi","place":"a","k":"k2","beats":2,"rhythm":"e e e e","arp":"alberti"},
+          {"chord":"III","place":"q","k":"k3","beats":1,"rhythm":"e e","arp":"alberti"},
+          {"chord":"vi","place":"a","k":"k2","beats":2,"rhythm":"e e e e","arp":"alberti"},
+          {"chord":"II","place":"e","k":"k4","beats":1,"rhythm":"e e","arp":"alberti"},
+          {"chord":"V","place":"d","k":"k5","beats":3,"rhythm":"e e e e e e","arp":"alberti"},
+          {"chord":"I","place":"f","k":"k1","beats":3,"rhythm":"e e e e e e","arp":"alberti"},
+          {"chord":"V","place":"d","k":"k5","beats":2,"rhythm":"e e e e","arp":"alberti"},
+          {"chord":"IV","place":"s","k":"k6","beats":1,"rhythm":"e e","arp":"alberti"},
+          {"chord":"I","place":"f","k":"k1","beats":6,"rhythm":"e e e e e e e e e e e e","arp":"alberti"},
+          {"chord":"I","place":"f","k":"k1","beats":6,"rhythm":"e e e e e e e e e e e e","arp":"alberti"},
+          {"chord":"V","place":"d","k":"k5","beats":6,"rhythm":"e e e e e e e e e e e e","arp":"alberti"},
+          {"chord":"vi","place":"a","k":"k2","beats":3,"rhythm":"e e e e e e","arp":"alberti"},
+          {"chord":"V","place":"d","k":"k5","beats":3,"rhythm":"e e e e e e","arp":"alberti"},
+          {"chord":"vi","place":"a","k":"k2","beats":2,"rhythm":"e e e e","arp":"alberti"},
+          {"chord":"II","place":"e","k":"k4","beats":1,"rhythm":"e e","arp":"alberti"},
+          {"chord":"V","place":"d","k":"k5","beats":3,"rhythm":"e e e e e e","arp":"alberti"},
+          {"chord":"I","place":"f","k":"k1","beats":3,"rhythm":"e e e e e e","arp":"alberti"},
+          {"chord":"ii","place":"g","k":"k7","beats":3,"rhythm":"e e e e e e","arp":"alberti"},
+          {"chord":"ii","place":"g","k":"k7","beats":3,"rhythm":"e e e e e e","arp":"alberti"},
+          {"chord":"V","place":"d","k":"k5","beats":3,"rhythm":"e e e e e e","arp":"alberti"},
+          {"chord":"V","place":"d","k":"k5","beats":3,"rhythm":"e e e e e e","arp":"alberti"},
+          {"chord":"I","place":"f","k":"k1","beats":2,"rhythm":"e e e e","arp":"alberti"},
+          {"chord":"vi","place":"a","k":"k2","beats":1,"rhythm":"e e","arp":"alberti"},
+          {"chord":"iii","place":"r","k":"k8","beats":2,"rhythm":"e e e e","arp":"alberti"},
+          {"chord":"iii","place":"r","k":"k8","beats":1,"rhythm":"e e","arp":"alberti"},
+          {"chord":"I","place":"f","k":"k1","beats":2,"rhythm":"e e e e","arp":"alberti"},
+          {"chord":"V","place":"d","k":"k5","beats":1,"rhythm":"e e","arp":"alberti"},
+          {"chord":"I","place":"f","k":"k1","beats":3,"rhythm":"e e e e e e","arp":"alberti"}
+        ]
+      }
+    ]
+  }
+};

@@ -1,0 +1,395 @@
+# Song Writer 2.0 / 2.5 / 3.0 / 3.5 — JSON formats
+
+(3.5 — the 3.0 sandbox renamed 2026-11-03 — writes the same shapes as 3.0 under its own
+keys, `song_writer_35_*`, copying 3.0's across once on its first run. 3.0 — the 2.5 sandbox
+renamed 2026-10-27 — wrote the same shapes as 2.5 under `song_writer_30_*`. 2.5 wrote the
+same shapes under its own keys, `song_writer_25_*`, and adds
+— 2026-10-03 — `progressions` and `track` (the chord progressions and where
+they play, §2); everything else here is unchanged. `cols[].ghost`, which 2.5
+wrote from 2026-10-01 to 10-26, is read but no longer written. 3.0 adds — 2026-10-28 —
+`chart` and, on any chord, `k` and `voice` (the Chord Chart, §2); a song without a chart
+is written exactly as before. 3.5 adds — 2026-11-03 — `parts` (§2): up to four parts,
+each its own lines, words, sound and volume; a one-part song is written exactly as before.)
+
+Every shape Song Writer 2.0 writes down or sends somewhere, in one place, so
+they stay steady while the app is still changing. **If you change any of these,
+change this file in the same edit** — and keep reading what older versions
+wrote (old links and backups live on in Google Sites and on students' laptops
+for years).
+
+The library header (`id`, `createdAt`, `updatedAt`, `received`, …) and the
+import rule are shared by every Eagle View Music app and are defined in
+`../EVM Library/README.md`. This file covers what is Song Writer's own.
+
+| Where | Key / carrier | Shape | Section |
+| --- | --- | --- | --- |
+| Library | `localStorage.song_writer_2_library_v1` | `{ [id]: record }` | 1 |
+| A song's music | `record.score` | the **score model** | 2 |
+| 1.0 text | `record.content` (1.0), text editor, envelopes | the **text format** | 3 |
+| Share link | `#song=~<base64url deflated JSON>` (since 2026-10-13); `#song=<base64 JSON>` before, `?song=` before 2026-09-28 | link payload | 4 |
+| Backup file | *Share & backup → Download* | `{ app, version: 2, songs }` | 5 |
+| Lesson link | `#lesson=~<base64url deflated JSON>` (since 2026-10-13); `#lesson=<base64 JSON>` before | lesson payload | 6 |
+| Layout settings | `localStorage.song_writer_2_layout_v1`, `record.layout`, links, lessons | layout | 7 |
+| Teacher Library shelf | `localStorage.evm_shelf_out_v1`, `…evm_shelf_index_v1` | books out; last index | 8 |
+| Everything else | `…_active_song_v1`, `…_view_prefs_v1`, lesson keys, sessionStorage `…_open_lesson_v1` | this device only; never travels | — |
+
+Base64 in links is UTF-8 bytes → `btoa` (see `ui.encodeJson` / `ui.decodeJson`
+in `js/core.js`). **Short links (2026-10-13):** a `~` after `song=` or `lesson=`
+means the UTF-8 JSON was deflated first (`CompressionStream('deflate')`, zlib
+format) and written in base64url (`-` `_`, no `=` padding) — about a tenth of
+the length (a 56-bar song: 15,800 characters → about 1,500). See
+`ui.packLink` / `ui.unpackLinks`. A browser without CompressionStream still
+writes the plain form; both are always read. A link that cannot be read (cut
+short on the way) opens the sandbox with a message, never the last song.
+
+## 1. Library record
+
+```json
+{
+  "id": "song_1790115314073_krre",
+  "title": "Rain on the Roof",
+  "score": { "v": 2, "key": "C", "lines": [ … ] },
+  "isCustom": true,
+  "createdAt": 1790115314073,
+  "updatedAt": 1790115399000,
+  "layout": { …§7… },
+  "received": true,
+  "receivedAt": 1790115314100,
+  "derivedFrom": "song_1789512614629",
+  "book": "Winter Songs"
+}
+```
+
+- `title` is trimmed and at most 60 characters.
+- `isCustom: false` only for the three built-ins: `twinkle`, `mary`,
+  `starspangledbanner`. Since 2026-11-11 (song boxes, §10) a built-in is kept
+  as it came, as a received song is: never saved into, renamed or deleted;
+  Save my copy makes the person's own (`derivedFrom` the built-in). A library
+  holding a built-in someone had changed and saved in place is split once
+  per browser (`library.js splitEditedBuiltins`, flag
+  `song_writer_35_builtins_split_v1`): the built-in comes back, and the
+  changes become a song of their own with `isCustom: true`,
+  `derivedFrom: "<built-in id>"` (and the open song if it was open).
+- `received`, `receivedAt`, `derivedFrom` are optional (see the EVM Library
+  README, §1 and §3). A received song is never saved into.
+- `book` is optional: the Teacher Library book this shared song was taken out
+  in (only on received songs; set by `lib/evm-shelf.js`, see §8). A Save my
+  copy of it never carries `book` — the copy is the student's own.
+- `layout` is optional: the Layout Settings (§7, a `layoutSnapshot()`, so
+  `locked: false`) the piece was saved with. Every piece keeps the Layout
+  Settings it was saved with; opening it brings them back — a shared piece's
+  only for that piece, locked; your own become the settings in use. Save my
+  copy keeps them, unlocked. Lesson songs never carry `layout`. It is not part
+  of what makes two songs the same (matching is by `score` alone), but a
+  change to it moves `updatedAt`.
+- The sandbox lives in the same object under the id `sandbox`; it is not a
+  library song and never travels by id.
+- `normalizeSong(raw, idHint)` in `js/library.js` turns anything —
+  a 1.0 record `{ id, title, content }` included — into this shape. It must
+  keep the header fields (`EVM.carry`) and `layout`, or the next save drops
+  them.
+
+## 2. The score model (`score`, `v: 2`)
+
+```json
+{
+  "v": 2,
+  "key": "G",
+  "scale": "dorian",
+  "board": { "d": { "root": "5", "q": "dom7", "mods": [] } },
+  "chart": [
+    { "id": "k1", "chord": "I", "place": "f", "rhythm": "e e e e e e e e", "arp": "up", "by": "e" },
+    { "id": "k2", "chord": "IV", "voice": [[-4, -7], [3, 5], [5, 9], [7, 12]] }
+  ],
+  "progressions": [
+    { "id": "p1", "name": "Verse", "rhythm": "q q e e q",
+      "chords": [ { "chord": "I", "place": "f" }, { "chord": "IV" }, { "chord": "V" }, { "chord": "vi", "rhythm": "h h" } ] }
+  ],
+  "track": [
+    { "prog": "p1", "from": 1, "to": 8,
+      "here": [ { "bar": 8, "beat": 1, "beats": 4, "chords": [ { "chord": "IV", "beats": 2 }, { "chord": "V", "beats": 2 } ] } ] },
+    { "from": 9, "to": 9, "chords": [ { "chord": "bVII", "beats": 4 } ] }
+  ],
+  "meter": "3/4",
+  "bpm": 96,
+  "swing": "8",
+  "parts": [
+    { "name": "Tune" },
+    { "name": "Harmony", "sound": "bell", "volume": 70,
+      "lines": [ { "label": "A", "syllables": [ { "text": "-", "cols": [ { "v": "h", "notes": [ { "n": "mi" } ] } ] } ] } ] }
+  ],
+  "lines": [
+    { "label": "A",
+      "syllables": [
+        { "text": "Twin", "chord": "V7",
+          "cols": [ { "v": "q", "notes": [ { "n": "do" } ] } ] },
+        { "text": "kle",
+          "cols": [ { "notes": [ { "n": "so", "acc": "sharp" }, { "n": "mi" } ] } ] },
+        { "text": "-",
+          "cols": [ { "v": "q", "notes": [ { "n": "do", "rest": true } ] } ] }
+      ] }
+  ]
+}
+```
+
+| Field | Values | Notes |
+| --- | --- | --- |
+| `v` | `2` | The model's version. |
+| `key` | `C Db D Eb E F F# Gb G Ab A Bb B` | |
+| `scale` | a scale id from Digital Accordion's `theory.js` (`major`, `minor`, `natural-minor`, `harmonic-minor`, `melodic-minor`, `dorian`, `phrygian`, `lydian`, `mixolydian`, `locrian`, `major-pentatonic`, `minor-pentatonic`, `blues`, `whole-tone`, `octatonic-hw`, `octatonic-wh`, `double-harmonic`, `hungarian-minor`, `phrygian-dominant`) | Optional (2026-09-27). **Omitted when `major`.** Decides the chords on the panel and the notes the keyboard colours; the melody's solfège is untouched. |
+| `board` | `{ place: { root, q, mods, label? } }` — place one of `f d s a g r e q w 1 2 3 4 5`; `root` a degree relative to the tonic (`5`, `b6`, `#4`); `q` a quality id from `theory.js` (`maj min dim aug sus2 sus4 pow dom7 maj7 min7 m7b5 dim7 mmaj7 aug7 dom7b5 six min6 add9 madd9 six9 dom9sus4 dom7s9 dom7b9 dom9s5 dom13b9 majb5`); `mods` function ids (`sus2 add9 sus4 b7 maj7 inv6 inv64 inv65 inv43 inv42`); `label` ≤ 12 chars | Optional (2026-09-27). The places on the chord panel the song has re-chorded; a place left out shows the scale's own chord. **Omitted when empty.** |
+| `chart` | `[ { id, chord, place?, voice?, name?, hidden? } ]` | **3.0, 2026-10-28** (`js/track.js` THE CHORD CHART; design: `../Song Writer Chords Redesign/README.md` §4.1). The song's **Chord Chart** — the chords chosen for it, in order. `id` `k1`, `k2` … (unique); `chord` a chord id as `syllables[].chord` (never `null`); `place` the panel key it was picked from (every chord from the card has it; a new scale changes them together); `voice` its own notes (below; omitted: the engine voices it); `name` ≤ 24 characters; `hidden` `true`: taken off the chart with its spots kept ("Keep those spots") — written only while a chord still comes from it. **A song with a chart is in the new shape:** its `track` holds loose chords only and it has no `progressions` (an old song goes over in one step, every strike where it was: `SW.track.useChart()`). **Omitted when empty** — a song without one is written exactly as before. |
+| *a card's* `rhythm` · `arp` · `by` | on `chart[]` | **3.0, 2026-10-30** (`js/track.js` A CARD'S RHYTHM; `js/components/chord-rhythm.js`). What the Chord Chart's Rhythm section chose for the card: `rhythm` one bar (a rhythm string, or `"held"`), `arp` a note order (below; never with `"held"`), `by` the speed it was chosen at (`q` `e` `s`; only with `arp`). Choosing writes it to every chord from the card, laid in step with the bar; a chord put on later from the card in empty time takes it too. The chords keep their own copies (`chords[].rhythm`, `chords[].arp`). **All omitted** while nothing was chosen. |
+| *a chord's* `arp` | on loose `chords[]` (and `progressions[].chords[]`, `here[].chords[]`) — never on a `null` chord | **3.0, 2026-10-30.** The chord's notes **one by one** instead of together: a preset — `up` `down` `updown` `downup` `out` (middle to the ends) `in` (ends to the middle) `alberti` (low, high, middle, high) `oompah` (the bass, then the rest together) `bassdown` (the bass, then top down) `random` — or `{ "o": [[ranks], …], "n": N }`: groups of notes by rank (0 = the lowest) as built on a chord of `N` notes (2–8); on a chord of another size the bottom stays the bottom, the top the top and the inner ones count up from the bottom. Its rhythm's strikes take the order in turn, from the chord's start and again at each bar line; each note rings until it is struck again, a silence, or the chord's end. Older readers ignore it (the chord plays its rhythm as block chords). |
+| *a chord's* `k` · `voice` | on `progressions[].chords[]`, `here[].chords[]` and loose `chords[]` (never on a `null` chord) | **3.0, 2026-10-28.** `k` the chart card the chord came from (dropped on reading when that card is not on the chart); `voice` a copy of its notes. A chord **sounds with its card's voice** while the card is there (so one change to a card changes every spot — the design's Y2), with its own copy once the card has gone. |
+| *a voice* | `[[step, semi], …]`, 2–8 notes, low to high | **3.0, 2026-10-28** (`js/chords.js` VOICES). `semi` semitones above the key's tonic as Theory's `tonicMidi` has it (C4 … G4, A♭3 … B3 — the note the engine voices from), so a voice moves with the key and keeps the app's register; `step` letters above the tonic's letter (0 its own, 7 an octave up), which keeps the spelling (G♯ stays G♯). No pitch twice; a step that cannot spell its pitch is respelled on reading. |
+| `progressions` | `[ { id, name, beats?, bars?, rhythm?, chords: [ { chord, place?, beats?, rhythm? } ] } ]` | **2.5, 2026-10-03** (`js/track.js`). The song's chord progressions. `id` `p1`, `p2` … (unique; never reused). `name` ≤ 24 characters (default *Progression n*). `beats` how long a chord lasts when it does not say (omitted = one bar of the meter). `bars` `2` for a two-bar rhythm (omitted = 1). `rhythm` what every bar plays (omitted = one strike a beat), or `"held"` (2026-10-27): every chord struck once and held for as long as it lasts. `chords[].chord` a chord id as `syllables[].chord`, or `null` (no chord); `place` the panel key it was picked from (`f d s a g r e q w 1–5`); `beats` its own length (any number of sixteenths); `rhythm` its own, as long as the chord, or `"held"`. A progression made on the music (2026-10-27) is an ordinary one — its stretch says `home`. **Omitted when empty.** **3.0: read, no longer written** (2026-10-29, progressions retired) — a song that has them goes over to the `chart` the first time its chords change, in the Chords window or on the music, every strike where it was. |
+| `track` | `[ { prog?, from, to, home?, phase?, here?, chords? } ]` | **2.5, 2026-10-03.** Where the progressions play, in bars as the staff numbers them (bar 1 = the first whole bar; 0 = a first-line pick-up). `prog` a progression's `id`; `from` / `to` the first and last bar (`to` may be `"melody"`: the melody's last bar, whatever it is now); `home` `true` (2026-10-27): the stretch the progression was **made on the music** in — it plays the progression once (the rest of its last bar is silent), its `to` follows the progression's length, and a change there changes the progression itself; at most one per progression, never with `phase` (read without it, it is an ordinary stretch); `phase` beats into the progression at `from`; `here` changes made just there — `{ bar, beat, beats, chords }`, the chords' `beats` summing to `beats`. Without `prog`, `chords` are **loose chords** laid end to end once from `from` (struck once and held unless given a rhythm). Stretches are kept in bar order and never overlap (a later one loses the bars an earlier one has). The melody never moves them; a new scale or time signature changes them as the app does (`track.js` followScale / followMeter, Song Writer Chord Progressions DESIGN §10). **Omitted when empty.** A song with lane chords (`syllables[].chord`) and no `track` plays them as one stretch of loose chords; the first change to the track writes that in and drops the syllables' chords. |
+| *rhythm strings* | value ids, space-separated: `q q e e q`; `~` after one = silence (`q~`); `_` joins values into one strike (`h_e`); or `held` (2026-10-27) | Read for `progressions[].rhythm`, `chords[].rhythm`, `here[].chords[].rhythm`; written back as the fewest values. One too short is filled out with silence, one too long is cut. |
+| `meter` | `2/4`, `3/4`, `4/4`; 2.5 also `6/8`, `9/8`, `12/8` | **Omitted when `4/4`.** In the compound meters a beat is a dotted quarter: a block (no `v`) lasts 36 ticks and `bpm` counts dotted quarters. 2.0 reads a compound meter as 4/4. |
+| `bpm` | 30–300 (the family's range; songs saved when it was 40–200 read unchanged) | **Omitted when 100.** |
+| `swing` | `"8"` · `"16"` | **3.0, 2026-11-01** (Setup → Swing; `js/timing.js` SWING). How the song is **played**, never how it is written: the eighths (`8`) or sixteenths (`16`) in pairs, long then short (2 : 1, a triplet's feel), counted from the song's bar lines. Every tick in the score stays straight. In compound time `8` plays straight (the eighths already go in threes) and is kept for a change back to 2/4–4/4. **Omitted when straight.** Older readers (2.5 and before) ignore it and play the song straight. |
+| `parts` | `[ { name?, sound?, volume?, clef? }, { name?, sound?, volume?, clef?, lines: [ { syllables } ] }, … ]` | **3.5, 2026-11-03 — PARTS** (`js/parts.js`). The song's **parts** — two-, three- or four-part polyphony, each part its own melody with its own words, sound and volume. **`clef`** (2026-11-04): `"bass"`, omitted for treble. The part is written on a bass clef and sounds an octave lower; its notes (`n`) are stored exactly as they were, so choosing treble again gives every note back. A bass clef's range is A1 to A4 in every key: a stored note that would land beyond it stays on its rung and sounds an octave nearer. A one-part song with a bass clef is `"parts": [ { "clef": "bass" } ]`. Older Song Writers ignore it and play the part on treble. The text format does not carry it. `parts[0]` is **Part 1**, whose syllables are in the song's `lines` (exactly as always — it never carries `lines` of its own; one it is given is ignored); `parts[1]` … `parts[3]` carry `lines`: **one entry for each of the song's `lines`, in order, holding that part's `syllables` for that line** (the lines — their names, pick-ups and bars — are the song's: *THE LINES ARE THE SONG'S*, later the same day). A part's entry for an instrumental line is `{ "syllables": [] }`; a sung line a part has nothing for holds one rest (`{ "text": "-", "cols": [ { "notes": [ { "n": "do", "rest": true } ] } ] }`), so every part always has a column on every line. A part with more entries than the song has lines stretches the song (Part 1 gets a rest line); fewer are filled with rests; a `label`, `pickup` or `bars` on a part's entry is ignored. At most four parts; more are dropped. `name` ≤ 24 characters (omitted when empty — shown as *Part n*); `sound` a `lib/audio.js` preset id (omitted: the part sounds with Sound → Melody's sound; an unknown id is dropped); `volume` 0–100, a share of the melody's level (omitted when 100). Every part plays together from the song's top; **a line is as long as the longest part needs it** (`js/timing.js` SHARED LENGTHS: a part with less in it is finished with rests to that bar line); the chords, the time, the tempo, the swing, the scale and the **key changes** are the whole song's — a `cols[].key` on a part other than Part 1 is dropped on reading. **Omitted** for a one-part song with nothing set, so every song saved before reads and is written exactly as it did. Older readers (2.5 and before) see Part 1 alone. The text format (§3) carries one part. (Parts saved earlier on 2026-11-03, when a part had lines of its own, read in: each line's syllables land on the song's line of the same index.) |
+| `pickup` | `1` | **No longer written** (2026-09-28 to 2026-10-01: every line opened with a one-beat pick-up). Still read: each line without `pickup: false` gets `pickup: "q"`. Before 2026-09-28 it was the Layout setting `show.pickup` (§7); a record, link or lesson whose `layout.show.pickup` is `true` and whose score has no `pickup` is read as `pickup: 1` (`normalizeSong`). |
+| `lines[].label` | string, ≤ 15 chars | Section name (`A`, `Verse`…); may be empty. |
+| `lines[].bars` | 1–64 | **3.0, 2026-10-29.** An **instrumental line**: that many bars with no melody — an intro or an interlude, made on the Chords window's Time Line (*Apply all*). It has `label` and `bars` and no `syllables` (read only while it has none); no pick-up of its own, and the next line's pick-up sounds in its last bar. Drawn as a row of its bars with their chords. Text format: `[Bars 2]` under its name. Older readers see an empty line. |
+| `lines[].pickup` | a value id shorter than a bar: `s`, `e`, `e.`, `q`, `q.`, `h`, `h.` | Optional (2026-10-01). The line opens with a pick-up worth that value; its first bar line falls that far in. **Omitted = none.** A value a bar long or more is dropped on reading. (`false` — the older "this line's pick-up was taken away" — is still read, with the song's old `pickup: 1`.) |
+| `syllables[].text` | string | `-` means no word under these notes. Never empty. |
+| `syllables[].hy` | `true` | **2.5, 2026-10-26.** This syllable's word goes on in the next syllable (the hyphen): `wa`·`ter`·`mel`·`on` are four syllables, the first three with `hy`. The text never holds the hyphen — the app draws it halfway between the two syllables on Notation and Rhythm, and joins the word whole on its notes on Pitch. Across a line's end it means the word runs on into the next line. **Omitted when false**, so every song saved before reads unchanged. In the text format it is a `-` after the word (`wa-[M1:e]`); a word written `-ter` (the old way) joins the word before it. |
+| `syllables[].chord` | *(2.5: still read; the chord track replaces the lane — see `track`)* a chord id (`I`, `V7`, `ii`, `bVI`, `#iv°7`, `Imaj7`, `V:inv64`, `I:sus4,add9`) | Optional; one per syllable, drawn in the chord lane. The id is a roman numeral the engine (`js/chords.js`) reads back in any key: ♭/♯ + numeral (lower case = the minor family) + Theory's quality suffix, then `:` and the functions applied, comma-separated. The fourteen ids written before 2026-09-27 (`I ii iii IV V vi V/V V/vi IV/IV bVI iv vii°7/V V/iii V/ii`) still read (`V/V` → `II`, `vii°7/V` → `#iv°7`). An id the engine cannot read is kept and drawn grey. |
+| `syllables[].cols` | ≥ 1 column | One column per note in time; a syllable can hold several (a melisma). |
+| `cols[].v` | `w h. h q. q e. e s`; 2.5 also `w.` (dotted whole, 144 ticks) | The note value. **Omitted = a block**: pitch only, length undecided, counted as a quarter until written. |
+| `cols[].tie` | `true` | Optional (2026-09-25). Tied to the next column: every pitch the two share sounds once, held for both. Only on a written column (`v`), never a rest. |
+| `cols[].ghost` | `true` | **Read only** (2.5, written 2026-10-01 → 10-26, never since). A note the rhythm made (`js/flow.js`) when a rhythm had more notes than the melody had pitches. Since 2026-10-26 a saved ghost is read as the silence it stood in for (and since 2026-11-04 a rhythm gesture past the melody makes a plain note on a `-` syllable, nothing ghostly): its notes become rests (on the word they sat on); a ghost that had been given a word of its own is read as a plain note. Never written again; older readers see an ordinary note. Not carried by the text format. |
+| `cols[].key` | `C Db D Eb E F F# Gb G Ab A Bb B` | **3.0, 2026-10-31 — KEY CHANGES** (`js/keys.js`). A key change's **trigger**: the column of the note selected when it was made (Setup's key chips with Look → *When the key is changed: Create Key Change*). The new key starts on the **first beat of the bar this column is in** — wherever the rhythm puts it — and runs to the next key change's bar; the song's `key` is the key it **opens** in. Each note's `n`/`acc` is solfège in the key of the bar it is in (a note in the trigger's bar before the trigger included); when a rhythm change carries notes across that bar line the app re-writes them in their new key so they keep their pitch. Two in one bar: the later one's key. One that repeats the key before it, or sits on the song's very first column, is tidied away on reading (the first becomes the song's `key`). **Omitted** on every other column. Older readers drop it — they play every note in the opening key. Not carried by the text format. |
+| `cols[].notes` | ≥ 1 note | Several notes in one column = harmony, sounded together. |
+| `notes[].n` | `do-low re-low mi-low fa-low so-low la-low ti-low do re mi fa so la ti do-high re-high mi-high fa-high so-high la-high ti-high do-high2` (each key's own range); also `do-low2 … ti-low2` and `re-high2 … ti-high2` | Solfège in the key, movable do. **3.0, 2026-10-31:** `do-low`, `re-low`, `ti-high` and `do-high2` (the do two octaves up) are new — older readers drop those notes. In the 1.0 text format they are `D-1` `R-1` `T2` `D3`. **Later the same day (KEY CHANGES):** an octave more at each end — `do-low2` … `ti-low2` (octave −2) and `re-high2` … `ti-high2` (octave +2) — for Create Key Change, where the range is real pitch (A♭2 … G6) in every key, and for notes kept as they sounded when the key changed (*Remain unchanged*). Text format `D-2` … `T-2`, `R3` … `T3`. Older readers drop them. |
+| `notes[].acc` | `sharp`, `flat` | **Omitted = natural.** |
+| `notes[].rest` | `true` | Optional. A rest keeps a pitch so it can be turned back into a note. |
+| `notes[].step` | a rung, as `n` | Optional (2026-09-29). The melody's rung when the song's scale shows the note on another one — a fa shown as mi because major pentatonic has no fa. Omitted = `n`. |
+| `notes[].alt` | `{ "<scale id>": { "n": "fa", "acc": "sharp" } }` | Optional (2026-09-29). **Each scale's fine-tuning.** `n`/`acc` are the note in the song's `scale`; `alt` holds the pitch it was given with ♯/♭ in *other* scales. A scale not listed plays the note as that scale has its step (minor's me for a mi), so an accidental made for one scale never reaches another. Text format: `F1^major=F#1^step=F1`. |
+
+Rules that keep two identical songs identical (the library matches songs by
+content, so this matters): `SW.score.normalize` (`normalizeScore` in
+`js/score.js`) fills in the omitted defaults, drops unknown notes, gives every
+syllable at least one column and every column at least one note. Always
+compare or fingerprint the **normalized** score, never the raw one.
+`readScore()` writes the compact form (defaults omitted).
+
+## 3. The 1.0 text format
+
+Still read everywhere a score is (1.0 songs, 1.0 links and backups, the text
+editor) and written by `SW.score.toText`. It carries **one part** (PARTS, §2):
+`toText(model, part)` writes that part's lines (the part on the page when not
+given — Part 1 for a record or a link), and the Lyrics window's *Set to the
+notes* puts a pasted text onto the part on the page, the song keeping its
+other parts, its chords and its board:
+
+```
+[Key of C]
+[Scale dorian]      (optional; omitted for major — 2026-09-27)
+[Time 3/4]          (optional; omitted for 4/4)
+[Tempo 96]          (optional; omitted for 100)
+[Swing 8]           (optional; 8 or 16, omitted when straight — 3.0, 2026-11-01)
+[A]
+[Pickup e]          (optional, under a line's name: its pick-up — 2026-10-01)
+[Intro]
+[Bars 2]            (an instrumental line: bars with no melody — 3.0, 2026-10-29)
+{I}Twin[D1] kle[D1:q] {V7}twin[S1,S1:e] kle[S1+M1:h] rest[D1~]
+```
+
+The `board` does not travel in the text (the JSON carries it). A `[Pickup 1]`
+in the head (2026-09-28 to 2026-10-01) is still read: a quarter on every line.
+
+`[X1]` note shorthand, `,` next column, `+` harmony, `:q` a value, `~` a rest,
+`_` at a column's end a tie to the next (`D1:q_,D1:e`),
+`#`/`b` after the letter an accidental, `{…}` a chord before the syllable.
+A 1.0 song is this text with no values, chords, time or tempo.
+
+## 4. Share link — `#song=`
+
+Written in the hash since 2026-09-28: the part after `#` is never sent to the
+server, so a long song cannot hit GitHub Pages' limit on an address (~8 KB —
+past it the server answers "URI too long" and the app never loads). Links
+made before, with `?song=`, are still read. Since 2026-10-13 the payload is
+deflated (`#song=~…`, above). Embedded in another page (a Google Site), the
+app leaves the link in its address once filed, so the frame brought back by
+Back or a reload still opens its own song.
+
+```json
+{ "v": 2, "title": "Rain on the Roof", "score": { … },
+  "id": "song_1789512614629", "createdAt": 1789512614629, "updatedAt": 1789600000000,
+  "sandbox": true,
+  "layout": { … }, "layoutLocked": true }
+```
+
+- `id` / `createdAt` / `updatedAt` are present **only** when the link holds
+  exactly what is saved under that id (`EVM.shareHeader`); never for the sandbox
+  or a built-in.
+- `sandbox: true` — the link opens in the receiver's sandbox, not the library.
+- `layout` + `layoutLocked` — sent when *Lock layout on share* was ticked.
+  The receiver's settings take it, locked; and since a record's own `layout`
+  (§1) has the same name, the shared song is filed carrying it too. Without
+  the tick the link carries no `layout`, and the song opens with the
+  receiver's own settings.
+- Also read: 2.0 links made before 2026-09-28 (`?song=`), and 1.0 links, `#song=` with `{ "title", "content" }`.
+- On arrival: `EVM.file` (EVM Library README §2) — filed once, as a shared song.
+
+## 5. Backup file
+
+```json
+{ "app": "Eagle View Music Song Writer 2.0", "version": 2,
+  "exportedAt": "2026-09-22T18:00:00.000Z", "count": 3,
+  "songs": [ record, … ],
+  "boxes": [ { "id": "box_…", "title": "The Star-Spangled Banner", "composer": "John Stafford Smith",
+               "lead": "song_…", "versions": ["starspangledbanner", "song_…"] } ] }
+```
+
+`boxes` (2026-11-11, optional): the song boxes (§10) the exported songs are
+in, with only the exported songs in `versions`. On import, once the songs are
+filed (each file id → the id it is filed under), a song already kept with
+other versions here stays where it is; the others join one box, and a box
+made only of the file's songs takes the file's title, composer, lead and id
+(so the same file brings the same box). Older readers ignore it.
+
+Also read: 1.0 backups (`songs` of `{ id, title, content }`), a bare array of
+records, 1.0's raw library object `{ id: { title, content } }`, and EVM
+envelopes / bundles for `app: "song-writer"` (whose `data` holds `score`
+and/or `content`).
+
+## 6. Lesson payload — `#lesson=`
+
+```json
+{ "lesson": 1, "v": 1, "id": "lsn_1790115314073", "title": "Write a melody",
+  "policy": { "v": 1,
+              "task": { "melodyLocked": false, "wordsLocked": true, "chordsLocked": false, "note": "" },
+              "key": { "locked": false },
+              "tempo": { "mode": "range", "min": 60, "max": 120 },
+              "shell": { "sound": true, "view": true, "strip": true, "dock": true, "sections": true,
+                         "textEditor": true, "picture": true, "present": true, "library": "lesson" } },
+  "layout": { … },
+  "songs": [ { "id": "…", "title": "…", "score": { … }, "isCustom": true } ] }
+```
+
+Lesson songs carry **no** `createdAt`, `updatedAt`, `received`, `receivedAt`,
+`derivedFrom`, `book` or `layout` (the lesson's own `layout` rules them
+all): the exercises are the student's to work in, not shared songs that
+refuse to save. They are filed under ids made from the lesson — the title,
+and (since 2026-09-25) the last characters of the lesson's own `id` — so
+the same lesson opened twice is not two copies, and two lessons that share
+a title never share exercises: `lesson_<slug>_<id-tail>_<i>`.
+
+Added 2026-09-25 (all optional; a lesson without them opens exactly as before):
+
+| Field | Values | Missing means |
+| --- | --- | --- |
+| `id` | the teacher's saved lesson id | the old ids, `lesson_<slug>_<i>` |
+| `policy.tempo.mode` | `any` · `range` · `locked` | `any` |
+| `policy.tempo.min`, `.max` | 30–300 BPM (`min ≤ max`) | 60, 120 |
+| `policy.shell.sound` | the Sound button | `true` |
+| `policy.shell.present` | the Present button | `true` |
+| `policy.task.chordsLocked` | **2.5, 2026-10-03.** `true`: *Chords: listen only* — the chord progressions and the chord track can be seen and heard, not changed | `false` |
+
+`range` narrows the BPM chip and its slider to `min`–`max` (a song saved
+outside them starts at the nearest); `locked` leaves the BPM as plain text
+at each exercise's own tempo.
+
+The lesson open in a tab is also kept in **sessionStorage**
+(`song_writer_2_open_lesson_v1`: `{ title, songIds, policy, current }`), so a
+reload does not end it. It never leaves the device.
+
+## 7. Layout settings
+
+```json
+{ "v": 1, "notes": null, "accidentals": true, "rests": true, "harmony": true,
+  "connected": true, "chords": null, "values": null, "keys": null, "scaleMorph": true,
+  "show": { "sectionTitles": true, "keycaps": true, "barNumbers": true },
+  "locked": false }
+```
+
+`show.barNumbers` (added 2026-09-25): a small number over the first note of
+each bar on written lines. Missing means `true`.
+
+`show.pickup` (2026-09-25 to 2026-09-28, no longer written): the 1-beat
+pick-up, now the score's own `pickup` (§2). Still read once, to carry an older
+song's pick-up over.
+
+`null` in a list means "all of them". `values`, when a list, always includes
+`q` (a block counts as a quarter). `locked` is set when the layout arrived in
+a link or lesson; `layoutSnapshot()` always sends it as `false` and the
+receiver locks it. A record's own `layout` (§1) is the same shape; a shared
+piece's is locked in memory only, never written to this key.
+
+## 8. Teacher Library shelf
+
+`lib/evm-shelf.js` (the shared component; see `../EVM Library/README.md`,
+§8) keeps two keys of its own, not Song Writer's:
+
+| Key | Holds |
+| --- | --- |
+| `evm_shelf_out_v1` | `["Winter Songs", …]` — the books a student has out. Shared by every app on the site, so a book taken out in one app is out in all of them. |
+| `evm_shelf_index_v1` | the Teacher Library `index.json` last read, so the shelf still shows offline. |
+
+A book's songs for `app: "song-writer"` are filed in the library (§1) as
+received records with `book` set; their envelopes' `data` holds `score` and/or
+`content`, which `normalizeSong` reads either way. Putting the book back
+removes every received record with that `book`. The shelf is off in a lesson.
+
+## 9. View preferences (this device only)
+
+`localStorage.song_writer_2_view_prefs_v1` never travels, but old values
+must still read:
+
+| Key | Values | Notes |
+| --- | --- | --- |
+| `workspace` | `song` · `keyboard` · `chords` · `custom` | 2.0 stored `classic` / `melody`; they are read as `song` / `keyboard`. |
+| `colours` | boolean, default `true` | Section colours (was an unremembered toolbar button). |
+| `playLight` | `note` · `box` · `both` · `off`, default `note` | While it plays → Light up (2026-10-01): the sounding note glows, a box behind its word, both, or nothing. Every light is behind the note. Replaces `lightNotes` (boolean): a stored `false` reads as `off`. |
+| `colourPictures` | boolean, default `true` | Library → Keep the section colours in saved pictures. |
+| `laneChordsPlay` | as before | Now shown in the Sound popover. (`voicing` — 1.0's chord voicings or Digital Accordion's — was here too until 2026-10-29; Digital Accordion's always now, a stored value is ignored.) |
+| `waveOpen` | boolean, default `false` | 2026-10-29: the Chord Chart's sound wave open in full (`true`) or folded to ▶ and the wave. |
+| `chartBoard` | `circle` · `panel`, default `circle` | 2026-10-29: the Chord Chart's chords — the circle of fifths in blocks, or the panel's blocks. |
+| `circleNames` | `letter` · `roman`, default `letter` | 2026-10-29: the circle's names (its own C · I switch; `chordNames` is the panel's). |
+| `tlZoom` | `close` · `mid` · `top`, default `close` | 2026-10-29: the Time Line's zoom — every beat, about 20 bars across, about 36 bars across. |
+| `partMinis` | boolean, default `true` | 2026-11-03: Options → Parts → Show the other parts small — the parts not on the page drawn small under the part tabs (`js/components/parts-ui.js`). |
+
+Sound's Melody, Steady beat, Count-in and At the end are not stored (reset
+each visit, as Rhythm Poetry's switches are).
+
+## 10. Song boxes (this device; the Library window)
+
+`localStorage.song_writer_35_boxes_v1` (2026-11-11, `js/library-boxes.js`) —
+a layer over the library; the records (§1) are untouched by it.
+
+```json
+{ "v": 1, "view": "boxes", "alpha": true,
+  "order": ["box_…", "box_…"],
+  "boxes": { "box_…": { "id": "box_…", "title": "The Star-Spangled Banner", "composer": "",
+                        "lead": "song_…", "versions": ["starspangledbanner", "song_…"] } } }
+```
+
+- `view`: `boxes` (the first view) or `list` (every song on a row, as before).
+- `alpha`: the boxes shown A–Z by `title`; moving one turns it off, and A–Z
+  writes the A–Z order into `order` and turns it on.
+- `title` and `composer` (≤ 60 characters) are the box's own, so a box of
+  songs kept as they came can still be renamed. `lead` is the version Open
+  opens; it is always one of `versions`.
+- Kept in step every time it is read: ids no longer in the library leave
+  (an empty box goes); a song in two boxes stays in the first; a song in
+  none joins the box of its `derivedFrom`, else gets a box of its own (at the
+  front, or the end while `alpha`). The very first time, songs made from one
+  another or of the same name (once "copy", "my copy", "(my copy)", "(from
+  1.0)" are left off; not generic names like "Untitled Song") share a box.
+- Never in a lesson (its Library is the exercises), and never written by a
+  guest frame (the Recording Studio's, the Preview's: `js/embed.js`).
+
+## When you change a shape
+
+1. Add, don't rename. Readers ignore fields they don't know, so adding is safe.
+2. A renamed or re-meant field needs the reader to accept **both** forever —
+   and a bump of that shape's `v`.
+3. Update `normalizeSong` / `normalizeScore` / `normalizeLayout` so the old
+   shape still comes in, and add the old shape to this file under "Also read".
+4. If the change affects what counts as "the same song" (§2's normalization),
+   remember that the library matches by it: two copies that used to match
+   must still match.
