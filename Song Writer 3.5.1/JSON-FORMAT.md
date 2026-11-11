@@ -1,6 +1,9 @@
-# Song Writer 2.0 / 2.5 / 3.0 / 3.5 — JSON formats
+# Song Writer 2.0 / 2.5 / 3.0 / 3.5 / 3.5.1 — JSON formats
 
-(3.5 — the 3.0 sandbox renamed 2026-11-03 — writes the same shapes as 3.0 under its own
+(3.5.1 — the 3.5 sandbox renamed 2026-11-11, live unlisted at `Song%20Writer%203.5.1/` — writes
+the same shapes as 3.5 under its own keys, `song_writer_351_*`, copying 3.5's across once on
+its first run; it adds the song boxes (§10) and a backup's `boxes` (§5).
+3.5 — the 3.0 sandbox renamed 2026-11-03 — writes the same shapes as 3.0 under its own
 keys, `song_writer_35_*`, copying 3.0's across once on its first run. 3.0 — the 2.5 sandbox
 renamed 2026-10-27 — wrote the same shapes as 2.5 under `song_writer_30_*`. 2.5 wrote the
 same shapes under its own keys, `song_writer_25_*`, and adds

@@ -1,6 +1,16 @@
-# Song Writer 3.5
+# Song Writer 3.5.1
 
-**Song Writer 3.5** is the Song Writer 3.0 sandbox, renamed on 2026-11-03 when it gained
+**Song Writer 3.5.1** is the Song Writer 3.5 sandbox, renamed on 2026-11-11 when the Library
+became song boxes (the first row of "What 2.5 adds"), and pushed live that day **unlisted**
+at `Song%20Writer%203.5.1/`, linked from `/unlisted/` ("Next versions"). The hub's Song
+Writer is still **3.5** (`../Eagle View Music/Song Writer 3.5/`, which this folder must never
+be copied over). 3.5.1 keeps its own saved songs (`song_writer_351_*`): its first run copies
+3.5's library and settings across once (or 3.0's, 2.5's, 2.0's — `js/core.js carryOver`),
+leaving Teacher Library book songs for the shelf to file fresh, and never writes 3.5's.
+Preview: launch entry **song-writer-351** (port 8812; tests on **song-writer-351-test**,
+8837). Preview needs a web address: opened from the Finder (`file://`) it says so.
+
+**Song Writer 3.5** was the Song Writer 3.0 sandbox, renamed on 2026-11-03 when it gained
 **parts** (up to four lines of music at once, §Parts in `JSON-FORMAT.md`). Song Writer 3.0
 — everything up to 2026-11-01 — is the site's Song Writer (the hub card, at
 `Song%20Writer%203.0/`) and is kept as it is in `../Eagle View Music/Song Writer 3.0/`;
