@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PNG Creator</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 3h8v8H3zM13 13h8v8h-8z' fill='%234f8cff'/%3E%3Cpath d='M13 3h8v8h-8zM3 13h8v8H3z' fill='none' stroke='%234f8cff' stroke-width='1.6'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<style>
+  /* Eagle View Music back button (hidden when the app is framed) */
+  .evm-home{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:9999px;background:rgba(30,41,59,.88);color:#f1f5f9;border:1px solid rgba(255,255,255,.22);font:600 13px/1 system-ui,-apple-system,sans-serif;text-decoration:none;white-space:nowrap;flex:none}
+  .evm-home:hover{background:#334155;color:#cdb4f0}
+  @media (max-width:640px){.evm-home .evm-home-label{display:none}}
+  .in-iframe .evm-home{display:none!important}
+</style>
+<script>try{if(window.self!==window.top)document.documentElement.classList.add('in-iframe')}catch(e){document.documentElement.classList.add('in-iframe')}</script>
+  <!-- EVM visit counter: one anonymous count each time an app is opened. What is sent, and what never is: /what-we-count.html -->
+  <script>
+    (function () {
+      var off = false;
+      try { off = localStorage.getItem('skipgc') === 't'; } catch (e) {}
+      if (location.hash === '#toggle-goatcounter') {   // the teacher's own browsers opt out here (and back in)
+        try { off ? localStorage.removeItem('skipgc') : localStorage.setItem('skipgc', 't'); } catch (e) {}
+        alert(off ? 'Visits from this browser will be counted again.' : 'Visits from this browser will no longer be counted.');
+        return;
+      }
+      if (off || navigator.webdriver) return;
+      if (navigator.globalPrivacyControl || navigator.doNotTrack === '1' || window.doNotTrack === '1') return;   // the visitor asked not to be counted
+      if (!/(^|\.)eagleviewmusic\.com$/.test(location.hostname)) return;   // testing, or a copy on another site
+      try { if (window.top !== window && parent.location.host) return; } catch (e) {}   // framed by another of our apps (the Music Stand), which counts itself
+      try {
+        var p = decodeURIComponent(location.pathname).replace(/index\.html$/, '');
+        var r = document.referrer.split(/[?#]/)[0];   // where the visit came from, never the rest of a link
+        var u = 'https://eagleviewmusic.goatcounter.com/count?p=' + encodeURIComponent(p) +
+          (r ? '&r=' + encodeURIComponent(r) : '') + '&s=' + screen.width + '&rnd=' + Math.random().toString(36).slice(2, 7);
+        if (!(navigator.sendBeacon && navigator.sendBeacon(u))) new Image().src = u;
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="../index.html" class="evm-home" title="Back to Eagle View Music" aria-label="Back to Eagle View Music"><span aria-hidden="true">←</span><span class="evm-home-label">Eagle View Music</span></a>
+  <div class="brand">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 14h6v6h-6z" class="fill"/><path d="M14 4h6v6h-6zM4 14h6v6H4z"/></svg>
+    <span>PNG Creator</span>
+  </div>
+  <button class="btn" id="openBtn" title="Open a picture (⌘O / Ctrl+O)">Open picture</button>
+  <span class="sep"></span>
+  <button class="btn icon-btn" id="undoBtn" title="Undo (⌘Z / Ctrl+Z)" disabled>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg><span>Undo</span>
+  </button>
+  <button class="btn icon-btn" id="redoBtn" title="Redo (⇧⌘Z / Ctrl+Y)" disabled>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg><span>Redo</span>
+  </button>
+  <span class="grow"></span>
+  <button class="btn" id="compareBtn" title="Press and hold to see the original picture" disabled>Hold to see original</button>
+  <button class="btn" id="copyBtn" title="Copy the finished picture" disabled>Copy</button>
+  <button class="btn primary" id="downloadBtn" title="Download a PNG with a see-through background (⌘S / Ctrl+S)" disabled>Download PNG</button>
+</header>
+
+<div class="main">
+  <nav class="tools" aria-label="Tools">
+    <button class="tool" data-tool="pan" title="Move (V or H) — drag to move around">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M12 3L9.5 5.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5"/></svg>
+      <span>Move</span>
+    </button>
+    <button class="tool active" data-tool="wand" title="Magic Wand (W) — click a color to remove it">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20L14 10"/><path d="M17 3v3M17 9v3M12.5 7.5h3M18.5 7.5h3M20 4.5l-1 1M15 9.5l-1 1M14 4.5l1 1"/></svg>
+      <span>Magic Wand</span>
+    </button>
+    <button class="tool" data-tool="erase" title="Eraser (E) — paint to remove">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 20h12"/><path d="M5.2 14.8l8.6-8.6a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L11 19H9.4l-4.2-4.2z"/><path d="M9.5 10.5l5 5"/></svg>
+      <span>Eraser</span>
+    </button>
+    <button class="tool" data-tool="restore" title="Restore brush (R) — paint to bring parts back">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4l6 6-7.5 7.5-6-6z"/><path d="M6.5 11.5L4 14c-1.2 1.2-1.2 3 0 4.2s3 1.2 4.2 0L10.7 16"/><path d="M17 7l-2 2"/></svg>
+      <span>Restore</span>
+    </button>
+    <button class="tool" data-tool="lasso" title="Lasso (L) — draw around an area">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 16.2C4.8 15 3 13 3 10.5 3 6.9 7 4 12 4s9 2.9 9 6.5S17 17 12 17c-1 0-2-.1-2.9-.3"/><circle cx="8" cy="17.5" r="1.8"/><path d="M8 19.3c0 1.2-.6 2-1.8 2.7"/></svg>
+      <span>Lasso</span>
+    </button>
+    <button class="tool" data-tool="crop" title="Crop (C) — cut the picture down">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M2 6h14a2 2 0 0 1 2 2v14"/></svg>
+      <span>Crop</span>
+    </button>
+  </nav>
+
+  <div class="stage-wrap" id="stageWrap">
+    <canvas id="stage"></canvas>
+
+    <div class="empty" id="empty">
+      <div class="drop">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>
+        <h2>Open a picture to start</h2>
+        <p>Drop a picture here, paste one (⌘V / Ctrl+V), or</p>
+        <button class="btn primary big" id="emptyOpen">Choose a picture…</button>
+        <button class="linkish" id="sampleBtn">or try a sample picture</button>
+        <p class="small">Everything happens on this computer. Pictures are never uploaded.</p>
+      </div>
+    </div>
+
+    <div class="drop-hint" id="dropHint" hidden>Drop the picture to open it</div>
+
+    <div class="zoombar" id="zoombar" hidden>
+      <button class="zb" id="zoomOut" title="Zoom out (⌘− / Ctrl+−)">−</button>
+      <span id="zoomLabel">100%</span>
+      <button class="zb" id="zoomIn" title="Zoom in (⌘+ / Ctrl+=)">+</button>
+      <button class="zb wide" id="zoomFit" title="Fit the picture (⌘0 / Ctrl+0)">Fit</button>
+      <button class="zb wide" id="zoom100" title="Actual pixels">1:1</button>
+    </div>
+
+    <div class="busy" id="busy" hidden><div class="spinner"></div><span id="busyText">Working…</span></div>
+  </div>
+
+  <aside class="panel" id="panel">
+    <!-- Options for the active tool -->
+    <section class="sec tool-opts">
+      <h3 id="toolTitle">Magic Wand</h3>
+
+      <div data-for="pan">
+        <p class="note" data-note="pan">Drag the picture to move it. Scroll or pinch to zoom. In any tool, hold <kbd>Space</kbd> and drag to move.</p>
+      </div>
+
+      <div data-for="wand">
+        <div class="seg" data-opt="wandMode" role="group" aria-label="Wand action">
+          <button data-val="remove">Remove</button>
+          <button data-val="restore">Bring back</button>
+        </div>
+        <label class="slider"><span>Tolerance</span><output data-out="wandTol"></output>
+          <input type="range" data-opt="wandTol" min="0" max="100" step="1"></label>
+        <label class="slider"><span>Edge softness</span><output data-out="wandSoft"></output>
+          <input type="range" data-opt="wandSoft" min="0" max="30" step="1"></label>
+        <label class="check"><input type="checkbox" data-opt="wandContig"> Only the touching area</label>
+        <p class="live" id="wandLive" hidden>Adjusting your last click — the sliders change it live.</p>
+        <p class="note" data-note="wand">Click a color in the picture to remove it. Higher tolerance takes more similar colors. Shift-click does the opposite action.</p>
+      </div>
+
+      <div data-for="erase restore">
+        <label class="slider"><span>Brush size</span><output data-out="brushSize"></output>
+          <input type="range" data-opt="brushSize" min="2" max="300" step="1"></label>
+        <label class="slider"><span>Softness</span><output data-out="brushSoft"></output>
+          <input type="range" data-opt="brushSoft" min="0" max="100" step="1"></label>
+        <p class="note" data-note="erase" data-only="erase">Paint over anything you want gone. <kbd>[</kbd> and <kbd>]</kbd> change the brush size. Shift-click draws a straight line from the last spot.</p>
+        <p class="note" data-note="restore" data-only="restore">Paint to bring removed parts back. While this brush is on, removed parts show faintly so you can see them.</p>
+      </div>
+
+      <div data-for="lasso">
+        <div class="field-label">Shape</div>
+        <div class="seg" data-opt="lassoShape" role="group" aria-label="Lasso shape">
+          <button data-val="free">Freehand</button>
+          <button data-val="poly">Straight lines</button>
+        </div>
+        <div class="field-label">When the shape is finished</div>
+        <div class="seg stack" data-opt="lassoMode" role="group" aria-label="Lasso action">
+          <button data-val="inside">Remove inside</button>
+          <button data-val="outside">Keep only inside</button>
+          <button data-val="restore">Bring back inside</button>
+        </div>
+        <p class="note" data-note="lasso-free" data-shape="free">Hold the mouse down and draw around an area. Let go to finish.</p>
+        <p class="note" data-note="lasso-poly" data-shape="poly">Click to place corners. Click the first corner, double-click, or press <kbd>Enter</kbd> to finish. <kbd>Backspace</kbd> takes back a corner, <kbd>Esc</kbd> cancels.</p>
+      </div>
+
+      <div data-for="crop">
+        <label class="select"><span>Shape</span>
+          <select data-opt="cropRatio">
+            <option value="free">Any shape</option>
+            <option value="1:1">Square 1:1</option>
+            <option value="4:3">Wide 4:3</option>
+            <option value="3:4">Tall 3:4</option>
+            <option value="16:9">Wide 16:9</option>
+            <option value="9:16">Tall 9:16</option>
+          </select></label>
+        <div class="crop-size" id="cropSize">—</div>
+        <div class="row">
+          <button class="btn primary" id="cropApply">Apply crop</button>
+          <button class="btn" id="cropReset">Reset box</button>
+        </div>
+        <button class="btn full" id="trimBtn2">Trim away empty space</button>
+        <p class="note" data-note="crop">Drag the box or its corners, or drag outside it to draw a new box. Press <kbd>Enter</kbd> or double-click inside to crop.</p>
+      </div>
+    </section>
+
+    <!-- Automatic background removal -->
+    <section class="sec">
+      <h3>Remove background</h3>
+      <button class="btn primary full big" id="autoBtn" disabled>Remove background</button>
+      <label class="slider"><span>Tolerance</span><output data-out="autoTol"></output>
+        <input type="range" data-opt="autoTol" min="0" max="100" step="1"></label>
+      <label class="slider"><span>Edge softness</span><output data-out="autoSoft"></output>
+        <input type="range" data-opt="autoSoft" min="0" max="30" step="1"></label>
+      <div class="field-label">Start from these edges</div>
+      <div class="chips">
+        <label><input type="checkbox" data-opt="autoTop"><span>Top</span></label>
+        <label><input type="checkbox" data-opt="autoBottom"><span>Bottom</span></label>
+        <label><input type="checkbox" data-opt="autoLeft"><span>Left</span></label>
+        <label><input type="checkbox" data-opt="autoRight"><span>Right</span></label>
+      </div>
+      <label class="check"><input type="checkbox" data-opt="autoHoles"> Also remove that color inside the picture (holes)</label>
+      <div class="auto-info" id="autoInfo" hidden></div>
+      <p class="live" id="autoLive" hidden>The sliders and edges change this removal live. Any other change locks it in.</p>
+      <p class="note" data-note="auto">Finds the colors along the edges of the picture and removes them, spreading inward until it reaches different colors. Works best on a plain background. If part of your subject touches an edge and gets removed, turn that edge off.</p>
+    </section>
+
+    <!-- Turn and flip -->
+    <section class="sec">
+      <h3>Turn &amp; flip</h3>
+      <div class="row four">
+        <button class="btn icon-only" id="rotL" title="Turn left 90°" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4v5h5"/><path d="M3.5 9A8.5 8.5 0 1 1 6 17.5"/></svg><span>Left</span></button>
+        <button class="btn icon-only" id="rotR" title="Turn right 90°" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 4v5h-5"/><path d="M20.5 9A8.5 8.5 0 1 0 18 17.5"/></svg><span>Right</span></button>
+        <button class="btn icon-only" id="flipH" title="Flip side to side" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18" stroke-dasharray="2 2"/><path d="M9 6L3 18h6zM15 6l6 12h-6z"/></svg><span>Flip ↔</span></button>
+        <button class="btn icon-only" id="flipV" title="Flip upside down" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18" stroke-dasharray="2 2"/><path d="M6 9L18 3v6zM6 15l12 6v-6z"/></svg><span>Flip ↕</span></button>
+      </div>
+      <label class="slider"><span>Straighten</span><output id="angleOut">0°</output>
+        <input type="range" id="angle" min="-45" max="45" step="0.5" value="0" disabled></label>
+      <div class="row">
+        <button class="btn primary" id="angleApply" disabled>Apply turn</button>
+        <button class="btn" id="angleReset" disabled>Reset</button>
+      </div>
+    </section>
+
+    <!-- Size -->
+    <section class="sec">
+      <h3>Size</h3>
+      <div class="row size-row">
+        <label class="num"><span>Width</span><input type="number" id="rsW" min="1" max="8000" disabled></label>
+        <span class="times">×</span>
+        <label class="num"><span>Height</span><input type="number" id="rsH" min="1" max="8000" disabled></label>
+        <span class="unit">px</span>
+      </div>
+      <label class="check"><input type="checkbox" data-opt="lockRatio"> Keep proportions</label>
+      <div class="row pcts">
+        <button class="btn small" data-pct="25" disabled>25%</button>
+        <button class="btn small" data-pct="50" disabled>50%</button>
+        <button class="btn small" data-pct="200" disabled>200%</button>
+      </div>
+      <button class="btn primary full" id="rsApply" disabled>Resize</button>
+    </section>
+
+    <!-- Cleanup -->
+    <section class="sec">
+      <h3>Clean up edges</h3>
+      <div class="row two">
+        <button class="btn" id="shrinkBtn" title="Shave 1 pixel off the edge of what is kept — removes leftover halo" disabled>Shrink edge</button>
+        <button class="btn" id="growBtn" title="Add 1 pixel back around the edge of what is kept" disabled>Grow edge</button>
+        <button class="btn" id="softenBtn" title="Blur the cut-out edge slightly" disabled>Soften edge</button>
+        <button class="btn" id="invertBtn" title="Keep what was removed, remove what was kept" disabled>Swap kept / removed</button>
+        <button class="btn" id="trimBtn" title="Crop away see-through space around the picture" disabled>Trim empty space</button>
+        <button class="btn" id="resetMaskBtn" title="Undo every removal but keep crops, turns and sizes" disabled>Bring all back</button>
+      </div>
+    </section>
+
+    <!-- Preview background -->
+    <section class="sec">
+      <h3>Preview background</h3>
+      <div class="seg" data-opt="bg" role="group" aria-label="Preview background">
+        <button data-val="checker">Checks</button>
+        <button data-val="white">White</button>
+        <button data-val="black">Black</button>
+        <button data-val="color">Color</button>
+      </div>
+      <label class="check color-row"><span>Color</span><input type="color" data-opt="bgColor"></label>
+      <label class="check"><input type="checkbox" data-opt="ghost"> Show removed parts faintly</label>
+      <p class="note" data-note="preview">The preview background is only for checking your work. The downloaded PNG is see-through wherever the checks show.</p>
+    </section>
+  </aside>
+</div>
+
+<footer class="status">
+  <span id="stInfo">No picture open</span>
+  <span id="stHint"></span>
+</footer>
+
+<input type="file" id="fileInput" accept="image/*" hidden>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
