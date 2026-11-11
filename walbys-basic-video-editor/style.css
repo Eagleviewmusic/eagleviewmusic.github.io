@@ -62,6 +62,7 @@ input[type=range] { accent-color: var(--accent); }
 #title-wrap { display: flex; align-items: baseline; gap: 10px; margin-left: 6px; }
 #p-title { font-weight: 600; font-size: 14px; }
 #save-state { color: var(--dim); font-size: 11px; }
+#save-state.needs-ok { color: #ffb454; font-weight: 600; cursor: pointer; text-decoration: underline; }
 
 /* ---- work area ---- */
 #work { flex: 1; display: flex; min-height: 0; }

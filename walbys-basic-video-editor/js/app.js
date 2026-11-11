@@ -9,11 +9,55 @@
   const A = VE.App = { copied: null };
   const $ = id => document.getElementById(id);
 
+  /* ================= Chrome's OK to use the projects folder =================
+     Chrome takes its OK back when the tab sits in the background for a while,
+     when the last tab of the site closes, and when Chrome restarts — unless
+     "Allow on every visit" was chosen. A web page can only ask again during a
+     click or key press, so everything that writes asks first (St.allowed(…, true)),
+     and if saving finds the OK gone, saving pauses until the next click asks
+     again. Nothing is lost: the whole project is written as soon as it's back. */
+  let paused = false;
+  const folder = () => A.root || VE.dir;
+  function pauseSaving(tell) {
+    if (!paused) {
+      paused = true;
+      const s = $('save-state');
+      s.textContent = '⚠ Not saved — click to allow';
+      s.title = 'Chrome took back its OK for the projects folder. Click, then say yes in Chrome’s box. Your work is kept and saves straight after.';
+      s.classList.add('needs-ok');
+    } else if (!tell) return;
+    VE.toast('Chrome took back its OK for your projects folder (it does that when the tab sits in the background). Click anywhere and say yes in Chrome’s box, then try again. <b>Allow on every visit</b> stops it asking.', 9000);
+  }
+  /* call from a click or key press: true when the editor may write (Chrome may show its Allow box) */
+  let asking = null;   // one Allow box at a time
+  A.ensure = function () {
+    return asking || (asking = (async () => {
+      const dir = folder();
+      if (!dir || await St.allowed(dir, true)) {
+        if (paused) { paused = false; $('save-state').classList.remove('needs-ok'); $('save-state').title = ''; scheduleSave(); }
+        return true;
+      }
+      if (VE.P) pauseSaving(true);
+      return false;
+    })().finally(() => { asking = null; }));
+  };
+  function initAccess() {
+    // the next click or key press after saving paused asks Chrome again
+    const again = () => { if (paused) A.ensure(); };
+    document.addEventListener('pointerdown', again, true);
+    document.addEventListener('keydown', again, true);
+    // coming back to the tab: find out now, not at the next save
+    document.addEventListener('visibilitychange', async () => {
+      if (document.hidden || !VE.P || !folder() || paused) return;
+      if (!(await St.allowed(folder(), false))) pauseSaving();
+    });
+  }
+
   /* ================= saving ================= */
   let saveTimer = 0, saving = null;
   function scheduleSave() {
     if (!VE.P || !VE.dir) return;
-    $('save-state').textContent = 'Saving…';
+    if (!paused) $('save-state').textContent = 'Saving…';
     clearTimeout(saveTimer);
     saveTimer = setTimeout(A.saveNow, 400);
   }
@@ -24,7 +68,11 @@
     await saving;
     saving = St.save(dir, p).then(
       () => { if (VE.P === p || VE.dir === dir) $('save-state').textContent = 'Saved'; },
-      e => { console.error(e); $('save-state').textContent = '⚠ Not saved — ' + (e.message || e); });
+      e => {
+        console.error(e);
+        if (St.blocked(e)) pauseSaving();
+        else $('save-state').textContent = '⚠ Not saved — ' + (e.message || e);
+      });
     return saving;
   };
 
@@ -40,6 +88,7 @@
       return;
     }
     const root = await St.root();
+    A.root = root;
     if (!root) {
       body.innerHTML = `<p>First, show the editor where its projects live: choose the folder
         <b>Documents › Walby's Basic Video Editor</b> and press <i>Open</i>, then let Chrome edit it.</p>
@@ -49,8 +98,10 @@
       return;
     }
     if (!(await St.allowed(root, false))) {
-      body.innerHTML = `<p>Chrome needs your OK to open the projects folder <b>${VE.esc(root.name)}</b> again
-        (it asks each time it restarts).</p>
+      body.innerHTML = (msg ? `<p>${msg}</p>` : '') +
+        `<p>Chrome needs your OK to use the projects folder <b>${VE.esc(root.name)}</b> again.
+        It takes its OK back when Chrome restarts or the tab sits in the background for a while.
+        Choose <b>Allow on every visit</b> and it stops asking.</p>
         <div class="home-actions"><button class="primary" id="h-allow">Open my projects</button><button id="h-pick">Use another folder…</button></div>`;
       $('h-allow').onclick = async () => { if (await St.allowed(root, true)) home(); };
       $('h-pick').onclick = () => pickRoot();
@@ -63,16 +114,19 @@
         <span class="pm">${p.w}×${p.h} · ${new Date(p.modified).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span></div>`).join('')}</div>`
         : '<p>No projects yet.</p>') +
       `<p class="small">Projects folder: <b>${VE.esc(root.name)}</b> <button class="small ghost" id="h-pick">Change…</button></p>`;
-    $('h-new').onclick = newProject;
+    // this screen can sit open in a background tab while Chrome takes its OK back, so each click asks again
+    $('h-new').onclick = async () => { if (await St.allowed(root, true)) newProject(root); else home(); };
     $('h-pick').onclick = () => pickRoot();
-    body.querySelectorAll('.pitem').forEach(el => { el.onclick = () => openProject(list[+el.dataset.i].handle); });
+    body.querySelectorAll('.pitem').forEach(el => {
+      el.onclick = async () => { if (await St.allowed(root, true)) openProject(list[+el.dataset.i].handle); else home(); };
+    });
   }
   async function pickRoot() {
     try { await St.pickRoot(); } catch (e) { if (e.name !== 'AbortError') VE.toast('Could not use that folder: ' + e.message); return; }
     home();
   }
 
-  function newProject() {
+  function newProject(root) {
     const d = $('dlg-new');
     $('n-title').value = 'My video';
     d.returnValue = '';
@@ -82,9 +136,13 @@
       if (d.returnValue !== 'ok') return;
       const [w, h] = $('n-size').value.split('x').map(Number);
       const p = VE.newProject($('n-title').value.trim() || 'My video', w, h);
-      const root = await St.root();
+      // the dialog may have stayed open long enough for Chrome to take its OK back: ask again (this is still the OK click)
+      if (!(await St.allowed(root, true))) return home();
       try { await openProject(await St.create(root, p)); }
-      catch (e) { VE.toast('Could not make the project folder: ' + e.message, 6000); }
+      catch (e) {
+        if (St.blocked(e)) home();
+        else VE.toast('Could not make the project folder: ' + e.message, 6000);
+      }
     };
   }
 
@@ -210,7 +268,10 @@
   /* ================= files from Finder / the clipboard ================= */
   async function addFiles(files, where) {
     if (!VE.P) { VE.toast('Open or make a project first.'); return; }
-    const list = await VE.Media.add(files);
+    if (!(await A.ensure())) return;   // a drop can't ask Chrome; pauseSaving() said to click first
+    let list;
+    try { list = await VE.Media.add(files); }
+    catch (e) { if (St.blocked(e)) { pauseSaving(true); return; } throw e; }
     if (where === 'stage') {
       let t = VE.time;
       for (const a of list) { const c = VE.Media.place(a, t); if (a.kind === 'image') t = VE.end(c); }
@@ -298,7 +359,7 @@
   function boot() {
     if (location.protocol === 'file:') { $('file-warning').hidden = false; document.body.style.overflow = 'auto'; return; }
     VE.Stage.init(); VE.Timeline.init(); VE.Inspector.init();
-    initDrop(); initSplitter();
+    initDrop(); initSplitter(); initAccess();   // (a click on the ⚠ save state is caught by initAccess too)
     document.addEventListener('keydown', keys);
 
     $('b-home').onclick = () => home();
@@ -332,6 +393,7 @@
   async function start() {
     if (!St.supported) return home();
     const root = await St.root();
+    A.root = root;
     if (root && await St.allowed(root, false)) {
       const last = await St.get('last');
       if (last) { try { return await openProject(await root.getDirectoryHandle(last)); } catch (e) { /* gone */ } }

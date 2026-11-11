@@ -57,6 +57,8 @@
     if ((await dir.queryPermission(opt)) === 'granted') return true;
     try { return ask ? (await dir.requestPermission(opt)) === 'granted' : false; } catch (e) { return false; }
   };
+  /* the error Chrome gives when its OK for the folder has lapsed (St.allowed(…, true) gets it back) */
+  St.blocked = e => !!e && e.name === 'NotAllowedError';
 
   /* ---- projects in it ---- */
   St.list = async function (root) {

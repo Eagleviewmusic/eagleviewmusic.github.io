@@ -96,6 +96,7 @@
       if (e.submitter && e.submitter.value !== 'ok') { if (job) { e.preventDefault(); job.abort(); } return; }
       e.preventDefault();
       if (job) return;
+      if (!(await VE.App.ensure())) return;   // Chrome's OK for the folder (this is the Export click)
       const go = document.getElementById('x-go'), bar = document.getElementById('x-bar'), msg = document.getElementById('x-msg');
       go.disabled = true; document.getElementById('x-progress').hidden = false;
       const name = (document.getElementById('x-name').value.trim() || VE.P.title) + '.mp4';
@@ -136,6 +137,7 @@
   /* ---- 📷 ---- */
   X.screenshot = async function () {
     if (!VE.P) return;
+    if (!(await VE.App.ensure())) return;   // Chrome's OK for the folder (this is the 📷 click or ⇧⌘S)
     const P = VE.P, c = new OffscreenCanvas(P.w, P.h);
     VE.Render.frame(c.getContext('2d'), P, VE.time, { scale: 1 });
     const blob = await c.convertToBlob({ type: 'image/png' });
