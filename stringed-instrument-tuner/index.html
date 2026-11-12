@@ -5,14 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="A tuner for guitar, ukulele, violin, viola, cello, bass, banjo, mandolin and more. Hear each string, tune them one at a time, or point it at any sound.">
 <title>Stringed Instrument Tuner</title>
+<!-- The picture in the browser tab (icon.svg), and on a tablet's home screen (icon-180.png). -->
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
 <link rel="stylesheet" href="style.css">
 <style>
   /* Eagle View Music back button (hidden when the app is framed) */
-  .evm-home{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:9999px;background:rgba(30,41,59,.88);color:#f1f5f9;border:1px solid rgba(255,255,255,.22);font:600 13px/1 system-ui,-apple-system,sans-serif;text-decoration:none;white-space:nowrap;flex:none}
-  .evm-home:hover{background:#334155;color:#cdb4f0}
-  @media (max-width:640px){.evm-home .evm-home-label{display:none}}
+  .evm-home{display:inline-flex;align-items:center;gap:6px;padding:0 12px;height:38px;border-radius:9999px;background:var(--chip);color:var(--ink-2);border:1px solid var(--line);font:600 13px/1 system-ui,-apple-system,sans-serif;text-decoration:none;white-space:nowrap;flex:none}
+  .evm-home:hover{color:var(--ink);border-color:var(--line-2)}
+  @media (max-width:1180px){.evm-home .evm-home-label{display:none}}
   .in-iframe .evm-home{display:none!important}
-  @media (max-width:719px){.topbar .brand{flex:1 1 0}}
 </style>
 <script>try{if(window.self!==window.top)document.documentElement.classList.add('in-iframe')}catch(e){document.documentElement.classList.add('in-iframe')}</script>
   <!-- EVM visit counter: one anonymous count each time an app is opened. What is sent, and what never is: /what-we-count.html -->
@@ -41,136 +43,120 @@
 </head>
 <body>
 
+<!-- Small icons, drawn once and reused -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-hear" viewBox="0 0 24 24"><path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z" fill="currentColor"/><path d="M15.5 8.6a4.6 4.6 0 0 1 0 6.8M18.2 6a8.3 8.3 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="i-tune" viewBox="0 0 24 24"><path d="M3.5 17a8.5 8.5 0 0 1 17 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M12 17l3.6-6.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="17" r="1.9" fill="currentColor"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><path d="M2.5 12c1.6 0 1.6-5 3.2-5s1.6 10 3.2 10 1.6-12 3.2-12 1.6 14 3.2 14 1.6-9 3.2-9 1.6 4 3.2 4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="8.6" y="3" width="6.8" height="11.4" rx="3.4" fill="currentColor"/><path d="M5.6 11.2a6.4 6.4 0 0 0 12.8 0M12 17.6V21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 10.8v5.6" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><circle cx="12" cy="7.6" r="1.25" fill="currentColor"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 13.5l1.6 1.2-1.9 3.3-1.9-.7a7.6 7.6 0 0 1-1.9 1.1l-.3 2H11l-.3-2a7.6 7.6 0 0 1-1.9-1.1l-1.9.7L5 14.7l1.6-1.2a7.4 7.4 0 0 1 0-3L5 9.3 6.9 6l1.9.7A7.6 7.6 0 0 1 10.7 5.6l.3-2h3.9l.3 2a7.6 7.6 0 0 1 1.9 1.1l1.9-.7L21 9.3l-1.6 1.2a7.4 7.4 0 0 1 0 3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.6A7.8 7.8 0 0 1 9.4 4.5a7.8 7.8 0 1 0 10.1 10.1z" fill="currentColor"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2" fill="currentColor"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-hold" viewBox="0 0 24 24"><path d="M6.6 8.4a3.6 3.6 0 1 0 0 7.2c3.2 0 7.6-7.2 10.8-7.2a3.6 3.6 0 1 1 0 7.2c-3.2 0-7.6-7.2-10.8-7.2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M5 6.5l7 5.5-7 5.5zM12.5 6.5l7 5.5-7 5.5z" fill="currentColor"/></symbol>
+</svg>
+
 <header class="topbar">
   <a href="../index.html" class="evm-home" title="Back to Eagle View Music" aria-label="Back to Eagle View Music"><span aria-hidden="true">←</span><span class="evm-home-label">Eagle View Music</span></a>
-  <div class="brand">
-    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
-      <path d="M16 3v26" /><path d="M9 6v20" /><path d="M23 6v20" />
-      <circle cx="16" cy="16" r="13" class="ring" />
-    </svg>
-    <h1>Stringed Instrument Tuner</h1>
+
+  <div class="pickers">
+    <label class="pick pick-inst">
+      <span class="sr-only">Instrument</span>
+      <select id="sel-instrument"></select>
+    </label>
+    <label class="pick pick-tuning" id="field-tuning">
+      <span class="sr-only">Tuning</span>
+      <select id="sel-tuning"></select>
+    </label>
+    <button class="icon-btn" id="btn-about" aria-haspopup="dialog" title="About this instrument" aria-label="About this instrument and tuning">
+      <svg aria-hidden="true"><use href="#i-info"/></svg></button>
   </div>
 
   <nav class="modes" role="tablist" aria-label="Tuner mode">
     <button class="mode-btn is-on" role="tab" aria-selected="true"  data-mode="play"   id="tab-play">
-      <span class="mode-icon" aria-hidden="true">&#9835;</span><span class="mode-label">Hear it</span></button>
+      <svg aria-hidden="true"><use href="#i-hear"/></svg><span>Hear</span></button>
     <button class="mode-btn"       role="tab" aria-selected="false" data-mode="tune"   id="tab-tune">
-      <span class="mode-icon" aria-hidden="true">&#9678;</span><span class="mode-label">Tune</span></button>
+      <svg aria-hidden="true"><use href="#i-tune"/></svg><span>Tune</span></button>
     <button class="mode-btn"       role="tab" aria-selected="false" data-mode="listen" id="tab-listen">
-      <span class="mode-icon" aria-hidden="true">&#9199;</span><span class="mode-label">Any note</span></button>
+      <svg aria-hidden="true"><use href="#i-wave"/></svg><span>Any note</span></button>
   </nav>
 
   <div class="topbar-tools">
     <button class="icon-btn" id="btn-theme" title="Light / dark" aria-label="Switch between light and dark">
-      <span aria-hidden="true" id="theme-glyph">&#9789;</span></button>
+      <svg aria-hidden="true"><use id="theme-glyph" href="#i-moon"/></svg></button>
     <button class="icon-btn" id="btn-settings" title="Settings" aria-label="Settings">
-      <span aria-hidden="true">&#9881;</span></button>
+      <svg aria-hidden="true"><use href="#i-gear"/></svg></button>
   </div>
 </header>
 
-<div class="pickerbar">
-  <label class="field">
-    <span class="field-label">Instrument</span>
-    <select id="sel-instrument"></select>
-  </label>
-  <label class="field" id="field-tuning">
-    <span class="field-label">Tuning</span>
-    <select id="sel-tuning"></select>
-  </label>
-  <button class="ghost-btn" id="btn-about" aria-haspopup="dialog">
-    <span aria-hidden="true">&#9432;</span> About this instrument
-  </button>
-</div>
-
 <main id="stage">
 
-  <!-- ───────────────────────── the string box ───────────────────────── -->
-  <section class="stringbox-wrap" id="stringbox-wrap" aria-label="Strings">
-    <div class="stringbox" id="stringbox"></div>
-    <p class="box-hint" id="box-hint"></p>
-  </section>
-
-  <!-- ───────────────────────── mode panels ───────────────────────── -->
-  <section class="panel" id="panel-play" role="tabpanel" aria-labelledby="tab-play">
-    <div class="card teach" id="play-teach"></div>
-    <div class="card controls-card">
-      <div class="row">
-        <button class="toggle-btn" id="btn-drone" aria-pressed="false">
-          <span class="toggle-dot" aria-hidden="true"></span>
-          <span><strong>Hold the note</strong><small>It keeps sounding until you press it again</small></span>
-        </button>
-        <button class="ghost-btn danger" id="btn-stop">Stop sound</button>
-      </div>
-      <p class="keys-hint">Press <kbd>1</kbd>&hellip;<kbd id="hint-last-key">6</kbd> on a keyboard, or tap a string.
-        <kbd>&larr;</kbd> <kbd>&rarr;</kbd> move &middot; <kbd>Space</kbd> plays &middot; <kbd>Esc</kbd> stops.</p>
+  <!-- ───────────── the instrument: headstock, pegs, neck, strings ───────────── -->
+  <section class="instrument-wrap" aria-label="Strings">
+    <div class="instrument" id="instrument">
+      <svg class="inst-art" id="inst-art" aria-hidden="true"></svg>
+      <div class="inst-hit" id="inst-hit"></div>
     </div>
   </section>
 
-  <section class="panel" id="panel-tune" role="tabpanel" aria-labelledby="tab-tune" hidden>
-    <div class="card gauge-card">
-      <div class="target-head">
-        <div class="target-main">
-          <span class="target-label">Tuning to</span>
-          <span class="target-note" id="tune-target-note">&mdash;</span>
-        </div>
-        <div class="target-sub">
-          <span id="tune-target-string">Pick a string</span>
-          <span class="dot-sep" aria-hidden="true">&middot;</span>
-          <span id="tune-target-hz"></span>
-        </div>
-        <button type="button" class="ghost-btn hear-btn" id="btn-hear">
-          <span aria-hidden="true">&#128266;</span> Hear how it should sound</button>
+  <!-- ───────────── the tuner: one screen, three faces ───────────── -->
+  <section class="device" id="device" aria-live="off">
+
+    <!-- Hear -->
+    <div class="face" id="panel-play" role="tabpanel" aria-labelledby="tab-play">
+      <div class="readout">
+        <span class="ro-label" id="play-string">&nbsp;</span>
+        <span class="ro-note" id="play-note">&mdash;</span>
+        <span class="ro-sub" id="play-hz">&nbsp;</span>
       </div>
+      <canvas class="scope" id="wave" aria-hidden="true"></canvas>
+      <div class="dev-row">
+        <button class="dev-btn" id="btn-drone" aria-pressed="false" title="Keep the note sounding until you tap it again">
+          <svg aria-hidden="true"><use href="#i-hold"/></svg><span>Hold</span></button>
+        <button class="dev-btn" id="btn-stop" title="Stop the sound (Esc)">
+          <svg aria-hidden="true"><use href="#i-stop"/></svg><span>Stop</span></button>
+      </div>
+    </div>
 
+    <!-- Tune -->
+    <div class="face" id="panel-tune" role="tabpanel" aria-labelledby="tab-tune" hidden>
+      <div class="readout">
+        <span class="ro-label" id="tune-target-string">&nbsp;</span>
+        <span class="ro-note" id="tune-target-note">&mdash;</span>
+        <span class="ro-sub" id="tune-target-hz">&nbsp;</span>
+      </div>
       <div class="gauge" id="tune-gauge"></div>
-
-      <p class="verdict" id="tune-verdict">Choose a string, then play it.</p>
+      <p class="verdict" id="tune-verdict" aria-live="polite">&nbsp;</p>
       <p class="advice" id="tune-advice"></p>
-
-      <div class="mic-strip">
-        <button class="primary-btn" id="btn-mic-tune">Turn on the microphone</button>
-        <div class="level"><div class="level-fill" id="level-tune"></div></div>
+      <div class="dev-row">
+        <button class="mic-btn" id="btn-mic-tune"><span class="mic-glow" id="level-tune"></span>
+          <svg aria-hidden="true"><use href="#i-mic"/></svg><span class="mic-label">Start mic</span></button>
+        <button class="dev-btn" id="btn-hear" title="Hear how this string should sound">
+          <svg aria-hidden="true"><use href="#i-hear"/></svg><span>Hear</span></button>
+        <label class="dev-btn dev-check" title="Move to the next string once this one is in tune">
+          <input type="checkbox" id="chk-autoadvance" checked>
+          <svg aria-hidden="true"><use href="#i-next"/></svg><span>Auto</span></label>
       </div>
       <p class="mic-note" id="mic-note-tune"></p>
-
-      <label class="check"><input type="checkbox" id="chk-autoadvance" checked>
-        <span>Move to the next string once this one is in tune</span></label>
     </div>
-  </section>
 
-  <section class="panel" id="panel-listen" role="tabpanel" aria-labelledby="tab-listen" hidden>
-    <div class="card gauge-card">
-      <div class="target-head listen-head">
-        <div class="target-main">
-          <span class="target-label">I hear</span>
-          <span class="target-note" id="free-note">&mdash;</span>
-        </div>
-        <div class="target-sub">
-          <span id="free-hz">&mdash;</span>
-          <span class="dot-sep" aria-hidden="true">&middot;</span>
-          <span id="free-nearest"></span>
-        </div>
+    <!-- Any note -->
+    <div class="face" id="panel-listen" role="tabpanel" aria-labelledby="tab-listen" hidden>
+      <div class="readout">
+        <span class="ro-label" id="free-nearest">&nbsp;</span>
+        <span class="ro-note" id="free-note">&mdash;</span>
+        <span class="ro-sub" id="free-hz">&nbsp;</span>
       </div>
-
       <div class="gauge" id="free-gauge"></div>
-
-      <p class="verdict" id="free-verdict">Play, sing or whistle anything.</p>
-
-      <div class="mic-strip">
-        <button class="primary-btn" id="btn-mic-free">Turn on the microphone</button>
-        <div class="level"><div class="level-fill" id="level-free"></div></div>
+      <p class="verdict" id="free-verdict">&nbsp;</p>
+      <canvas class="scope" id="trace" title="The last few seconds of what you played. A steady note draws a flat line; vibrato draws a wave."></canvas>
+      <div class="dev-row">
+        <button class="mic-btn" id="btn-mic-free"><span class="mic-glow" id="level-free"></span>
+          <svg aria-hidden="true"><use href="#i-mic"/></svg><span class="mic-label">Start mic</span></button>
       </div>
       <p class="mic-note" id="mic-note-free"></p>
-    </div>
-
-    <div class="card trace-card">
-      <div class="card-head">
-        <h2>Pitch trace</h2>
-        <span class="card-sub">the last few seconds of what you played</span>
-      </div>
-      <canvas id="trace" height="260"></canvas>
-      <p class="trace-legend">Slide a finger up a string and watch the line climb. A steady note draws
-        a flat line. Vibrato draws a wave.</p>
     </div>
   </section>
 </main>
@@ -182,25 +168,21 @@
 
     <div class="setting">
       <h3>Microphone</h3>
-      <p class="setting-note">Pick a different microphone if you have one plugged in. You may have to
-        allow the microphone first.</p>
-      <select id="sel-mic"></select>
-      <button type="button" class="ghost-btn" id="btn-refresh-mics">Look for microphones again</button>
+      <div class="setting-row">
+        <select id="sel-mic"></select>
+        <button type="button" class="ghost-btn" id="btn-refresh-mics">Look again</button>
+      </div>
     </div>
 
     <div class="setting">
-      <h3>Reference pitch</h3>
-      <p class="setting-note">Nearly everyone tunes to A&nbsp;=&nbsp;440&nbsp;Hz. Some orchestras tune a
-        little higher. Old instruments are often tuned lower.</p>
+      <h3>Reference pitch <span class="setting-note">Most music uses A = 440</span></h3>
       <div class="pitch-picker" id="a4-picker"></div>
       <label class="inline-num">A =
         <input type="number" id="num-a4" min="380" max="470" step="0.5" value="440"> Hz</label>
     </div>
 
     <div class="setting">
-      <h3>How close is close enough?</h3>
-      <p class="setting-note">Cents are tiny steps in pitch: 100 cents make one semitone. Beginners can
-        aim for 10 cents. Advanced players aim for 3.</p>
+      <h3>How close is in tune? <span class="setting-note">100 cents = one semitone</span></h3>
       <div class="seg" id="tol-picker"></div>
     </div>
 
@@ -208,16 +190,22 @@
       <h3>The note the app plays</h3>
       <label class="inline-num">Volume
         <input type="range" id="rng-volume" min="0" max="100" value="75"></label>
-      <label class="inline-num">Note length
+      <label class="inline-num">Length
         <input type="range" id="rng-length" min="1" max="8" step="0.5" value="3"> <span id="len-read">3.0 s</span></label>
     </div>
 
     <div class="setting">
       <h3>Display</h3>
       <label class="check"><input type="checkbox" id="chk-bigtext">
-        <span>Extra-large text (for a whiteboard or projector)</span></label>
+        <span>Extra-large text (whiteboard or projector)</span></label>
       <label class="check"><input type="checkbox" id="chk-intervals" checked>
-        <span>Show the gap between strings that sit next to each other</span></label>
+        <span>Show the gap between neighbouring strings (in Hear)</span></label>
+    </div>
+
+    <div class="setting keys-setting">
+      <h3>Keyboard</h3>
+      <p class="keys-list"><kbd>1</kbd>&hellip;<kbd id="hint-last-key">6</kbd> play a string &nbsp;
+        <kbd>&larr;</kbd><kbd>&rarr;</kbd> move &nbsp; <kbd>Space</kbd> play &nbsp; <kbd>Esc</kbd> stop</p>
     </div>
   </form>
 </dialog>

@@ -248,11 +248,12 @@ const INSTRUMENTS = [
 {
   id:'banjo5', name:'Banjo (5-string)', family:'Plucked', voice:'pluck',
   tone:{ bright:0.84, decay:1.7 },
+  drone:{ t:5, fret:5 },             /* the short 5th string, peg at the 5th fret */
   blurb:'A 5-string banjo has a short extra string with its own peg halfway up the ' +
         'neck. It is called the 5th string, and it sits on the far left. On every ' +
         'other instrument that spot holds the lowest note. On a banjo it holds the ' +
         'HIGHEST one. It is a drone, which means it rings the same note over and ' +
-        'over. Look for the thinnest string in the box, sitting right where you ' +
+        'over. Look for the thinnest string on the neck, sitting right where you ' +
         'would expect the thickest.',
   care:'The peg for the 5th string is small and touchy. Banjo heads react to the ' +
        'weather too, so expect to retune when you move from a cold room to a warm one.',
@@ -407,6 +408,8 @@ function stringsOf(inst, tuning, a4){
         trad:s.t, label:s.label || null,
         pair:s.pair || null,
         pairMidi:s.pair ? midiOf(s.pair) : null,
+        /* the banjo's 5th string is short: it starts at the 5th fret */
+        short:(inst.drone && s.t === inst.drone.t) ? inst.drone.fret : 0,
         display:splitName(s.n)
       };
     })
@@ -1063,13 +1066,35 @@ function el(tag, cls, text){
   if (text !== undefined) n.textContent = text;
   return n;
 }
+
+/* The Eagle View Music note colours: the same rainbow as the Virtual Keyboard
+   and the Digital Accordion, so a G is the same teal in every app. */
+const NOTE_COLOR = {
+  'C':'#FF3B30', 'C#':'#ff6818', 'D':'#FF9500', 'D#':'#ffb000', 'E':'#FFCC00', 'F':'#34C759',
+  'F#':'#32c490', 'G':'#30c0c6', 'G#':'#189de2', 'A':'#007AFF', 'A#':'#5866ee', 'B':'#AF52DE'
+};
+function colorOfMidi(midi){ return NOTE_COLOR[SHARP_NAMES[((Math.round(midi) % 12) + 12) % 12]]; }
+/* E A D stay as they are; F#3 reads F♯3 and Bb3 reads B♭3 */
+function pretty(name){ return String(name).replace('#', '♯').replace(/^([A-G])b/, '$1♭'); }
+
 function noteSpan(name, cls){
   const p = splitName(name);
   const s = el('span', cls);
-  s.appendChild(document.createTextNode(p.letter));
+  s.appendChild(document.createTextNode(pretty(p.letter)));
   if (p.octave !== '') s.appendChild(el('span', 's-oct', p.octave));
   return s;
 }
+function stringName(r){ return r.label ? r.label + ' string' : ordinal(r.trad) + ' string'; }
+
+/* a big note on the tuner screen, in its own colour */
+function setNote(host, name, midi, pair){
+  host.textContent = '';
+  if (!name){ host.textContent = '—'; host.style.removeProperty('--nc'); return; }
+  host.appendChild(noteSpan(name, 'nn'));
+  if (pair) host.appendChild(el('span', 'ro-pair', '+' + pretty(pair)));
+  host.style.setProperty('--nc', colorOfMidi(midi));
+}
+
 let toastTimer = null;
 function toast(msg, good){
   const t = $('#toast');
@@ -1081,20 +1106,18 @@ function toast(msg, good){
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   8 · THE DIAL
+   8 · THE METER — an arc of lights with a needle, like a clip-on tuner
    ───────────────────────────────────────────────────────────────────────── */
 
-const GEO = { cx:150, cy:150, r:105, band:18, tickIn:116, tickOut:123, labelR:136,
-  needleIn:52, needleOut:99 };
+const GEO = { cx:150, cy:138, rIn:98, rOut:120, span:72, needle:88, band:132 };
 
 function polar(cents, radius){
-  const a = (cents / 50) * (Math.PI / 2);      /* ±50 cents fills ±90° */
+  const a = (cents / 50) * GEO.span * Math.PI / 180;      /* ±50 cents fills ±72° */
   return [GEO.cx + radius * Math.sin(a), GEO.cy - radius * Math.cos(a)];
 }
 function arcPath(c1, c2, radius){
   const [x1, y1] = polar(c1, radius), [x2, y2] = polar(c2, radius);
-  const large = Math.abs(c2 - c1) > 50 ? 1 : 0;
-  return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${radius} ${radius} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+  return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${radius} ${radius} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
 }
 const SVGNS = 'http://www.w3.org/2000/svg';
 function svgEl(tag, attrs){
@@ -1105,189 +1128,448 @@ function svgEl(tag, attrs){
 
 function buildGauge(host){
   host.textContent = '';
-  const svg = svgEl('svg', { viewBox:'0 0 300 192', role:'img' });
-  const bands = svgEl('g', {});
-  svg.appendChild(bands);
+  const svg = svgEl('svg', { viewBox:'0 0 300 176', role:'img', 'aria-label':'Tuning meter' });
+  const band = svgEl('path', { class:'g-band' });
+  svg.appendChild(band);
 
-  const ticks = svgEl('g', {});
-  for (let c = -50; c <= 50; c += 10){
-    const major = c === 0 || Math.abs(c) === 50;
-    const [x1, y1] = polar(c, GEO.tickIn);
-    const [x2, y2] = polar(c, major ? GEO.tickOut + 4 : GEO.tickOut);
-    ticks.appendChild(svgEl('line', { class:'g-tick' + (major ? ' major' : ''),
-      x1:x1.toFixed(2), y1:y1.toFixed(2), x2:x2.toFixed(2), y2:y2.toFixed(2) }));
-    if (major){
-      const [lx, ly] = polar(c, GEO.labelR);
-      const t = svgEl('text', { class:'g-ticklabel', x:lx.toFixed(2), y:(ly + 4).toFixed(2) });
-      t.textContent = c > 0 ? '+' + c : String(c);
-      ticks.appendChild(t);
-    }
+  const leds = [];
+  for (let c = -50; c <= 50; c += 5){
+    const zero = c === 0;
+    const [x1, y1] = polar(c, zero ? GEO.rIn - 10 : GEO.rIn);
+    const [x2, y2] = polar(c, zero ? GEO.rOut + 4 : GEO.rOut);
+    const base = 'g-led' + (zero ? ' zero' : '');
+    const l = svgEl('line', { class:base, x1:x1.toFixed(2), y1:y1.toFixed(2), x2:x2.toFixed(2), y2:y2.toFixed(2) });
+    svg.appendChild(l);
+    leds.push({ c, l, base });
   }
-  svg.appendChild(ticks);
+  const flat = svgEl('text', { class:'g-sign', x:20, y:122 });
+  flat.textContent = '♭';
+  const sharp = svgEl('text', { class:'g-sign', x:280, y:122 });
+  sharp.textContent = '♯';
+  svg.append(flat, sharp);
 
-  /* the pointer floats just inside the arc, so it never crosses the readout */
-  const needle = svgEl('line', { class:'g-needle', x1:GEO.cx, y1:GEO.cy - GEO.needleIn,
-    x2:GEO.cx, y2:GEO.cy - GEO.needleOut });
+  const needle = svgEl('line', { class:'g-needle', x1:GEO.cx, y1:GEO.cy, x2:GEO.cx, y2:GEO.cy - GEO.needle });
   svg.appendChild(needle);
-  svg.appendChild(svgEl('circle', { class:'g-hub', cx:GEO.cx, cy:GEO.cy, r:5 }));
-
-  const centsText = svgEl('text', { class:'g-cents', x:GEO.cx, y:122 });
-  centsText.textContent = '\u2013';
+  svg.appendChild(svgEl('circle', { class:'g-hub', cx:GEO.cx, cy:GEO.cy, r:7 }));
+  const centsText = svgEl('text', { class:'g-cents', x:GEO.cx, y:170 });
   svg.appendChild(centsText);
-  const unit = svgEl('text', { class:'g-centsunit', x:GEO.cx, y:140 });
-  unit.textContent = 'cents';
-  svg.appendChild(unit);
-
-  const left = svgEl('text', { class:'g-side', x:10, y:180, 'text-anchor':'start' });
-  left.textContent = 'too low \u2013 flat';
-  svg.appendChild(left);
-  const right = svgEl('text', { class:'g-side', x:290, y:180, 'text-anchor':'end' });
-  right.textContent = 'sharp \u2013 too high';
-  svg.appendChild(right);
-
   host.appendChild(svg);
 
-  function drawBands(tol){
-    bands.textContent = '';
-    const near = Math.min(30, tol * 3);
-    bands.appendChild(svgEl('path', { class:'g-band off', d:arcPath(-50, 50, GEO.r),
-      'stroke-width':GEO.band }));
-    bands.appendChild(svgEl('path', { class:'g-band near', d:arcPath(-near, near, GEO.r),
-      'stroke-width':GEO.band }));
-    bands.appendChild(svgEl('path', { class:'g-band good', d:arcPath(-tol, tol, GEO.r),
-      'stroke-width':GEO.band }));
-  }
+  function drawBands(tol){ band.setAttribute('d', arcPath(-tol, tol, GEO.band)); }
   drawBands(State.tol);
 
-  return {
+  const api = {
     host, drawBands,
     idle(){
       host.classList.add('is-idle');
       host.classList.remove('is-good', 'is-flat', 'is-sharp');
-      needle.setAttribute('transform', 'rotate(0 150 150)');
-      centsText.textContent = '–';
+      needle.style.transform = 'rotate(0deg)';
+      leds.forEach(d => d.l.setAttribute('class', d.base));
+      centsText.textContent = '';
     },
     show(cents, inTune){
       host.classList.remove('is-idle');
       const c = Math.max(-50, Math.min(50, cents));
-      needle.setAttribute('transform', `rotate(${(c / 50 * 90).toFixed(2)} 150 150)`);
-      const rounded = Math.round(cents);
-      centsText.textContent = (rounded > 0 ? '+' : '') + rounded;
+      needle.style.transform = `rotate(${(c / 50 * GEO.span).toFixed(2)}deg)`;
+      const tone = inTune ? 'good' : cents < 0 ? 'flat' : 'sharp';
+      leds.forEach(d => {
+        const gap = Math.abs(d.c - c);
+        d.l.setAttribute('class', d.base +
+          (inTune && d.c === 0 ? ' on good' : gap <= 2.5 ? ' on ' + tone : gap <= 7.5 ? ' half ' + tone : ''));
+      });
+      const r = Math.round(cents);
+      centsText.textContent = (r > 0 ? '+' : r < 0 ? '−' : '') + Math.abs(r) + ' cents';
       host.classList.toggle('is-good', !!inTune);
       host.classList.toggle('is-flat', !inTune && cents < 0);
       host.classList.toggle('is-sharp', !inTune && cents > 0);
     }
   };
+  api.idle();
+  return api;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   9 · THE STRING BOX
+   9 · THE INSTRUMENT
+   One drawing for every instrument: a headstock (or a violin scroll) with
+   the note names on its tuning pegs, then the neck, then a glimpse of the
+   body. Strings sit as close together as they do on the real thing, in
+   playing order — the highest-numbered string on the left. The drawing is
+   an SVG; the parts you tap are ordinary buttons laid over it.
    ───────────────────────────────────────────────────────────────────────── */
 
-function renderBox(){
-  const box = $('#stringbox');
-  box.textContent = '';
-  const done = currentDoneSet();
+const ART = { S:40, P:60, R:25, crown:42, gapNut:24, NL:300, NLc:176, Bh:104, Bhc:70 };
+const COMPACT_MQ = window.matchMedia ? window.matchMedia('(max-width: 759px)') : { matches:false };
 
-  ROWS.forEach((row, i) => {
+function lookOf(inst){
+  const id = inst.id;
+  if (id === 'erhu') return { head:'scroll', board:'ebony', frets:false, body:'drum', skin:'dark' };
+  if (inst.family === 'Bowed') return { head:'scroll', board:'ebony', frets:id === 'gamba', body:'bouts' };
+  if (/^banjo/.test(id)) return { head:'flared', board:'rosewood', frets:true, inlays:true, body:'drum' };
+  if (id === 'bassguitar') return { head:'flared', board:'rosewood', frets:true, inlays:true, body:'electric' };
+  return { head:'flared', board:'rosewood', frets:true, inlays:true, body:'hole' };
+}
+
+let GEOM = null;
+
+function layoutInstrument(){
+  const look = lookOf(INST);
+  const n = ROWS.length, S = ART.S, R = ART.R;
+  const compact = !!COMPACT_MQ.matches;
+  const scroll = look.head === 'scroll';
+  const neckW = n * S;
+
+  /* the banjo's short 5th string has its peg on the side of the neck */
+  const headed = ROWS.map((r, i) => i).filter(i => !ROWS[i].short);
+  const nh = headed.length;
+  const pL = Math.ceil(nh / 2), pR = nh - pL;
+  const rows = Math.max(pL, pR, 1);
+
+  const headW = scroll ? Math.max(neckW * 0.86, 96) : Math.max(neckW + 60, 160);
+  const knobOff = scroll ? 34 : 30;
+  const W = Math.round(Math.max(headW + 2 * (knobOff + R) + 8, neckW + 48));
+  const cx = W / 2;
+  const top = 6;
+  const headH = ART.crown + rows * ART.P + ART.gapNut + (scroll ? 44 : 0);
+  const nutY = top + headH;
+  const NL = compact ? ART.NLc : ART.NL;
+  const Bh = compact ? ART.Bhc : ART.Bh;
+  const H = Math.round(nutY + NL + Bh);
+  const xs = ROWS.map((r, i) => cx - neckW / 2 + (i + 0.5) * S);
+  const scale = NL / (1 - Math.pow(2, -7 / 12));            /* the 7th fret ends the neck */
+  const fretY = k => nutY + scale * (1 - Math.pow(2, -k / 12));
+
+  /* Outer strings go to the pegs nearest the nut, inner strings to the top
+     ones, so no two strings ever cross — the way a real headstock is strung. */
+  const postIn = scroll ? headW * 0.2 : headW / 2 - 22;
+  const pegs = [];
+  headed.forEach((i, k) => {
+    const left = k < pL;
+    const row = left ? k : nh - 1 - k;
+    const side = left ? -1 : 1;
+    const py = nutY - ART.gapNut - ART.P * (row + 0.5);
+    pegs.push({ i, side, row, px:cx + side * postIn, py, kx:cx + side * (headW / 2 + knobOff), ky:py, r:R });
+  });
+  ROWS.forEach((r, i) => {
+    if (!r.short) return;
+    const y = fretY(r.short);
+    pegs.push({ i, side:-1, row:-1, short:true, px:xs[i], py:y, kx:cx - neckW / 2 - knobOff + 2, ky:y, r:R * 0.84 });
+  });
+
+  return { look, n, S, R, neckW, headW, W, H, cx, top, nutY, NL, Bh, xs, fretY, pegs, scroll, rows, compact };
+}
+
+const f1 = v => Math.round(v * 10) / 10;
+
+const ART_DEFS = `<defs>
+  <linearGradient id="g-head" x1="0" x2="1"><stop offset="0" stop-color="#4e2c13"/><stop offset=".22" stop-color="#7d4c22"/><stop offset=".5" stop-color="#93602f"/><stop offset=".78" stop-color="#7d4c22"/><stop offset="1" stop-color="#4e2c13"/></linearGradient>
+  <linearGradient id="g-varnish" x1="0" x2="1"><stop offset="0" stop-color="#6e2810"/><stop offset=".45" stop-color="#b65a26"/><stop offset=".55" stop-color="#c26a31"/><stop offset="1" stop-color="#6e2810"/></linearGradient>
+  <linearGradient id="g-board" x1="0" x2="1"><stop offset="0" stop-color="#26160d"/><stop offset=".5" stop-color="#3d2616"/><stop offset="1" stop-color="#26160d"/></linearGradient>
+  <linearGradient id="g-ebony" x1="0" x2="1"><stop offset="0" stop-color="#0c0a09"/><stop offset=".5" stop-color="#231e1b"/><stop offset="1" stop-color="#0c0a09"/></linearGradient>
+  <linearGradient id="g-top" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1d39d"/><stop offset="1" stop-color="#d9a864"/></linearGradient>
+  <radialGradient id="g-burst" cx=".5" cy=".9" r=".9"><stop offset="0" stop-color="#e09a3a"/><stop offset=".55" stop-color="#a1361a"/><stop offset="1" stop-color="#2a0905"/></radialGradient>
+  <radialGradient id="g-skin" cx=".5" cy=".35" r=".7"><stop offset="0" stop-color="#fcfaf4"/><stop offset="1" stop-color="#e4dac6"/></radialGradient>
+  <radialGradient id="g-skin-dark" cx=".5" cy=".35" r=".7"><stop offset="0" stop-color="#4a403a"/><stop offset="1" stop-color="#1f1a17"/></radialGradient>
+  <linearGradient id="g-plain" x1="0" x2="1"><stop offset="0" stop-color="#7c868d"/><stop offset=".42" stop-color="#e9eef1"/><stop offset=".52" stop-color="#ffffff"/><stop offset=".72" stop-color="#b3bdc3"/><stop offset="1" stop-color="#626c73"/></linearGradient>
+  <linearGradient id="g-wound" x1="0" x2="1"><stop offset="0" stop-color="#5f421d"/><stop offset=".42" stop-color="#d7a65c"/><stop offset=".52" stop-color="#f7dfae"/><stop offset=".72" stop-color="#b48542"/><stop offset="1" stop-color="#55391a"/></linearGradient>
+  <linearGradient id="g-metal" x1="0" x2="1"><stop offset="0" stop-color="#868d93"/><stop offset=".45" stop-color="#f2f5f7"/><stop offset="1" stop-color="#7d848a"/></linearGradient>
+  <linearGradient id="g-shaft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f6f8"/><stop offset=".55" stop-color="#9aa1a7"/><stop offset="1" stop-color="#5e656b"/></linearGradient>
+  <linearGradient id="g-pegwood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a3326"/><stop offset=".4" stop-color="#21150e"/><stop offset="1" stop-color="#0d0805"/></linearGradient>
+  <radialGradient id="g-bush" cx=".38" cy=".35" r=".7"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#c3c9ce"/><stop offset="1" stop-color="#6b7278"/></radialGradient>
+  <radialGradient id="g-pearl" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#fffdf7"/><stop offset="1" stop-color="#d9cdb8"/></radialGradient>
+  <pattern id="p-wind" width="6" height="2.6" patternUnits="userSpaceOnUse"><rect width="6" height="1.1" fill="rgba(40,22,4,.5)"/></pattern>
+</defs>`;
+
+function headArt(g){
+  const { cx, top, nutY, neckW, headW, scroll, look, rows } = g;
+  const nl = cx - neckW / 2, nr = cx + neckW / 2, hl = cx - headW / 2, hr = cx + headW / 2;
+  const out = [];
+  if (!scroll){
+    const d = `M ${f1(nl)} ${f1(nutY)} C ${f1(nl)} ${f1(nutY - 18)} ${f1(hl)} ${f1(nutY - 20)} ${f1(hl)} ${f1(nutY - 46)}
+      L ${f1(hl + 4)} ${f1(top + 26)} Q ${f1(hl + 6)} ${f1(top + 2)} ${f1(hl + 32)} ${f1(top + 4)}
+      Q ${f1(cx)} ${f1(top - 10)} ${f1(hr - 32)} ${f1(top + 4)} Q ${f1(hr - 6)} ${f1(top + 2)} ${f1(hr - 4)} ${f1(top + 26)}
+      L ${f1(hr)} ${f1(nutY - 46)} C ${f1(hr)} ${f1(nutY - 20)} ${f1(nr)} ${f1(nutY - 18)} ${f1(nr)} ${f1(nutY)} Z`;
+    out.push(`<clipPath id="c-head"><path d="${d}"/></clipPath>`);
+    out.push(`<path d="${d}" fill="url(#g-head)" stroke="#2c1708" stroke-width="2.4"/>`);
+    /* a little wood grain */
+    const grain = [];
+    for (let k = 1; k <= 6; k++){
+      const x = hl + headW * k / 7, wob = (k % 2 ? 7 : -6);
+      grain.push(`M ${f1(x)} ${f1(top)} C ${f1(x + wob)} ${f1(top + 60)} ${f1(x - wob)} ${f1(nutY - 70)} ${f1(x + wob * 0.4)} ${f1(nutY)}`);
+    }
+    out.push(`<path d="${grain.join(' ')}" fill="none" stroke="rgba(40,18,4,.22)" stroke-width="1.6" clip-path="url(#c-head)"/>`);
+    out.push(`<path d="M ${f1(hl + 10)} ${f1(top + 14)} Q ${f1(cx)} ${f1(top - 1)} ${f1(hr - 10)} ${f1(top + 14)}" fill="none" stroke="rgba(255,236,205,.28)" stroke-width="2"/>`);
+    if (headW >= 150) out.push(`<text x="${f1(cx)}" y="${f1(top + 32)}" class="head-logo" text-anchor="middle">EVM</text>`);
+  } else {
+    /* a violin pegbox with its scroll on top */
+    const boxTop = nutY - ART.gapNut - rows * ART.P - 8;
+    const sr = Math.min(30, headW * 0.36), sy = boxTop - sr + 6;
+    out.push(`<rect x="${f1(hl)}" y="${f1(boxTop)}" width="${f1(headW)}" height="${f1(nutY - boxTop + 4)}" rx="14" fill="url(#g-varnish)" stroke="#2f0f04" stroke-width="2.2"/>`);
+    out.push(`<rect x="${f1(hl + 9)}" y="${f1(boxTop + 10)}" width="${f1(headW - 18)}" height="${f1(nutY - boxTop - 12)}" rx="8" fill="#250c04"/>`);
+    out.push(`<circle cx="${f1(cx)}" cy="${f1(sy)}" r="${f1(sr)}" fill="url(#g-varnish)" stroke="#2f0f04" stroke-width="2.2"/>`);
+    const pts = [];
+    for (let t = 0; t <= 4.6 * Math.PI; t += 0.18){
+      const rr = sr * 0.84 * (1 - t / (5.2 * Math.PI));
+      pts.push(f1(cx + rr * Math.cos(t - Math.PI / 2)) + ' ' + f1(sy + rr * Math.sin(t - Math.PI / 2)));
+    }
+    out.push(`<path d="M ${pts.join(' L ')}" fill="none" stroke="#3a1406" stroke-width="2.4" stroke-linecap="round"/>`);
+    out.push(`<circle cx="${f1(cx)}" cy="${f1(sy)}" r="3.4" fill="#3a1406"/>`);
+  }
+  return out.join('');
+}
+
+function bodyArt(g){
+  const { look, W, H, cx, nutY, NL, Bh, neckW, xs } = g;
+  const y0 = nutY + NL;
+  const nl = cx - neckW / 2, nr = cx + neckW / 2;
+  const out = [];
+  const shoulders = (fill, stroke) => `<path d="M ${f1(nl - 2)} ${f1(y0)} C ${f1(nl - 70)} ${f1(y0)} 6 ${f1(y0 + 12)} 6 ${f1(y0 + Math.min(80, Bh * 0.8))}
+      L 6 ${f1(H + 4)} L ${f1(W - 6)} ${f1(H + 4)} L ${f1(W - 6)} ${f1(y0 + Math.min(80, Bh * 0.8))}
+      C ${f1(W - 6)} ${f1(y0 + 12)} ${f1(nr + 70)} ${f1(y0)} ${f1(nr + 2)} ${f1(y0)} Z" fill="${fill}" stroke="${stroke}" stroke-width="2.4"/>`;
+
+  if (look.body === 'hole'){
+    out.push(shoulders('url(#g-top)', '#5a3414'));
+    const r = neckW * 0.5, hy = y0 + Math.max(20, Bh * 0.3) + r;
+    out.push(`<circle cx="${f1(cx)}" cy="${f1(hy)}" r="${f1(r + 15)}" fill="none" stroke="#3b2210" stroke-width="2"/>`);
+    out.push(`<circle cx="${f1(cx)}" cy="${f1(hy)}" r="${f1(r + 9)}" fill="none" stroke="#7a4b20" stroke-width="5" stroke-dasharray="3 3"/>`);
+    out.push(`<circle cx="${f1(cx)}" cy="${f1(hy)}" r="${f1(r)}" fill="#1a0e06"/>`);
+  } else if (look.body === 'bouts'){
+    out.push(shoulders('url(#g-varnish)', '#2f0f04'));
+    if (!g.compact){
+      [-1, 1].forEach(s => {
+        const x = cx + s * (neckW / 2 + 26);
+        out.push(`<circle cx="${f1(x)}" cy="${f1(H - 16)}" r="4.2" fill="#160602"/>`);
+        out.push(`<path d="M ${f1(x)} ${f1(H - 16)} q ${s * 5} 10 ${s * 2} 22" fill="none" stroke="#160602" stroke-width="3.2" stroke-linecap="round"/>`);
+      });
+    }
+  } else if (look.body === 'drum'){
+    const R = W / 2 - 4, cy = y0 + R;
+    out.push(`<circle cx="${f1(cx)}" cy="${f1(cy)}" r="${f1(R)}" fill="url(#${look.skin === 'dark' ? 'g-skin-dark' : 'g-skin'})" stroke="url(#g-metal)" stroke-width="11"/>`);
+    for (let a = -80; a <= 80; a += 16){
+      const t = a * Math.PI / 180;
+      out.push(`<circle cx="${f1(cx + (R + 1) * Math.sin(t))}" cy="${f1(cy - (R + 1) * Math.cos(t))}" r="3.2" fill="#5e656b"/>`);
+    }
+  } else if (look.body === 'electric'){
+    out.push(shoulders('url(#g-burst)', '#160402'));
+    const py = y0 + Bh * 0.62;
+    out.push(`<rect x="${f1(nl - 12)}" y="${f1(py - 12)}" width="${f1(neckW + 24)}" height="24" rx="7" fill="#121212" stroke="#000" stroke-width="1.5"/>`);
+    xs.forEach(x => {
+      out.push(`<circle cx="${f1(x - 6)}" cy="${f1(py)}" r="3" fill="#8b9095"/><circle cx="${f1(x + 6)}" cy="${f1(py)}" r="3" fill="#8b9095"/>`);
+    });
+  }
+  return out.join('');
+}
+
+function drawArt(g){
+  const { look, H, cx, nutY, NL, Bh, neckW, headW, xs, pegs, scroll, fretY, n } = g;
+  const nl = cx - neckW / 2, nr = cx + neckW / 2, hl = cx - headW / 2, hr = cx + headW / 2;
+  const y0 = nutY + NL;
+  const out = [ART_DEFS];
+
+  out.push(bodyArt(g));
+
+  /* the fingerboard, running a little way onto the body */
+  const ext = look.body === 'bouts' ? Bh * 0.62 : look.body === 'electric' ? 8 : 28;
+  out.push(`<rect x="${f1(nl)}" y="${f1(nutY)}" width="${f1(neckW)}" height="${f1(NL + ext)}" rx="2" fill="url(#${look.board === 'ebony' ? 'g-ebony' : 'g-board'})"/>`);
+  if (look.board !== 'ebony'){        /* the edge binding: kept dim so it never reads as a string */
+    out.push(`<rect x="${f1(nl - 1.5)}" y="${f1(nutY)}" width="2.2" height="${f1(NL + ext)}" fill="rgba(226,205,165,.38)"/>`);
+    out.push(`<rect x="${f1(nr - 0.7)}" y="${f1(nutY)}" width="2.2" height="${f1(NL + ext)}" fill="rgba(226,205,165,.38)"/>`);
+  }
+  if (look.inlays && n >= 3){
+    [3, 5, 7].forEach(k => {
+      const y = (fretY(k - 1) + fretY(k)) / 2;
+      out.push(`<circle cx="${f1(cx)}" cy="${f1(y)}" r="7" fill="url(#g-pearl)"/>`);
+    });
+  }
+  if (look.frets){
+    for (let k = 1; k <= 7; k++){
+      const y = fretY(k);
+      if (look.body === 'bouts'){    /* a gamba's frets are gut, tied round the neck */
+        out.push(`<rect x="${f1(nl - 2)}" y="${f1(y - 1.6)}" width="${f1(neckW + 4)}" height="3.2" rx="1.6" fill="#c9a97a"/>`);
+      } else {
+        out.push(`<rect x="${f1(nl)}" y="${f1(y + 1)}" width="${f1(neckW)}" height="2" fill="rgba(0,0,0,.45)"/>`);
+        out.push(`<rect x="${f1(nl)}" y="${f1(y - 2)}" width="${f1(neckW)}" height="3.4" rx="1.2" fill="url(#g-shaft)"/>`);
+      }
+    }
+  }
+
+  out.push(headArt(g));
+
+  /* tuning machines: the gear housing on the edge of the headstock, and the
+     shaft out to the peg you tap (that part is a button, drawn in HTML) */
+  pegs.forEach(p => {
+    if (p.short){
+      const x0 = Math.min(p.kx, nl - 6), x1 = nl - 6;
+      out.push(`<rect x="${f1(x0)}" y="${f1(p.py - 3)}" width="${f1(x1 - x0)}" height="6" rx="3" fill="url(#g-shaft)"/>`);
+      out.push(`<rect x="${f1(nl - 11)}" y="${f1(p.py - 7)}" width="11" height="14" rx="4" fill="url(#g-metal)"/>`);
+    } else if (!scroll){
+      const edge = p.side < 0 ? hl : hr;
+      const hx = p.side < 0 ? edge - 13 : edge - 3;
+      const sx0 = p.side < 0 ? p.kx : edge + 13, sx1 = p.side < 0 ? edge - 13 : p.kx;
+      out.push(`<rect x="${f1(sx0)}" y="${f1(p.py - 3.5)}" width="${f1(sx1 - sx0)}" height="7" rx="3" fill="url(#g-shaft)"/>`);
+      out.push(`<rect x="${f1(hx)}" y="${f1(p.py - 10)}" width="16" height="20" rx="5" fill="url(#g-metal)" stroke="rgba(0,0,0,.35)" stroke-width="1"/>`);
+    }
+  });
+
+  /* the nut */
+  out.push(`<rect x="${f1(nl - 2)}" y="${f1(nutY - 7)}" width="${f1(neckW + 4)}" height="9" rx="2.5" fill="#efe5cd" stroke="rgba(60,40,20,.45)" stroke-width="1.2"/>`);
+
+  /* the strings */
+  ROWS.forEach((r, i) => {
+    const peg = pegs.find(p => p.i === i);
+    const pair = r.pair ? [r.midi, r.pairMidi] : [r.midi];
+    const offs = pair.length > 1 ? [-5.5, 5.5] : [0];
+    const startY = r.short ? fretY(r.short) : nutY - 7;
+    const w = pair.map(m => f1(wireWidth(m) * 0.62 + 0.7));
+    const fill = pair.map(m => isWound(m) ? 'url(#g-wound)' : 'url(#g-plain)');
+
+    /* above the nut: straight to its post (never vibrates, so not in the group) */
+    if (!r.short && peg){
+      offs.forEach((o, k) => {
+        out.push(`<line x1="${f1(xs[i] + o)}" y1="${f1(nutY - 7)}" x2="${f1(peg.px + o * 0.4)}" y2="${f1(peg.py)}"
+          stroke="${isWound(pair[k]) ? '#c39654' : '#d4dade'}" stroke-width="${f1(w[k] * 0.85)}" stroke-linecap="round"/>`);
+      });
+    }
+
+    const len = f1(H - startY + 4);
+    const amp = f1(2.6 + Math.max(...w) * 0.75);
+    const vib = (INST.voice === 'bow' ? 0.5 : 0.45 + Math.max(...w) * 0.07).toFixed(2);
+    const rects = cls => offs.map((o, k) =>
+      `<rect class="${cls}" x="${f1(xs[i] + o - w[k] / 2)}" y="${f1(startY)}" width="${w[k]}" height="${len}" rx="${f1(w[k] / 2)}"/>`).join('');
+    let g1 = `<g class="str" data-i="${i}" style="--amp:${amp}px;--vib:${vib}s">`;
+    g1 += offs.map((o, k) => `<rect x="${f1(xs[i] + o - w[k] / 2 + 2.2)}" y="${f1(startY)}" width="${w[k]}" height="${len}" fill="rgba(0,0,0,.35)"/>`).join('');
+    g1 += `<g class="ghost g1">${rects('')}</g><g class="ghost g2">${rects('')}</g>`;
+    g1 += `<g class="wire">` + offs.map((o, k) =>
+      `<rect x="${f1(xs[i] + o - w[k] / 2)}" y="${f1(startY)}" width="${w[k]}" height="${len}" fill="${fill[k]}"/>` +
+      (isWound(pair[k]) ? `<rect x="${f1(xs[i] + o - w[k] / 2)}" y="${f1(startY)}" width="${w[k]}" height="${len}" fill="url(#p-wind)"/>` : '')
+    ).join('') + `</g></g>`;
+    out.push(g1);
+  });
+
+  /* posts and pegs drawn over the string ends */
+  pegs.forEach(p => {
+    if (p.short){
+      out.push(`<circle cx="${f1(p.px)}" cy="${f1(p.py)}" r="4.6" fill="url(#g-bush)" stroke="rgba(0,0,0,.4)"/>`);
+    } else if (!scroll){
+      out.push(`<circle cx="${f1(p.px)}" cy="${f1(p.py)}" r="8.5" fill="url(#g-bush)" stroke="rgba(0,0,0,.35)" stroke-width="1"/>`);
+      out.push(`<circle cx="${f1(p.px)}" cy="${f1(p.py)}" r="3" fill="#2b2b2b"/>`);
+    } else {
+      /* a violin peg runs right through the pegbox */
+      const x0 = p.side < 0 ? p.kx : hl - 7, x1 = p.side < 0 ? hr + 7 : p.kx;
+      out.push(`<rect x="${f1(x0)}" y="${f1(p.py - 5.5)}" width="${f1(x1 - x0)}" height="11" rx="5.5" fill="url(#g-pegwood)"/>`);
+    }
+  });
+
+  return out.join('');
+}
+
+function renderBox(){
+  const g = GEOM = layoutInstrument();
+  const inst = $('#instrument');
+  inst.style.setProperty('--W', g.W);
+  inst.style.setProperty('--H', g.H);
+  inst.dataset.head = g.look.head;
+
+  const svg = $('#inst-art');
+  svg.setAttribute('viewBox', `0 0 ${g.W} ${g.H}`);
+  svg.innerHTML = drawArt(g);
+
+  const hit = $('#inst-hit');
+  hit.textContent = '';
+  nearShown = -1;                     /* new buttons: nothing is lit yet */
+  const px = v => (v / g.W * 100).toFixed(3) + '%';
+  const py = v => (v / g.H * 100).toFixed(3) + '%';
+
+  ROWS.forEach((r, i) => {
+    const color = colorOfMidi(r.midi);
+    const startY = r.short ? g.fretY(r.short) - 10 : g.nutY - 8;
+
+    /* the long tap target along the string — pointer only; the peg is the
+       keyboard and screen-reader button for the same string */
+    const lane = el('button', 'lane');
+    lane.type = 'button';
+    lane.tabIndex = -1;
+    lane.setAttribute('aria-hidden', 'true');
+    lane.dataset.i = i;
+    lane.style.cssText = `left:${px(g.xs[i] - g.S / 2)};top:${py(startY)};width:${px(g.S)};height:${py(g.H - startY)};--nc:${color}`;
+    hit.appendChild(lane);
+
+    /* the string's number; a named string (the dulcimer's Bass, Middle,
+       Melody) shows its name on the screen and in the tooltip instead */
+    const lab = el('span', 'snum', String(r.trad));
+    lab.style.cssText = `left:${px(g.xs[i])};top:${py(g.H - 21)}`;
+    lab.title = stringName(r);
+    hit.appendChild(lab);
+
+    const key = el('kbd', 'keycap', String(r.key));
+    key.style.cssText = `left:${px(g.xs[i])};top:${py(g.H - 52)}`;
+    hit.appendChild(key);
+
     if (i > 0){
-      const gap = row.midi - ROWS[i - 1].midi;
+      const gap = r.midi - ROWS[i - 1].midi;
       const up = gap >= 0, size = Math.abs(gap);
       const short = size <= 12 ? INTERVALS_SHORT[size] : size + 'st';
-      const tag = el('span', 'interval-tag' + (up ? '' : ' down'),
-        gap === 0 ? '=' : (up ? short : '\u2193' + short));
+      const tag = el('span', 'ichip' + (up ? '' : ' down'), gap === 0 ? '=' : (up ? short : '↓' + short));
       tag.title = gap === 0
         ? 'these two strings are tuned to the same note'
         : (size <= 12 ? 'a ' + INTERVALS[size] : size + ' semitones') +
           (up ? ' up' : ' DOWN') + ' from the string on the left';
-      box.appendChild(tag);
+      tag.style.cssText = `left:${px((g.xs[i - 1] + g.xs[i]) / 2)};top:${py(g.H - 52)}`;
+      hit.appendChild(tag);
     }
+  });
 
-    const col = el('button', 'string-col');
-    col.type = 'button';
-    col.dataset.i = i;
-    col.setAttribute('aria-label',
-      `String ${row.key}: ${row.note}${row.pair ? ' with ' + row.pair : ''}, ` +
-      `${row.label || ordinal(row.trad) + ' string'}, ${row.freq.toFixed(1)} hertz`);
-
-    col.appendChild(el('span', 's-tick', '✓'));
-    col.appendChild(noteSpan(row.note, 's-note'));
-    col.appendChild(el('span', 's-pair', row.pair ? '+ ' + row.pair : ' '));
-
-    const lane = el('span', 'wire-lane');
-    const w = wireWidth(row.midi);
-    const wound = isWound(row.midi);
-    lane.style.setProperty('--w', w.toFixed(2) + 'px');
-    lane.style.setProperty('--wire-col', wound ? 'var(--wire-wound)' : 'var(--wire)');
-    lane.style.setProperty('--amp', (3.5 + w * 0.85).toFixed(1) + 'px');
-    lane.style.setProperty('--vib', (INST.voice === 'bow' ? 0.5 : 0.45 + w * 0.06).toFixed(2) + 's');
-    lane.appendChild(el('span', 'wire-ghost g1'));
-    lane.appendChild(el('span', 'wire-ghost g2'));
-    lane.appendChild(el('span', 'wire' + (wound ? ' wound' : '')));
-    if (row.pair){
-      const w2 = wireWidth(row.pairMidi);
-      const lane2 = el('span', 'wire');
-      lane2.style.setProperty('--w', w2.toFixed(2) + 'px');
-      lane2.style.setProperty('--wire-col', isWound(row.pairMidi) ? 'var(--wire-wound)' : 'var(--wire)');
-      lane2.style.left = 'calc(50% + 5px)';
-      lane.querySelector('.wire').style.left = 'calc(50% - 5px)';
-      if (isWound(row.pairMidi)) lane2.classList.add('wound');
-      lane.appendChild(lane2);
-    }
-    col.appendChild(lane);
-
-    const foot = el('span', 's-foot');
-    foot.appendChild(el('span', 's-key', String(row.key)));
-    foot.appendChild(el('span', 's-trad', row.label || ordinal(row.trad) + ' string'));
-    col.appendChild(foot);
-
-    if (done[row.key]) col.classList.add('is-done');
-    if (i === State.selected) col.classList.add('is-sel');
-    box.appendChild(col);
+  g.pegs.forEach(p => {
+    const r = ROWS[p.i];
+    const peg = el('button', 'peg' + (p.short ? ' small' : ''));
+    peg.type = 'button';
+    peg.dataset.i = p.i;
+    peg.setAttribute('aria-label',
+      `String ${r.key}: ${r.note}${r.pair ? ' with ' + r.pair : ''}, ` +
+      `${stringName(r)}, ${r.freq.toFixed(1)} hertz`);
+    peg.style.cssText = `left:${px(p.kx - p.r)};top:${py(p.ky - p.r)};width:${px(p.r * 2)};--nc:${colorOfMidi(r.midi)}`;
+    peg.appendChild(noteSpan(r.note, 'pn'));
+    peg.appendChild(el('span', 'tick', '✓'));
+    hit.appendChild(peg);
   });
 
   $('#hint-last-key').textContent = String(ROWS.length);
+  markSelected();
+  markDone();
   syncSounding();
-  renderBoxHint();
 }
 
-function renderBoxHint(){
-  const h = $('#box-hint');
-  if (State.mode === 'tune'){
-    h.textContent = 'Tap the string you want to tune. Its number key works too.';
-  } else if (State.mode === 'listen'){
-    h.textContent = 'The tuner listens to any sound, not just this instrument. ' +
-      'Your strings are here so you can compare.';
-  } else {
-    const low = lowestOf(ROWS), high = highestOf(ROWS);
-    const inOrder = !isReentrant(TUNING);
-    h.textContent = 'The strings are in the same order as on the real instrument: ' +
-      'the ' + (ROWS[0].label || ordinal(ROWS[0].trad) + ' string') + ' on the left, ' +
-      'the ' + (ROWS[ROWS.length - 1].label || ordinal(ROWS[ROWS.length - 1].trad) +
-      ' string') + ' on the right. ' +
-      (inOrder
-        ? 'The thickest one is on the left (' + low.note + ', ' + low.freq.toFixed(1) +
-          ' Hz) and the thinnest is on the right (' + high.note + ', ' +
-          high.freq.toFixed(1) + ' Hz). A thicker, heavier string vibrates more ' +
-          'slowly, and slower means lower.'
-        : 'Look at how thick each string is. They do not just get thinner as you go ' +
-          'across, because this tuning does not just get higher. The lowest string ' +
-          'is ' + low.note + ' (' + low.freq.toFixed(1) + ' Hz) and the highest is ' +
-          high.note + ' (' + high.freq.toFixed(1) + ' Hz).');
-  }
+function markSelected(){
+  $$('#inst-hit [data-i]').forEach(b => b.classList.toggle('is-sel', +b.dataset.i === State.selected));
+}
+function markDone(){
+  const done = currentDoneSet();
+  $$('#inst-hit .peg').forEach(b => b.classList.toggle('is-done', !!done[ROWS[+b.dataset.i].key]));
+}
+let nearShown = -1;
+function markNear(i){
+  if (i === nearShown) return;
+  nearShown = i;
+  $$('#inst-hit [data-i]').forEach(b => b.classList.toggle('is-near', +b.dataset.i === i));
+}
+let stateShown = '';
+function setInstState(s){
+  if (s === stateShown) return;
+  stateShown = s;
+  $('#instrument').dataset.state = s;
 }
 
 function syncSounding(){
-  $$('#stringbox .string-col').forEach(col => {
-    const i = +col.dataset.i;
-    col.classList.toggle('sounding', Audio_.isSounding('s' + ROWS[i].key));
+  ROWS.forEach((r, i) => {
+    const on = Audio_.isSounding('s' + r.key);
+    $$(`#inst-hit [data-i="${i}"], #inst-art .str[data-i="${i}"]`).forEach(n => n.classList.toggle('sounding', on));
   });
 }
 
 function selectString(i, opts){
   State.selected = Math.max(0, Math.min(ROWS.length - 1, i));
-  $$('#stringbox .string-col').forEach(c => c.classList.toggle('is-sel', +c.dataset.i === State.selected));
+  markSelected();
   if (State.mode === 'tune') Tune.retarget(opts && opts.keepReadings);
+  if (State.mode === 'play') renderTeach();
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -1307,61 +1589,96 @@ function pluck(i){
     key, voice:INST.voice, bright:INST.tone.bright,
     decay:INST.tone.decay || 2.5, seconds:State.noteSeconds, hold:State.hold
   });
+  Wave.hit(row, freqs);
 
-  const col = $(`#stringbox .string-col[data-i="${i}"]`);
-  if (col){
-    col.classList.remove('plucking');
-    void col.offsetWidth;                              /* restart the animation */
-    col.classList.add('plucking');
-    setTimeout(() => col.classList.remove('plucking'), 1200);
+  const str = $(`#inst-art .str[data-i="${i}"]`);
+  if (str){
+    str.classList.remove('plucking');
+    void str.getBoundingClientRect();                  /* restart the animation */
+    str.classList.add('plucking');
+    setTimeout(() => str.classList.remove('plucking'), 1200);
   }
+  if (State.mode === 'play') renderTeach();
+}
+
+/* the Hear screen: the note, and a picture of the string vibrating — a low
+   note draws a few slow, wide waves, a high note many quick narrow ones */
+const Wave = {
+  canvas:null, cctx:null, last:null, phase:0, prev:0, quiet:false,
+
+  init(){ this.canvas = $('#wave'); this.cctx = this.canvas.getContext('2d'); },
+
+  hit(row, freqs){
+    this.last = { key:'s' + row.key, freqs, t:performance.now(), hold:State.hold,
+      color:colorOfMidi(row.midi), bow:INST.voice === 'bow', decay:INST.tone.decay || 2.5 };
+    this.quiet = false;
+  },
+
+  draw(now){
+    const dt = this.prev ? Math.min(0.1, (now - this.prev) / 1000) : 0;
+    this.prev = now;
+    const L = this.last;
+    let amp = 0;
+    if (L && Audio_.isSounding(L.key)){
+      const age = (now - L.t) / 1000;
+      const attack = Math.min(1, age / (L.bow ? 0.15 : 0.02));
+      amp = attack * (L.bow || L.hold ? 1 : Math.exp(-age / Math.max(0.5, Math.min(L.decay, State.noteSeconds) * 0.6)));
+    }
+    if (amp < 0.004){ if (this.quiet) return; this.quiet = true; amp = 0; }
+    else this.quiet = false;
+
+    const { w, h } = fitCanvas(this.canvas, this.cctx);
+    const g = this.cctx;
+    g.clearRect(0, 0, w, h);
+    g.strokeStyle = 'rgba(160,190,175,.16)';
+    g.lineWidth = 1;
+    g.beginPath(); g.moveTo(0, h / 2 + 0.5); g.lineTo(w, h / 2 + 0.5); g.stroke();
+    if (!L || !amp) return;
+
+    this.phase += dt * Math.PI * 2 * 0.9;
+    const cyc = L.freqs.map(fq => Math.min(26, fq / 55));
+    g.strokeStyle = L.color;
+    g.lineWidth = 3;
+    g.lineJoin = 'round';
+    g.shadowColor = L.color;
+    g.shadowBlur = 10;
+    g.beginPath();
+    for (let x = 0; x <= w; x += 2){
+      let y = 0;
+      cyc.forEach((c, k) => { y += Math.sin(2 * Math.PI * c * x / w - this.phase * (k + 1)) / cyc.length; });
+      const edge = Math.sin(Math.PI * x / w);                     /* pinned at both ends, like a string */
+      const yy = h / 2 - y * amp * edge * (h * 0.4);
+      if (x === 0) g.moveTo(x, yy); else g.lineTo(x, yy);
+    }
+    g.stroke();
+    g.shadowBlur = 0;
+  }
+};
+
+function fitCanvas(c, cctx){
+  const dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth || 300, h = c.clientHeight || 90;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)){
+    c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+    cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  return { w, h };
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   11 · WHAT THIS TUNING IS TEACHING
+   11 · THE HEAR SCREEN, AND WHAT THIS TUNING IS TEACHING (in the ⓘ sheet)
    ───────────────────────────────────────────────────────────────────────── */
 
 function preferFlats(){ return TUNING.strings.some(s => s.n.includes('b')); }
 
+/* (kept under its old name: everything that changes the strings calls it) */
 function renderTeach(){
-  const box = $('#play-teach');
-  box.textContent = '';
-  box.appendChild(el('h2', null, INST.name + ' · ' + TUNING.name));
-
-  const chips = el('p');
-  ROWS.forEach(r => {
-    const c = el('span', 'pattern', r.key + '  ' + r.note + (r.pair ? ' + ' + r.pair : ''));
-    c.title = (r.label || ordinal(r.trad) + ' string') + ' · ' + r.freq.toFixed(2) + ' Hz';
-    chips.appendChild(c);
-  });
-  box.appendChild(chips);
-
-  if (isReentrant(TUNING)){
-    /* name the exact place where the notes stop climbing */
-    let d = 1;
-    while (d < ROWS.length && ROWS[d].midi >= ROWS[d - 1].midi) d++;
-    const high = ROWS[d - 1], low = ROWS[d];
-    const nameOf = r => r.label ? r.label.toLowerCase() + ' string'
-                                : ordinal(r.trad) + ' string';
-    const p = el('p');
-    p.innerHTML = '<b>This tuning is re-entrant.</b> Read the box from left to ' +
-      'right and the notes do not just climb. The ' + nameOf(high) + ' (<b>' +
-      high.note + '</b>) sounds <i>higher</i> than the ' + nameOf(low) + ' (<b>' +
-      low.note + '</b>) right next to it. The ↓ between them shows where the pitch ' +
-      'steps back down. You can see it in the string thicknesses too.';
-    box.appendChild(p);
-  } else {
-    box.appendChild(el('p', null, describePattern(ROWS)));
-  }
-
-  if (TUNING.note) box.appendChild(el('p', null, TUNING.note));
-
-  const hz = el('p');
-  const lo = lowestOf(ROWS), hi = highestOf(ROWS);
-  hz.innerHTML = 'Lowest string <b>' + lo.note + '</b> at ' + lo.freq.toFixed(1) +
-    ' Hz. Highest string <b>' + hi.note + '</b> at ' + hi.freq.toFixed(1) + ' Hz. ' +
-    'That is ' + (hi.freq / lo.freq).toFixed(1) + ' times as many vibrations per second.';
-  box.appendChild(hz);
+  const r = ROWS[State.selected];
+  if (!r) return;
+  $('#play-string').textContent = stringName(r);
+  setNote($('#play-note'), r.note, r.midi, r.pair);
+  $('#play-hz').textContent = r.freq.toFixed(1) + ' Hz' +
+    (r.pairMidi !== null && r.pairMidi !== r.midi ? ' + ' + freqOf(r.pairMidi, State.a4).toFixed(1) + ' Hz' : '');
 }
 
 function renderAbout(){
@@ -1378,37 +1695,50 @@ function renderAbout(){
     f.appendChild(el('dd', null, dd));
     facts.appendChild(f);
   };
+  const lo = lowestOf(ROWS), hi = highestOf(ROWS);
   addFact('Family', INST.family === 'Bowed' ? 'Bowed strings' : 'Plucked strings');
   addFact('Strings', ROWS.length + (TUNING.strings.some(s => s.pair) ? ' courses' : ''));
-  addFact('Lowest', lowestOf(ROWS).note + ' · ' + lowestOf(ROWS).freq.toFixed(1) + ' Hz');
-  addFact('Highest', highestOf(ROWS).note + ' · ' + highestOf(ROWS).freq.toFixed(1) + ' Hz');
+  addFact('Lowest', pretty(lo.note) + ' · ' + lo.freq.toFixed(1) + ' Hz');
+  addFact('Highest', pretty(hi.note) + ' · ' + hi.freq.toFixed(1) + ' Hz');
   b.appendChild(facts);
 
+  /* the tuning: its pattern, then its strings */
   const h = el('div');
   h.appendChild(el('h3', null, TUNING.name));
+  if (isReentrant(TUNING)){
+    let d = 1;
+    while (d < ROWS.length && ROWS[d].midi >= ROWS[d - 1].midi) d++;
+    const high = ROWS[d - 1], low = ROWS[d];
+    const p = el('p');
+    p.innerHTML = '<b>This tuning is re-entrant.</b> Read the strings from left to ' +
+      'right and the notes do not just climb. The ' + stringName(high).toLowerCase() + ' (<b>' +
+      pretty(high.note) + '</b>) sounds <i>higher</i> than the ' + stringName(low).toLowerCase() + ' (<b>' +
+      pretty(low.note) + '</b>) right next to it. In Hear, the amber ↓ shows where the pitch ' +
+      'steps back down. You can see it in the string thicknesses too.';
+    h.appendChild(p);
+  } else {
+    const pat = describePattern(ROWS);
+    if (pat) h.appendChild(el('p', null, pat));
+  }
+  if (TUNING.note) h.appendChild(el('p', null, TUNING.note));
+  h.appendChild(el('p', null, 'The highest string vibrates ' + (hi.freq / lo.freq).toFixed(1) +
+    ' times as fast as the lowest.'));
+
   const tbl = el('table', 'string-table');
   const thead = el('tr');
-  ['Key', 'Note', 'Player calls it', 'Frequency'].forEach(t => {
-    const th = el('th', null, t); thead.appendChild(th);
-  });
+  ['Key', 'Note', 'Player calls it', 'Frequency'].forEach(t => thead.appendChild(el('th', null, t)));
   tbl.appendChild(thead);
   ROWS.forEach(r => {
     const tr = el('tr');
     tr.appendChild(el('td', null, String(r.key)));
-    tr.appendChild(el('td', null, r.note + (r.pair ? ' + ' + r.pair : '')));
-    tr.appendChild(el('td', null, r.label || ordinal(r.trad) + ' string'));
+    tr.appendChild(el('td', null, pretty(r.note) + (r.pair ? ' + ' + pretty(r.pair) : '')));
+    tr.appendChild(el('td', null, stringName(r)));
     tr.appendChild(el('td', null, r.freq.toFixed(2) + ' Hz'));
     tbl.appendChild(tr);
   });
   h.appendChild(tbl);
   b.appendChild(h);
 
-  if (TUNING.note){
-    const d = el('div');
-    d.appendChild(el('h3', null, 'About this tuning'));
-    d.appendChild(el('p', null, TUNING.note));
-    b.appendChild(d);
-  }
   if (INST.care){
     const d = el('div');
     d.appendChild(el('h3', null, 'Tuning it well'));
@@ -1447,15 +1777,12 @@ const Tune = {
     this.target = ROWS[State.selected] || null;
     if (!keep){ this.ema = null; this.hist = []; this.goodSince = 0; this.celebrated = false; }
     const t = this.target;
-    const noteEl = $('#tune-target-note');
-    noteEl.textContent = '';
-    if (!t){ noteEl.textContent = '—'; return; }
-    noteEl.appendChild(noteSpan(t.note, ''));
-    $('#tune-target-string').textContent =
-      'Key ' + t.key + ' · ' + (t.label || ordinal(t.trad) + ' string') +
-      (t.pair ? ' (a pair: ' + t.note + ' and ' + t.pair + ')' : '');
+    if (!t){ setNote($('#tune-target-note'), null); return; }
+    setNote($('#tune-target-note'), t.note, t.midi, t.pair);
+    $('#tune-target-string').textContent = stringName(t);
     $('#tune-target-hz').textContent = t.freq.toFixed(2) + ' Hz';
     this.gauge.idle();
+    setInstState('');
   },
 
   targets(){
@@ -1470,44 +1797,43 @@ const Tune = {
 
   say(verdict, cls, advice){
     const v = $('#tune-verdict');
-    v.textContent = verdict;
+    if (v.textContent !== verdict) v.textContent = verdict;
     v.className = 'verdict' + (cls ? ' ' + cls : '');
-    $('#tune-advice').textContent = advice || '';
+    const a = $('#tune-advice');
+    if (a.textContent !== (advice || '')) a.textContent = advice || '';
   },
 
   tick(now){
     if (!this.target) return;
 
     if (Audio_.anySounding()){
-      this.gauge.idle();
-      this.say('That is the app playing, not you', 'warn',
-        'The microphone can hear the speaker too, not just you. Wait for the note ' +
-        'to finish, or use headphones, then play your string.');
-      $('#level-tune').style.width = '0%';
+      this.gauge.idle(); setInstState('');
+      this.say('That’s the app playing', 'warn',
+        'The mic hears the speaker too. Let the note finish (or use headphones), then play.');
+      setLevel('#level-tune', 0);
       this.ema = null; this.goodSince = 0;
       return;
     }
     if (!Mic.on){
-      this.gauge.idle();
-      this.say('Turn on the microphone to check this string', '',
-        'Or press ' + this.target.key + ' to hear what it should sound like and tune by ear.');
+      this.gauge.idle(); setInstState('');
+      this.say('Start the mic, then play ' + pretty(this.target.note), '',
+        'Or tap Hear and tune by ear.');
       return;
     }
 
     const useLow = this.target.midi < 52;
     const res = Mic.read(useLow ? 16384 : 8192, 27.5, 1400);
     if (!res) return;
-    $('#level-tune').style.width = Math.min(100, res.rms * 420).toFixed(0) + '%';
+    setLevel('#level-tune', res.rms);
 
     if (!res.freq || res.clarity < 0.45){
       if (now - this.lastHeard > 900){
-        this.gauge.idle();
+        this.gauge.idle(); setInstState('');
         this.ema = null; this.goodSince = 0;
-        this.say('Listening for your ' + this.target.note + ' string…', '',
+        this.say('Listening for ' + pretty(this.target.note) + '…', '',
           res.rms > 0.02
-            ? 'I can hear something, but it is not a clear note. Play one string on ' +
-              'its own, and stop the others ringing with your hand.'
-            : 'Play the string a little louder, or move closer to the microphone.');
+            ? 'Not a clear note yet. Play one string, and stop the others ringing.'
+            : 'Play a little louder, or come closer to the mic.');
       }
       return;
     }
@@ -1523,7 +1849,7 @@ const Tune = {
 
     /* a long way off is not a tuning problem, it is the wrong string */
     if (Math.abs(bestCents) > 60){
-      this.gauge.idle();
+      this.gauge.idle(); setInstState('wrong');
       this.ema = null; this.goodSince = 0;
       const heardMidi = Math.round(midiOfFreq(res.freq, State.a4));
       const heardName = nameOfMidi(heardMidi, preferFlats());
@@ -1531,21 +1857,17 @@ const Tune = {
       const other = ROWS.find(r => r.midi === heardMidi && r.key !== this.target.key);
       let advice;
       if (other){
-        advice = 'That is your ' + other.note + ' string — key ' + other.key + ', ' +
-          (other.label ? 'the ' + other.label.toLowerCase() + ' string'
-                       : 'the ' + ordinal(other.trad) + ' string') +
-          '. The one you picked is ' +
-          (other.key < this.target.key ? 'to its right' : 'to its left') +
-          ', or you can switch the tuner over to this string instead.';
+        advice = 'That’s your ' + stringName(other) + ' (' + pretty(other.note) + '). ' +
+          'Yours is ' + (other.key < this.target.key ? 'to its right' : 'to its left') +
+          ' — or tap that peg to tune it instead.';
       } else if (Math.abs(semis) === 12){
-        advice = 'That is exactly one octave ' + (semis > 0 ? 'above' : 'below') +
-          ' the note you want. Right letter, wrong string.';
+        advice = 'Right letter, one octave ' + (semis > 0 ? 'too high' : 'too low') + '. Wrong string?';
       } else {
-        advice = 'That is ' + Math.abs(semis) + ' semitone' + (Math.abs(semis) === 1 ? '' : 's') +
-          ' ' + (semis > 0 ? 'above' : 'below') + ' ' + best.note +
-          '. Check that you are playing an open string, with no finger pressing down.';
+        advice = Math.abs(semis) + ' semitone' + (Math.abs(semis) === 1 ? '' : 's') +
+          ' ' + (semis > 0 ? 'above' : 'below') + ' ' + pretty(best.note) +
+          '. Play it open, with no finger pressing down.';
       }
-      this.say('I hear ' + heardName + ', not ' + best.note, 'warn', advice);
+      this.say('I hear ' + pretty(heardName) + ', not ' + pretty(best.note), 'warn', advice);
       return;
     }
 
@@ -1569,6 +1891,7 @@ const Tune = {
     const tol = State.tol;
     const inTune = Math.abs(cents) <= tol;
     this.gauge.show(cents, inTune);
+    setInstState(inTune ? 'good' : cents < 0 ? 'flat' : 'sharp');
 
     /* A pitch that is still sliding — usually because the peg is being turned —
        must not be declared in tune. But nor should the reading be hidden: the
@@ -1577,9 +1900,8 @@ const Tune = {
     const settling = spread > 18;
     const v = tuneVerdict(cents, tol, best);
     this.say(v.text, v.cls, settling
-      ? (INST.voice === 'bow'
-          ? 'Keep the bow moving steadily and give the reading a moment to settle. '
-          : 'Pluck once and let it ring, so the reading can settle. ') + v.advice
+      ? (INST.voice === 'bow' ? 'Keep the bow steady so the reading settles. '
+                              : 'Let it ring so the reading settles. ') + v.advice
       : v.advice);
     if (settling){ this.goodSince = 0; return; }
 
@@ -1595,15 +1917,16 @@ const Tune = {
   succeed(best){
     this.celebrated = true;
     currentDoneSet()[this.target.key] = true;
-    const col = $(`#stringbox .string-col[data-i="${State.selected}"]`);
-    if (col) col.classList.add('is-done');
-    toast(best.note + ' is in tune', true);
+    markDone();
+    const peg = $(`#inst-hit .peg[data-i="${State.selected}"]`);
+    if (peg){ peg.classList.remove('landed'); void peg.offsetWidth; peg.classList.add('landed'); }
+    toast(pretty(best.note) + ' is in tune', true);
     if (navigator.vibrate) try{ navigator.vibrate([18, 50, 18]); }catch(e){}
     chime();
 
     const done = currentDoneSet();
     if (ROWS.every(r => done[r.key])){
-      setTimeout(() => toast('Every string is in tune. Well done.', true), 2700);
+      setTimeout(() => toast('Every string is in tune. Well done!', true), 2700);
       return;
     }
     if (State.autoAdvance){
@@ -1623,45 +1946,35 @@ function tuneVerdict(cents, tol, target){
   const dir = flat ? 'flat' : 'sharp';
   const bowed = INST.voice === 'bow';
 
-  if (a <= tol) return {
-    text:'In tune ✓', cls:'good',
-    advice:'Hold it there. ' + target.note + ' is right where it should be.'
-  };
+  if (a <= tol) return { text:'In tune ✓', cls:'good', advice:'Hold it there.' };
 
   const raise = flat;
   let how;
   if (bowed && a <= 18){
-    how = 'Use the fine tuner by the tailpiece: turn it ' +
-      (raise ? 'clockwise to tighten and raise' : 'anticlockwise to loosen and lower') +
-      ' the string.';
+    how = 'Fine tuner: turn it ' + (raise ? 'clockwise to raise' : 'anticlockwise to lower') + ' the note.';
   } else if (bowed){
-    how = 'This is too far for the fine tuner, so use the peg. Press it gently INTO ' +
-      'the scroll while you turn, or it will slip back. Turn it ' +
-      (raise ? 'to tighten' : 'to loosen') + ' the string.';
+    how = 'Too far for the fine tuner. Turn the peg ' + (raise ? 'to tighten' : 'to loosen') +
+      ', pressing it gently in so it does not slip.';
   } else {
-    how = 'Turn the tuning peg slowly ' +
-      (raise ? 'to tighten the string and raise the note' : 'to loosen the string and lower the note') +
-      '.';
+    how = raise ? 'Tighten the peg slowly to raise the note.' : 'Loosen the peg to lower the note.';
   }
-  if (!raise) how += ' Go a little below the note, then bring it back up. A string ' +
-    'that is pulling upwards against the peg stays in tune better.';
+  if (!raise) how += ' Go a little below, then come back up to it — it stays in tune better.';
 
   let text;
-  if (a <= tol * 2.2) text = 'So close! Just a touch ' + dir;
+  if (a <= tol * 2.2) text = 'So close! A touch ' + dir;
   else if (a <= 22)   text = 'A little ' + dir;
-  else if (a <= 45)   text = 'Quite a bit ' + dir;
-  else                text = 'A long way ' + dir;
+  else if (a <= 45)   text = 'Quite ' + dir;
+  else                text = 'Very ' + dir;
 
-  return { text, cls:flat ? 'flat' : 'sharp',
-    advice:(flat ? 'The note is below ' : 'The note is above ') + target.note + '. ' + how };
+  return { text:(flat ? '↑ ' : '↓ ') + text, cls:flat ? 'flat' : 'sharp', advice:how };
 }
 
 /* a small, quiet two-note ding when a string lands */
 function chime(){
   const ctx = Audio_.resume(), t = ctx.currentTime + 0.02;
-  [[880, 0], [1320, 0.11]].forEach(([f, d]) => {
+  [[880, 0], [1320, 0.11]].forEach(([fq, d]) => {
     const o = ctx.createOscillator(), g = ctx.createGain();
-    o.type = 'sine'; o.frequency.value = f;
+    o.type = 'sine'; o.frequency.value = fq;
     g.gain.setValueAtTime(0, t + d);
     g.gain.linearRampToValueAtTime(0.10, t + d + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0004, t + d + 0.5);
@@ -1685,44 +1998,35 @@ const Free = {
     this.sizeCanvas();
   },
 
-  sizeCanvas(){
-    const c = this.canvas, dpr = window.devicePixelRatio || 1;
-    const w = c.clientWidth || 600, h = c.clientHeight || 200;
-    if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)){
-      c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
-      this.cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
-    this._w = w; this._h = h;
+  sizeCanvas(){ const s = fitCanvas(this.canvas, this.cctx); this._w = s.w; this._h = s.h; },
+
+  blank(label, verdict){
+    this.gauge.idle();
+    setNote($('#free-note'), null);
+    $('#free-hz').textContent = ' ';
+    $('#free-nearest').textContent = label || ' ';
+    $('#free-verdict').textContent = verdict;
+    markNear(-1);
   },
 
   tick(now){
     if (Audio_.anySounding()){
-      $('#free-verdict').textContent = 'The app is playing a note, so that is what I can hear.';
+      $('#free-verdict').textContent = 'That’s the app playing a note.';
     }
     if (!Mic.on){
-      this.gauge.idle();
-      $('#free-note').textContent = '—';
-      $('#free-hz').textContent = '—';
-      $('#free-nearest').textContent = '';
-      $('#free-verdict').textContent = 'Turn on the microphone, then play, sing or whistle anything.';
+      this.blank('', 'Start the mic, then play, sing or whistle.');
       this.draw(now);
       return;
     }
 
     const res = Mic.read(this.useLow ? 16384 : 8192, 27.5, 2200);
     if (!res){ this.draw(now); return; }
-    $('#level-free').style.width = Math.min(100, res.rms * 420).toFixed(0) + '%';
+    setLevel('#level-free', res.rms);
 
     if (!res.freq || res.clarity < 0.4){
       this.useLow = true;                    /* nothing found — look wider next time */
       if (now - this.lastHeard > 800){
-        this.gauge.idle();
-        $('#free-note').textContent = '—';
-        $('#free-hz').textContent = '—';
-        $('#free-nearest').textContent = '';
-        $('#free-verdict').textContent = res.rms > 0.02
-          ? 'I can hear a sound, but it has no clear pitch.'
-          : 'Listening…';
+        this.blank('', res.rms > 0.02 ? 'I hear a sound, but no clear pitch.' : 'Listening…');
         this.ema = null;
       }
       this.draw(now);
@@ -1738,26 +2042,23 @@ const Free = {
     const near = Math.round(this.ema);
     const cents = (this.ema - near) * 100;
     const name = nameOfMidi(near, preferFlats());
-    const noteEl = $('#free-note');
-    noteEl.textContent = '';
-    noteEl.appendChild(noteSpan(name, ''));
-
-    $('#free-hz').textContent = res.freq.toFixed(1) + ' Hz';
+    setNote($('#free-note'), name, near);
+    const alt = nameOfMidi(near, !preferFlats());
+    $('#free-nearest').textContent = alt !== name ? 'also written ' + pretty(alt) : 'I hear';
 
     const match = ROWS.reduce((b, r) =>
       Math.abs(r.midi - this.ema) < Math.abs(b.midi - this.ema) ? r : b, ROWS[0]);
     const off = Math.round((this.ema - match.midi) * 100);
-    $('#free-nearest').textContent = Math.abs(off) < 400
-      ? 'nearest string: ' + match.note + ' (key ' + match.key + ')'
-      : '';
+    const close = Math.abs(off) < 400;
+    $('#free-hz').textContent = res.freq.toFixed(1) + ' Hz' + (close ? ' · near ' + stringName(match) : '');
+    markNear(close ? ROWS.indexOf(match) : -1);
 
     const inTune = Math.abs(cents) <= State.tol;
     this.gauge.show(cents, inTune);
-    const alt = nameOfMidi(near, !preferFlats());
-    $('#free-verdict').textContent = inTune
-      ? 'That is ' + name + (alt !== name ? ', also written ' + alt : '') + ', exactly in tune.'
-      : (cents < 0 ? Math.abs(Math.round(cents)) + ' cents below ' + name
-                   : Math.round(cents) + ' cents above ' + name);
+    const n = Math.abs(Math.round(cents));
+    $('#free-verdict').textContent = inTune ? 'In tune ✓'
+      : n + ' cent' + (n === 1 ? '' : 's') + (cents < 0 ? ' flat' : ' sharp');
+    $('#free-verdict').className = 'verdict ' + (inTune ? 'good' : cents < 0 ? 'flat' : 'sharp');
 
     this.points.push({ t:now, m:this.ema });
     this.draw(now);
@@ -1768,21 +2069,18 @@ const Free = {
     while (this.points.length && now - this.points[0].t > span) this.points.shift();
     this.sizeCanvas();
     const g = this.cctx, w = this._w, h = this._h;
-    const css = getComputedStyle(document.documentElement);
-    const ink3 = css.getPropertyValue('--ink-3').trim();
-    const line = css.getPropertyValue('--line').trim();
-    const accent = css.getPropertyValue('--accent').trim();
+    const ink3 = '#6f877c', line = 'rgba(160,190,175,.13)', accent = '#5eead4';
 
     g.clearRect(0, 0, w, h);
     if (!this.points.length){
-      g.fillStyle = ink3; g.font = '13px system-ui, sans-serif'; g.textAlign = 'center';
-      g.fillText('Nothing yet — play a note.', w / 2, h / 2);
+      g.fillStyle = ink3; g.font = '600 12px system-ui, sans-serif'; g.textAlign = 'center';
+      g.fillText('Your pitch draws a line here', w / 2, h / 2 + 4);
       return;
     }
 
     let lo = Infinity, hi = -Infinity;
     this.points.forEach(p => { if (p.m < lo) lo = p.m; if (p.m > hi) hi = p.m; });
-    let mid = (lo + hi) / 2, range = Math.max(hi - lo + 4, 13);
+    const mid = (lo + hi) / 2, range = Math.max(hi - lo + 4, 13);
     lo = mid - range / 2; hi = mid + range / 2;
 
     const y = m => h - ((m - lo) / (hi - lo)) * (h - 8) - 4;
@@ -1793,7 +2091,7 @@ const Free = {
     for (let m = Math.ceil(lo); m <= hi; m++){
       const isC = ((m % 12) + 12) % 12 === 0;
       g.strokeStyle = isC ? ink3 : line;
-      g.globalAlpha = isC ? 0.45 : 0.65;
+      g.globalAlpha = isC ? 0.55 : 1;
       g.beginPath(); g.moveTo(0, y(m) + 0.5); g.lineTo(w, y(m) + 0.5); g.stroke();
       if (isC && hi - lo < 40){
         g.globalAlpha = 0.9; g.fillStyle = ink3;
@@ -1837,9 +2135,11 @@ function setMode(mode){
     b.setAttribute('aria-selected', on ? 'true' : 'false');
   });
   ['play', 'tune', 'listen'].forEach(m => { $('#panel-' + m).hidden = m !== mode; });
+  setInstState('');
+  markNear(-1);
   if (mode === 'tune') Tune.retarget();
   if (mode === 'listen') Free.sizeCanvas();
-  renderBoxHint();
+  if (mode === 'play'){ renderTeach(); Wave.quiet = false; }
   State.save();
 }
 
@@ -1851,6 +2151,7 @@ function loop(){
     if (State.mode === 'tune') Tune.tick(now);
     else if (State.mode === 'listen') Free.tick(now);
   }
+  if (State.mode === 'play') Wave.draw(now);
   requestAnimationFrame(loop);
 }
 
@@ -1860,26 +2161,28 @@ function loop(){
 
 let micIndicator = null;
 
+function setLevel(sel, rms){
+  const n = $(sel);
+  if (n) n.style.setProperty('--lvl', Math.min(1, rms * 4.2).toFixed(2));
+}
+
 function micMessage(err){
   if (!err) return '';
   if (err.name === 'NotAllowedError' || err.name === 'SecurityError')
-    return 'The browser blocked the microphone. Look for the padlock or camera icon ' +
-      'in the address bar, allow the microphone there, then try again.';
+    return 'The browser blocked the mic. Allow it from the padlock or camera icon in the address bar, then try again.';
   if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError')
     return 'No microphone found. Plug one in, or check it is switched on.';
   if (err.name === 'NotReadableError')
     return 'Another app is using the microphone. Close it and try again.';
   if (err.name === 'InsecureContextError')
-    return 'This browser will not turn on the microphone for a page opened straight ' +
-      'from a folder. Put the app on a web server or online, and the listening ' +
-      'modes will work. The reference tones work either way.';
+    return 'The mic only works when the app is online (or on a web server), not opened from a folder. The notes still play.';
   return 'The microphone could not be started (' + err.name + ').';
 }
 
 async function toggleMic(){
   if (Mic.on){
     Mic.stop();
-    syncMicUI('Microphone off.');
+    syncMicUI('');
     return;
   }
   try{
@@ -1892,22 +2195,15 @@ async function toggleMic(){
 }
 
 function syncMicUI(message, alert){
-  const label = Mic.on ? 'Microphone is on — tap to stop' : 'Turn on the microphone';
   ['#btn-mic-tune', '#btn-mic-free'].forEach(sel => {
     const b = $(sel);
-    b.textContent = label;
+    b.querySelector('.mic-label').textContent = Mic.on ? 'Stop mic' : 'Start mic';
     b.classList.toggle('is-live', Mic.on);
+    b.setAttribute('aria-pressed', Mic.on ? 'true' : 'false');
   });
   let note = message;
-  if (!note && Mic.on){
-    const d = Mic.devices.find(d => d.deviceId === (Mic.deviceId || 'default'));
-    const nm = d && d.label ? d.label : 'the default microphone';
-    note = 'Listening through ' + nm + '. Change it in Settings if you have another one.';
-  }
-  if (!note && !Mic.on) note = location.protocol === 'file:'
-    ? 'Tip: most browsers only turn on the microphone for a page on a web server. ' +
-      'If nothing happens when you press this, that is why.'
-    : '';
+  if (!note && !Mic.on && location.protocol === 'file:')
+    note = 'Most browsers only allow the mic on a web page that is online.';
   ['#mic-note-tune', '#mic-note-free'].forEach(sel => {
     const n = $(sel);
     n.textContent = note || '';
@@ -1915,10 +2211,7 @@ function syncMicUI(message, alert){
   });
   document.body.classList.toggle('mic-on', Mic.on);
   if (micIndicator) micIndicator.hidden = !Mic.on;
-  if (!Mic.on){
-    $('#level-tune').style.width = '0%';
-    $('#level-free').style.width = '0%';
-  }
+  if (!Mic.on){ setLevel('#level-tune', 0); setLevel('#level-free', 0); }
 }
 
 async function fillMicList(){
@@ -1935,9 +2228,8 @@ async function fillMicList(){
   });
   sel.value = State.micId && [...sel.options].some(o => o.value === State.micId)
     ? State.micId : 'default';
-  if (!Mic.devices.length || !Mic.devices[0].label){
-    sel.title = 'Names appear once you have allowed microphone access.';
-  }
+  sel.title = (!Mic.devices.length || !Mic.devices[0].label)
+    ? 'Names appear once you have allowed microphone access.' : '';
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -1964,7 +2256,7 @@ function buildSettings(){
   A4_PRESETS.forEach(p => {
     const b = el('button', 'chip');
     b.type = 'button';
-    b.appendChild(document.createTextNode(p.label + ' Hz'));
+    b.appendChild(document.createTextNode(p.label));
     b.appendChild(el('small', null, p.sub));
     b.dataset.hz = p.hz;
     b.addEventListener('click', () => setA4(p.hz));
@@ -2027,7 +2319,7 @@ function applyTheme(){
   if (explicit) document.documentElement.setAttribute('data-theme', explicit);
   else document.documentElement.removeAttribute('data-theme');
   const now = shownTheme();
-  $('#theme-glyph').textContent = now === 'dark' ? '☾' : '☀';
+  $('#theme-glyph').setAttribute('href', now === 'dark' ? '#i-moon' : '#i-sun');
   $('#btn-theme').title = 'Switch to the ' + (now === 'dark' ? 'light' : 'dark') + ' theme';
 }
 function setTheme(t){ State.theme = t; applyTheme(); State.save(); }
@@ -2064,7 +2356,7 @@ function fillTunings(){
     sel.appendChild(o);
   });
   sel.value = TUNING.id;
-  $('#field-tuning').style.display = INST.tunings.length > 1 ? '' : 'none';
+  $('#field-tuning').hidden = INST.tunings.length < 2;
 }
 
 function renderAll(){
@@ -2096,11 +2388,11 @@ function wire(){
   /* --- modes --- */
   $$('.mode-btn').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
 
-  /* --- the strings --- */
-  $('#stringbox').addEventListener('click', e => {
-    const col = e.target.closest('.string-col');
-    if (!col) return;
-    const i = +col.dataset.i;
+  /* --- the strings and pegs --- */
+  $('#inst-hit').addEventListener('click', e => {
+    const b = e.target.closest('[data-i]');
+    if (!b) return;
+    const i = +b.dataset.i;
     selectString(i);
     if (State.mode !== 'tune') pluck(i);
   });
@@ -2195,7 +2487,12 @@ function wire(){
     }
   });
 
-  window.addEventListener('resize', () => { Free.sizeCanvas(); });
+  /* the neck gets shorter on a phone, so redraw when the window crosses over */
+  let wasCompact = !!COMPACT_MQ.matches;
+  window.addEventListener('resize', () => {
+    Free.sizeCanvas();
+    if (!!COMPACT_MQ.matches !== wasCompact){ wasCompact = !wasCompact; renderBox(); }
+  });
   window.addEventListener('blur', () => { if (!State.hold) Audio_.stopAll(0.2); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) Audio_.stopAll(0.15);
@@ -2229,6 +2526,7 @@ function boot(){
   buildSettings();
   Tune.init();
   Free.init();
+  Wave.init();
   renderBox();
   renderTeach();
   syncSettings();
