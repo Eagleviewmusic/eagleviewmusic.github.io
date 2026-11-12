@@ -16,6 +16,9 @@
   <!-- js/embed.js comes first: inside the Recording Studio's hidden frame (?embed=studio) it swaps
        localStorage for a read-through, write-to-memory layer before anything else reads it; elsewhere it does nothing -->
   <script src="js/embed.js"></script>
+  <!-- a long press (smart board, pen, iPad) never opens the browser's right-click menu, drags or selects:
+       a key or chord block can be held as long as the note needs (2026-11-11) -->
+  <script src="lib/evm-hold-guard.js"></script>
   <script>
     try {
       if (window.self !== window.top) document.documentElement.classList.add('in-iframe');

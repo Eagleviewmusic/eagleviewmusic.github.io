@@ -11,6 +11,9 @@
   try { if (window.self !== window.top) document.documentElement.classList.add('in-iframe'); } catch (e) { document.documentElement.classList.add('in-iframe'); }
 </script>
 <title>Recording Studio</title>
+<!-- a long press (smart board, pen, iPad) never opens the browser's right-click menu, drags or selects:
+     anything can be held as long as the note needs (2026-11-11, from Song Writer 3.5) -->
+<script src="lib/evm-hold-guard.js"></script>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

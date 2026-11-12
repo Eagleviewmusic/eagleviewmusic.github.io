@@ -10,6 +10,9 @@
   try { var t = localStorage.getItem('virtual_keyboard_theme_v1'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
 </script>
 <title>Virtual Keyboard</title>
+<!-- a long press (smart board, pen, iPad) never opens the browser's right-click menu, drags or selects:
+     a key or block can be held as long as the note needs, here and inside the Recording Studio (2026-11-11, from Song Writer 3.5) -->
+<script src="lib/evm-hold-guard.js"></script>
 <!-- The picture in the browser tab (icon.svg), and on a tablet's home screen (icon-180.png). -->
 <link rel="icon" href="icon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="icon-180.png" />
