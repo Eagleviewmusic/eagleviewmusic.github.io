@@ -376,7 +376,7 @@
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(compact(P)));
     } catch (e) {
-      if (!saveWarned) { saveWarned = true; toast('This browser would not keep the recording. Save a project file to keep it.'); }
+      if (!saveWarned) { saveWarned = true; toast('This browser would not keep the recording. Library → Download JSON keeps a copy.'); }
     }
   }
   function load() {
@@ -1542,7 +1542,7 @@
       before: JSON.stringify(tr.clips),                       // Cancel's track
       saved: { clips: JSON.parse(JSON.stringify(tr.clips)), notes: tr.notes.map(n => ({ ...n })) }, // what autosave keeps meanwhile
       view0: { win, viewAt },                                 // the view to go back to
-      undo: [], sel: new Set(), caret: part ? part.b : R.pos,
+      undo: [], sel: new Set(), caret: part ? part.b : R.pos, tap: null,
       top: 72, rowH: 12, h: 0, lo: EDIT_LO, hi: EDIT_HI,
       preview: null, box: null, hits: [], gesture: null, drop: null,
       ladder: ctls[i].ladder
@@ -1564,7 +1564,7 @@
     renderAll();
     if (!sessionStorageGet('edit-tip')) {
       sessionStorageSet('edit-tip');
-      toast('Drag notes to change them. Save Changes keeps them; Cancel puts the track back.');
+      toast('Double-click to add a note; drag notes to change them. Save Changes keeps them; Cancel puts the track back.');
     }
   }
   function closeEditor(keep) {
@@ -1717,6 +1717,9 @@
     const l = lanes[ed.i + 1], wrap = l.wrap, id = e.pointerId;
     const p0 = editPoint(e), hit = editHit(e);
     const add = e.shiftKey || e.metaKey || e.ctrlKey;
+    // a double-click on an empty spot: a note there (its first click put the dashed line there)
+    if (hit || add) ed.tap = null;
+    else if (editDoubleTap(e)) { addNoteAt(p0); return; }
     let g;
     if (hit) {
       const n = hit.v.n, was = ed.sel.has(n);
@@ -1821,6 +1824,7 @@
       wrap.removeEventListener('pointercancel', up);
       dock.classList.remove('moving-note', 'sizing-note', 'boxing');
       if (!ed) return;
+      if (on) ed.tap = null; // a drag, not half of a double-click
       ed.gesture = null;
       ed.box = null;
       const res = ed.preview;
@@ -1844,6 +1848,29 @@
     wrap.addEventListener('pointermove', move);
     wrap.addEventListener('pointerup', up);
     wrap.addEventListener('pointercancel', up);
+  }
+  // A second press on an empty spot soon after the first, in the same place.
+  function editDoubleTap(e) {
+    const now = performance.now(), t = ed.tap;
+    ed.tap = { at: now, x: e.clientX, y: e.clientY };
+    if (!t || now - t.at > 450 || Math.hypot(e.clientX - t.x, e.clientY - t.y) > 14) return false;
+    ed.tap = null;
+    return true;
+  }
+  // A note made by a double-click: it fills the box it was put in — that
+  // row's pitch, from the grid line before to the line after (beats, 8ths or
+  // 16ths, as the zoom shows them). Drag its right end to make it longer.
+  // One step of the editor's Undo, like Paste.
+  function addNoteAt(pt) {
+    const m = Math.ceil(pt.p); // (row m spans m − 1 to m)
+    if (m < ed.lo || m > ed.hi) return; // beyond the piano's rows
+    const grid = noteGrid();
+    const b = Math.max(-barBeats(), Math.floor(pt.beat / grid + 1e-6) * grid);
+    commitEdit(applyEdit({ kind: 'add', notes: [{ m, b, d: grid }] }));
+    if (!ed.sel.size) { toast('There is no room for a note there.'); return; }
+    audition(m);
+    renderEditBar();
+    queueDraw();
   }
   // What a drag there would do, said by the pointer.
   function editCursor(e, wrap) {
@@ -1957,7 +1984,7 @@
     const grid = P.quant.on ? 'Quantize on: notes land on the beat lines.' : 'Quantize off: notes go just where you put them.';
     const hint = (n
       ? `${n === 1 ? 'One note' : n + ' notes'} highlighted: drag ${n === 1 ? 'it' : 'them'}, or press ← → ↑ ↓. `
-      : 'Drag a note to move it, its right end to resize it, or across empty space to highlight several. ')
+      : 'Double-click to add a note. Drag a note to move it, its right end to resize it, or across empty space to highlight several. ')
       + (tr.loop ? 'Every pass of the loop changes together. ' : '') + grid;
     el('rec-edit-hint').textContent = hint;
     editInfo.title = el('rec-edit-title').textContent + ' — ' + hint; // (a narrow bar cuts it short)
@@ -3082,24 +3109,22 @@
   matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (R.open) drawAll(); });
   document.querySelectorAll('input[name="theme"]').forEach(r => r.addEventListener('change', () => { if (R.open) drawAll(); }));
 
-  // -------- SAVE: SONG FILES AND PROJECT FILES --------
-  const saveSheet = el('rec-save-sheet');
+  // -------- SAVE AS MP3 --------
+  // The sheet is a name and a download, nothing else. (The notes themselves
+  // go in the Library's Download JSON, which also opens the old project files.)
   const saveStatus = el('rec-save-status');
   const nameInput = el('rec-name');
+  const mp3Btn = el('rec-mp3');
   let exporting = false;
 
   el('rec-save').addEventListener('click', () => {
     if (busy()) stopRun();
     nameInput.value = P.name;
     saveStatus.textContent = '';
-    const kept = LESSON && LESSON.locks.tracks.length;
-    el('rec-new-note').textContent = kept
-      ? 'Clears the tracks you recorded on; the lesson’s locked tracks stay. Undo brings them back.'
-      : 'Clears all four tracks. Undo brings them back.';
-    el('rec-new').textContent = kept ? 'Clear my tracks' : 'New recording';
     openSheet('rec-save-sheet');
   });
   nameInput.addEventListener('input', () => { P.name = nameInput.value.slice(0, 60); save(); });
+  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); exportSong(); } });
 
   function fileBase() {
     const name = (P.name || 'Keyboard recording').trim().replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ');
@@ -3156,37 +3181,19 @@
     return new Blob(out, { type: 'audio/mpeg' });
   }
 
-  function encodeWav(buffer) {
-    const L = buffer.getChannelData(0), Rt = buffer.getChannelData(1);
-    const len = buffer.length, rate = buffer.sampleRate;
-    const view = new DataView(new ArrayBuffer(44 + len * 4));
-    const text = (at, s) => { for (let i = 0; i < s.length; i++) view.setUint8(at + i, s.charCodeAt(i)); };
-    text(0, 'RIFF'); view.setUint32(4, 36 + len * 4, true); text(8, 'WAVE');
-    text(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 2, true);
-    view.setUint32(24, rate, true); view.setUint32(28, rate * 4, true); view.setUint16(32, 4, true); view.setUint16(34, 16, true);
-    text(36, 'data'); view.setUint32(40, len * 4, true);
-    for (let i = 0, at = 44; i < len; i++, at += 4) {
-      view.setInt16(at, toS16(L[i]), true);
-      view.setInt16(at + 2, toS16(Rt[i]), true);
-    }
-    return new Blob([view], { type: 'audio/wav' });
-  }
-
-  async function exportSong(kind) {
+  async function exportSong() {
     if (exporting) return;
     const song = songForFile();
     if (!song) { saveStatus.textContent = 'Nothing to save yet. Record a line first (muted tracks are left out).'; return; }
-    if (kind === 'mp3' && typeof lamejs === 'undefined') { saveStatus.textContent = 'The MP3 maker did not load. Try WAV, or reload the page.'; return; }
+    if (typeof lamejs === 'undefined') { saveStatus.textContent = 'The MP3 maker did not load. Reload the page and try again.'; return; }
     exporting = true;
-    document.querySelectorAll('#rec-mp3, #rec-wav').forEach(b => { b.disabled = true; });
+    mp3Btn.disabled = true;
     try {
       saveStatus.textContent = 'Mixing the tracks…';
       await pause();
       const buffer = await Audio.render(song);
-      const blob = kind === 'mp3'
-        ? await encodeMp3(buffer, p => { saveStatus.textContent = `Making the MP3… ${Math.round(p * 100)}%`; })
-        : encodeWav(buffer);
-      const filename = `${fileBase()}.${kind}`;
+      const blob = await encodeMp3(buffer, p => { saveStatus.textContent = `Making the MP3… ${Math.round(p * 100)}%`; });
+      const filename = `${fileBase()}.mp3`;
       download(blob, filename);
       const secs = Math.round(buffer.duration);
       saveStatus.textContent = `Saved ${filename} (${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}, ${(blob.size / 1048576).toFixed(1)} MB).`;
@@ -3195,50 +3202,10 @@
       saveStatus.textContent = 'Something went wrong making the file. Please try again.';
     } finally {
       exporting = false;
-      document.querySelectorAll('#rec-mp3, #rec-wav').forEach(b => { b.disabled = false; });
+      mp3Btn.disabled = false;
     }
   }
-  el('rec-mp3').addEventListener('click', () => exportSong('mp3'));
-  el('rec-wav').addEventListener('click', () => exportSong('wav'));
-
-  // A project file is an Eagle View Music envelope (EVM Library/README.md §7).
-  el('rec-project-dl').addEventListener('click', () => {
-    const env = { format: 'evm-item', formatVersion: 1, app: APP_SLUG, kind: 'recording', title: fileBase(), data: compact(P) };
-    download(new Blob([JSON.stringify(env, null, 1)], { type: 'application/json' }), `${fileBase()}.json`);
-    saveStatus.textContent = `Saved ${fileBase()}.json.`;
-  });
-  const projectFile = el('rec-project-file');
-  el('rec-project-open').addEventListener('click', () => { if (!(LESSON && LESSON.locked)) projectFile.click(); }); // (hidden in a locked lesson)
-  projectFile.addEventListener('change', () => {
-    const file = projectFile.files[0];
-    projectFile.value = '';
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      let obj = null;
-      try { obj = JSON.parse(reader.result); } catch (e) {}
-      let data = null;
-      if (obj && obj.format === 'evm-item' && obj.app === APP_SLUG && obj.kind === 'recording') data = obj.data;
-      else if (obj && Array.isArray(obj.tracks)) data = obj;
-      if (!data) { saveStatus.textContent = 'That file is not a Virtual Keyboard recording.'; return; }
-      pushUndo('opening ' + file.name);
-      P = normalizeProject(data);
-      afterProjectChange();
-      nameInput.value = P.name;
-      saveStatus.textContent = 'Opened ' + file.name + '. Undo brings back what was here.';
-    };
-    reader.readAsText(file);
-  });
-  el('rec-new').addEventListener('click', () => {
-    const mine = P.tracks.filter((tr, i) => !trackLocked(i)); // (a lesson's locked tracks stay)
-    if (!mine.some(tr => tr.clips.length)) { saveStatus.textContent = mine.length < TRACKS ? 'Your tracks are already empty.' : 'The tracks are already empty.'; return; }
-    pushUndo('starting over');
-    mine.forEach(tr => { tr.clips = []; tr.notes = []; });
-    if (mine.length === TRACKS) { P.name = ''; nameInput.value = ''; }
-    afterProjectChange();
-    closeSheet('rec-save-sheet');
-    toast(mine.length < TRACKS ? 'Your tracks are cleared; the lesson’s stay. Undo brings them back.' : 'All four tracks cleared. Undo brings them back.');
-  });
+  mp3Btn.addEventListener('click', () => exportSong());
 
   // -------- LINE UP THE TIMING (the tap-along test) --------
   // A steady click: four to listen to, then ten to tap along with. The first

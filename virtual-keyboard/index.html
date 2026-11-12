@@ -106,7 +106,7 @@
   <select id="sound-select" class="select sound-select" aria-label="Sound"></select>
   <button class="quick-btn" id="focus-btn" type="button" aria-pressed="false" title="Focus: only the notes of the scale can be played">Focus</button>
   <button class="quick-btn layout-btn" id="layout-btn" type="button" aria-pressed="false">Flex</button>
-  <button class="quick-btn rec-toggle" id="recorder-btn" type="button" aria-pressed="false" aria-controls="recorder" title="The four-track recorder">Record</button>
+  <button class="quick-btn rec-toggle" id="recorder-btn" type="button" aria-pressed="false" aria-controls="recorder" title="The four-track recorder">Multi Track</button>
   <button class="quick-btn names-btn" id="names-btn" type="button">Key Names</button>
 </div>
 
@@ -402,7 +402,7 @@
             </label>
             <label class="choice" data-for="scale">
               <input type="checkbox" id="lk-record">
-              <span class="choice-body"><span class="choice-title">Recording</span><span class="choice-note">The Record button is gone: students play the keyboard, but do not record.</span></span>
+              <span class="choice-body"><span class="choice-title">Recording</span><span class="choice-note">The Multi Track button is gone: students play the keyboard, but do not record.</span></span>
             </label>
             <label class="choice" data-for="workspace">
               <input type="checkbox" id="lk-meter">
@@ -557,37 +557,18 @@
   </div>
 </div>
 
-<!-- ================= SHEET: SAVE THE RECORDING ================= -->
+<!-- ================= SHEET: SAVE AS MP3 =================
+     A name and a download, nothing else (the user, 2026-11-11). Keeping the
+     notes themselves is the Library's Download JSON. -->
 <div class="sheet-backdrop" id="rec-save-sheet">
-  <div class="sheet" role="dialog" aria-label="Save the recording">
-    <div class="sheet-head"><h2>Save the recording</h2><button class="sheet-close" type="button" data-close aria-label="Close">&times;</button></div>
-    <div class="sheet-body sheet-scroll">
+  <div class="sheet sheet-narrow" role="dialog" aria-labelledby="rec-save-title">
+    <div class="sheet-head"><h2 id="rec-save-title">Save as MP3</h2><button class="sheet-close" type="button" data-close aria-label="Close">&times;</button></div>
+    <div class="sheet-body">
       <section class="panel-section">
         <h3>Name</h3>
-        <input type="text" class="text-field" id="rec-name" maxlength="60" placeholder="Keyboard recording" aria-label="Name of the recording">
-      </section>
-      <section class="panel-section">
-        <h3>Song file</h3>
-        <p class="panel-note">The tracks mixed into one file, each at its own volume, with the Room setting. Muted tracks and the click are left out. MP3 is small and plays almost anywhere; WAV is full quality and larger.</p>
-        <div class="row-wrap">
-          <button class="btn btn-primary" id="rec-mp3" type="button">Download MP3</button>
-          <button class="btn" id="rec-wav" type="button">Download WAV</button>
-        </div>
+        <input type="text" class="text-field" id="rec-name" maxlength="60" placeholder="Keyboard recording" aria-label="Name of the MP3">
+        <div class="row-wrap"><button class="btn btn-primary" id="rec-mp3" type="button">Download MP3</button></div>
         <span class="status-msg" id="rec-save-status" role="status"></span>
-      </section>
-      <section class="panel-section">
-        <h3>Project file</h3>
-        <p class="panel-note">The notes themselves, to keep a copy or open the recording on another computer. This browser also keeps your recording by itself.</p>
-        <div class="row-wrap">
-          <button class="btn" id="rec-project-dl" type="button">Download project</button>
-          <button class="btn lesson-hide" id="rec-project-open" type="button">Open a project…</button>
-          <input type="file" id="rec-project-file" accept=".json,application/json" hidden>
-        </div>
-      </section>
-      <section class="panel-section">
-        <h3>Start over</h3>
-        <p class="panel-note" id="rec-new-note">Clears all four tracks. Undo brings them back.</p>
-        <div class="row-wrap"><button class="btn" id="rec-new" type="button">New recording</button></div>
       </section>
     </div>
   </div>

@@ -701,6 +701,7 @@ body.keys-view .keyboard { display: none; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 /* ---------------- recorder (four tracks) ---------------- */
+.rec-toggle { white-space: nowrap; } /* "Multi Track" stays on one line */
 .rec-toggle::before {
   content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 50%;
   margin-right: 7px; vertical-align: 0; background: #ff453a;
@@ -1231,6 +1232,12 @@ body.lock-quant .rec-quant-fixed { display: inline-flex; }
   .key-ctl { grid-area: key; }
   .settings-btn { margin-left: 0; }
 }
+/* "Multi Track" is longer than "Record" was: without the Octaves label the
+   quick row stays on one line down to ~710 px, a 768 px tablet included
+   (record mode never shows the label either) */
+@media (max-width: 800px) {
+  .quick-label { display: none; }
+}
 @media (max-width: 480px) {
   .brand-name { font-size: 16px; }
   .tb-btn span { display: none; }
@@ -1240,6 +1247,10 @@ body.lock-quant .rec-quant-fixed { display: inline-flex; }
   .scale-select { max-width: 160px; }
   .key-grid { grid-template-columns: repeat(4, 1fr); }
   .quick-label { display: none; }
+  /* record mode: "Multi Track" is longer than "Record" was — without its dot
+     (the button is red all over) the app's name still fits beside it */
+  .topbar .rec-toggle { padding: 0 9px; }
+  .topbar .rec-toggle::before { display: none; }
 }
 
 /* In the Recording Studio (?embed=studio) the studio records: this app's own
