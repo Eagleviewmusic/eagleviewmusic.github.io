@@ -10,6 +10,9 @@
   try { var t = localStorage.getItem('virtual_keyboard_theme_v1'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
 </script>
 <title>Virtual Keyboard</title>
+<!-- The picture in the browser tab (icon.svg), and on a tablet's home screen (icon-180.png). -->
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="icon-180.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
