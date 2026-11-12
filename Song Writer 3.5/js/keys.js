@@ -74,7 +74,7 @@
      choose(key)             Setup's key chips (one of the two modes above)
      range()                 [low, high] MIDI for Create Key Change (A♭2 … G6)
      inRange(midi)           inside it?
-     rungsFor(key)           the rungs a key may write in Create Key Change
+     rungsFor(key)           the rungs a key may write in Create Key Change, or on a clef with a range
      startBar(stack)         the song bar a column is in
      barStart(stack)         the first column of that bar (read from the line alone — no pitches)
    Events: 'keyhere:changed' { key } — the selection is now in another key
@@ -93,13 +93,15 @@
   /* ---------------- the range (Create Key Change) ---------------- */
   const LOW = M.noteMidi('do-low', 'natural', 'Ab');     // A♭2 — A♭'s low do, the lowest note any key has
   const HIGH = M.noteMidi('do-high2', 'natural', 'G');   // G6 — G's top do, the highest
-  const range = () => [LOW, HIGH];
-  const inRange = midi => midi >= LOW && midi <= HIGH;
+  // a clef's own range, where it has one (core.js: the bass clef's A1 … A4)
+  const range = () => M.clef().range || [LOW, HIGH];
+  const inRange = midi => { const r = range(); return midi >= r[0] && midi <= r[1]; };
   /* the rungs whose notes (natural, ♯ or ♭) can land inside the range in this key */
   function rungsFor(key) {
+    const r = range();
     return M.RUNGS.filter(nc => {
-      const m = M.noteMidi(nc, 'natural', key);
-      return m !== null && m >= LOW - 1 && m <= HIGH + 1;
+      const m = M.midiOnClef(nc, 'natural', key);
+      return m !== null && m >= r[0] - 1 && m <= r[1] + 1;
     });
   }
 
@@ -425,7 +427,7 @@
      sharp, 1.0's rule) that sounds the same pitch in the new key: in the
      scale if it can be, else on the same letter, else plain, else any. */
   function respellPitch(nc, acc, fromKey, toKey) {
-    const midi = M.noteMidi(nc, acc, fromKey);
+    const midi = M.midiOnClef(nc, acc, fromKey);
     const letter = M.spellNote(nc, acc, fromKey).letter;
     let best = null, bestScore = -1;
     M.RUNGS.forEach(r => {
@@ -433,7 +435,7 @@
       ['natural', 'flat', 'sharp'].forEach(a => {
         if (a === 'flat' && (sol === 'Do' || sol === 'Fa')) return;
         if (a === 'sharp' && (sol === 'Mi' || sol === 'Ti')) return;
-        if (M.noteMidi(r, a, toKey) !== midi) return;
+        if (M.midiOnClef(r, a, toKey) !== midi) return;
         const score = (M.withKey(toKey, () => M.inScale(r, a)) ? 4 : 0) +
           (M.spellNote(r, a, toKey).letter === letter ? 2 : 0) + (a === 'natural' ? 1 : 0);
         if (score > bestScore) { bestScore = score; best = { nc: r, acc: a }; }

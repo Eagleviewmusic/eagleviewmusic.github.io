@@ -845,8 +845,14 @@
   /* The rungs that may be written. Layout settings' range (a choice of the
      twenty-two, each key's own) when it is narrowed; otherwise all twenty-two
      — or, with Look → Create Key Change (js/keys.js), every rung whose notes
-     sound inside A♭2 … G6 in the key given (the key in effect when none). */
+     sound inside A♭2 … G6 in the key given (the key in effect when none).
+     A clef with a range of its own (core.js: the bass clef's A1 … A4) holds
+     to it in every key, the Layout's narrowing inside that. */
   function allowedNotes(key) {
+    if (SW.keys && M.clef().range) {
+      const rungs = SW.keys.rungsFor(key || M.keyNow());
+      return layout.notes ? layout.notes.filter(nc => rungs.indexOf(nc) !== -1) : rungs;
+    }
     if (layout.notes) return layout.notes;
     if (SW.keys && SW.keys.mode() === 'change') return SW.keys.rungsFor(key || M.keyNow());
     return M.noteOrder;

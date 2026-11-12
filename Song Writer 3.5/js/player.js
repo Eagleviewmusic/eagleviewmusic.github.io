@@ -200,7 +200,7 @@
     const hearAll = SW.settings.view.hearHidden !== false;
     for (let i = 0; i < SW.parts.count(); i++) {
       if (i === focus || pitchPage || (!hearAll && !SW.parts.isShown(i))) continue;
-      const sg = SW.timing.songOf(SW.parts.lines(i));
+      const sg = SW.parts.song(i);
       others.push({ part: i, meta: SW.parts.meta(i), all: flatten(sg), total: sg.total });
     }
     const g = SW.track ? SW.track.grid(song) : null;
@@ -536,7 +536,7 @@
   // matches); a change of tempo or swing re-times it instead
   SW.bus.on('score:changed', d => {
     if (d && (d.reason === 'tempo' || d.reason === 'swing')) retime(d.reason);
-    else if (d && (d.reason === 'chart' || d.reason === 'part-sound' || d.reason === 'part-volume')) replan();   // the Chord Chart, a part's sound: the music goes on
+    else if (d && (d.reason === 'chart' || d.reason === 'part-sound' || d.reason === 'part-volume' || d.reason === 'part-clef')) replan();   // the Chord Chart, a part's sound or clef: the music goes on
     else stop();
   });
   ['score:loaded', 'key:changed'].forEach(evt => SW.bus.on(evt, stop));

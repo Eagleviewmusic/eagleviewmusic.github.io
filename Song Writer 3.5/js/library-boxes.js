@@ -12,7 +12,7 @@
    Recording Studio all keep working on records exactly as before. The
    boxes are a layer over the library, kept under their own key:
 
-     song_writer_351_boxes_v1
+     song_writer_35_boxes_v1
        { v: 1,
          view:  'boxes' | 'list'   the Library's view (Boxes is the first)
          alpha: true               the boxes in A–Z order; dragging one turns
@@ -64,7 +64,7 @@
   const EVM = window.EVMLibrary;
   const $ = id => document.getElementById(id);
 
-  const BOX_KEY = 'song_writer_351_boxes_v1';
+  const BOX_KEY = 'song_writer_35_boxes_v1';
   const inLesson = () => !!(SW.lessons && SW.lessons.meta());
   const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
 

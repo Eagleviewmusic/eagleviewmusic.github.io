@@ -36,7 +36,7 @@
      score.lines              the song's lines with Part 1's syllables —
                               exactly as always, so every song saved before
                               and every older reader is untouched
-     score.parts[i]           { name?, sound?, volume? } for part i, and for
+     score.parts[i]           { name?, sound?, volume?, clef? } for part i, and for
                               i ≥ 1 its `lines`: [{ syllables }], one for
                               each of score.lines (an instrumental line's
                               is empty). parts[0] never carries lines.
@@ -45,6 +45,10 @@
      name     ≤ 24 characters (omitted when empty: "Part n")
      sound    a lib/audio.js preset id (omitted: Sound → Melody's sound)
      volume   0–100 (omitted when 100), a share of the melody's level
+     clef     'bass' (omitted: treble). The part is written on that clef and
+              sounds an octave lower (core.js THE CLEF IN EFFECT); its rungs
+              are stored as they were, so going back changes nothing. A
+              one-part song with a bass clef is { parts: [{ clef: 'bass' }] }.
      KEY CHANGES (js/keys.js) are the song's and live on Part 1's columns;
      a `cols[].key` on another part is dropped on reading.
 
@@ -60,12 +64,14 @@
      linesOf(model, i)             part i's lines, whole (the song's lines with its syllables)
      setLines(model, i, lines)     the model with part i's lines replaced (new objects; returns it)
      everyLine(model)              [[lines of part 0], [lines of part 1], …]
-     metaOf(model, i)              { name, sound, volume } with defaults filled
+     metaOf(model, i)              { name, sound, volume, clef } with defaults filled
      restSyllables()               what a part's empty line holds: one rest
    API — the song on screen
      count() · focused() · MAX
-     meta(i)                       { name, sound, volume } (defaults filled; a copy)
+     meta(i)                       { name, sound, volume, clef } (defaults filled; a copy)
+     clef(i?)                      part i's clef, 'treble' or 'bass' (no i: the part on the page's)
      lines(i)                      part i's lines, whole (a copy)
+     song(i, o?)                   part i read from the model, in its own clef (SW.timing.songOf)
      firstPickup()                 the song's first line's pick-up id, or ''
      focus(i, o?)                  put part i on the page (not an edit); o.at: then select its column at that song tick
      isShown(i) · shownParts()     SHOWN: the parts drawn on Notation and Rhythm (the focused one always)
@@ -78,7 +84,7 @@
      selfTest()                    the model rules, on copies
    Events: 'parts:shown' { part, on } (SHOWN — a redraw of Notation and
            Rhythm); otherwise a change to the parts is a 'score:changed'
-           (reason 'part', 'part-name', 'part-sound', 'part-volume') and a
+           (reason 'part', 'part-name', 'part-sound', 'part-volume', 'part-clef') and a
            focus is a redraw ('score:loaded' then 'score:changed' 'part').
    ========================================================================== */
 (function () {
@@ -130,12 +136,13 @@
     return out;
   }
   function cleanMeta(raw) {
-    const m = { name: '', sound: '', volume: 100 };
+    const m = { name: '', sound: '', volume: 100, clef: 'treble' };
     if (!raw || typeof raw !== 'object') return m;
     if (typeof raw.name === 'string') m.name = raw.name.trim().slice(0, NAME_MAX);
     if (typeof raw.sound === 'string' && SW.audio && SW.audio.hasSound(raw.sound)) m.sound = raw.sound;
     const v = Number(raw.volume);
     if (raw.volume !== undefined && raw.volume !== null && !isNaN(v)) m.volume = Math.max(0, Math.min(100, Math.round(v)));
+    if (raw.clef === 'bass') m.clef = 'bass';
     return m;
   }
   function metaOf(model, i) {
@@ -146,14 +153,15 @@
     if (m.name) out.name = m.name;
     if (m.sound) out.sound = m.sound;
     if (m.volume !== 100) out.volume = m.volume;
+    if (m.clef === 'bass') out.clef = m.clef;
     return out;
   }
-  const emptyMeta = m => !m.name && !m.sound && m.volume === 100;
+  const emptyMeta = m => !m.name && !m.sound && m.volume === 100 && m.clef !== 'bass';
 
   /* ---------------- the song on screen ---------------- */
   /* syls: for a part off the page, its syllables for each of the song's
      lines ([] for an instrumental line); null for the part on the page */
-  let parts = [{ name: '', sound: '', volume: 100, syls: null }];
+  let parts = [{ name: '', sound: '', volume: 100, clef: 'treble', syls: null }];
   let focus = 0;
   /* SHOWN (later the same day, the user: on Notation and Rhythm the part
      tabs are switches — Part 1 on, Part 2 on, or one turned off to see the
@@ -168,7 +176,12 @@
   const ok = i => Number.isInteger(i) && i >= 0 && i < parts.length;
   function meta(i) {
     const p = ok(i) ? parts[i] : parts[0];
-    return { name: p.name, sound: p.sound, volume: p.volume };
+    return { name: p.name, sound: p.sound, volume: p.volume, clef: p.clef };
+  }
+  /* core.js clefNow asks on every pitch: no copy */
+  function clefOf(i) {
+    const p = parts[i === undefined ? focus : i];
+    return (p && p.clef) || 'treble';
   }
   function label(i) { return meta(i).name || 'Part ' + (i + 1); }
   const page = () => SW.score.readLines();
@@ -185,6 +198,8 @@
       return a;
     });
   }
+  /* a part read from the model, in its own clef */
+  function partSong(i, o) { return SW.timing.songOf(lines(i), Object.assign({ clef: clefOf(i) }, o)); }
   const isShown = i => ok(i) && (i === focus || !hidden.has(i));
   const shownParts = () => parts.map((_, i) => i).filter(isShown);
   function setShown(i, on) {
@@ -347,13 +362,15 @@
   }
   /* o: { from, notes, rhythm, words } — start the new part from part
      `from` (copySyllables); without it (or with nothing chosen) the new
-     part is a rest in every sung line */
+     part is a rest in every sung line. A part that takes another's notes
+     takes its clef too: the same notes, sounding the same. */
   function add(o) {
     if (parts.length >= MAX) return -1;
     const model = SW.score.read();
     const i = parts.length;
     const src = o && ok(o.from) && (o.notes || o.rhythm || o.words) ? linesOf(model, o.from) : null;
     setLines(model, i, (model.lines || []).map((l, k) => (l.bars ? { bars: l.bars } : { syllables: src && src[k] ? copySyllables(src[k].syllables, o) : restSyllables() })));
+    if (src && o.notes && clefOf(o.from) === 'bass') model.parts[i] = Object.assign({}, model.parts[i], { clef: 'bass' });
     redraw(model, i, 'part');
     return i;
   }
@@ -377,9 +394,9 @@
     if (!ok(i) || !patch) return false;
     const was = meta(i);
     const next = cleanMeta(Object.assign({}, was, patch));
-    if (next.name === was.name && next.sound === was.sound && next.volume === was.volume) return false;
+    if (next.name === was.name && next.sound === was.sound && next.volume === was.volume && next.clef === was.clef) return false;
     Object.assign(parts[i], next);
-    const reason = 'name' in patch ? 'part-name' : 'sound' in patch ? 'part-sound' : 'part-volume';
+    const reason = 'name' in patch ? 'part-name' : 'sound' in patch ? 'part-sound' : 'clef' in patch ? 'part-clef' : 'part-volume';
     SW.score.changed(reason);
     return true;
   }
@@ -413,6 +430,23 @@
     const plain = N({ v: 2, key: 'C', lines: one.lines, parts: [{}] });
     check('an empty parts list is no parts', plain.parts === undefined);
     check('everyLine lists each part', everyLine(two).length === 2);
+    // a clef: bass or nothing; a one-part song keeps it
+    const low = N({ v: 2, key: 'C', lines: one.lines, parts: [{ clef: 'bass' }] });
+    check('a one-part song keeps a bass clef', countOf(low) === 1 && low.parts[0].clef === 'bass' && metaOf(low, 0).clef === 'bass');
+    check('treble is never written', N({ v: 2, key: 'C', lines: one.lines, parts: [{ clef: 'treble' }] }).parts === undefined);
+    check('an unknown clef reads as treble', metaOf({ parts: [{ clef: 'alto' }] }, 0).clef === 'treble');
+    check('no clef reads as treble', metaOf(two, 1).clef === 'treble');
+    const lowMidi = M => M.withClef('bass', () => M.noteMidi('do', 'natural', 'C'));
+    check('bass sounds an octave under treble', lowMidi(SW.music) === SW.music.withClef('treble', () => SW.music.noteMidi('do', 'natural', 'C')) - 12);
+    const c3 = SW.music.withClef('bass', () => SW.music.spellNote('do', 'natural', 'C'));
+    check("do in C on a bass clef is C3", c3.letter === 'C' && c3.octave === 3);
+    // the bass clef's range, A1 to A4, the same in every key
+    const B = fn => SW.music.withClef('bass', fn);
+    check('C an octave over the range folds back', B(() => SW.music.noteMidi('do-high2', 'natural', 'C')) === 60 && !B(() => SW.music.clefFits('do-high2', 'natural', 'C')));
+    check("A♭'s low do folds up", B(() => SW.music.noteMidi('do-low', 'natural', 'Ab')) === 44 && !B(() => SW.music.clefFits('do-low', 'natural', 'Ab')));
+    check('both ends fit', B(() => SW.music.clefFits('la-low2', 'natural', 'C') && SW.music.clefFits('la-high', 'natural', 'C')) && B(() => SW.music.noteMidi('la-low2', 'natural', 'C')) === 33 && B(() => SW.music.noteMidi('la-high', 'natural', 'C')) === 69);
+    check('a sharp over the top does not fit', !B(() => SW.music.clefFits('la-high', 'sharp', 'C')));
+    check('treble has no such limit', SW.music.withClef('treble', () => SW.music.clefFits('do-high2', 'natural', 'G') && SW.music.noteMidi('do-high2', 'natural', 'G') === 91));
     // a new part from another: notes, rhythm, words — each on its own
     const src = [{ text: 'twin', hy: true, chord: 'I', cols: [{ v: 'e', tie: true, key: 'G', notes: [{ n: 'so', acc: 'sharp' }, { n: 'mi' }] }, { v: 'e', notes: [{ n: 'la' }] }] }, { text: '-', cols: [{ v: 'q', notes: [{ n: 're', rest: true }] }] }, { text: 'kle', cols: [{ notes: [{ n: 'fa' }] }] }];
     const cp = what => copySyllables(clone(src), what);
@@ -447,7 +481,7 @@
   SW.parts = {
     MAX,
     countOf, linesOf, setLines, everyLine, metaOf, cleanMeta, compactMeta, restSyllables,
-    count, focused, meta, label, lines, firstPickup, isShown, shownParts, setShown,
+    count, focused, meta, clef: clefOf, label, lines, song: partSong, firstPickup, isShown, shownParts, setShown,
     focus: focusPart, add, remove, setMeta, mirror, copySyllables,
     load, write, selfTest
   };

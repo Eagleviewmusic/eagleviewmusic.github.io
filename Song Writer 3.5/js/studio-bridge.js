@@ -92,7 +92,7 @@
     const parts = [];
     for (let i = 0; i < SW.parts.count(); i++) {
       const meta = SW.parts.meta(i);
-      const sg = i === focus ? song : SW.timing.songOf(SW.parts.lines(i));
+      const sg = i === focus ? song : SW.parts.song(i);
       parts.push({ name: SW.parts.label(i), sound: SW.audio.partMix(meta).preset, volume: meta.volume, notes: notesOf(sg) });
     }
     const melody = [].concat(...parts.map(p => p.notes)).sort((a, b) => a.at - b.at);
@@ -136,7 +136,7 @@
        over (core.js carryOver), but this frame cannot save, so they are read where they are — the
        same rule, into this frame's memory only (2026-10-30: the studio listed the built-ins alone) */
     if (localStorage.getItem(L.STORAGE_KEY) === null) {
-      const old = ['song_writer_30_library_v1', 'song_writer_25_library_v1', 'song_writer_2_library_v1']
+      const old = ['song_writer_351_library_v1', 'song_writer_30_library_v1', 'song_writer_25_library_v1', 'song_writer_2_library_v1']
         .find(k => localStorage.getItem(k) !== null);
       const v = old ? localStorage.getItem(old) : null;
       if (v !== null) localStorage.setItem(L.STORAGE_KEY, v);

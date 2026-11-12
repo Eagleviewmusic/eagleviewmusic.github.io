@@ -284,7 +284,7 @@
   /* the scale's notes on the allowed rungs; all twenty-two when the
      range holds none of them (a lesson range built for another scale) */
   function ladder(id) {
-    const inRange = n => !SW.keys || SW.keys.mode() !== 'change' || SW.keys.inRange(n.midi);
+    const inRange = n => !SW.keys || (SW.keys.mode() !== 'change' && !M.clef().range) || SW.keys.inRange(n.midi);
     const l = M.scaleLadder(allowedNotes(), id).filter(inRange);
     return l.length ? l : M.scaleLadder(noteOrder, id);
   }
@@ -372,7 +372,7 @@
     if (!noteClass) return false;
     if (!can('pitch')) return false;
     if (allowedNotes().indexOf(noteClass) === -1) {
-      SW.ui.toast('That note is outside the range in Layout settings');
+      SW.ui.toast(M.clefFits(noteClass, 'natural') ? 'That note is outside the range in Layout settings' : M.clef().rangeNote);
       return true;
     }
     const activeNote = getActiveNote();
@@ -382,6 +382,7 @@
     const num = M.STEP_OF[noteToSolfege[noteClass]];
     const alter = M.stepAlters()[num];
     const acc = alter === undefined ? 'natural' : M.accOf(Math.max(-1, Math.min(1, alter)));
+    if (!M.clefFits(noteClass, acc)) { SW.ui.toast(M.clef().rangeNote); return true; }
     if (alter === undefined) {
       const sc = M.scaleOf();
       SW.ui.toast(noteToSolfege[noteClass] + ' is not in ' + (sc ? sc.name : 'this scale') + ' — written as an outside note');
@@ -468,7 +469,7 @@
   }
   function setNoteMidiIn(note, midi) {
     if (!S.editing || !can('pitch')) return false;
-    if (SW.keys && SW.keys.mode() === 'change' && !SW.keys.inRange(midi)) return false;
+    if (SW.keys && (SW.keys.mode() === 'change' || M.clef().range) && !SW.keys.inRange(midi)) return false;
     const allowed = allowedNotes();
     const tonic = M.KEY_SIGNATURES_CHROMATIC_INDEX[M.keyNow()] || 0;
     const rel = ((midi - tonic) % 12 + 12) % 12;
@@ -483,7 +484,7 @@
       for (const nc of allowed) {
         const sol = noteToSolfege[nc];
         if (t.num !== null && M.STEP_OF[sol] !== t.num) continue;
-        if (M.noteMidi(nc, t.acc) !== midi) continue;
+        if (M.noteMidi(nc, t.acc) !== midi || !M.clefFits(nc, t.acc)) continue;
         if (t.acc === 'flat' && (sol === 'Do' || sol === 'Fa')) continue;
         if (t.acc === 'sharp' && (sol === 'Mi' || sol === 'Ti')) continue;
         found = { nc, acc: t.acc };
@@ -547,7 +548,9 @@
       if (intended === 'flat' && (sol === 'Do' || sol === 'Fa')) { SW.ui.toast(sol + ' cannot be flat'); return; }
       if (intended === 'sharp' && (sol === 'Mi' || sol === 'Ti')) { SW.ui.toast(sol + ' cannot be sharp'); return; }
     }
-    S.accidentalMode = S.accidentalMode === intended ? 'natural' : intended;
+    const next = S.accidentalMode === intended ? 'natural' : intended;
+    if (!M.clefFits(M.noteClassOf(activeNote), next, keyOf(activeNote))) { SW.ui.toast(M.clef().rangeNote); return; }
+    S.accidentalMode = next;
     applyActiveAccidentalToCurrentNote();
   }
 

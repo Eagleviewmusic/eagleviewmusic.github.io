@@ -97,6 +97,27 @@
   const NEW_SONG_TEXT = (typeof PRELOADED_SONGS !== 'undefined' && PRELOADED_SONGS['new-song']) || '[Key of C]\n[A]\nStart[D1] Here[D1]';
   const isSandboxId = id => id === SANDBOX_ID;
   const isDefaultId = id => Object.prototype.hasOwnProperty.call(DEFAULT_TITLES, id);
+  /* A song that comes with the app, untouched by anyone: since the song boxes
+     (2026-11-11, the user) it is kept as it came, as a shared song is — never
+     renamed, saved into or deleted. Changes to it become a version of the
+     person's own (Save my copy), in the same box. */
+  const isBuiltin = (id, rec) => isDefaultId(id) && !!rec && !rec.isCustom && !rec.received;
+  /* Whose a song is, for the song boxes (js/library-boxes.js) and the list:
+       'book'     from a book taken off the Teacher Library shelf — read-only, leaves with its book
+       'shared'   from a link — read-only, can be deleted
+       'builtin'  comes with Song Writer — read-only, stays
+       'lesson'   a lesson's exercise (the student's work)
+       'mine'     everything else */
+  function kindOf(id, rec) {
+    if (!rec) return 'mine';
+    if (isShelfSong(rec)) return 'book';
+    if (rec.received) return 'shared';
+    if (isBuiltin(id, rec)) return 'builtin';
+    if (String(id).indexOf('lesson_') === 0) return 'lesson';
+    return 'mine';
+  }
+  // never renamed, saved into or deleted here (a book's song leaves with its book; a link's may be deleted)
+  const isProtectedKind = k => k === 'book' || k === 'shared' || k === 'builtin';
 
   let currentSongId = null;
   let currentSongTitle = '';
@@ -108,6 +129,9 @@
   let openedReceived = false;
   // …and, if it came from a book taken off the Teacher Library shelf, which one
   let openedBook = '';
+  // …or it is one of the songs that come with the app, kept the same way (2026-11-11)
+  let openedBuiltin = false;
+  const readOnly = () => openedReceived || openedBuiltin;
 
   /* ---------------- records ---------------- */
   function normalizeSong(raw, idHint) {
@@ -284,6 +308,42 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     if (n) saveStoredLibrary(library);
   }
 
+  /* SONG BOXES (2026-11-11): the built-ins are kept as they came from now on.
+     Until then one could be changed and saved in place; a library holding
+     such a changed built-in gets the built-in back, and the changes become
+     the person's own song beside it (derivedFrom the built-in, so the boxes
+     put the two in one box, js/library-boxes.js). Once per browser — after
+     that a built-in cannot be changed, and a later songs.js must not make
+     an untouched old one look like someone's work. Never in a frame that
+     is only a guest here (the Recording Studio's, a preview): what it wrote
+     would be in its memory alone, under ids the real library never has. */
+  const BUILTINS_SPLIT_KEY = 'song_writer_35_builtins_split_v1';
+  function splitEditedBuiltins() {
+    if (window.EVM_STUDIO_EMBED) return;
+    try { if (localStorage.getItem(BUILTINS_SPLIT_KEY)) return; } catch (e) { return; }
+    let library = null;
+    try { library = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) { return; }
+    if (library && typeof library === 'object') {
+      let active = null;
+      try { active = localStorage.getItem(ACTIVE_ID_KEY); } catch (e) {}
+      let n = 0;
+      DEFAULT_ORDER.forEach(id => {
+        const rec = library[id];
+        if (!rec || typeof rec !== 'object' || rec.isCustom || rec.received) return;
+        if (rawSongKey(rec) === rawSongKey(defaultRecord(id))) return;
+        const mine = Object.assign({}, rec, { id: EVM.newId('song'), isCustom: true, derivedFrom: id });
+        library[mine.id] = mine;
+        const fresh = defaultRecord(id);
+        fresh.createdAt = rec.createdAt || 0;
+        library[id] = fresh;
+        if (active === id) { try { localStorage.setItem(ACTIVE_ID_KEY, mine.id); } catch (e) {} }
+        n++;
+      });
+      if (n) saveStoredLibrary(library);
+    }
+    try { localStorage.setItem(BUILTINS_SPLIT_KEY, '1'); } catch (e) {}
+  }
+
   /* First run: the examples, plus anything the user made in 1.0. A 1.0
      example they changed comes across as a song of its own, so the 2.0
      example stays pristine and nothing they wrote is lost. The 1.0 key is
@@ -430,7 +490,7 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
   function autoSaveOffered() {
     return !(SW.lessons && SW.lessons.meta()) && !isSandboxId(currentSongId) && !!currentSongId;
   }
-  function autoSaveOn() { return !autoSaveOffered() || (autoSave && !openedReceived); }
+  function autoSaveOn() { return !autoSaveOffered() || (autoSave && !readOnly()); }
   function hasUnsavedChanges() {
     if (autoSaveOn() || savedFingerprint === null) return false;
     if (SW.lessons && SW.lessons.isPreviewing()) return false;
@@ -442,7 +502,7 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     if (!hasUnsavedChanges()) return true;
     const title = currentSongTitle || 'this song';
     return confirm('Leave “' + title + '” without saving your changes?\n\n'
-      + 'Auto-save is off' + (openedReceived ? ' (it is a shared song)' : '') + ', so the changes you have made since opening it are not saved. '
+      + 'Auto-save is off' + (openedReceived ? ' (it is a shared song)' : openedBuiltin ? ' (it is a song that comes with Song Writer)' : '') + ', so the changes you have made since opening it are not saved. '
       + 'OK ' + (where || 'goes on') + ' and leaves them behind. Cancel stays here — then Save as… (or turn auto-save on) to keep them.');
   }
 
@@ -457,7 +517,7 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     /* A shared song stays exactly as it was sent — that is what lets a
        student always go back to it. Their changes become theirs only
        through Save my copy (Save as…). A lesson always keeps itself. */
-    if (existing.received && !(SW.lessons && SW.lessons.meta())) return;
+    if ((existing.received || isBuiltin(currentSongId, existing)) && !(SW.lessons && SW.lessons.meta())) return;
     const record = {
       id: currentSongId,
       title: currentSongTitle || existing.title || 'Untitled Song',
@@ -492,20 +552,22 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     if (!offered) return;
     const on = autoSaveOn();
     autoSaveToggle.classList.toggle('is-off', !on);
-    autoSaveToggle.classList.toggle('is-shared', openedReceived);
+    autoSaveToggle.classList.toggle('is-shared', readOnly());
     autoSaveToggle.setAttribute('aria-pressed', String(on));
     autoSaveToggle.title = openedReceived
       ? 'A shared song stays exactly as it was sent, so you can always go back to it. Press to save your own copy and keep your changes.'
+      : openedBuiltin
+      ? 'This song comes with Song Writer and stays as it is, so you can always go back to it. Press to save your own version and keep your changes.'
       : on
       ? 'Auto-save is on: every change is saved to this song. Press to stop saving.'
       : 'Auto-save is off: your changes are not being saved. Press to save them and start saving again.';
-    $('autosave-label').textContent = openedReceived ? 'Save my copy' : (on ? 'Auto-save' : 'Not saving');
-    autoSaveToggle.querySelector('.autosave-icon').innerHTML = openedReceived ? ICON_COPY : (on ? ICON_SAVING : ICON_NOT_SAVING);
+    $('autosave-label').textContent = readOnly() ? 'Save my copy' : (on ? 'Auto-save' : 'Not saving');
+    autoSaveToggle.querySelector('.autosave-icon').innerHTML = readOnly() ? ICON_COPY : (on ? ICON_SAVING : ICON_NOT_SAVING);
   }
 
   function setAutoSave(on) {
     if (!autoSaveOffered()) return;
-    if (on && openedReceived) { showNewSongModal('saveAs'); return; }
+    if (on && readOnly()) { showNewSongModal('saveAs'); return; }
     if (on && hasUnsavedChanges()) {
       const title = currentSongTitle || 'this song';
       const ok = confirm('Save the changes you have made to “' + title + '”?\n\n'
@@ -528,7 +590,7 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     const sandbox = isSandboxId(currentSongId);
     const lesson = SW.lessons && SW.lessons.meta();
     const title = sandbox ? SANDBOX_TITLE : (currentSongTitle || 'Untitled');
-    const where = sandbox ? 'Sandbox' : (lesson ? 'Lesson' : (openedReceived ? (openedBook || 'Shared') : 'Library'));
+    const where = sandbox ? 'Sandbox' : (lesson ? 'Lesson' : (openedReceived ? (openedBook || 'Shared') : openedBuiltin ? 'Built-in' : 'Library'));
     const chip = $('song-chip');
     chip.classList.toggle('is-sandbox', sandbox);
     chip.title = sandbox ? 'Library — your sandbox is open: scratch work, not in your library' : `Library — ${where}: ${title}`;
@@ -546,6 +608,8 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
       ? 'From the book “' + openedBook + '” in the Teacher Library. It stays exactly as it was sent, so you can always come back to it — use Save as… to keep your own copy with your changes.'
       : openedReceived
       ? 'Shared with you. It stays exactly as it was sent, so you can always come back to it — use Save as… to keep your own copy with your changes.'
+      : openedBuiltin
+      ? 'Comes with Song Writer. It stays as it is, so you can always come back to it — use Save my copy to keep your own version, in the same box.'
       : '';
     note.hidden = !note.textContent;
     document.title = (sandbox ? 'Sandbox' : title) + ' — Song Writer 3.5';
@@ -583,7 +647,8 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     // song is never auto-saved.
     openedReceived = !!rec.received && !(SW.lessons && SW.lessons.meta());
     openedBook = openedReceived && rec.book ? String(rec.book) : '';
-    autoSave = !!(options && options.autoSave) && !openedReceived;
+    openedBuiltin = !openedReceived && isBuiltin(songId, song) && !(SW.lessons && SW.lessons.meta());
+    autoSave = !!(options && options.autoSave) && !readOnly();
     markSaved();
     updateSongChip();
     SW.bus.emit('song:opened', { id: songId, title: rec.title });
@@ -635,9 +700,11 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
       sub.textContent = 'Your sandbox stays as it is. This adds a copy to your library as a new song, and you carry on in that copy.';
       confirmNewSongBtn.textContent = 'Save to library';
       newSongTitleInput.value = '';
-    } else if (titlePromptIntent === 'saveAs' && openedReceived) {
+    } else if (titlePromptIntent === 'saveAs' && readOnly()) {
       heading.textContent = 'Save my copy';
-      sub.textContent = 'The shared song stays as it was sent, so you can always go back to it. Your copy is yours to change, and you carry on in it.';
+      sub.textContent = (openedBuiltin
+        ? 'The song that comes with Song Writer stays as it is, so you can always go back to it.'
+        : 'The shared song stays as it was sent, so you can always go back to it.') + ' Your copy is yours to change, and you carry on in it.';
       confirmNewSongBtn.textContent = 'Save my copy';
       newSongTitleInput.value = `${currentSongTitle || 'Untitled'} (my copy)`;
     } else if (titlePromptIntent === 'saveAs') {
@@ -653,10 +720,24 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
       confirmNewSongBtn.textContent = 'Create';
       newSongTitleInput.value = '';
     }
+    syncKeepInBox();
     newSongTitleInput.classList.remove('input-error');
     ui.openSheet('newSongModal');
     setTimeout(() => { newSongTitleInput.focus(); newSongTitleInput.select(); }, 60);
   }
+  /* Save as… from a song in a box (js/library-boxes.js): the copy is a new
+     version in that box — or, unticked, a box of its own. Ticked to start. */
+  function syncKeepInBox() {
+    const row = $('keep-in-box-row');
+    if (!row) return;
+    const box = titlePromptIntent === 'saveAs' && !isSandboxId(currentSongId) && !(SW.lessons && SW.lessons.meta())
+      && SW.boxes ? SW.boxes.boxOf(currentSongId) : null;
+    row.hidden = !box;
+    if (!box) return;
+    $('keep-in-box').checked = true;
+    $('keep-in-box-name').textContent = '“' + box.title + '”';
+  }
+
   function hideNewSongModal() {
     ui.closeSheet('newSongModal');
     newSongTitleInput.value = '';
@@ -677,13 +758,34 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     const lib = getStoredLibrary();
     if (!lib[id]) { hideNewSongModal(); return; }
     if (id === currentSongId) save();
+    // a song that is kept as it came keeps its name (its box can be renamed: js/library-boxes.js)
+    if (isProtectedKind(kindOf(id, lib[id]))) { hideNewSongModal(); return; }
+    const was = lib[id].title;
     lib[id].title = trimmed;
     lib[id].updatedAt = Date.now();
     saveStoredLibrary(lib);
+    if (SW.boxes) SW.boxes.recordRenamed(id, was, trimmed);
     if (id === currentSongId) { currentSongTitle = trimmed; updateSongChip(); }
     hideNewSongModal();
     renderLibrarySongList();
     ui.toast('Renamed “' + trimmed + '”');
+  }
+
+  /* A new name for one of the person's own songs without the name window —
+     a box renamed in its Expand window takes its own versions' names with
+     it (js/library-boxes.js). The song on screen is saved first and keeps
+     the name in memory too, or its next save would put the old one back. */
+  function setSongTitle(id, title) {
+    const trimmed = (title && String(title).trim()) ? String(title).trim().slice(0, 60) : '';
+    const lib = getStoredLibrary();
+    if (!trimmed || !lib[id] || isProtectedKind(kindOf(id, lib[id]))) return false;
+    if (id === currentSongId) save();
+    const fresh = getStoredLibrary();
+    fresh[id].title = trimmed;
+    fresh[id].updatedAt = Date.now();
+    saveStoredLibrary(fresh);
+    if (id === currentSongId) { currentSongTitle = trimmed; updateSongChip(); }
+    return true;
   }
 
   /* 1.0: a new song opens straight into Edit mode — the Edit box out (2026-10-31). */
@@ -740,6 +842,9 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     if (from && !isSandboxId(from)) record.derivedFrom = from;
     library[id] = record;
     saveStoredLibrary(library);
+    // a new version in the box it was made from, or a box of its own (the name window's tick)
+    const keep = $('keep-in-box'), row = $('keep-in-box-row');
+    if (SW.boxes && from && !isSandboxId(from)) SW.boxes.placeNew(id, from, !!(row && !row.hidden && keep && keep.checked));
     hideNewSongModal();
     ui.closeSheet('library-sheet');
     loadSongById(id, { autoSave: true });
@@ -862,25 +967,41 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
         if (SW.lessons.restoreSong(id)) { renderLibrarySongList(); ui.toast('Back to the original'); }
       }));
     } else {
-      // A shared song keeps the name it was sent with; a copy can be renamed.
-      if (!rec.received) actions.appendChild(actionBtn('', 'Rename', 'Give “' + rec.title + '” a new name', () => showNewSongModal('rename', id)));
+      const kind = kindOf(id, song);
+      // A shared song keeps the name it was sent with, a built-in the one it came with; a copy can be renamed.
+      if (!isProtectedKind(kind)) actions.appendChild(actionBtn('', 'Rename', 'Give “' + rec.title + '” a new name', () => showNewSongModal('rename', id)));
       /* A song from a book leaves with its book (Put back): deleted on its
-         own it would only come back at the next visit while the book is out. */
-      if (!isShelfSong(rec)) actions.appendChild(actionBtn('delete-btn-item', '&times;', 'Delete “' + rec.title + '”', () => {
+         own it would only come back at the next visit while the book is out.
+         A built-in stays (2026-11-11, the song boxes). */
+      if (canDelete(id, song)) actions.appendChild(actionBtn('delete-btn-item', '&times;', 'Delete “' + rec.title + '”', () => {
         if (!confirm('Delete “' + rec.title + '”?')) return;
-        const lib = getStoredLibrary();
-        delete lib[id];
-        saveStoredLibrary(lib);
-        // deleting the song on screen drops you into the sandbox
-        if (id === currentSongId) loadSongById(ensureSandbox());
-        renderLibrarySongList();
-        ui.toast('Deleted “' + rec.title + '”');
+        deleteSongById(id);
       }));
     }
     row.appendChild(badge);
     row.appendChild(titleSpan);
     row.appendChild(actions);
     return row;
+  }
+
+  /* Every song can be deleted but a book's (it leaves with its book) and a
+     built-in (it stays, 2026-11-11). Deleting the song on screen drops you
+     into the sandbox. */
+  function canDelete(id, song) {
+    const k = kindOf(id, song);
+    return k !== 'book' && k !== 'builtin';
+  }
+  function deleteSongById(id, quiet) {
+    const lib = getStoredLibrary();
+    const song = lib[id];
+    if (!song || !canDelete(id, song)) return false;
+    const title = normalizeSong(song, id).title;
+    delete lib[id];
+    saveStoredLibrary(lib);
+    if (id === currentSongId) loadSongById(ensureSandbox());
+    renderLibrarySongList();
+    if (!quiet) ui.toast('Deleted “' + title + '”');
+    return true;
   }
 
   /* ------------------------------------------------------------------
@@ -941,6 +1062,11 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     if (!list) return;
     const library = getStoredLibrary();
     const lesson = SW.lessons && SW.lessons.meta();
+    /* The song boxes are the Library's first view (2026-11-11, js/library-boxes.js);
+       this list — every song on its own row — is its List view. A lesson's
+       exercises are always a list. */
+    if (SW.boxes) SW.boxes.syncBar(!lesson);
+    if (!lesson && SW.boxes && SW.boxes.view() === 'boxes') { SW.boxes.render(list, library); return; }
     list.innerHTML = '';
     const group = (cls, icon, label, ids, empty) => {
       if (!ids.length && !empty) return;
@@ -961,11 +1087,16 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
       group('library-group-songs', SONGS_ICON, 'Exercises', ids, 'No exercises here.');
       return;
     }
-    const g = document.createElement('section');
-    g.className = 'library-group library-group-sandbox';
-    g.appendChild(groupHead(SANDBOX_ICON, 'Sandbox'));
-    g.appendChild(buildSandboxRow());
-    list.appendChild(g);
+    // Find a song… (the bar over the boxes, js/library-boxes.js) narrows the list too
+    const q = SW.boxes ? SW.boxes.query() : '';
+    if (q) ids = ids.filter(id => SW.boxes.matches(normalizeSong(library[id], id).title, q));
+    if (!q) {
+      const g = document.createElement('section');
+      g.className = 'library-group library-group-sandbox';
+      g.appendChild(groupHead(SANDBOX_ICON, 'Sandbox'));
+      g.appendChild(buildSandboxRow());
+      list.appendChild(g);
+    }
     // songs from a book are listed under their book, above the student's own
     renderBookGroups(list, library, ids);
     ids = ids.filter(id => !isShelfSong(library[id]));
@@ -973,7 +1104,7 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     const examples = ids.filter(id => isDefaultId(id) && !library[id].isCustom);
     const own = ids.filter(id => shared.indexOf(id) === -1 && examples.indexOf(id) === -1);
     group('library-group-shared', SHARED_ICON, 'Shared with you', shared);
-    group('library-group-songs', SONGS_ICON, 'Your songs', own, 'No songs yet — press New song to make one.');
+    group('library-group-songs', SONGS_ICON, 'Your songs', own, q ? (ids.length ? '' : 'No song is called that.') : 'No songs yet — press New song to make one.');
     group('library-group-examples', EXAMPLES_ICON, 'Examples', examples);
   }
 
@@ -984,6 +1115,7 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     updateSongChip();
     const box = $('picture-colours');
     if (box) box.checked = SW.settings.view.colourPictures !== false;
+    if (SW.boxes) SW.boxes.onOpen();
     renderLibrarySongList();
     ui.openSheet('library-sheet');
   }
@@ -1153,6 +1285,9 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
       count: songs.length,
       songs
     };
+    // the song boxes these songs are in (2026-11-11): a backup opened on another computer keeps them together
+    const boxes = SW.boxes ? SW.boxes.exportFor(songs.map(r => r.id)) : [];
+    if (boxes.length) exportData.boxes = boxes;
     let filename = $('exportFilenameInput').value.trim() || 'song-library-backup';
     if (!filename.endsWith('.json')) filename += '.json';
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -1194,9 +1329,11 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
            ones stay shared. Blank songs are left out. */
         const library = getStoredLibrary();
         const counts = { added: 0, updated: 0, same: 0, matched: 0, kept: 0, blank: 0 };
+        const where = {};          // the file's id → the id it is filed under here (for its box)
         imported.forEach(song => {
           const result = EVM.file(library, incomingSong(song, 'Imported Song'), fileOpts(false));
           counts[result.action] = (counts[result.action] || 0) + 1;
+          if (song.id && result.id) where[song.id] = result.id;
         });
         const parts = [];
         if (counts.added) parts.push(`added ${counts.added}`);
@@ -1205,6 +1342,8 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
         if (counts.kept) parts.push(`kept your newer copy of ${counts.kept}`);
         if (counts.blank) parts.push(`skipped ${counts.blank} blank`);
         saveStoredLibrary(library);
+        // the boxes the file kept its songs in (a backup made since 2026-11-11)
+        if (SW.boxes && Array.isArray(json.boxes)) SW.boxes.importFrom(json.boxes, where);
         renderExportSongList();
         renderLibrarySongList();
         const said = parts.join(', ');
@@ -1226,6 +1365,7 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(ACTIVE_ID_KEY);
       localStorage.removeItem('song_writer_35_skip_delete_section_confirm');
+      if (SW.boxes) SW.boxes.reset();
       if (SW.settings) SW.settings.resetLayout();
       currentSongId = null;
       // a fresh library, without bringing 1.0's songs across a second time
@@ -1312,6 +1452,7 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
   function boot() {
     clearLinkCopies();
     upgradeDefaults();
+    splitEditedBuiltins();
     openFirstSong();
     startShelf();
     booted = true;
@@ -1458,6 +1599,9 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     showManageLibraryModal, offerLink, shareLinkFor, shortLinkFor, clearLinkFromAddress, hasUnsavedChanges, okToLeave,
     currentId: () => currentSongId,
     currentTitle: () => currentSongTitle,
-    isSandboxId, isDefaultId, SANDBOX_ID, STORAGE_KEY
+    isSandboxId, isDefaultId, SANDBOX_ID, STORAGE_KEY,
+    // for the song boxes (js/library-boxes.js)
+    kindOf, isProtectedKind, canDelete, deleteSongById, openFromLibrary, buildSandboxRow, subline, paintBadge, setSongTitle,
+    showNewSongModal, isShelfSong: rec => isShelfSong(rec)
   };
 })();

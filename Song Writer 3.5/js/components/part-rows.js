@@ -229,7 +229,7 @@
           const svg = parts.map((i, k) => {
             const slot = slots ? slots[k] : null;
             const h = slot ? slot.h : H;
-            const out = jointBand(jr, i, i === f, y, h, bs, { prefixW, lineIndex, look, slot });
+            const out = M.withClef(SW.parts.clef(i), () => jointBand(jr, i, i === f, y, h, bs, { prefixW, lineIndex, look, slot }));   // each staff in its part's clef
             y += h;
             return out;
           }).join('');
@@ -314,7 +314,7 @@
     // no name over the staff (the user: it hid under the notes and jumped from staff to staff on a focus — the system line says which goes with which)
     for (let i = 0; i < 5; i++) out.push(K.rect(left, yOf(K.E4 + 2 * i) - lineW / 2, cx(jr.end) - left, lineW, K.INK, ' class="sl"'));
     const pre = K.prefix(s, o.lineIndex === 0 && jr.r === 0, key);
-    out.push(K.at('gClef', left + pre.clefX, yOf(K.step('G', 4)), k));
+    out.push(K.clefInk(pre, left, yOf, k, part));
     pre.sig.forEach(a => out.push(K.at(a.name, left + a.x, yOf(a.st), k)));
     if (pre.time) {
       const t = pre.time, tx = left + t.x;
@@ -426,7 +426,7 @@
     if (cache && cache.focused !== SW.parts.focused()) cache = null;
     if (!cache) cache = { focused: SW.parts.focused(), parts: new Map() };
     if (!cache.parts.has(i)) {
-      const sg = SW.timing.songOf(SW.parts.lines(i));
+      const sg = SW.parts.song(i);
       const evs = [];
       sg.lines.forEach(le => {
         le.events.forEach(ev => { ev.le = le; evs.push(ev); });

@@ -1,7 +1,10 @@
 # Song Writer 2.0 / 2.5 / 3.0 / 3.5 — JSON formats
 
 (3.5 — the 3.0 sandbox renamed 2026-11-03 — writes the same shapes as 3.0 under its own
-keys, `song_writer_35_*`, copying 3.0's across once on its first run. 3.0 — the 2.5 sandbox
+keys, `song_writer_35_*`, copying 3.0's across once on its first run. Since 2026-11-11 it
+adds the song boxes (§10) and a backup's `boxes` (§5); for that one evening they were tried
+as "3.5.1" under `song_writer_351_*`, which 3.5 reads once and folds back into its own
+library (`js/core.js` foldBack351), never writing them. 3.0 — the 2.5 sandbox
 renamed 2026-10-27 — wrote the same shapes as 2.5 under `song_writer_30_*`. 2.5 wrote the
 same shapes under its own keys, `song_writer_25_*`, and adds
 — 2026-10-03 — `progressions` and `track` (the chord progressions and where
@@ -62,7 +65,14 @@ short on the way) opens the sandbox with a message, never the last song.
 
 - `title` is trimmed and at most 60 characters.
 - `isCustom: false` only for the three built-ins: `twinkle`, `mary`,
-  `starspangledbanner`.
+  `starspangledbanner`. Since 2026-11-11 (song boxes, §10) a built-in is kept
+  as it came, as a received song is: never saved into, renamed or deleted;
+  Save my copy makes the person's own (`derivedFrom` the built-in). A library
+  holding a built-in someone had changed and saved in place is split once
+  per browser (`library.js splitEditedBuiltins`, flag
+  `song_writer_35_builtins_split_v1`): the built-in comes back, and the
+  changes become a song of their own with `isCustom: true`,
+  `derivedFrom: "<built-in id>"` (and the open song if it was open).
 - `received`, `receivedAt`, `derivedFrom` are optional (see the EVM Library
   README, §1 and §3). A received song is never saved into.
 - `book` is optional: the Teacher Library book this shared song was taken out
@@ -142,7 +152,7 @@ short on the way) opens the sandbox with a message, never the last song.
 | `meter` | `2/4`, `3/4`, `4/4`; 2.5 also `6/8`, `9/8`, `12/8` | **Omitted when `4/4`.** In the compound meters a beat is a dotted quarter: a block (no `v`) lasts 36 ticks and `bpm` counts dotted quarters. 2.0 reads a compound meter as 4/4. |
 | `bpm` | 30–300 (the family's range; songs saved when it was 40–200 read unchanged) | **Omitted when 100.** |
 | `swing` | `"8"` · `"16"` | **3.0, 2026-11-01** (Setup → Swing; `js/timing.js` SWING). How the song is **played**, never how it is written: the eighths (`8`) or sixteenths (`16`) in pairs, long then short (2 : 1, a triplet's feel), counted from the song's bar lines. Every tick in the score stays straight. In compound time `8` plays straight (the eighths already go in threes) and is kept for a change back to 2/4–4/4. **Omitted when straight.** Older readers (2.5 and before) ignore it and play the song straight. |
-| `parts` | `[ { name?, sound?, volume? }, { name?, sound?, volume?, lines: [ { syllables } ] }, … ]` | **3.5, 2026-11-03 — PARTS** (`js/parts.js`). The song's **parts** — two-, three- or four-part polyphony, each part its own melody with its own words, sound and volume. `parts[0]` is **Part 1**, whose syllables are in the song's `lines` (exactly as always — it never carries `lines` of its own; one it is given is ignored); `parts[1]` … `parts[3]` carry `lines`: **one entry for each of the song's `lines`, in order, holding that part's `syllables` for that line** (the lines — their names, pick-ups and bars — are the song's: *THE LINES ARE THE SONG'S*, later the same day). A part's entry for an instrumental line is `{ "syllables": [] }`; a sung line a part has nothing for holds one rest (`{ "text": "-", "cols": [ { "notes": [ { "n": "do", "rest": true } ] } ] }`), so every part always has a column on every line. A part with more entries than the song has lines stretches the song (Part 1 gets a rest line); fewer are filled with rests; a `label`, `pickup` or `bars` on a part's entry is ignored. At most four parts; more are dropped. `name` ≤ 24 characters (omitted when empty — shown as *Part n*); `sound` a `lib/audio.js` preset id (omitted: the part sounds with Sound → Melody's sound; an unknown id is dropped); `volume` 0–100, a share of the melody's level (omitted when 100). Every part plays together from the song's top; **a line is as long as the longest part needs it** (`js/timing.js` SHARED LENGTHS: a part with less in it is finished with rests to that bar line); the chords, the time, the tempo, the swing, the scale and the **key changes** are the whole song's — a `cols[].key` on a part other than Part 1 is dropped on reading. **Omitted** for a one-part song with nothing set, so every song saved before reads and is written exactly as it did. Older readers (2.5 and before) see Part 1 alone. The text format (§3) carries one part. (Parts saved earlier on 2026-11-03, when a part had lines of its own, read in: each line's syllables land on the song's line of the same index.) |
+| `parts` | `[ { name?, sound?, volume?, clef? }, { name?, sound?, volume?, clef?, lines: [ { syllables } ] }, … ]` | **3.5, 2026-11-03 — PARTS** (`js/parts.js`). The song's **parts** — two-, three- or four-part polyphony, each part its own melody with its own words, sound and volume. **`clef`** (2026-11-04): `"bass"`, omitted for treble. The part is written on a bass clef and sounds an octave lower; its notes (`n`) are stored exactly as they were, so choosing treble again gives every note back. A bass clef's range is A1 to A4 in every key: a stored note that would land beyond it stays on its rung and sounds an octave nearer. A one-part song with a bass clef is `"parts": [ { "clef": "bass" } ]`. Older Song Writers ignore it and play the part on treble. The text format does not carry it. `parts[0]` is **Part 1**, whose syllables are in the song's `lines` (exactly as always — it never carries `lines` of its own; one it is given is ignored); `parts[1]` … `parts[3]` carry `lines`: **one entry for each of the song's `lines`, in order, holding that part's `syllables` for that line** (the lines — their names, pick-ups and bars — are the song's: *THE LINES ARE THE SONG'S*, later the same day). A part's entry for an instrumental line is `{ "syllables": [] }`; a sung line a part has nothing for holds one rest (`{ "text": "-", "cols": [ { "notes": [ { "n": "do", "rest": true } ] } ] }`), so every part always has a column on every line. A part with more entries than the song has lines stretches the song (Part 1 gets a rest line); fewer are filled with rests; a `label`, `pickup` or `bars` on a part's entry is ignored. At most four parts; more are dropped. `name` ≤ 24 characters (omitted when empty — shown as *Part n*); `sound` a `lib/audio.js` preset id (omitted: the part sounds with Sound → Melody's sound; an unknown id is dropped); `volume` 0–100, a share of the melody's level (omitted when 100). Every part plays together from the song's top; **a line is as long as the longest part needs it** (`js/timing.js` SHARED LENGTHS: a part with less in it is finished with rests to that bar line); the chords, the time, the tempo, the swing, the scale and the **key changes** are the whole song's — a `cols[].key` on a part other than Part 1 is dropped on reading. **Omitted** for a one-part song with nothing set, so every song saved before reads and is written exactly as it did. Older readers (2.5 and before) see Part 1 alone. The text format (§3) carries one part. (Parts saved earlier on 2026-11-03, when a part had lines of its own, read in: each line's syllables land on the song's line of the same index.) |
 | `pickup` | `1` | **No longer written** (2026-09-28 to 2026-10-01: every line opened with a one-beat pick-up). Still read: each line without `pickup: false` gets `pickup: "q"`. Before 2026-09-28 it was the Layout setting `show.pickup` (§7); a record, link or lesson whose `layout.show.pickup` is `true` and whose score has no `pickup` is read as `pickup: 1` (`normalizeSong`). |
 | `lines[].label` | string, ≤ 15 chars | Section name (`A`, `Verse`…); may be empty. |
 | `lines[].bars` | 1–64 | **3.0, 2026-10-29.** An **instrumental line**: that many bars with no melody — an intro or an interlude, made on the Chords window's Time Line (*Apply all*). It has `label` and `bars` and no `syllables` (read only while it has none); no pick-up of its own, and the next line's pick-up sounds in its last bar. Drawn as a row of its bars with their chords. Text format: `[Bars 2]` under its name. Older readers see an empty line. |
@@ -233,8 +243,17 @@ Back or a reload still opens its own song.
 ```json
 { "app": "Eagle View Music Song Writer 2.0", "version": 2,
   "exportedAt": "2026-09-22T18:00:00.000Z", "count": 3,
-  "songs": [ record, … ] }
+  "songs": [ record, … ],
+  "boxes": [ { "id": "box_…", "title": "The Star-Spangled Banner", "composer": "John Stafford Smith",
+               "lead": "song_…", "versions": ["starspangledbanner", "song_…"] } ] }
 ```
+
+`boxes` (2026-11-11, optional): the song boxes (§10) the exported songs are
+in, with only the exported songs in `versions`. On import, once the songs are
+filed (each file id → the id it is filed under), a song already kept with
+other versions here stays where it is; the others join one box, and a box
+made only of the file's songs takes the file's title, composer, lead and id
+(so the same file brings the same box). Older readers ignore it.
 
 Also read: 1.0 backups (`songs` of `{ id, title, content }`), a bare array of
 records, 1.0's raw library object `{ id: { title, content } }`, and EVM
@@ -339,6 +358,33 @@ must still read:
 
 Sound's Melody, Steady beat, Count-in and At the end are not stored (reset
 each visit, as Rhythm Poetry's switches are).
+
+## 10. Song boxes (this device; the Library window)
+
+`localStorage.song_writer_35_boxes_v1` (2026-11-11, `js/library-boxes.js`) —
+a layer over the library; the records (§1) are untouched by it.
+
+```json
+{ "v": 1, "view": "boxes", "alpha": true,
+  "order": ["box_…", "box_…"],
+  "boxes": { "box_…": { "id": "box_…", "title": "The Star-Spangled Banner", "composer": "",
+                        "lead": "song_…", "versions": ["starspangledbanner", "song_…"] } } }
+```
+
+- `view`: `boxes` (the first view) or `list` (every song on a row, as before).
+- `alpha`: the boxes shown A–Z by `title`; moving one turns it off, and A–Z
+  writes the A–Z order into `order` and turns it on.
+- `title` and `composer` (≤ 60 characters) are the box's own, so a box of
+  songs kept as they came can still be renamed. `lead` is the version Open
+  opens; it is always one of `versions`.
+- Kept in step every time it is read: ids no longer in the library leave
+  (an empty box goes); a song in two boxes stays in the first; a song in
+  none joins the box of its `derivedFrom`, else gets a box of its own (at the
+  front, or the end while `alpha`). The very first time, songs made from one
+  another or of the same name (once "copy", "my copy", "(my copy)", "(from
+  1.0)" are left off; not generic names like "Untitled Song") share a box.
+- Never in a lesson (its Library is the exercises), and never written by a
+  guest frame (the Recording Studio's, the Preview's: `js/embed.js`).
 
 ## When you change a shape
 

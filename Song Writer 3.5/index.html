@@ -614,7 +614,7 @@
 
 <!-- ============ SHEET: LIBRARY ============ -->
 <div class="sheet-backdrop" id="library-sheet">
-  <div class="sheet sheet-lg">
+  <div class="sheet sheet-lg library-sheet">
     <div class="sheet-head">
       <h2 id="library-sheet-title">Library</h2>
       <button class="sheet-close" data-close="library-sheet" title="Close" aria-label="Close">&times;</button>
@@ -649,7 +649,72 @@
       <span>Keep the section colours in saved pictures <em>(off = plain white, ready to print)</em></span>
     </label>
 
+    <!-- SONG BOXES (2026-11-11, js/library-boxes.js): find a song, Boxes | List, and A–Z for the boxes -->
+    <div class="lib-bar" id="lib-bar">
+      <label class="lib-find">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" id="lib-find" placeholder="Find a song…" autocomplete="off" spellcheck="false" aria-label="Find a song">
+      </label>
+      <div class="seg lib-view-seg" id="lib-view-seg" role="radiogroup" aria-label="Show the songs as">
+        <button class="seg-btn" type="button" data-lib-view="boxes" role="radio" title="One box for each song, with its versions inside">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/></svg>
+          Boxes
+        </button>
+        <button class="seg-btn" type="button" data-lib-view="list" role="radio" title="Every song on a line of its own">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><circle cx="3.5" cy="6" r="1" fill="currentColor"/><circle cx="3.5" cy="12" r="1" fill="currentColor"/><circle cx="3.5" cy="18" r="1" fill="currentColor"/></svg>
+          List
+        </button>
+      </div>
+      <button class="lib-az" type="button" id="lib-az" aria-pressed="true">A–Z</button>
+    </div>
+
     <div class="library-groups" id="librarySongList"></div>
+  </div>
+</div>
+
+<!-- ============ SHEET: A SONG'S BOX, EXPANDED (js/library-boxes.js, 2026-11-11) ============ -->
+<div class="sheet-backdrop" id="box-sheet">
+  <div class="sheet sheet-lg box-sheet" role="dialog" aria-labelledby="box-sheet-title">
+    <div class="sheet-head">
+      <h2 id="box-sheet-title">Song</h2>
+      <button class="sheet-close" data-close="box-sheet" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <div class="box-fields">
+      <label class="box-field">
+        <span>Name</span>
+        <input type="text" class="text-field" id="box-name" maxlength="60" autocomplete="off">
+      </label>
+      <label class="box-field">
+        <span>Composer</span>
+        <input type="text" class="text-field" id="box-composer" maxlength="60" autocomplete="off" placeholder="Who wrote it">
+      </label>
+    </div>
+    <p class="box-name-note" id="box-name-note" hidden></p>
+
+    <div class="library-group-head box-versions-head">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+      <span class="library-group-title" id="box-versions-title">Versions</span>
+      <span class="library-group-rule"></span>
+    </div>
+    <div class="box-versions" id="box-versions"></div>
+
+    <div class="box-add">
+      <button class="btn" type="button" id="box-add-btn" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        Add a version from your library
+      </button>
+      <div class="box-add-panel" id="box-add-panel" hidden>
+        <label class="lib-find">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input type="search" id="box-add-find" placeholder="Find the song to bring in…" autocomplete="off" spellcheck="false" aria-label="Find the song to bring in">
+        </label>
+        <div class="box-add-list" id="box-add-list"></div>
+      </div>
+    </div>
+
+    <div class="sheet-foot">
+      <button class="btn btn-primary" data-close="box-sheet">Done</button>
+    </div>
   </div>
 </div>
 
@@ -662,6 +727,11 @@
     </div>
     <p class="sheet-sub" id="newSongModalSubtext">Give it a name so you can find it later, or leave it blank for a fresh page in your sandbox.</p>
     <input type="text" id="newSongTitleInput" class="text-field" placeholder="e.g. My New Song" maxlength="60" autocomplete="off" />
+    <!-- Save as… from a song in a box (js/library-boxes.js): a new version there, or a box of its own -->
+    <label class="inline-check keep-in-box" id="keep-in-box-row" for="keep-in-box" hidden>
+      <input type="checkbox" id="keep-in-box" checked />
+      <span>Keep it in the box <b id="keep-in-box-name"></b> as a new version <em>(off: a box of its own)</em></span>
+    </label>
     <div class="sheet-foot">
       <button class="btn" data-close="newSongModal" id="cancelNewSongBtn">Cancel</button>
       <button class="btn btn-primary" id="confirmNewSongBtn">Create</button>
@@ -1181,6 +1251,25 @@
   </div>
 </div>
 
+<div class="popover clef-popover" id="clef-popover" role="dialog" aria-label="Clef"></div>
+
+<!-- ============ PREVIEW: a song from the Library, in a small floating window (js/library-boxes.js, 2026-11-11) ============
+     The song is drawn by Song Writer itself in a frame (?embed=preview, js/embed.js + js/preview-frame.js)
+     that reads the library and writes nothing. -->
+<div class="song-preview" id="song-preview" role="dialog" aria-labelledby="sp-title" hidden>
+  <div class="sp-head" id="sp-head">
+    <div class="sp-titles">
+      <b id="sp-title">Preview</b>
+      <small id="sp-sub"></small>
+    </div>
+    <button class="sheet-close sp-close" id="sp-close" type="button" title="Close the preview" aria-label="Close the preview">&times;</button>
+  </div>
+  <div class="sp-body">
+    <iframe id="sp-frame" title="Song preview" allow="autoplay"></iframe>
+    <div class="sp-loading" id="sp-loading">Opening…</div>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1209,6 +1298,7 @@
 <script src="js/library.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/lessons.js"></script>
+<script src="js/library-boxes.js"></script>   <!-- the Library's song boxes, the Expand window and Preview (2026-11-11) -->
 <script src="js/history.js"></script>
 <script src="js/flow.js"></script>
 <script src="js/components/chord-strip.js"></script>
@@ -1231,10 +1321,12 @@
 <script src="js/components/edit-box.js"></script>
 <script src="js/components/parts-ui.js"></script>   <!-- PARTS: the strip over the page, Options → Parts -->
 <script src="js/components/part-rows.js"></script>   <!-- PARTS: the other parts under the page's rows, bar for bar (staff.js render calls it) -->
+<script src="js/components/clef-menu.js"></script>   <!-- double-click a clef on Notation: treble or bass -->
 <script src="js/components/note-tools.js"></script>
 <script src="js/keymap.js"></script>
 <script src="js/app.js"></script>
 <!-- js/studio-bridge.js: window.SongWriterStudio, a song as notes for the Recording Studio — only in its frame (js/embed.js) -->
 <script src="js/studio-bridge.js"></script>
+<script src="js/preview-frame.js"></script>   <!-- only in the Library's Preview frame (?embed=preview) -->
 </body>
 </html>

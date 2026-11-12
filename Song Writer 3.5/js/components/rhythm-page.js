@@ -186,7 +186,7 @@
     for (let i = 0; i < SW.parts.count(); i++) {
       if (i === SW.parts.focused() || !SW.parts.isShown(i)) continue;
       const cell = new Map();                       // absolute tick → { t: 'on' | 'hold' | 'reston' | 'rest', word, at, colour }
-      SW.timing.songOf(SW.parts.lines(i)).lines.forEach(le => le.events.forEach(ev => {
+      SW.parts.song(i).lines.forEach(le => le.events.forEach(ev => {
         const colour = ev.pitches && ev.pitches.length ? ev.pitches[0].color : null;
         for (let c = 0; c * CELL < ev.ticks; c++) {
           cell.set(ev.at + c * CELL, { t: ev.rest ? (c ? 'rest' : 'reston') : (c ? 'hold' : 'on'), word: c ? null : ev.word, at: ev.at, colour });

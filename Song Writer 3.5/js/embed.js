@@ -20,6 +20,16 @@
    localStorage itself is swapped for a layer that reads through to the
    real thing and keeps every write in memory.
 
+   INSIDE THE LIBRARY'S PREVIEW (?embed=preview, 2026-11-11)
+
+   The Library's Preview window (js/library-boxes.js) shows a song in a
+   small floating window by opening this app in a frame there, in Present
+   mode, locked (js/preview-frame.js). The same guest rules as the studio's
+   frame — it reads the library and writes nothing — so the same layer, and
+   window.EVM_STUDIO_EMBED is set as there (no shelf, no lessons, no "Leave
+   site?"). window.EVM_PREVIEW says which of the two it is, and the page
+   gets html.preview-embed before anything is drawn.
+
    WHEN THE BROWSER REFUSES STORAGE (2026-11-04, the user's report)
 
    A page embedded in another site (a Google Site) can be refused storage
@@ -59,10 +69,11 @@
     }
   }
 
-  let embedded = false;
+  let embedded = false, preview = false;
   try {
-    embedded = new URLSearchParams(window.location.search).get('embed') === 'studio'
-      && window.parent !== window;
+    const as = new URLSearchParams(window.location.search).get('embed');
+    embedded = (as === 'studio' || as === 'preview') && window.parent !== window;
+    preview = embedded && as === 'preview';
   } catch (e) {}
   const refusedNow = !embedded && refused();
   if (!embedded && !refusedNow) return;
@@ -95,4 +106,8 @@
        current value — the studio's song picker wants the live library. */
     forget(k) { writes.delete(String(k)); }
   };
+  if (preview) {
+    window.EVM_PREVIEW = true;
+    document.documentElement.classList.add('preview-embed');
+  }
 })();

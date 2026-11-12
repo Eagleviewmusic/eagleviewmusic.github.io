@@ -22,19 +22,59 @@
   const SW = window.SW = window.SW || {};
 
   /* SONG WRITER 3.5 (the 3.0 sandbox, renamed 2026-11-03 when it gained
-     parts) keeps its own keys (song_writer_35_*), so on an origin it shares
-     with 3.0, 2.5 and 2.0 — eagleviewmusic.com — none can harm the others'
-     songs (3.0 would read a song with parts as its Part 1 alone). The first
-     run copies the newest older library across, once: 3.0's (or 2.5's, or
-     2.0's), with its View and Layout settings, lessons and syllable
-     choices. The older keys are only read, never written. (3.0 did the
-     same with 2.5's, 2.5 with 2.0's.) */
+     parts; its Library became song boxes 2026-11-11) keeps its own keys
+     (song_writer_35_*), so on an origin it shares with 3.0, 2.5 and 2.0 —
+     eagleviewmusic.com — none can harm the others' songs (3.0 would read a
+     song with parts as its Part 1 alone). The first run copies the newest
+     older library across, once: 3.0's (or 2.5's, or 2.0's), with its View
+     and Layout settings, lessons, syllable choices and chord drafts. The
+     older keys are only read, never written. (3.0 did the same with 2.5's,
+     2.5 with 2.0's.)
+
+     "SONG WRITER 3.5.1" (2026-11-11): for an evening the song boxes were
+     tried out as 3.5.1, at its own address with its own keys
+     (song_writer_351_*, copied from 3.5's), before they became 3.5. What
+     was saved there comes home here, once (FROM_351). A device that never
+     ran 3.5 takes 3.5.1's library whole, boxes and all (carryOver). Any
+     other goes song by song (foldBack351): a song only 3.5.1 has joins this
+     library; a song both have keeps the copy saved last, except a
+     built-in, which keeps 3.5.1's (3.5.1 gave back a built-in changed in
+     place as it came, the changes becoming a song of their own, and that
+     song comes too, so 3.5 has nothing left to split). 3.5.1's boxes come
+     along while this library has none. Book songs stay with the shelf. The
+     351 keys are only read. */
+  const FROM_351 = 'song_writer_35_from_351_v1';
+  (function foldBack351() {
+    try {
+      if (localStorage.getItem(FROM_351)) return;
+      const theirs = localStorage.getItem('song_writer_351_library_v1');
+      const ours = localStorage.getItem('song_writer_35_library_v1');
+      if (!theirs || !ours) return;   // nothing to bring home, or carryOver takes it whole
+      const lib = JSON.parse(ours), got = JSON.parse(theirs);
+      if (!lib || typeof lib !== 'object' || !got || typeof got !== 'object') return;
+      let n = 0;
+      Object.keys(got).forEach(id => {
+        const r = got[id], o = lib[id];
+        if (!r || typeof r !== 'object' || (r.received && r.book)) return;
+        const builtin = !r.isCustom && !r.received && String(id).indexOf('lesson_') !== 0;
+        if (o && !builtin && (r.updatedAt || 0) <= (o.updatedAt || 0)) return;
+        if (o && JSON.stringify(o) === JSON.stringify(r)) return;
+        lib[id] = r;
+        n++;
+      });
+      if (n) localStorage.setItem('song_writer_35_library_v1', JSON.stringify(lib));
+      const boxes = localStorage.getItem('song_writer_351_boxes_v1');
+      if (boxes !== null && localStorage.getItem('song_writer_35_boxes_v1') === null) localStorage.setItem('song_writer_35_boxes_v1', boxes);
+      localStorage.setItem(FROM_351, '1');
+    } catch (e) { /* storage blocked or unreadable: 3.5's own library as it is */ }
+  })();
   (function carryOver() {
     try {
       if (localStorage.getItem('song_writer_35_library_v1')) return;
-      const from = ['song_writer_30_', 'song_writer_25_'].find(p => localStorage.getItem(p + 'library_v1')) || 'song_writer_2_';
+      const from = ['song_writer_351_', 'song_writer_30_', 'song_writer_25_'].find(p => localStorage.getItem(p + 'library_v1')) || 'song_writer_2_';
+      localStorage.setItem(FROM_351, '1');
       ['library_v1', 'active_song_v1', 'view_prefs_v1', 'layout_v1', 'lessons_v1', 'lesson_sources_v1',
-       'syllable_choices_v1', 'skip_delete_section_confirm'].forEach(k => {
+       'syllable_choices_v1', 'skip_delete_section_confirm', 'chord_drafts_v1', 'boxes_v1'].forEach(k => {
         let v = localStorage.getItem(from + k);
         /* not the Teacher Library's songs: an older app's copy of one may be missing what only
            a newer app reads (2.5 drops instrumental bars and the Chord Chart, 3.0 drops parts),
@@ -376,16 +416,85 @@
     try { return fn(); } finally { keyOverride = was; }
   }
 
+  /* ------------------------------------------------------------------
+     THE CLEF IN EFFECT (2026-11-04, the user: double-click the treble
+     clef on Notation and choose the bass clef; the notes go down an
+     octave, sit correctly on it, and the Pitch page plays that octave
+     too). A clef belongs to a part (parts.js `clef`). The song as written
+     does not change — a block keeps its rung and its height — so going
+     back to treble gives every note back exactly. What changes is what a
+     rung means: everything that turns a rung into a pitch asks here, in
+     noteMidi and spellNote (so the player, the keyboard, the letter keys,
+     the Recording Studio and the note names all follow) and in audio.js
+     calculateFrequency.
+
+     clefNow() is the clef of the part on the page, unless inside
+     withClef(id, fn) — a part off the page being read or drawn. clef() is
+     its entry here:
+       octave      what it does to the sound
+       staffShift  steps from a written note to its place on the staff,
+                   counted as if the staff were a treble one. The engraver
+                   (staff.js) knows one staff — E4 its bottom line, B4 its
+                   middle, F5 its top — and stems, ledgers, rests and dots
+                   work from those; a bass staff's bottom line is G2, twelve
+                   steps under E4, so a pitch's `step` is that much higher
+       sigShift    a key signature sits one line lower on a bass staff
+       glyph       the clef's drawing (staff.js puts it on its own line)
+       range       [low, high] MIDI, the same in every key, or null for none
+
+     THE BASS CLEF'S RANGE (later the same day, the user: an absolute range,
+     from the A below C2 to the A above middle C — A1 to A4). What can be
+     written stops there: the arrows, the letter keys, the piano and the ♯ / ♭
+     use clefFits, and settings.js allowedNotes offers the rungs that land
+     inside it in the key in effect (keys.js rungsFor, as Create Key Change
+     does), low2 and high2 rungs included. A note already written beyond it —
+     a song brought over from treble, or a change of key — is kept on its
+     rung and sounds and is drawn the nearest octave inside (foldIntoClef),
+     so nothing ever leaves the range and treble still gives it back.
+     midiOnClef is the pitch before that: compare with it when asking whether
+     a rung fits, or two rungs can seem to be one note.
+     ------------------------------------------------------------------ */
+  const CLEFS = {
+    treble: { id: 'treble', name: 'Treble', octave: 0, staffShift: 0, sigShift: 0, glyph: 'gClef', range: null, rangeNote: '' },
+    bass: { id: 'bass', name: 'Bass', octave: -1, staffShift: 12, sigShift: -2, glyph: 'fClef', range: [33, 69], rangeNote: 'The bass clef runs from A1 to A4' }
+  };
+  let clefOverride = null;
+  function clefNow() {
+    if (clefOverride) return clefOverride;
+    return SW.parts ? SW.parts.clef() : 'treble';
+  }
+  function withClef(id, fn) {
+    const was = clefOverride;
+    clefOverride = id || null;
+    try { return fn(); } finally { clefOverride = was; }
+  }
+  const clef = () => CLEFS[clefNow()] || CLEFS.treble;
+
   /* The MIDI number a block sounds, by exactly 1.0's arithmetic
-     (calculateFrequency counts semitones from C0; MIDI 12 is C0). */
-  function noteMidi(noteClass, accidental, key) {
+     (calculateFrequency counts semitones from C0; MIDI 12 is C0), in the
+     clef in effect and inside its range. */
+  function noteMidi(noteClass, accidental, key) { return foldIntoClef(midiOnClef(noteClass, accidental, key)); }
+  function foldIntoClef(m) {
+    const r = clef().range;
+    if (!r || m === null) return m;
+    while (m > r[1]) m -= 12;
+    while (m < r[0]) m += 12;
+    return m;
+  }
+  function clefFits(noteClass, accidental, key) {
+    const r = clef().range;
+    if (!r) return true;
+    const m = midiOnClef(noteClass, accidental, key);
+    return m !== null && m >= r[0] && m <= r[1];
+  }
+  function midiOnClef(noteClass, accidental, key) {
     const k = key || keyNow();
     const tonic = KEY_SIGNATURES_CHROMATIC_INDEX[k];
     const sol = noteToSolfege[noteClass];
     if (tonic === undefined || !sol) return null;
     const shift = KEY_TRANSPOSITION[k] ? (KEY_TRANSPOSITION[k].octaveShift || 0) : 0;
     const acc = accidental === 'sharp' ? 1 : accidental === 'flat' ? -1 : 0;
-    return 12 + tonic + (DEFAULT_SOLFEGE_OCTAVE + shift) * 12 + SOLFEGE_INTERVALS[sol] + acc + octaveOf(noteClass) * 12;
+    return 12 + tonic + (DEFAULT_SOLFEGE_OCTAVE + shift) * 12 + SOLFEGE_INTERVALS[sol] + acc + octaveOf(noteClass) * 12 + clef().octave * 12;
   }
 
   /* 'C#4' / 'Bb3' → MIDI */
@@ -475,7 +584,7 @@
         if (p.num !== num) return;
         const acc = accOf(p.alter);
         const midi = noteMidi(nc, acc);
-        if (midi !== null) out.push({ nc, acc, midi });
+        if (midi !== null && clefFits(nc, acc)) out.push({ nc, acc, midi });
       });
     });
     return out.sort((a, b) => a.midi - b.midi);
@@ -541,7 +650,7 @@
     chordNamesByKey, NOTE_FREQUENCIES, CHROMATIC_NOTES, KEY_TRANSPOSITION,
     solfegeKeyMap, SOLFEGE_INTERVALS, DEFAULT_SOLFEGE_OCTAVE, KEY_SIGNATURES_CHROMATIC_INDEX, KEYS,
     noteOrder, noteToSolfege, noteToShorthandMap, shorthandToNoteMap, NOTE_HEIGHTS, LINE_COLORS,
-    RUNGS, isRung, keyNow, withKey,
+    RUNGS, isRung, keyNow, withKey, CLEFS, clef, clefNow, withClef, midiOnClef, foldIntoClef, clefFits,
     LETTER_PC, displayKey, noteClassOf, octaveOf, noteMidi, midiFromName, midiToFreq, spellNote,
     // the scale (Digital Accordion's, Do on the tonic)
     STEP_OF, accOf, alterOf, scaleOf, scaleSteps, stepAlters, inScale, scaleLadder, solfegeOf,

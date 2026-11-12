@@ -82,6 +82,14 @@
    the pitch, as it is on the keyboard dock) inside an ink outline; stems,
    beams, rests and the staff are ink.
 
+   ONE STAFF, TWO CLEFS (2026-11-04, core.js THE CLEF IN EFFECT). The
+   engraver knows one staff: E4 its bottom line, B4 its middle, F5 its top.
+   On a bass clef a pitch's `step` (timing.js) and do's (doStepOf) are its
+   place on that staff, not its letter's octave, so stems, ledgers, rests,
+   dots and beams work with no thought of the clef. Only the clef's own
+   glyph and the key signature's places differ. A notehead still stands at
+   its block's top edge: it is the staff that sits lower behind the notes.
+
    API
      SW.staff.render()     plan and redraw every line (cheap; called on
                            every change, selection, view or size change)
@@ -135,6 +143,8 @@
   const n2 = v => Number(Number(v).toFixed(2));
   const step = (letter, octave) => LETTERS.indexOf(letter) + 7 * octave;
   const E4 = step('E', 4), B4 = step('B', 4), D5 = step('D', 5), F5 = step('F', 5);
+  // the staff line a clef's glyph stands on: the G line, or the F line (the fourth, where the treble's D5 is)
+  const CLEF_LINE = { gClef: step('G', 4), fClef: D5 };
 
   /* ---- glyph helpers (as engrave.js) ---- */
   function at(name, x, y, k, extra, vScale) {
@@ -197,11 +207,13 @@
     const order = (sharps ? ORDER_SHARP : ORDER_FLAT).filter(l => sig[l]);
     return { sig, order, kind: sharps ? 1 : flats ? -1 : 0 };
   }
-  // treble-clef positions of the signature accidentals, as steps
+  // treble-clef positions of the signature accidentals, as steps; a bass clef's are a line lower (sigStep)
   const SIG_POS = {
     1: { F: step('F', 5), C: step('C', 5), G: step('G', 5), D: step('D', 5), A: step('A', 4), E: step('E', 5), B: step('B', 4) },
     '-1': { B: step('B', 4), E: step('E', 5), A: step('A', 4), D: step('D', 5), G: step('G', 4), C: step('C', 5), F: step('F', 4) }
   };
+
+  const sigStep = (kind, letter) => SIG_POS[String(kind)][letter] + M.clef().sigShift;
 
   /* ---- offsets inside the line, ignoring transforms (the highlighted
      syllable is scaled, and the SVG is not) ---- */
@@ -217,9 +229,12 @@
 
   /* The vertical placement: `yOf(step)` for a row whose bar base is at
      `base` px from the line's top. do's notehead sits at do's bar top. */
-  function geometry(base, bs, key) {
+  function doStepOf(key) {
     const doSp = M.spellNote('do', 'natural', key || M.keyNow());
-    const doStep = step(doSp.letter, doSp.octave);
+    return step(doSp.letter, doSp.octave) + M.clef().staffShift;
+  }
+  function geometry(base, bs, key) {
+    const doStep = doStepOf(key);
     const s = SS_PX * bs;
     const doY = base - M.NOTE_HEIGHTS.do * bs;
     return { S: s, k: s / UNITS, yOf: st => doY - (st - doStep) * (s / 2), doStep, base };
@@ -230,24 +245,23 @@
      line as --staff-top; the CSS makes every column at least that tall,
      so a wrapped row never lets its staff run up into the row above. */
   function staffTop(bs, key) {
-    const doSp = M.spellNote('do', 'natural', key || M.keyNow());
-    const doStep = step(doSp.letter, doSp.octave);
-    return (M.NOTE_HEIGHTS.do + (F5 - doStep) * STEP + 14) * bs;
+    return (M.NOTE_HEIGHTS.do + (F5 - doStepOf(key)) * STEP + 14) * bs;
   }
 
   /* The clef, key signature and (on the song's first row) time
      signature: where each piece goes from the staff's left edge, and the
      width the line keeps for them (--staff-prefix). One function, so the
-     room kept and the room drawn in can never disagree. */
+     room kept and the room drawn in can never disagree. Either clef takes
+     the room of the wider, so parts on different clefs line up. */
   function prefix(s, withTime, key) {
     const k = s / UNITS;
     const ks = keySignature(key || M.keyNow(), S.scale);
     let x = s * 0.5;
     const clefX = x;
-    x += gw('gClef', k) + s * 0.55;
+    x += Math.max(gw('gClef', k), gw('fClef', k)) + s * 0.55;
     const sig = ks.order.map(l => {
       const name = ACC_GLYPH[String(ks.sig[l])];
-      const at_ = { letter: l, name, x, st: SIG_POS[String(ks.kind)][l] };
+      const at_ = { letter: l, name, x, st: sigStep(ks.kind, l) };
       x += gw(name, k) + s * 0.1;
       return at_;
     });
@@ -264,7 +278,12 @@
       time = { x, top, bot, w: tw, widthOf };
       x += tw + s * 0.25;
     }
-    return { clefX, sig, time, width: x + s * 0.5 };
+    return { clefX, clef: M.clef().glyph, sig, time, width: x + s * 0.5 };
+  }
+  /* The clef itself, of the part it is drawn for. .clef-ink is how a double
+     click finds it (components/clef-menu.js). */
+  function clefInk(pre, left, yOf, k, part) {
+    return at(pre.clef, left + pre.clefX, yOf(CLEF_LINE[pre.clef]), k, 'fill="' + INK + '" class="clef-ink" data-part="' + part + '"');
   }
 
   /* KEY CHANGES (js/keys.js, 2026-10-31). A line is written in the key at
@@ -289,7 +308,7 @@
     let x = 0;
     const put = (ks, letters, natural) => letters.forEach(l => {
       const name = natural ? ACC_GLYPH['0'] : ACC_GLYPH[String(ks.sig[l])];
-      list.push({ name, x, st: SIG_POS[String(ks.kind)][l] });
+      list.push({ name, x, st: sigStep(ks.kind, l) });
       x += gw(name, k) + s * 0.1;
     });
     const dropped = from.order.filter(l => (to.sig[l] || 0) !== from.sig[l]);
@@ -565,6 +584,7 @@
     const avail = line.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
     const pre = prefix(s, lineIndex === 0, lk);
     pre.width = prefixWidth(line, s, lineIndex === 0);          // as --staff-prefix keeps it (render)
+    const lineSig = pre;
     // where the key changes inside the line — the first column of the trigger's bar (keys.js
     // starts): the signature from and to (readAccidentals, placeRow, the drawing)
     const changeAt = new Map(SW.keys ? SW.keys.starts().map(e => [e.stack, e.key]) : []);
@@ -577,8 +597,6 @@
     });
     const firstText = line.querySelector('.text');
     const lyricPx = firstText ? parseFloat(getComputedStyle(firstText).fontSize) || 22 : 22;
-    const gRel = geometry(0, bs, lk);        // y from the bar base (negative: above it)
-    const staffTopPx = staffTop(bs, lk);
     const ctx = { s, avail, lyricGap: Math.max(8, lyricPx * 0.5), hyGap: Math.max(14, lyricPx * 1.1), textAllowance: Math.max(0, pre.width - s * 1.2) };
 
     // beam groups decide their direction together
@@ -669,9 +687,13 @@
        part has the same room on the page or drawn in a band
        (components/part-rows.js) — its words are placed by its own notes,
        never pushed by another part's (the user), and nothing moves when
-       another part comes onto the page. o: { blockTop, wordL } — the
-       first word's left edge, which may reach back under the clef. */
-    const roomOf = (cols, xs, o) => {
+       another part comes onto the page. o: { blockTop, wordL, clef } —
+       the first word's left edge, which may reach back under the clef, and
+       the clef of a part off the page (its staff sits where its clef says). */
+    const roomOf = (cols, xs, o) => M.withClef(o.clef, () => {
+      const gRel = geometry(0, bs, lk);        // y from the bar base (negative: above it)
+      const staffTopPx = staffTop(bs, lk);
+      const pre = Object.assign(prefix(s, lineIndex === 0, lk), { width: lineSig.width });
       // room above the row: stems, beams, ledger notes and names must not
       // reach the row above. Every syllable of the row gets the same, so
       // the bars still share a base.
@@ -715,7 +737,7 @@
       if (typeof o.wordL === 'number' && isFinite(o.wordL)) {
         const wordL = o.wordL;
         const clefL = pre.clefX - pre.width;                     // in the row's frame, where x = 0 is after the prefix
-        if (wordL < clefL + gw('gClef', k) + s * 0.3) floor = Math.max(floor, gRel.yOf(step('G', 4)) + gb('gClef', k));
+        if (wordL < clefL + gw(pre.clef, k) + s * 0.3) floor = Math.max(floor, gRel.yOf(CLEF_LINE[pre.clef]) + gb(pre.clef, k));
         pre.sig.forEach(a => {
           if (wordL < a.x - pre.width + gw(a.name, k) + s * 0.3) floor = Math.max(floor, gRel.yOf(a.st) + gb(a.name, k));
         });
@@ -724,7 +746,7 @@
       if (blocks) words = Math.max(words, 8 * bs);
       const drop = Math.round(words - 8 * bs);
       return { rise, drop, above: Math.max(blockTop, staffTopPx + rise) };
-    };
+    });
     /* one visual row: its columns' places (p, from placeRow) become each
        syllable's custom properties and each column's drawing info; it
        hands back the row's room (roomOf) */
@@ -964,7 +986,7 @@
   ['score:changed', 'score:loaded', 'key:changed', 'meter:changed', 'scale:changed', 'names:changed'].forEach(evt => SW.bus.on(evt, () => { partSongs = null; }));
   function partSong(i) {
     if (!partSongs) partSongs = new Map();
-    if (!partSongs.has(i)) partSongs.set(i, SW.timing.songOf(SW.parts.lines(i)));
+    if (!partSongs.has(i)) partSongs.set(i, SW.parts.song(i));
     return partSongs.get(i);
   }
   /* a part's columns for one line, from the model, as planLine builds the page's */
@@ -1146,7 +1168,7 @@
         list.forEach(q => { if (!q.c.piece && !q.c.standalone) (q.c.pitches || []).forEach(pt => { blockTop = Math.max(blockTop, (M.NOTE_HEIGHTS[pt.nc] || 0) * bs); }); });
         const first = list.find(q => !q.c.standalone && !q.c.piece);
         const wordL = first && first.c.sylStart && first.c.textW ? first.x + (first.c.anchorOff || 0) - first.c.textW / 2 : undefined;
-        jr.room[p.part] = roomOf(list.map(q => q.c), list.map(q => q.x), { blockTop, wordL });
+        jr.room[p.part] = roomOf(list.map(q => q.c), list.map(q => q.x), { blockTop, wordL, clef: SW.parts.clef(p.part) });
       });
       jrows.push(jr);
     });
@@ -1454,7 +1476,7 @@
 
     // clef, key signature (the key the row opens in), time signature
     const pre = prefix(s, o.withTime, row.events.length && SW.keys ? SW.keys.at(row.events[0].stack) : o.key);
-    p.push(at('gClef', o.left + pre.clefX, yOf(step('G', 4)), k));
+    p.push(clefInk(pre, o.left, yOf, k, SW.parts.focused()));
     pre.sig.forEach(a => p.push(at(a.name, o.left + a.x, yOf(a.st), k)));
     if (pre.time) {
       const t = pre.time, tx = o.left + t.x;
@@ -1600,7 +1622,8 @@
           heads: pc.rest ? [] : headsOf(ev, ev.stack)
         }));
       });
-      o.hits.push({ top: yOf(F5) - s * 5, bottom: row.base + 6, mid: yOf(B4), s, targets });
+      // the notes reach as high above the base on either clef; a bass staff sits 2½ spaces lower among them
+      o.hits.push({ top: yOf(F5) - s * (M.clef().staffShift ? 7.5 : 5), bottom: row.base + 6, mid: yOf(B4), s, targets });
     }
 
     // the row's closing bar line; the song's last is a final bar line
@@ -1937,5 +1960,5 @@
     // the drawing kit the part rows draw with (components/part-rows.js), so the other parts are engraved as this file engraves
     kit: { at, boxAt, gw, gh, gx0, gb, headFor, restFor, flagsFor, rect, text, prefix, keySignature, offsetIn, blockScale, step,
       geometry, staffTop, drawNote, drawRest, drawHeads, drawTies, drawBeam,
-      E, SP, UNITS, SS_PX, INK, ACC_GLYPH, SIG_POS, E4, B4, D5, F5, TIE_OFF, tieBow } };
+      clefInk, E, SP, UNITS, SS_PX, INK, ACC_GLYPH, SIG_POS, E4, B4, D5, F5, TIE_OFF, tieBow } };
 })();

@@ -109,8 +109,9 @@
       const sol = M.solfegeOf(n.nc, n.acc);               // ra, me, fi … (Do on the tonic)
       return {
         el: n.el || null, nc: n.nc, acc: n.acc, sol,
+        folded: !M.clefFits(n.nc, n.acc),                  // kept inside the clef's range (core.js)
         letter: sp.letter, alter: sp.alter, octave: sp.octave, midi: sp.midi,
-        step: LETTERS.indexOf(sp.letter) + 7 * sp.octave,
+        step: LETTERS.indexOf(sp.letter) + 7 * sp.octave + M.clef().staffShift,   // its place on the staff (core.js THE CLEF IN EFFECT)
         color: M.noteColour(n.nc) || '#888',
         name: sp.letter + M.prettyAlter(sp.alter)          // B♭, not B
       };
@@ -350,8 +351,9 @@
   /* A part that is not on the page, from its model lines (parts.lines(i)):
      the same shape as song(), its events without stacks (stack, syllable
      null; `spec` the column). Pitches are spelled in the key in force at
-     each column's tick (o.keyAt(tick), else the song's key map); o.pitches
-     === false gives the time alone. */
+     each column's tick (o.keyAt(tick), else the song's key map) and in the
+     clef o.clef (SW.parts.song(i) passes the part's own); o.pitches === false
+     gives the time alone. */
   function songOf(lines, o) {
     const opt = o || {};
     const mt = meter();
@@ -371,7 +373,7 @@
       le.at = at;
       le.events.forEach(ev => { ev.at = at + ev.start; });
       if (opt.pitches !== false) {
-        le.events.forEach(ev => { ev.pitches = ev.rest ? [] : pitchesOf(soundingOf(ev.spec), keyAt(ev.at)); });
+        M.withClef(opt.clef, () => le.events.forEach(ev => { ev.pitches = ev.rest ? [] : pitchesOf(soundingOf(ev.spec), keyAt(ev.at)); }));
         ties(le.events);
       }
       at += le.padded;

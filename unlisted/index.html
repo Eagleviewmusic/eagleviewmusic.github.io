@@ -15,8 +15,6 @@
     /* this page only: a fourth shelf colour, and a smaller welcome than the hub's */
     .theme-teacher { --theme: #7c3aed; --theme-dark: #6d28d9; --theme-soft: #ede9fe; --theme-line: #c4b5fd; }
     .jump-link.theme-teacher { color: var(--theme-dark); }
-    .theme-next { --theme: #db2777; --theme-dark: #be185d; --theme-soft: #fce7f3; --theme-line: #f9a8d4; }
-    .jump-link.theme-next { color: var(--theme-dark); }
     .more-hero { padding: 28px 0 4px; }
     .more-hero .hero-title { font-size: clamp(1.9rem, 4vw, 2.6rem); }
     .more-hero .hero-line { max-width: 46rem; }
@@ -69,7 +67,6 @@
         <h1 id="more-title" class="hero-title">More <span>apps</span></h1>
         <p class="hero-line">New apps that are still being tested, and tools for the classroom. Some of these will move to the main page when they are ready.</p>
         <nav class="jump" aria-label="App groups">
-            <a href="#next" class="jump-link theme-next"><span aria-hidden="true">🧪</span> Next versions</a>
             <a href="#instruments" class="jump-link theme-play"><span aria-hidden="true">🎺</span> New instruments</a>
             <a href="#record" class="jump-link theme-create"><span aria-hidden="true">🎙️</span> Record</a>
             <a href="#practice" class="jump-link theme-practice"><span aria-hidden="true">🎯</span> Practice</a>
@@ -80,25 +77,6 @@
 
     <div class="shelves" id="apps">
       <div class="container">
-
-        <section class="shelf theme-next" id="next" aria-labelledby="next-title">
-          <div class="shelf-head">
-            <span class="shelf-icon" aria-hidden="true">🧪</span>
-            <div>
-              <h2 id="next-title" class="shelf-title">Next versions</h2>
-              <p class="shelf-hint">Newer versions of apps on the main page, being tried out. Your songs come across the first time you open one.</p>
-            </div>
-          </div>
-          <div class="app-grid">
-            <a href="../Song%20Writer%203.5.1/" class="app">
-              <img src="../assets/MA4A-song-writer-cover.jpg" width="400" height="400" alt="" loading="lazy">
-              <span class="app-text">
-                <span class="app-name">Song Writer 3.5.1</span>
-                <span class="app-line">Your songs in boxes, with every version inside</span>
-              </span>
-            </a>
-          </div>
-        </section>
 
         <section class="shelf theme-play" id="instruments" aria-labelledby="instruments-title">
           <div class="shelf-head">

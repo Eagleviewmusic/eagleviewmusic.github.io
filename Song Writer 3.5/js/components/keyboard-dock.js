@@ -75,7 +75,7 @@
   const dock = document.getElementById('keyboard-dock');
   if (!dock) return;
 
-  const LOW = 36, HIGH = 108;                // C2 … C8 (the Virtual Keyboard's four octaves in G reach B7)
+  const LOW = 24, HIGH = 108;                // C1 … C8 (the Virtual Keyboard's four octaves in G reach B7; a bass clef reaches down to A1)
   const IS_BLACK = [false, true, false, true, false, false, true, false, true, false, true, false];
   const WHITE_LETTER = { 0: 'C', 2: 'D', 4: 'E', 5: 'F', 7: 'G', 9: 'A', 11: 'B' };
   // a real piano's black keys are not centred on the crack: C♯ and F♯ lean
@@ -93,7 +93,7 @@
   const MIN_H = 52;
   const FRAME_PAD = 6;                       // the black frame round the keys
 
-  let TOTAL = 0;                             // white keys C2…C8
+  let TOTAL = 0;                             // white keys C1…C8
   for (let m = LOW; m <= HIGH; m++) if (!IS_BLACK[m % 12]) TOTAL++;
 
   let panel, stage, frame, viewport, strip, grip, spacer;
@@ -317,6 +317,7 @@
     dock.classList.toggle('panel-away', !!cornerOut);
   }
 
+  const outsideClef = m => { const r = M.clef().range; return !!r && (m < r[0] || m > r[1]); };
   /* Colours, names and Focus: what depends on the key and the song. */
   function dress() {
     const focus = focusOn();
@@ -335,14 +336,16 @@
         // it otherwise (C♭ in G♭, E♯ in F♯), when it wears its block's
         k.style.setProperty('--band-c', !rainbow ? PLAIN_WHITE : p ? p.color : M.LETTER_COLORS[WHITE_LETTER[pc]]);
       }
-      const off = focus && !p;
+      const beyond = outsideClef(m);             // the bass clef's range (core.js): those keys are grey, as Focus's are
+      const off = beyond || (focus && !p);
       k.classList.toggle('off', off);
+      k.classList.toggle('beyond', beyond);
       k.classList.toggle('bent', !!(p && p.bent));
       k.setAttribute('aria-disabled', off ? 'true' : 'false');
       const name = p ? p.name : plainName(pc);
       const oct = Math.floor(m / 12) - 1;
       k.dataset.name = name;
-      k.setAttribute('aria-label', name + oct + (off ? ' (not in the key)' : ''));
+      k.setAttribute('aria-label', name + oct + (beyond ? ' (outside the clef)' : off ? ' (not in the key)' : ''));
       const label = k.firstChild;
       label.innerHTML = pc === 0 ? name + '<small>' + oct + '</small>' : name.replace(/([♯♭𝄪]+)/, '<i>$1</i>');
     }
@@ -690,6 +693,11 @@
     held.clear();
   }
 
+  /* a grey key pressed: why it is grey */
+  function offHint(k) {
+    if (k.classList.contains('beyond')) SW.ui.toast(M.clef().rangeNote);
+    else focusHint();
+  }
   function focusHint() {
     if (focusHinted) return;
     focusHinted = true;
@@ -700,7 +708,7 @@
     const k = e.target.closest('.kkey');
     if (!k) return;
     e.preventDefault();
-    if (k.classList.contains('off')) { focusHint(); return; }
+    if (k.classList.contains('off')) { offHint(k); return; }
     release(held.get(e.pointerId));
     held.set(e.pointerId, press(k));
     write(+k.dataset.midi);
@@ -753,8 +761,9 @@
   }
   /* `light`: the key to light, when the keymap chose it (null: none) */
   function keyDown(m, light) {
+    if (outsideClef(m)) { SW.ui.toast(M.clef().rangeNote); return null; }
     const k = light === undefined ? shownKey(m) : light !== null && visible() && showing(light) ? keyEls[light] : null;
-    if (k && k.classList.contains('off')) { focusHint(); return null; }
+    if (k && k.classList.contains('off')) { offHint(k); return null; }
     const h = k ? press(k, m) : { k: null, v: SW.audio.noteOn(m) };
     write(m);
     return h;

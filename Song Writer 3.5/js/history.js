@@ -62,11 +62,12 @@
     if (step.mel === undefined) {
       try {
         // every part's lines (PARTS), each without its chords
-        const parts = SW.parts.everyLine(JSON.parse(step.json)).map(lines => lines.filter(l => !l.bars).map(l => {
+        const model = JSON.parse(step.json);
+        const parts = SW.parts.everyLine(model).map(lines => lines.filter(l => !l.bars).map(l => {
           if (!Array.isArray(l.syllables)) return l;
           return Object.assign({}, l, { syllables: l.syllables.map(sy => { const c = Object.assign({}, sy); delete c.chord; return c; }) });
         }));
-        step.mel = JSON.stringify(parts);
+        step.mel = JSON.stringify([parts, parts.map((_, i) => SW.parts.metaOf(model, i).clef)]);   // a clef moves the notes an octave
       } catch (e) { step.mel = step.json; }
     }
     return step.mel;

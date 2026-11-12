@@ -121,7 +121,8 @@
     else if (accidental === 'flat') accidentalOffset = -1;
     const keyOctaveShift = M.KEY_TRANSPOSITION[key] ? (M.KEY_TRANSPOSITION[key].octaveShift || 0) : 0;
     const tonicSemis = tonicChromaticIndex + (M.DEFAULT_SOLFEGE_OCTAVE + keyOctaveShift) * SEMITONES_IN_OCTAVE;
-    const targetSemis = tonicSemis + solfegeInterval + accidentalOffset + (octaveShift * SEMITONES_IN_OCTAVE);
+    // the clef in effect and its range (core.js); these semitones count from C0, and MIDI 12 is C0
+    const targetSemis = M.foldIntoClef(12 + tonicSemis + solfegeInterval + accidentalOffset + (octaveShift * SEMITONES_IN_OCTAVE) + M.clef().octave * SEMITONES_IN_OCTAVE) - 12;
     const frequency = C0_HZ * Math.pow(2, targetSemis / SEMITONES_IN_OCTAVE);
     return isNaN(frequency) ? null : frequency;
   }
