@@ -188,6 +188,86 @@
     }
     .gear-btn:hover, .gear-btn[aria-expanded="true"] { background: #334155; color: #74B9FF; }
     .gear-btn svg { width: 19px; height: 19px; }
+    /* Opens the whole fingering chart */
+    .chart-btn {
+      position: absolute;
+      top: 50%;
+      right: 52px;
+      transform: translateY(-50%);
+      min-width: 64px;
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(30, 41, 59, 0.88);
+      color: #f1f5f9;
+      font: 600 13px/1 Montserrat, system-ui, -apple-system, sans-serif;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .chart-btn:hover { background: #334155; color: #74B9FF; }
+    @media (max-width: 400px) { .chart-btn { display: none; } }   /* it is in Settings too */
+
+    /* ----- the whole fingering chart, the page a recorder book prints ----- */
+    .chart-sheet {
+      position: fixed;
+      inset: 0;
+      z-index: 10001;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 56px 12px 16px;
+      box-sizing: border-box;
+      overflow-y: auto;
+      background: rgba(31, 41, 55, 0.55);
+    }
+    .chart-sheet.open { display: flex; }
+    .chart-card {
+      width: min(1120px, 100%);
+      box-sizing: border-box;
+      padding: 14px 18px 18px;
+      border-radius: 14px;
+      background: #ffffff;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+      font: 14px/1.4 system-ui, -apple-system, sans-serif;
+      color: #1f2937;
+    }
+    .chart-head { display: flex; align-items: center; gap: 10px; }
+    .chart-head h2 { margin: 0; flex: 1; font: normal 26px 'Lobster', cursive; color: #e69e22; }
+    .chart-key { margin: 2px 0 10px; font-size: 12.5px; color: #4b5563; }
+    .chart-key svg { vertical-align: -4px; }
+    /* Columns --u chart units wide drawn at --cs px a unit. A note with --n fingerings is a cell as wide as --n cells
+       and the gaps between them, so the columns line up (buildChartSheet's CHART_GAP is that gap plus a cell's
+       padding and border, 15 px, in chart units) */
+    .chart-grid { display: flex; flex-wrap: wrap; --gap: 8px; gap: var(--gap); --cs: 1.1; }
+    .chart-cell {
+      flex: 0 0 auto;
+      width: calc(var(--n) * (var(--u) * var(--cs) * 1px + 7px) + (var(--n) - 1) * var(--gap));
+      max-width: 100%;
+      box-sizing: border-box;
+      display: flex;
+      justify-content: center;
+      padding: 4px 2px 6px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 10px;
+      background: #ffffff;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+      break-inside: avoid;
+    }
+    .chart-cell:hover, .chart-cell:focus-visible { border-color: #e69e22; background: #fffaf0; outline: none; }
+    .chart-cell svg { display: block; width: 100%; height: auto; }
+    .chart-cell .hit { fill: transparent; }
+    .chart-cell.multi [data-f]:hover .hit { fill: rgba(230, 158, 34, 0.16); }   /* which of its fingerings a press plays */
+    @media print {
+      body > *:not(.chart-sheet) { display: none !important; }
+      html, body { background: #fff; overflow: visible; height: auto; display: block; padding: 0; }
+      .chart-sheet { position: static; display: block; padding: 0; background: none; overflow: visible; }
+      .chart-card { width: 100%; box-shadow: none; padding: 0; }
+      .chart-head button { display: none; }
+      .chart-grid { --gap: 3px; --cs: 0.733; }   /* 3 px = CHART_GAP × 0.733 − 7, so the wide cells draw at the same size */
+    }
 
     .settings-panel {
       position: fixed;
@@ -386,6 +466,7 @@
           Virtual Recorder
         </h1>
     </a>
+    <button type="button" class="chart-btn" id="chartBtn" title="The whole fingering chart">Chart</button>
     <button type="button" class="gear-btn" id="settingsBtn" title="Settings" aria-label="Settings" aria-expanded="false" aria-controls="settingsPanel">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
@@ -415,6 +496,12 @@
       </div>
     </div>
     <div class="sp-section">
+      <h3>Fingering chart</h3>
+      <div class="sp-actions">
+        <button type="button" class="sp-btn" id="chartBtn2">Open the whole chart</button>
+      </div>
+    </div>
+    <div class="sp-section">
       <h3>Sound</h3>
       <div class="sp-actions">
         <button type="button" class="sp-btn primary" id="tuneBtn">▶ Try it: Hot Cross Buns</button>
@@ -423,6 +510,17 @@
       <div id="soundControls"></div>
     </div>
   </aside>
+  <div class="chart-sheet" id="chartSheet" role="dialog" aria-label="Recorder fingering chart">
+    <div class="chart-card">
+      <div class="chart-head">
+        <h2>Recorder Fingering Chart</h2>
+        <button type="button" class="sp-btn" id="chartPrint">Print</button>
+        <button type="button" class="sp-close" id="chartClose" aria-label="Close the chart">×</button>
+      </div>
+      <div class="chart-key" id="chartKey"></div>
+      <div class="chart-grid" id="chartGrid"></div>
+    </div>
+  </div>
   <script src="recorder-synth.js"></script>
   <script>
     // Fingerings from Yamaha's soprano recorder (Baroque) fingering chart, low C to high D.
@@ -476,10 +574,13 @@
       const letter = pitch[0];
       const sharp = pitch[1] === '#';
       const upper = LETTERS[(LETTERS.indexOf(letter) + 1) % 7];
+      const name = sharp ? ACCIDENTAL_NAMES[letter][0] : letter;
       return {
         pitch, key, fingerings, sharp,
-        name: sharp ? ACCIDENTAL_NAMES[letter][0] : letter,
-        otherName: sharp ? ACCIDENTAL_NAMES[letter][1] : '',
+        name, otherName: sharp ? ACCIDENTAL_NAMES[letter][1] : '',
+        // Where it sits on the staff (the fingering chart's): the letter of its first name, in steps from C4
+        step: (Number(pitch.slice(-1)) - 4) * 7 + LETTERS.indexOf(name[0]),
+        accidental: name[1] || '',
         // A sharp's colour runs from the letter below it to the letter above it
         color: LETTER_COLORS[letter],
         upperColor: sharp ? LETTER_COLORS[upper] : LETTER_COLORS[letter],
@@ -948,7 +1049,7 @@
     // ----- keys -----
     window.addEventListener('keydown', e => {
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key === 'Escape') return closeSettings();
+      if (e.key === 'Escape') { closeChartSheet(); return closeSettings(); }
       const note = keyMap[e.key.toLowerCase()];
       if (note) press(note);
     });
@@ -967,10 +1068,138 @@
 
     // Clicking anywhere else puts the recorder back to all holes open (and closes the settings)
     document.body.addEventListener('pointerdown', e => {
-      if (e.target.closest('.settings-panel, #app-header')) return;
+      if (e.target.closest('.settings-panel, #app-header, .chart-sheet')) return;
       if (!e.target.closest('.note-btn')) closeSettings();
       if (!e.target.closest('.note-btn, .alt-btn')) showNote(null);
     });
+
+    // ----- the whole fingering chart -----
+    // One cell a note: its name, the note on a small staff, and the chart's symbol for each way to finger it.
+    const chartSheet = document.getElementById('chartSheet');
+    const chartGrid = document.getElementById('chartGrid');
+    const INK = '#1f2937', LINE = '#6b7280';
+
+    // How recorder fingering charts draw a fingering: the thumb hole at the top left, the seven finger holes down the
+    // middle with a line between the hands, and the double holes 6 and 7 as a big and a small hole side by side.
+    const SYMBOL = { w: 36, h: 110, x: 23, r: 5.6, thumb: [8.5, 9], holes: [16, 30, 44, 62, 76, 90, 104], hands: 53 };
+    const symHole = (cx, cy, r, on) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${on ? INK : '#fff'}" stroke="${on ? INK : LINE}" stroke-width="1.3" />`;
+    // Pinched: covered, with a little gap left open at the top
+    function symPinch(cx, cy, r) {
+      const cap = r * 0.8, yc = cy - r + cap, dx = Math.sqrt(r * r - (r - cap) ** 2);
+      return symHole(cx, cy, r, true) + `<path d="M${cx - dx} ${yc}A${r} ${r} 0 0 1 ${cx + dx} ${yc}Z" fill="#fff" />
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${INK}" stroke-width="1.3" />`;
+    }
+    // A double hole: 2 both covered, 1 only the big one, 0 both open
+    const symDouble = (x, cy, state) => symHole(x - 3.4, cy, 4.4, state > 0) + symHole(x + 6, cy, 2.4, state === 2);
+    function recorderSymbol(code) {
+      const f = parseFingering(code), { x, r, holes } = SYMBOL, [tx, ty] = SYMBOL.thumb;
+      let out = f.thumb === 'pinch' ? symPinch(tx, ty, r) : symHole(tx, ty, r, f.thumb === 'closed');
+      out += `<line x1="${x - 10}" y1="${SYMBOL.hands}" x2="${x + 10}" y2="${SYMBOL.hands}" stroke="#9ca3af" stroke-width="1.2" />`;
+      f.holes.forEach((state, i) => { out += i < 5 ? symHole(x, holes[i], r, state > 0) : symDouble(x, holes[i], state); });
+      return out;
+    }
+
+    // Leland music glyphs (SIL Open Font Licence), 360 units to a staff space: the same as the other virtual instruments
+    const GLYPHS = {
+      gClef: 'M 809 30 C 809 132 768 238 665 279 C 635 107 596 -122 586 -186 C 716 -186 809 -98 809 30 Z M 605 297 C 576 302 549 305 521 305 C 315 305 140 161 140 -56 C 140 -232 264 -389 390 -498 C 415 -520 438 -540 459 -562 C 472 -484 482 -416 492 -357 C 361 -318 272 -180 272 -45 C 272 56 351 194 467 194 C 478 194 491 189 491 176 C 491 163 477 156 459 144 C 403 109 372 72 372 1 C 372 -86 436 -157 521 -177 Z M 478 -1184 C 491 -1241 557 -1392 632 -1392 C 654 -1392 688 -1322 688 -1223 C 688 -1073 577 -960 478 -863 C 469 -920 462 -976 462 -1037 C 462 -1090 467 -1139 478 -1184 Z M 176 739 C 176 834 249 959 444 959 C 511 959 570 942 622 910 C 700 855 720 760 720 670 C 720 613 711 549 697 467 C 693 438 684 395 675 338 C 816 292 922 145 922 -3 C 922 -220 768 -367 557 -367 C 543 -454 528 -539 516 -619 C 668 -779 773 -959 773 -1188 C 773 -1319 733 -1426 710 -1477 C 675 -1551 634 -1601 608 -1601 C 598 -1601 553 -1584 505 -1528 C 413 -1418 387 -1234 387 -1113 C 387 -1035 395 -965 419 -804 C 418 -802 343 -726 312 -701 C 181 -579 0 -405 0 -117 C 0 153 235 364 503 364 C 544 364 583 360 616 354 C 644 492 660 593 660 670 C 660 819 583 899 438 899 C 403 899 373 891 370 891 C 369 890 366 888 366 887 C 366 884 369 883 373 881 C 441 871 508 814 508 721 C 508 644 449 562 341 562 C 240 562 176 644 176 739 Z',
+      noteheadBlack: 'M 0 60 C 0 122 45 192 161 192 C 311 192 468 69 468 -58 C 468 -143 396 -190 307 -190 C 167 -190 0 -72 0 60 Z',
+      sharp: 'M 336 -151 C 344 -153 351 -163 351 -171 L 351 -256 C 351 -268 343 -276 331 -276 C 330 -276 330 -276 328 -276 L 281 -266 L 281 -481 L 240 -481 L 240 -258 L 112 -232 L 112 -435 L 72 -435 L 72 -223 L 16 -212 C 7 -210 0 -200 0 -192 L 0 -189 L 0 -105 L 0 -108 C 0 -96 9 -88 20 -88 C 22 -88 23 -88 24 -88 L 72 -98 L 72 140 L 16 151 C 7 153 0 163 0 171 L 0 255 C 0 266 9 275 20 275 C 22 275 23 275 24 275 L 72 265 L 72 480 L 112 480 L 112 256 L 240 230 L 240 433 L 281 433 L 281 222 L 336 212 C 344 210 351 200 351 192 L 351 107 C 351 95 343 86 331 86 C 330 86 330 86 328 86 L 281 96 L 281 -141 Z M 112 -107 L 240 -132 L 240 105 L 112 132 Z',
+      flat: 'M 289 -114 C 281 -170 246 -223 173 -223 C 101 -223 59 -179 52 -170 L 58 -632 C 58 -644 49 -652 37 -652 L 20 -652 C 9 -652 0 -644 0 -632 L 7 233 C 7 245 16 253 27 253 C 30 253 36 252 39 251 C 45 248 138 202 216 114 C 271 52 292 -19 292 -78 C 292 -91 291 -102 289 -114 Z M 190 -58 C 190 -36 184 30 148 85 C 124 122 75 161 48 183 L 52 -98 C 55 -111 76 -153 134 -153 C 186 -153 190 -104 190 -73 C 190 -66 190 -62 190 -58 Z',
+    };
+    function noteMid(note) {
+      return note.sharp ? mix(note.color, note.upperColor, 0.5) : note.color;
+    }
+    // The note on a small staff, 120 wide (wide) or 70: the clef, the note with its sharp or flat and any ledger lines
+    function miniStaff(note, wide) {
+      const ss = 7, gs = ss / 360, bottom = 66, left = wide ? 8 : 3, right = wide ? 112 : 67, x = wide ? 84 : 48;
+      const y = bottom - (note.step - 2) * (ss / 2), headW = 468 * gs;
+      let out = '<g stroke="#1f2937" stroke-width="0.8">';
+      for (let i = 0; i < 5; i++) out += `<line x1="${left}" y1="${bottom - i * ss}" x2="${right}" y2="${bottom - i * ss}" />`;
+      const ledger = s => `<line x1="${x - headW / 2 - 4}" y1="${bottom - (s - 2) * (ss / 2)}" x2="${x + headW / 2 + 4}" y2="${bottom - (s - 2) * (ss / 2)}" />`;
+      for (let s = 12; s <= note.step; s += 2) out += ledger(s);
+      for (let s = 0; s >= note.step; s -= 2) out += ledger(s);
+      out += '</g>';
+      out += `<path fill="#1f2937" transform="translate(${left + 5} ${bottom - ss}) scale(${gs})" d="${GLYPHS.gClef}" />`;
+      const stemUp = note.step < 6, stemX = stemUp ? x + headW / 2 - 0.5 : x - headW / 2 + 0.5;
+      out += `<line x1="${stemX}" y1="${y}" x2="${stemX}" y2="${stemUp ? y - 3.5 * ss : y + 3.5 * ss}" stroke="#1f2937" stroke-width="1" />`;
+      out += `<path fill="#1f2937" transform="translate(${x - headW / 2} ${y}) scale(${gs})" d="${GLYPHS.noteheadBlack}" />`;
+      if (note.accidental) {
+        const g = note.accidental === '♯' ? 'sharp' : 'flat';
+        out += `<path fill="#1f2937" transform="translate(${x - headW / 2 - (g === 'sharp' ? 351 : 292) * gs - 3} ${y}) scale(${gs})" d="${GLYPHS[g]}" />`;
+      }
+      return out;
+    }
+    // A cell: the note's name and the note on a small staff, then a column for each way to finger it, "or" between
+    // them and any names under them. A column is o.unit wide; the gap between two is what lies between two cells on the
+    // sheet, so a cell with two fingerings lines up with two cells.
+    // o: { unit, wideStaff, staffY (how far down the staff sits, 14), top, w, h (the symbol's size), draw(fingering), captions, captionRoom }
+    let CHART_GAP = 15;   // set from the sheet's --cs when it is built
+    function chartCell(note, o) {
+      const fs = note.fingerings, n = fs.length;
+      const W = n * o.unit + (n - 1) * CHART_GAP, H = o.top + o.h + (o.captionRoom || 0) + 6;
+      const staffW = o.wideStaff ? 120 : 70, sx = (W - staffW) / 2, bx = sx + (o.wideStaff ? 6 : 3);
+      const mid = noteMid(note), tight = t => t.replace(/([♭♯])/g, '<tspan dx="-1">$1</tspan>');
+      const label = note.sharp ? `${tight(note.name)} · ${tight(note.otherName)}` : note.name, bw = note.sharp ? 58 : 26;
+      let svg = `<rect x="${bx}" y="3" width="${bw}" height="17" rx="5" fill="${mid}" stroke="${darken(mid, 0.62)}" stroke-width="1" />
+        <text x="${bx + bw / 2}" y="16" font-family="Arial, Helvetica, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="${textColorOn(mid)}">${label}</text>
+        <g transform="translate(${sx} ${o.staffY || 14})">${miniStaff(note, o.wideStaff)}</g>`;
+      fs.forEach((f, i) => {
+        const x0 = i * (o.unit + CHART_GAP), x = x0 + (o.unit - o.w) / 2;
+        if (i) svg += `<text x="${x0 - CHART_GAP / 2}" y="${o.top + o.h / 2 + 3}" font-family="Arial, Helvetica, sans-serif" font-size="9" fill="#6b7280" text-anchor="middle">or</text>`;
+        const caption = o.captions && o.captions[i];
+        svg += `<g data-f="${i}"><rect class="hit" x="${x0 + 1}" y="${o.top - 5}" width="${o.unit - 2}" height="${o.h + (o.captionRoom || 0) + 9}" rx="6" />
+          <g transform="translate(${x} ${o.top})">${o.draw(f)}</g>
+          ${caption ? `<text x="${x0 + o.unit / 2}" y="${o.top + o.h + 12}" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#374151" text-anchor="middle">${tight(caption)}</text>` : ''}</g>`;
+      });
+      return { svg, W, H };
+    }
+    const SYM_SCALE = 1.3, UNIT = 70;
+    function buildChartSheet() {
+      chartGrid.innerHTML = '';
+      CHART_GAP = 15 / (parseFloat(getComputedStyle(chartGrid).getPropertyValue('--cs')) || 1);
+      notes.forEach(note => {
+        const { svg, W, H } = chartCell(note, {
+          unit: UNIT, top: 100, w: SYMBOL.w * SYM_SCALE, h: SYMBOL.h * SYM_SCALE,
+          draw: code => `<g transform="scale(${SYM_SCALE})">${recorderSymbol(code)}</g>`,
+        });
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'chart-cell' + (note.fingerings.length > 1 ? ' multi' : '');
+        cell.style.cssText = `--n: ${note.fingerings.length}; --u: ${UNIT}`;
+        const label = note.sharp ? `${note.name} · ${note.otherName}` : note.name;
+        cell.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${label}${note.fingerings.length > 1 ? `, ${note.fingerings.length} fingerings` : ''}">${svg}</svg>`;
+        cell.addEventListener('click', e => {
+          const f = e.target.closest('[data-f]');
+          closeChartSheet();
+          chosenFingering[note.pitch] = f ? Number(f.dataset.f) : 0;
+          press(note);
+          setTimeout(() => release(note), 600);
+        });
+        chartGrid.appendChild(cell);
+      });
+    }
+    // The key: each mark drawn as the chart draws it
+    (function () {
+      const mark = (inner, w) => `<svg width="${w}" height="18" viewBox="0 0 ${w} 18" aria-hidden="true">${inner}</svg>`;
+      document.getElementById('chartKey').innerHTML =
+        `${mark(symHole(8, 9, 6, true), 16)} cover the hole &nbsp; ${mark(symHole(8, 9, 6, false), 16)} leave it open &nbsp;
+        ${mark(symPinch(8, 9, 6), 16)} pinch the thumb hole: leave a tiny gap at the top &nbsp;
+        ${mark(symDouble(10, 9, 1), 22)} cover only the big hole of a double hole.
+        The thumb hole is at the top left, then the finger holes from the top down; the line splits the left hand from the
+        right. “or” shows another way to finger the same note. Baroque (English) fingering, from Yamaha's soprano recorder
+        chart. Press a note to hear it and see it on the recorder.`;
+    })();
+    function openChartSheet() {
+      if (!chartGrid.children.length) buildChartSheet();
+      closeSettings();
+      chartSheet.classList.add('open');
+    }
+    function closeChartSheet() { chartSheet.classList.remove('open'); }
+    document.getElementById('chartBtn').addEventListener('click', openChartSheet);
+    document.getElementById('chartBtn2').addEventListener('click', openChartSheet);
+    document.getElementById('chartClose').addEventListener('click', closeChartSheet);
+    document.getElementById('chartPrint').addEventListener('click', () => window.print());
+    chartSheet.addEventListener('pointerdown', e => { if (e.target === chartSheet) closeChartSheet(); });
 
     // ----- the settings panel -----
     const settingsPanel = document.getElementById('settingsPanel');

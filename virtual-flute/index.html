@@ -232,6 +232,70 @@
     .labels-btn:hover { background: #334155; color: #74B9FF; }
     @media (max-width: 360px) { .labels-btn { min-width: 62px; padding: 0 8px; right: 48px; } }
     .gear-btn svg { width: 19px; height: 19px; }
+    /* Opens the whole fingering chart */
+    .chart-btn { right: 136px; min-width: 64px; }
+    @media (max-width: 560px) { .chart-btn { display: none; } }   /* it is in Settings too */
+
+    /* ----- the whole fingering chart, the page a band book prints ----- */
+    .chart-sheet {
+      position: fixed;
+      inset: 0;
+      z-index: 10001;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 56px 12px 16px;
+      box-sizing: border-box;
+      overflow-y: auto;
+      background: rgba(31, 41, 55, 0.55);
+    }
+    .chart-sheet.open { display: flex; }
+    .chart-card {
+      width: min(1120px, 100%);
+      box-sizing: border-box;
+      padding: 14px 18px 18px;
+      border-radius: 14px;
+      background: #ffffff;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+      font: 14px/1.4 system-ui, -apple-system, sans-serif;
+      color: #1f2937;
+    }
+    .chart-head { display: flex; align-items: center; gap: 10px; }
+    .chart-head h2 { margin: 0; flex: 1; font: normal 26px 'Lobster', cursive; color: #3b6ea8; }
+    .chart-key { margin: 2px 0 10px; font-size: 12.5px; color: #4b5563; }
+    .chart-key svg { vertical-align: -3px; }
+    /* Columns --u chart units wide drawn at --cs px a unit. A note with --n fingerings is a cell as wide as --n cells
+       and the gaps between them, so the columns line up (buildChartSheet's CHART_GAP is that gap plus a cell's
+       padding and border, 15 px, in chart units) */
+    .chart-grid { display: flex; flex-wrap: wrap; --gap: 8px; gap: var(--gap); --cs: 0.9; }
+    .chart-cell {
+      flex: 0 0 auto;
+      width: calc(var(--n) * (var(--u) * var(--cs) * 1px + 7px) + (var(--n) - 1) * var(--gap));
+      max-width: 100%;
+      box-sizing: border-box;
+      display: flex;
+      justify-content: center;
+      padding: 4px 2px 6px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 10px;
+      background: #ffffff;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+      break-inside: avoid;
+    }
+    .chart-cell:hover, .chart-cell:focus-visible { border-color: #3b6ea8; background: #f3f7fc; outline: none; }
+    .chart-cell svg { display: block; width: 100%; height: auto; }
+    .chart-cell .hit { fill: transparent; }
+    .chart-cell.multi [data-f]:hover .hit { fill: rgba(59, 110, 168, 0.13); }   /* which of its fingerings a press plays */
+    @media print {
+      body > *:not(.chart-sheet) { display: none !important; }
+      html, body { background: #fff; overflow: visible; height: auto; display: block; }
+      .chart-sheet { position: static; display: block; padding: 0; background: none; overflow: visible; }
+      .chart-card { width: 100%; box-shadow: none; padding: 0; }
+      .chart-head button { display: none; }
+      .chart-grid { --gap: 1.3px; --cs: 0.5; }   /* 1.3 px = CHART_GAP × 0.5 − 7, so the wide cells draw at the same size; one Letter page */
+    }
 
     .settings-panel {
       position: fixed;
@@ -372,6 +436,7 @@
           Virtual Flute
         </h1>
     </a>
+    <button type="button" class="labels-btn chart-btn" id="chartBtn" title="The whole fingering chart">Chart</button>
     <button type="button" class="labels-btn" id="labelsBtn" aria-label="Flute labels: Keys">Keys</button>
     <button type="button" class="gear-btn" id="settingsBtn" title="Settings" aria-label="Settings" aria-expanded="false" aria-controls="settingsPanel">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -404,6 +469,12 @@
       </div>
     </div>
     <div class="sp-section">
+      <h3>Fingering chart</h3>
+      <div class="sp-actions">
+        <button type="button" class="sp-btn" id="chartBtn2">Open the whole chart</button>
+      </div>
+    </div>
+    <div class="sp-section">
       <h3>Sound</h3>
       <div class="sp-actions">
         <button type="button" class="sp-btn primary" id="tuneBtn">▶ Try it: Hot Cross Buns</button>
@@ -412,6 +483,23 @@
       <div id="soundControls"></div>
     </div>
   </aside>
+  <div class="chart-sheet" id="chartSheet" role="dialog" aria-label="Flute fingering chart">
+    <div class="chart-card">
+      <div class="chart-head">
+        <h2>Flute Fingering Chart</h2>
+        <button type="button" class="sp-btn" id="chartPrint">Print</button>
+        <button type="button" class="sp-close" id="chartClose" aria-label="Close the chart">×</button>
+      </div>
+      <div class="chart-key">
+        <svg width="34" height="16" viewBox="0 0 34 16"><circle cx="8" cy="8" r="6.2" fill="#1f2937" stroke="#1f2937" stroke-width="1.6"/><circle cx="25" cy="8" r="6.2" fill="#fff" stroke="#6b7280" stroke-width="1.6"/></svg>
+        Black means the key is down. The keys lie the way the flute does, head at the left: the left hand's three, with
+        the thumb keys under them and the G♯ key above; the B♭ lever; the right hand's three, with the trill keys under
+        them; the E♭ key; then the foot's B, C and C♯ keys with the gizmo beside them. “or” shows another way to finger
+        the same note. For a B foot flute with a closed G♯. Press a note to hear it and see it on the flute.
+      </div>
+      <div class="chart-grid" id="chartGrid"></div>
+    </div>
+  </div>
   <script src="flute-synth.js"></script>
   <script>
     // Fingerings for the Boehm flute (closed G♯, B foot) from the Woodwind Fingering Guide's basic
@@ -500,7 +588,7 @@
       const upper = LETTERS[(LETTERS.indexOf(letter) + 1) % 7];
       const name = sharp ? ACCIDENTAL_NAMES[letter][0] : letter;
       return {
-        pitch, fingerings: fingerings.map(parseFingering), sharp, octave,
+        pitch, fingerings: fingerings.map(parseFingering), codes: fingerings, sharp, octave,
         name, otherName: sharp ? ACCIDENTAL_NAMES[letter][1] : '',
         // Where it sits on the staff: the letter of its first name (E♭ on E's line), in steps from C4
         step: (octave - 4) * 7 + LETTERS.indexOf(name[0]),
@@ -1225,14 +1313,18 @@
       if (down.has('C')) down.add('Cs');
       return down;
     }
-    function drawChart(note, keys) {
+    // The symbol in the chart's own units (x 50 to 952, y 36 to 314); the whole chart draws it smaller, with a thicker line
+    function chartSymbol(keys, lineWidth = 3.6) {
       const down = chartKeysDown(keys || []);
-      const paint = on => `fill="${on ? '#1f2937' : '#fff'}" stroke="${on ? '#1f2937' : '#6b7280'}" stroke-width="3.6" stroke-linejoin="round"`;
+      const paint = on => `fill="${on ? '#1f2937' : '#fff'}" stroke="${on ? '#1f2937' : '#6b7280'}" stroke-width="${lineWidth}" stroke-linejoin="round"`;
       let out = '';
       Object.entries(CHART_CIRCLES).forEach(([k, [cx, r]]) => { out += `<circle cx="${cx}" cy="${CHART_Y}" r="${r}" ${paint(down.has(k))} />`; });
       Object.entries(CHART_SHAPES).forEach(([k, d]) => { out += `<path d="${d}" ${paint(down.has(k))} />`; });
+      return out;
+    }
+    function drawChart(note, keys) {
       const svg = document.getElementById('chart');
-      svg.innerHTML = out;
+      svg.innerHTML = chartSymbol(keys);
       svg.setAttribute('aria-label', note ? `Fingering chart for ${note.name}` : 'Fingering chart');
     }
 
@@ -1494,7 +1586,7 @@
 
     window.addEventListener('keydown', e => {
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key === 'Escape') return closeSettings();
+      if (e.key === 'Escape') { closeChartSheet(); return closeSettings(); }
       if (e.target.closest && e.target.closest('input, textarea')) return;
       const pitch = pitchForCode(e.code, e.shiftKey);
       if (!pitch) return;
@@ -1520,7 +1612,7 @@
 
     // Clicking anywhere else puts the flute back to rest (and closes the settings)
     document.body.addEventListener('pointerdown', e => {
-      if (e.target.closest('.settings-panel, #app-header')) return;
+      if (e.target.closest('.settings-panel, #app-header, .chart-sheet')) return;
       if (!e.target.closest('.note-btn')) closeSettings();
       if (!e.target.closest('.note-btn, .alt-btn')) showNote(null);
     });
@@ -1540,6 +1632,96 @@
       showNote(shownNote);
     });
     showLabelButton();
+
+    // ----- the whole fingering chart -----
+    // One cell a note: its name, the note on a small staff, and the chart's symbol for each way to finger it.
+    const chartSheet = document.getElementById('chartSheet');
+    const chartGrid = document.getElementById('chartGrid');
+    // The three B♭ fingerings have names every flutist knows
+    const FINGERING_NAMES = { 'T 1-- 1-- Eb': '1 and 1', 'Tb 1-- --- Eb': 'Thumb B♭', 'T 1-- --- BbL Eb': 'B♭ lever' };
+    const SYM_W = 170, SYM_SCALE = SYM_W / 902, SYM_H = 278 * SYM_SCALE;
+    // The note on a small staff, 120 wide (wide) or 70: the clef, the note with its sharp or flat and any ledger lines
+    function miniStaff(note, wide) {
+      const ss = 7, gs = ss / 360, bottom = 66, left = wide ? 8 : 3, right = wide ? 112 : 67, x = wide ? 84 : 48;
+      const y = bottom - (note.step - 2) * (ss / 2), headW = 468 * gs;
+      let out = '<g stroke="#1f2937" stroke-width="0.8">';
+      for (let i = 0; i < 5; i++) out += `<line x1="${left}" y1="${bottom - i * ss}" x2="${right}" y2="${bottom - i * ss}" />`;
+      const ledger = s => `<line x1="${x - headW / 2 - 4}" y1="${bottom - (s - 2) * (ss / 2)}" x2="${x + headW / 2 + 4}" y2="${bottom - (s - 2) * (ss / 2)}" />`;
+      for (let s = 12; s <= note.step; s += 2) out += ledger(s);
+      for (let s = 0; s >= note.step; s -= 2) out += ledger(s);
+      out += '</g>';
+      out += `<path fill="#1f2937" transform="translate(${left + 5} ${bottom - ss}) scale(${gs})" d="${GLYPHS.gClef}" />`;
+      const stemUp = note.step < 6, stemX = stemUp ? x + headW / 2 - 0.5 : x - headW / 2 + 0.5;
+      out += `<line x1="${stemX}" y1="${y}" x2="${stemX}" y2="${stemUp ? y - 3.5 * ss : y + 3.5 * ss}" stroke="#1f2937" stroke-width="1" />`;
+      out += `<path fill="#1f2937" transform="translate(${x - headW / 2} ${y}) scale(${gs})" d="${GLYPHS.noteheadBlack}" />`;
+      if (note.accidental) {
+        const g = note.accidental === '♯' ? 'sharp' : 'flat';
+        out += `<path fill="#1f2937" transform="translate(${x - headW / 2 - (g === 'sharp' ? 351 : 292) * gs - 3} ${y}) scale(${gs})" d="${GLYPHS[g]}" />`;
+      }
+      return out;
+    }
+    // A cell: the note's name and the note on a small staff, then a column for each way to finger it, "or" between
+    // them and any names under them. A column is o.unit wide; the gap between two is what lies between two cells on the
+    // sheet, so a cell with three fingerings lines up with three cells.
+    // o: { unit, wideStaff, staffY (how far down the staff sits, 14), top, w, h (the symbol's size), draw(fingering), captions, captionRoom }
+    let CHART_GAP = 15;   // set from the sheet's --cs when it is built
+    function chartCell(note, o) {
+      const fs = note.fingerings, n = fs.length;
+      const W = n * o.unit + (n - 1) * CHART_GAP, H = o.top + o.h + (o.captionRoom || 0) + 6;
+      const staffW = o.wideStaff ? 120 : 70, sx = (W - staffW) / 2, bx = sx + (o.wideStaff ? 6 : 3);
+      const mid = noteMid(note), tight = t => t.replace(/([♭♯])/g, '<tspan dx="-1">$1</tspan>');
+      const label = note.sharp ? `${tight(note.name)} · ${tight(note.otherName)}` : note.name, bw = note.sharp ? 58 : 26;
+      let svg = `<rect x="${bx}" y="3" width="${bw}" height="17" rx="5" fill="${mid}" stroke="${darken(mid, 0.62)}" stroke-width="1" />
+        <text x="${bx + bw / 2}" y="16" font-family="Arial, Helvetica, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="${textColorOn(mid)}">${label}</text>
+        <g transform="translate(${sx} ${o.staffY || 14})">${miniStaff(note, o.wideStaff)}</g>`;
+      fs.forEach((f, i) => {
+        const x0 = i * (o.unit + CHART_GAP), x = x0 + (o.unit - o.w) / 2;
+        if (i) svg += `<text x="${x0 - CHART_GAP / 2}" y="${o.top + o.h / 2 + 3}" font-family="Arial, Helvetica, sans-serif" font-size="9" fill="#6b7280" text-anchor="middle">or</text>`;
+        const caption = o.captions && o.captions[i];
+        svg += `<g data-f="${i}"><rect class="hit" x="${x0 + 1}" y="${o.top - 5}" width="${o.unit - 2}" height="${o.h + (o.captionRoom || 0) + 9}" rx="6" />
+          <g transform="translate(${x} ${o.top})">${o.draw(f)}</g>
+          ${caption ? `<text x="${x0 + o.unit / 2}" y="${o.top + o.h + 12}" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#374151" text-anchor="middle">${tight(caption)}</text>` : ''}</g>`;
+      });
+      return { svg, W, H };
+    }
+    function buildChartSheet() {
+      chartGrid.innerHTML = '';
+      CHART_GAP = 15 / (parseFloat(getComputedStyle(chartGrid).getPropertyValue('--cs')) || 1);
+      const named = note => note.codes.some(c => FINGERING_NAMES[c]);
+      const captionRoom = notes.some(named) ? 14 : 0;
+      notes.forEach(note => {
+        const captions = named(note) ? note.codes.map(c => FINGERING_NAMES[c] || '') : null;
+        const { svg, W, H } = chartCell(note, {
+          unit: SYM_W + 12, wideStaff: true, top: 100, w: SYM_W, h: SYM_H, captions, captionRoom,
+          draw: keys => `<g transform="scale(${SYM_SCALE}) translate(-50 -36)">${chartSymbol(keys, 6.5)}</g>`,
+        });
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'chart-cell' + (note.fingerings.length > 1 ? ' multi' : '');
+        const label = note.sharp ? `${note.name} · ${note.otherName}` : note.name;
+        cell.style.cssText = `--n: ${note.fingerings.length}; --u: ${SYM_W + 12}`;
+        cell.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${label}${captions ? ': ' + captions.join(', or ') : ''}">${svg}</svg>`;
+        cell.addEventListener('click', e => {
+          const f = e.target.closest('[data-f]');
+          closeChartSheet();
+          chosenFingering[note.pitch] = f ? Number(f.dataset.f) : 0;
+          press(note);
+          setTimeout(() => release(note), 600);
+        });
+        chartGrid.appendChild(cell);
+      });
+    }
+    function openChartSheet() {
+      if (!chartGrid.children.length) buildChartSheet();
+      closeSettings();
+      chartSheet.classList.add('open');
+    }
+    function closeChartSheet() { chartSheet.classList.remove('open'); }
+    document.getElementById('chartBtn').addEventListener('click', openChartSheet);
+    document.getElementById('chartBtn2').addEventListener('click', openChartSheet);
+    document.getElementById('chartClose').addEventListener('click', closeChartSheet);
+    document.getElementById('chartPrint').addEventListener('click', () => window.print());
+    chartSheet.addEventListener('pointerdown', e => { if (e.target === chartSheet) closeChartSheet(); });
 
     // ----- the settings panel -----
     const settingsPanel = document.getElementById('settingsPanel');
