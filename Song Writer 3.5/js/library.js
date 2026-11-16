@@ -380,6 +380,11 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
      JSON. getStoredLibrary shows it with the others, so it opens, lists and
      deletes as a shared song does; saveStoredLibrary leaves it out. */
   const visiting = {};
+  /* A song on screen for a moment, never filed (2026-11-15): a student's
+     returned work opened "as they had it" (lessons.js VIEWING). It must be
+     received, or saveStoredLibrary would let it go into storage. */
+  function holdVisiting(id, rec) { visiting[id] = JSON.stringify(normalizeSong(Object.assign({}, rec, { id, received: true }), id)); }
+  function dropVisiting(id) { delete visiting[id]; }
   let booted = false;
   let saidMemory = false;
   /* Refused storage (js/embed.js): nothing outlives the page, which matters
@@ -1160,11 +1165,10 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     if (isSandboxId(currentSongId)) { data.sandbox = true; data.title = SANDBOX_TITLE; }
     else Object.assign(data, EVM.shareHeader(
       getStoredLibrary()[currentSongId], rawSongKey, rawSongKey({ score: data.score })));
-    const lock = $('lock-layout-on-share');
-    if (lock && lock.checked && SW.settings) {
-      data.layout = SW.settings.layoutSnapshot();
-      data.layoutLocked = true;
-    }
+    /* (Until 2026-11-15 a check box here locked the sender's Layout
+       settings into the link — data.layout + data.layoutLocked, still read
+       by offerSharedSong. A student version — lessons.js, the button beside
+       this one — always carries them locked.) */
     offerLink(shortLinkFor(data), $('shareLinkInput'), $('shareLinkContainer'), $('copyShareLinkBtnText'), $('shareLinkFeedback'));
   }
 
@@ -1312,6 +1316,15 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     reader.onload = e => {
       try {
         const json = JSON.parse(e.target.result);
+        /* A student's returned work, or a student version (2026-11-15):
+           not songs to add — lessons.js asks how to open it */
+        if (json && (json.kind === 'student-work' || json.kind === 'student-version')) {
+          $('jsonFileInput').value = '';
+          if (SW.lessons && SW.lessons.offerReturned(json)) { status.textContent = ''; return; }
+          status.textContent = 'That file could not be read.';
+          status.className = 'status-msg error';
+          return;
+        }
         /* A backup, an old export, a raw library, or a Librarian file —
            see EVM.readItems. */
         const imported = EVM.readItems(json, {
@@ -1579,7 +1592,7 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     // address bar of an open app changes only the hash, so re-boot
     window.addEventListener('hashchange', () => {
       const h = window.location.hash;
-      if (/[#&](song|lesson)=/.test(h)) { save(); window.location.reload(); }
+      if (/[#&](song|lesson|work)=/.test(h)) { save(); window.location.reload(); }
     });
 
     // flush on the way out (gated like every other save) — and ask the
@@ -1599,7 +1612,7 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     showManageLibraryModal, offerLink, shareLinkFor, shortLinkFor, clearLinkFromAddress, hasUnsavedChanges, okToLeave,
     currentId: () => currentSongId,
     currentTitle: () => currentSongTitle,
-    isSandboxId, isDefaultId, SANDBOX_ID, STORAGE_KEY,
+    isSandboxId, isDefaultId, SANDBOX_ID, STORAGE_KEY, holdVisiting, dropVisiting,
     // for the song boxes (js/library-boxes.js)
     kindOf, isProtectedKind, canDelete, deleteSongById, openFromLibrary, buildSandboxRow, subline, paintBadge, setSongTitle,
     showNewSongModal, isShelfSong: rec => isShelfSong(rec)

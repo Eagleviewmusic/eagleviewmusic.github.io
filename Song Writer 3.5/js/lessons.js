@@ -15,10 +15,24 @@
    lesson_<slug>_<i>, only if absent, so a returning student finds their
    work; the teacher's originals are kept beside them for "Start again".
 
-   KEYS: song_writer_35_lessons_v1 (the teacher's saved lessons),
+   STUDENT VERSIONS (2026-11-15): Share & backup → Make a student
+   version… makes a ONE-SONG lesson on the same policy (kind
+   'student-version'): its own sheet (THE STUDENT VERSION SHEET), the same
+   link and opening, plus SAVE MY WORK — the student's way to hand the work
+   back (#work=~… or a .json file, kind 'student-work') — and RETURNED
+   WORK, the teacher's side: Open as they had it (VIEWING, nothing filed)
+   or Open with everything (filed as a received song, "Title — Name").
+   The melody is two halves since then: task.pitchLocked and
+   task.rhythmLocked (melodyLocked read as both — every old link opens as
+   it did). JSON-FORMAT.md §6, §6a, §6b.
+
+   KEYS: song_writer_35_lessons_v1 (the teacher's saved lessons — and
+         student versions, marked kind: 'student-version'),
          song_writer_35_lesson_sources_v1 (pristine exercises), and in
          sessionStorage song_writer_35_open_lesson_v1 (the lesson open in
-         this tab, so a reload does not end it).
+         this tab, so a reload does not end it) and
+         song_writer_35_student_name_v1 (a student version's name, asked
+         once a session).
    ========================================================================== */
 (function () {
   'use strict';
@@ -62,20 +76,53 @@
   /* Tempo, as Rhythm Poetry's lessons have it: Any · Between · Locked. */
   const TEMPO_MODES = ['any', 'range', 'locked'];
 
+  /* STUDENT VERSIONS (2026-11-15): Share & backup → Make a student
+     version… builds a ONE-SONG lesson on this same policy, with
+     kind: 'student-version' — its own sheet (below, THE STUDENT VERSION
+     SHEET), the same link (#lesson=), the same opening (openLesson), so
+     the work is kept as lesson_<slug>_<id>_0 and Start again still works.
+     What it adds to the policy:
+       task.pitchLocked / task.rhythmLocked — the melody split in two
+         (melodyLocked until then, read as both: every old link opens as
+         before; a new policy still writes melodyLocked = either, for
+         readers older than this);
+       shell.lookPage — Look's Music Page rows (lights, follow along,
+         section colours, Display Chords, note names). Off: policy.look
+         carries the teacher's choices, put on for this song only
+         (settings.js pinLook — never written over the student's own);
+         an older policy reads it as shell.view, which covered them;
+       shell.options — the Options button (also gone when nothing is left
+         in it, in a student version);
+       save { link, file } — the Save my work button and what it offers
+         (#work=~… links, .json files: kind 'student-work');
+       student { askName } — their name, asked before they hand it in.
+     In a student version `view` is only Look's sizes and fonts, `strip`
+     only the chord panel (the chords on the music are always seen and
+     heard — can('chordsListen')), and the chords change by
+     task.chordsLocked alone, not through the melody. */
+  const PAGE_LOOK_KEYS = ['playLight', 'followScroll', 'colours', 'showLane', 'chordRhythm', 'noteNames'];
+
   function blankPolicy() {
     return {
       v: POLICY_VERSION,
-      task: { melodyLocked: false, wordsLocked: false, chordsLocked: false, note: '' },
+      kind: 'lesson',
+      task: { pitchLocked: false, rhythmLocked: false, wordsLocked: false, chordsLocked: false, note: '' },
       key: { locked: false },
       tempo: { mode: 'any', min: 60, max: 120 },
-      shell: { sound: true, view: true, strip: true, dock: true, sections: true, textEditor: true, picture: true, present: true, library: 'lesson' }
+      shell: { sound: true, view: true, lookPage: true, strip: true, dock: true, sections: true, textEditor: true, picture: true, present: true, options: true, library: 'lesson' },
+      save: { link: false, file: false },
+      student: { askName: false },
+      look: null
     };
   }
   function normalizePolicy(raw) {
     if (!raw || typeof raw !== 'object') return null;
     const p = blankPolicy();
+    if (raw.kind === 'student-version') p.kind = 'student-version';
     if (raw.task) {
-      p.task.melodyLocked = !!raw.task.melodyLocked;
+      const melody = !!raw.task.melodyLocked;            // until 2026-11-15: pitch and rhythm together
+      p.task.pitchLocked = raw.task.pitchLocked !== undefined ? !!raw.task.pitchLocked : melody;
+      p.task.rhythmLocked = raw.task.rhythmLocked !== undefined ? !!raw.task.rhythmLocked : melody;
       p.task.wordsLocked = !!raw.task.wordsLocked;
       p.task.chordsLocked = !!raw.task.chordsLocked;       // 2.5: the chord progressions to hear, not to change
       p.task.note = typeof raw.task.note === 'string' ? raw.task.note.slice(0, 160) : '';
@@ -94,23 +141,60 @@
     }
     if (raw.shell) {
       SHELL_SWITCHES.forEach(s => { p.shell[s.key] = raw.shell[s.key] !== false; });
+      // the Music Page rows were the 'view' switch's until 2026-11-15
+      p.shell.lookPage = raw.shell.lookPage !== undefined ? raw.shell.lookPage !== false : p.shell.view;
+      p.shell.options = raw.shell.options !== false;
       p.shell.library = raw.shell.library === 'none' ? 'none' : 'lesson';
     }
+    if (raw.save && typeof raw.save === 'object') {
+      p.save.link = !!raw.save.link;
+      p.save.file = !!raw.save.file;
+    }
+    if (raw.student && typeof raw.student === 'object') p.student.askName = !!raw.student.askName;
+    if (raw.look && typeof raw.look === 'object') {
+      const look = {};
+      PAGE_LOOK_KEYS.forEach(k => { if (raw.look[k] !== undefined) look[k] = raw.look[k]; });
+      p.look = look;
+    }
     return p;
+  }
+  /* what goes in a link: the policy, plus melodyLocked for older readers
+     (either half fixed reads there as the whole melody fixed) */
+  function policyForLink(p) {
+    const out = JSON.parse(JSON.stringify(p));
+    out.task.melodyLocked = !!(p.task.pitchLocked || p.task.rhythmLocked);
+    if (out.kind !== 'student-version') { delete out.kind; delete out.save; delete out.student; delete out.look; }
+    else if (out.shell.lookPage) delete out.look;
+    return out;
   }
 
   function taskKind(p) {
     const pol = p || policy;
     if (!pol) return 'free';
-    const m = pol.task.melodyLocked, w = pol.task.wordsLocked;
+    const m = pol.task.pitchLocked && pol.task.rhythmLocked, w = pol.task.wordsLocked;
     return m && w ? 'read' : m ? 'words' : w ? 'melody' : 'free';
+  }
+  /* A student version's strip, when the teacher wrote no sentence: what is theirs to change. */
+  function versionBlurb(pol) {
+    const t = pol.task;
+    const theirs = [];
+    if (!t.pitchLocked) theirs.push('the notes');
+    if (!t.rhythmLocked) theirs.push('the rhythm');
+    if (!t.wordsLocked) theirs.push('the words');
+    if (!t.chordsLocked) theirs.push('the chords');
+    if (!theirs.length) return TASK_BLURB.read;
+    if (theirs.length === 4) return TASK_BLURB.free;
+    const list = theirs.length === 1 ? theirs[0] : theirs.slice(0, -1).join(', ') + ' and ' + theirs[theirs.length - 1];
+    return 'You can change ' + list + ' — the rest is set.';
   }
   function taskBlurb() {
     if (policy && policy.task.note) return policy.task.note;
+    if (policy && policy.kind === 'student-version') return versionBlurb(policy);
     return TASK_BLURB[taskKind()];
   }
   function shellAllows(key) { return !policy || policy.shell[key] !== false; }
   function libraryMode() { return policy ? policy.shell.library : 'full'; }
+  function isStudentVersion() { return !!(policy && policy.kind === 'student-version'); }
 
   function slugify(text) {
     return String(text || 'lesson').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'lesson';
@@ -161,7 +245,7 @@
     L.saveStoredLibrary(library);
     writeSources(sources);
     policy = p;
-    lessonMeta = { title, songIds: ids };
+    lessonMeta = { title, songIds: ids, id: payload.id ? String(payload.id) : '', kind: p.kind };
     // the lesson brings the teacher's layout, locked
     if (payload.layout) SW.settings.applyLayoutSnapshot(payload.layout, true);
     L.clearLinkFromAddress();                     // (kept when embedded: library.js)
@@ -176,7 +260,7 @@
   function rememberOpenLesson(current) {
     if (previewing || !lessonMeta) return;
     try {
-      sessionStorage.setItem(OPEN_LESSON_KEY, JSON.stringify({ title: lessonMeta.title, songIds: lessonMeta.songIds, policy, current }));
+      sessionStorage.setItem(OPEN_LESSON_KEY, JSON.stringify({ title: lessonMeta.title, songIds: lessonMeta.songIds, id: lessonMeta.id, policy, current }));
     } catch (e) {}
   }
   function reopenFromSession() {
@@ -188,7 +272,7 @@
     const p = normalizePolicy(saved.policy);
     if (!ids.length || !p) return null;
     policy = p;
-    lessonMeta = { title: saved.title || 'Lesson', songIds: ids };
+    lessonMeta = { title: saved.title || 'Lesson', songIds: ids, id: saved.id || '', kind: p.kind };
     SW.settings.applyPolicyToShell();
     return ids.indexOf(saved.current) !== -1 ? saved.current : ids[0];
   }
@@ -205,7 +289,7 @@
     /* A song link in the address is what was asked for: it opens, and ends
        the lesson this tab had open (2026-11-04). Until then a lesson opened
        on one page of a site took over every song link on its later pages. */
-    if (ui.linkParam('song')) {
+    if (ui.linkParam('song') || ui.linkParam('work')) {   // (#work=: a student's work, for the teacher — afterStart)
       try { sessionStorage.removeItem(OPEN_LESSON_KEY); } catch (e) {}
       return null;
     }
@@ -248,7 +332,8 @@
       card.querySelector('.task-card-label').textContent = type.label;
       card.querySelector('.task-card-desc').textContent = type.desc;
       card.addEventListener('click', () => {
-        draft.policy.task.melodyLocked = type.m;
+        draft.policy.task.pitchLocked = type.m;      // the whole melody, as before the split (2026-11-15)
+        draft.policy.task.rhythmLocked = type.m;
         draft.policy.task.wordsLocked = type.w;
         renderSetupSheet();
       });
@@ -259,8 +344,8 @@
     note.value = draft.policy.task.note || '';
   }
 
-  function renderLayoutSummary() {
-    const box = $('lesson-layout-summary');
+  function renderLayoutSummary(boxId, sheetId) {
+    const box = $(boxId || 'lesson-layout-summary');
     box.innerHTML = '';
     const ul = document.createElement('ul');
     ul.className = 'summary-list';
@@ -276,7 +361,7 @@
     const b = document.createElement('button');
     b.className = 'text-tool';
     b.textContent = 'Change them…';
-    b.addEventListener('click', () => { ui.closeSheet('lesson-setup-sheet'); SW.settings.openLayoutSheet(); });
+    b.addEventListener('click', () => { ui.closeSheet(sheetId || 'lesson-setup-sheet'); SW.settings.openLayoutSheet(); });
     p.appendChild(document.createTextNode(' '));
     p.appendChild(b);
     box.appendChild(p);
@@ -312,6 +397,8 @@
     SHELL_SWITCHES.forEach(s => {
       list.appendChild(ui.switchRow(s.name, s.desc, draft.policy.shell[s.key], () => {
         draft.policy.shell[s.key] = !draft.policy.shell[s.key];
+        // Look options keeps the Music Page rows with it here, as it always had them
+        if (s.key === 'view') draft.policy.shell.lookPage = draft.policy.shell.view;
         renderShell();
       }));
     });
@@ -367,7 +454,9 @@
   function renderSavedLessons() {
     const list = $('lesson-saved-list');
     const saved = getStoredLessons();
-    const ids = Object.keys(saved).sort((a, b) => (saved[b].savedAt || 0) - (saved[a].savedAt || 0));
+    // (a student version is kept in the same store, and listed on its own sheet)
+    const ids = Object.keys(saved).filter(id => saved[id].kind !== 'student-version')
+      .sort((a, b) => (saved[b].savedAt || 0) - (saved[a].savedAt || 0));
     $('lesson-saved-card').classList.toggle('policy-off', ids.length === 0);
     list.innerHTML = '';
     ids.forEach(id => {
@@ -443,7 +532,7 @@
       delete rec.layout;
       return rec;
     });
-    return { lesson: 1, v: POLICY_VERSION, id: draft.id, title: draft.title || 'Lesson', policy: draft.policy, layout: SW.settings.layoutSnapshot(), songs };
+    return { lesson: 1, v: POLICY_VERSION, id: draft.id, title: draft.title || 'Lesson', policy: policyForLink(draft.policy), layout: SW.settings.layoutSnapshot(), songs };
   }
 
   /* ---------------- preview ---------------- */
@@ -451,16 +540,22 @@
     if (!draft.songIds.length) { ui.toast('Tick at least one exercise first'); return; }
     if (!SW.library.okToLeave('starts the preview')) return;
     SW.library.save();
-    policy = normalizePolicy(draft.policy);
-    lessonMeta = { title: draft.title || 'Lesson preview', songIds: draft.songIds.slice() };
+    previewFrom = 'lesson-setup-sheet';
+    beginPreview(normalizePolicy(draft.policy), draft.title || 'Lesson preview', draft.songIds.slice());
+  }
+  /* the preview itself — a lesson's (above) or a student version's (previewVersion) */
+  function beginPreview(p, title, songIds) {
+    policy = p;
+    lessonMeta = { title, songIds, id: '', kind: p.kind };
     previewing = true;
     previewLayoutLocked = SW.settings.layout.locked;
     SW.settings.layout.locked = true;
     $('preview-bar').hidden = false;
     ui.closeSheet('lesson-setup-sheet');
+    ui.closeSheet('student-version-sheet');
     ui.closeSheet('library-sheet');
     SW.settings.applyPolicyToShell();
-    SW.library.loadSongById(draft.songIds[0]);
+    SW.library.loadSongById(songIds[0]);
   }
   function endPreview() {
     const back = previewTarget;
@@ -469,12 +564,558 @@
     lessonMeta = null;
     SW.settings.layout.locked = previewLayoutLocked;
     $('preview-bar').hidden = true;
+    ui.closeSheet('save-work-sheet');
     SW.settings.applyPolicyToShell();
     if (back) SW.library.loadSongById(back);
-    ui.openSheet('lesson-setup-sheet');
-    renderSetupSheet();
+    ui.openSheet(previewFrom);
+    if (previewFrom === 'student-version-sheet') renderVersionSheet(); else renderSetupSheet();
   }
   let previewTarget = null;
+  let previewFrom = 'lesson-setup-sheet';    // the sheet the preview goes back to
+
+  /* ---------------- files ---------------- */
+  function downloadJson(data, filename) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  // a name a file can carry (the title as written, less what a file system refuses)
+  const fileSafe = t => String(t || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+  function readJsonFile(input, then) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      let json = null;
+      try { json = JSON.parse(e.target.result); } catch (err) { json = null; }
+      input.value = '';
+      then(json);
+    };
+    reader.readAsText(file);
+  }
+  const cloneJson = o => JSON.parse(JSON.stringify(o));
+  const alnumTag = v => String(v || '').replace(/[^a-z0-9]/gi, '').slice(-8).toLowerCase();
+
+  /* ==================================================================
+     THE STUDENT VERSION SHEET (2026-11-15) — Share & backup → Make a
+     student version… One song (the one open when the sheet opened, or a
+     saved version's), the switches below written straight into a policy
+     (kind 'student-version'), and the same three ways out as a lesson:
+     Preview as a student, Create the link (#lesson=~…), and Download as a
+     file (the payload as .json). Each version made is kept in the
+     lessons' store, marked kind: 'student-version'.
+     ================================================================== */
+  let sv = null;            // { id, title, policy, songId }
+
+  function newVersionDraft(songId) {
+    const p = blankPolicy();
+    p.kind = 'student-version';
+    p.key.locked = true;                         // Key & scale: off to start
+    p.shell = { sound: true, view: true, lookPage: false, strip: true, dock: true, sections: true, textEditor: true,
+                picture: false, present: true, options: true, library: 'none' };
+    p.save = { link: true, file: true };
+    p.student = { askName: true };
+    return { id: null, title: '', policy: p, songId };
+  }
+
+  /* A. what they can change in the music: ON = theirs */
+  const SV_MUSIC = [
+    { k: 'pitchLocked',  name: 'Pitch',  desc: 'Which note: the Pitch page blocks, the letter and arrow keys that write notes, ♯ ♭, harmony, connected notes, the clef, Create Key Change' },
+    { k: 'rhythmLocked', name: 'Rhythm', desc: 'Note lengths and rests: the value circles, Dotted, Tie, Rest, the Rhythm page circles, adding notes without words, the time signature' },
+    { k: 'chordsLocked', name: 'Chords', desc: 'Changing the chords. Off, they still see and hear them' },
+    { k: 'wordsLocked',  name: 'Lyrics', desc: 'Typing words: tap or double-click a word. With Pitch and Rhythm on too, the Lyrics editor and Split into syllables (they can add notes)' }
+  ];
+  /* B. what they can adjust (the bottom row), after Tempo */
+  const SV_ADJUST = [
+    { name: 'Key & scale', desc: 'The key and the scale in Setup. Off: the key reads as plain text', get: p => !p.key.locked, set: (p, on) => { p.key.locked = !on; } },
+    { shell: 'sound', name: 'Sound', desc: 'The melody, chord and part sounds and volumes, Room, At the end, the steady beat and the count-in' },
+    { shell: 'view', name: 'Sizes & fonts', desc: 'Look → Scale, Text size, Lyric font' },
+    { shell: 'lookPage', name: 'Music page display', desc: 'Look → Note/Box lights, Follow along, section colours, Display Chords, Display Note Names. Off: the way you have them now, for this song only — their own settings are left alone' },
+    { shell: 'dock', name: 'Keyboard', desc: 'The Piano button, and the keyboard’s rows in Options' },
+    { shell: 'strip', name: 'Chord panel', desc: 'The Edit box’s Chords tab: the chord panel, to play chords and put them on the music' },
+    { shell: 'options', name: 'Options button', desc: 'The lock, Parts and the keyboard’s rows. It goes by itself when none of them is left. (Layout settings… is never in a student version)' },
+    { shell: 'present', name: 'Present', desc: 'Big and clean, filling the screen' },
+    { shell: 'picture', name: 'Save a picture', desc: 'A picture of the song for printing — in the Library, so it needs Library on' }
+  ];
+
+  function versionRecord() {
+    const L = SW.library;
+    const library = L.getStoredLibrary();
+    const id = sv.songId;
+    if (!id || !library[id]) return null;
+    const rec = L.normalizeSong(cloneJson(library[id]), id);
+    // the song open now goes as it is on the page (Create a link does the same)
+    if (id === L.currentId()) rec.score = SW.score.read();
+    if (L.isSandboxId(id)) rec.title = sv.title || 'Song';
+    ['createdAt', 'updatedAt', 'received', 'receivedAt', 'derivedFrom', 'book', 'layout'].forEach(k => { delete rec[k]; });
+    return rec;
+  }
+  function versionSongTitle() {
+    const L = SW.library;
+    const rec = L.getStoredLibrary()[sv.songId];
+    if (!rec) return 'this song';
+    return L.isSandboxId(sv.songId) ? 'your sandbox' : (L.normalizeSong(rec, sv.songId).title || 'this song');
+  }
+  /* the policy as it travels: the Music Page as you have it now, when theirs is left out */
+  function versionPolicy() {
+    const p = cloneJson(sv.policy);
+    p.kind = 'student-version';
+    p.look = p.shell.lookPage ? null : SW.settings.pageLook();
+    return p;
+  }
+  function versionPayload() {
+    const rec = versionRecord();
+    if (!rec) return null;
+    return { lesson: 1, v: POLICY_VERSION, kind: 'student-version', id: sv.id, title: sv.title || rec.title,
+             policy: policyForLink(versionPolicy()), layout: SW.settings.layoutSnapshot(), songs: [rec] };
+  }
+
+  function renderVersionMusic() {
+    const list = $('sv-music');
+    const t = sv.policy.task;
+    list.innerHTML = '';
+    SV_MUSIC.forEach(m => {
+      list.appendChild(ui.switchRow(m.name, m.desc, !t[m.k], () => {
+        t[m.k] = !t[m.k];
+        // the chord panel follows Chords (it can be changed back below)
+        if (m.k === 'chordsLocked') sv.policy.shell.strip = !t.chordsLocked;
+        renderVersionSheet(true);
+      }));
+    });
+    const all = !t.pitchLocked && !t.rhythmLocked && !t.wordsLocked;
+    const none = t.pitchLocked && t.rhythmLocked && t.wordsLocked && t.chordsLocked;
+    $('sv-music-note').textContent = none
+      ? 'Nothing in the music changes: a song to read, play and sing. The Edit box and its lock are not there.'
+      : all
+      ? 'Adding, moving, copying and deleting lines comes with Pitch, Rhythm and Lyrics together.'
+      : 'Adding, moving, copying and deleting lines needs Pitch, Rhythm and Lyrics all on — so those stay out.';
+  }
+
+  const SV_TEMPO_NOTES = {
+    any: 'They can set any tempo, 30–300 BPM, and the swing.',
+    range: 'They can set a tempo between these two, and the swing.',
+    locked: 'It plays at the tempo and swing it was saved with; they read as plain text.'
+  };
+  function renderVersionAdjust() {
+    const p = sv.policy;
+    const t = p.tempo;
+    document.querySelectorAll('#sv-tempo-seg .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.tempo === t.mode));
+    $('sv-tempo-range').hidden = t.mode !== 'range';
+    $('sv-tempo-min').value = t.min;
+    $('sv-tempo-max').value = t.max;
+    $('sv-tempo-note').textContent = SV_TEMPO_NOTES[t.mode];
+    const list = $('sv-adjust');
+    list.innerHTML = '';
+    SV_ADJUST.forEach(r => {
+      const on = r.shell ? p.shell[r.shell] !== false : r.get(p);
+      list.appendChild(ui.switchRow(r.name, r.desc, on, () => {
+        if (r.shell) p.shell[r.shell] = !on; else r.set(p, !on);
+        renderVersionSheet(true);
+      }));
+    });
+    const rhythm = !p.task.rhythmLocked, built = !p.task.pitchLocked && rhythm && !p.task.wordsLocked;
+    $('sv-adjust-note').textContent =
+      'Time signature: ' + (rhythm ? 'theirs to change, with Rhythm.' : 'stays as written (it goes with Rhythm).') + ' ' +
+      'Parts: ' + (built ? 'they can add and remove parts.' : p.shell.sound !== false ? 'they can change each part’s sound and volume, but not add or remove parts.' : 'as written.') +
+      (p.key.locked && t.mode === 'locked' && !rhythm ? ' With the key, the time and the tempo all fixed, Setup still reads them back.' : '');
+  }
+
+  function renderVersionRest() {
+    const p = sv.policy;
+    const lib = $('sv-library');
+    lib.innerHTML = '';
+    lib.appendChild(ui.switchRow('Library', 'The song chip at the top, with Start again (and Save a picture, if it is on). Off: they have only this song',
+      p.shell.library !== 'none', () => { p.shell.library = p.shell.library === 'none' ? 'lesson' : 'none'; renderVersionSheet(true); }));
+    $('sv-save-link').checked = !!p.save.link;
+    $('sv-save-file').checked = !!p.save.file;
+    $('sv-save-note').textContent = (p.save.link || p.save.file)
+      ? 'Whatever they send carries their song, the settings they had, and their name.'
+      : 'No Save my work button: their work stays in their browser — a read-and-sing link, say.';
+    const st = $('sv-student');
+    st.innerHTML = '';
+    st.appendChild(ui.switchRow('Ask for their name',
+      'Asked the first time they press Save my work, and needed before they can make the link or the file. It goes on the file’s name and the title you see: Song — Name',
+      !!p.student.askName, () => { p.student.askName = !p.student.askName; renderVersionSheet(true); }));
+  }
+
+  function getStoredVersions() {
+    const all = getStoredLessons();
+    const out = {};
+    Object.keys(all).forEach(id => { if (all[id] && all[id].kind === 'student-version') out[id] = all[id]; });
+    return out;
+  }
+  function storeVersion() {
+    const all = getStoredLessons();
+    const id = sv.id || ('sv_' + Date.now());
+    sv.id = id;
+    all[id] = { id, kind: 'student-version', title: sv.title, policy: sv.policy, songIds: [sv.songId], savedAt: Date.now() };
+    try { localStorage.setItem(LESSON_KEY, JSON.stringify(all)); } catch (e) {}
+  }
+  function renderSavedVersions() {
+    const list = $('sv-saved-list');
+    const saved = getStoredVersions();
+    const ids = Object.keys(saved).sort((a, b) => (saved[b].savedAt || 0) - (saved[a].savedAt || 0));
+    $('sv-saved-card').classList.toggle('policy-off', ids.length === 0);
+    list.innerHTML = '';
+    const library = SW.library.getStoredLibrary();
+    ids.forEach(id => {
+      const item = saved[id];
+      const row = document.createElement('div');
+      row.className = 'library-song-item' + (id === sv.id ? ' active' : '');
+      const title = document.createElement('span');
+      title.className = 'library-song-title';
+      const songId = (item.songIds || [])[0];
+      const song = songId && library[songId] ? SW.library.normalizeSong(library[songId], songId).title : '';
+      title.textContent = (item.title || 'Untitled version') + (song && song !== item.title ? ' · ' + song : '');
+      const actions = document.createElement('div');
+      actions.className = 'library-song-actions';
+      const edit = document.createElement('button');
+      edit.className = 'lib-action-btn load-btn';
+      edit.textContent = 'Edit';
+      edit.addEventListener('click', () => {
+        const keep = songId && library[songId] ? songId : SW.library.currentId();
+        if (keep !== songId) ui.toast('Its song is no longer in your library — it uses the song open now');
+        sv = { id, title: item.title || '', policy: normalizePolicy(Object.assign({}, item.policy, { kind: 'student-version' })) || newVersionDraft(keep).policy, songId: keep };
+        renderVersionSheet();
+      });
+      const del = document.createElement('button');
+      del.className = 'lib-action-btn delete-btn-item';
+      del.innerHTML = '&times;';
+      del.title = 'Delete this version';
+      del.addEventListener('click', () => {
+        if (!confirm('Delete “' + (item.title || 'Untitled version') + '”? Links already sent keep working.')) return;
+        const all = getStoredLessons();
+        delete all[id];
+        try { localStorage.setItem(LESSON_KEY, JSON.stringify(all)); } catch (e) {}
+        if (sv && sv.id === id) sv.id = null;
+        renderSavedVersions();
+      });
+      actions.appendChild(edit);
+      actions.appendChild(del);
+      row.appendChild(title);
+      row.appendChild(actions);
+      list.appendChild(row);
+    });
+  }
+
+  /* keepLink: a switch moved — the link made before it no longer says what the sheet says, so it goes */
+  function renderVersionSheet(keepScroll) {
+    if (!sv) return;
+    $('sv-song-title').textContent = versionSongTitle() === 'your sandbox' ? 'your sandbox' : '“' + versionSongTitle() + '”';
+    renderVersionMusic();
+    renderVersionAdjust();
+    renderVersionRest();
+    renderLayoutSummary('sv-layout-summary', 'student-version-sheet');
+    $('sv-note').value = sv.policy.task.note || '';
+    $('sv-note').placeholder = versionBlurb(sv.policy);
+    $('sv-title').value = sv.title || '';
+    $('sv-title').placeholder = 'e.g. ' + (SW.library.isSandboxId(sv.songId) ? 'My song' : versionSongTitle()) + ' — write the words';
+    $('sv-link-row').hidden = true;
+    renderSavedVersions();
+    if (!keepScroll) { const sheet = document.querySelector('#student-version-sheet .sheet'); if (sheet) sheet.scrollTop = 0; }
+  }
+
+  function openVersionSheet() {
+    SW.library.save();
+    const cur = SW.library.currentId();
+    if (!sv || sv.songId !== cur) sv = newVersionDraft(cur);
+    ui.closeSheet('importExportModal');
+    ui.closeSheet('library-sheet');
+    ui.openSheet('student-version-sheet');
+    renderVersionSheet();
+  }
+  function ensureVersionTitle() {
+    if (!sv.title.trim()) {
+      const rec = versionRecord();
+      sv.title = rec ? rec.title : 'Student version';
+      $('sv-title').value = sv.title;
+    }
+  }
+  function previewVersion() {
+    if (!versionRecord()) { ui.toast('That song is no longer in your library'); return; }
+    if (!SW.library.okToLeave('starts the preview')) return;
+    SW.library.save();
+    previewTarget = SW.library.currentId();
+    previewFrom = 'student-version-sheet';
+    beginPreview(normalizePolicy(versionPolicy()), sv.title || 'Student version', [sv.songId]);
+  }
+
+  /* ==================================================================
+     SAVE MY WORK (2026-11-15) — the student's side. In a student version
+     whose policy.save allows a link or a file, one button in the top bar
+     (where the auto-save toggle sits outside a lesson). Their work keeps
+     itself in their browser as any lesson's does; this is only for
+     handing it in:
+       • Copy a link to send — #work=~… (core.js SHORT LINKS);
+       • Download a file — <Song title> - <Name>.json;
+       • Open a saved file — one of their own files, back into this same
+         version (in place of what is on the page).
+     Both carry { v, kind: 'student-work', title, version, student, policy,
+     layout, song }. With policy.student.askName, their name comes first:
+     asked the first time, kept for the session (sessionStorage), and
+     editable on the sheet.
+     ================================================================== */
+  const NAME_KEY = 'song_writer_35_student_name_v1';     // sessionStorage
+  let nameInMemory = '';
+  function studentName() {
+    try { const n = sessionStorage.getItem(NAME_KEY); if (n !== null) return n; } catch (e) {}
+    return nameInMemory;
+  }
+  function setStudentName(n) {
+    nameInMemory = String(n || '').slice(0, 40);
+    try { sessionStorage.setItem(NAME_KEY, nameInMemory); } catch (e) {}
+  }
+  function saveOffered() {
+    return !!(policy && policy.kind === 'student-version' && (policy.save.link || policy.save.file) && !viewing);
+  }
+  const asksName = () => !!(policy && policy.student && policy.student.askName);
+  const nameMissing = () => asksName() && !studentName().trim();
+
+  function workFileName() {
+    const title = fileSafe(SW.library.currentTitle()) || 'My song';
+    const name = asksName() ? fileSafe(studentName()) : '';
+    return title + (name ? ' - ' + name : '') + '.json';
+  }
+  function workPayload() {
+    const L = SW.library;
+    const id = L.currentId();
+    const library = L.getStoredLibrary();
+    const rec = L.normalizeSong(cloneJson(library[id] || { title: L.currentTitle() }), id);
+    rec.score = SW.score.read();                       // what is on the page (a preview saves nothing)
+    rec.title = L.currentTitle() || rec.title;
+    rec.updatedAt = Date.now();
+    ['received', 'receivedAt', 'derivedFrom', 'book', 'layout'].forEach(k => { delete rec[k]; });
+    return {
+      v: 1, kind: 'student-work',
+      title: rec.title,
+      version: { id: lessonMeta && lessonMeta.id || '', title: lessonMeta && lessonMeta.title || '' },
+      student: { name: asksName() ? studentName().trim() : '' },
+      policy: policyForLink(policy),
+      layout: SW.settings.layoutSnapshot(),
+      song: rec,
+      savedAt: new Date().toISOString()
+    };
+  }
+
+  function renderSaveWork() {
+    if (!policy) return;
+    const ask = asksName();
+    const waiting = nameMissing();
+    $('sw-name-row').hidden = !ask;
+    if (document.activeElement !== $('sw-name')) $('sw-name').value = studentName();
+    $('sw-name').classList.remove('input-error');
+    $('sw-name-ok').hidden = !waiting;
+    $('sw-name-note').textContent = waiting
+      ? 'First, your name — it goes with your work, so your teacher knows it is yours.'
+      : 'Your name goes with your work. You can change it here.';
+    $('sw-choices').hidden = waiting;
+    $('sw-link').hidden = !policy.save.link;
+    $('sw-file').hidden = !policy.save.file;
+    $('sw-open').hidden = !policy.save.file;
+    $('sw-file-note').textContent = 'Saves “' + workFileName() + '” to your downloads, to upload or email — or to open here again later.';
+    $('sw-sub').textContent = waiting ? 'Your work is kept in this browser as you go.' : 'Your work is kept in this browser as you go. To hand it in:';
+  }
+  function openSaveWork() {
+    if (!saveOffered()) return;
+    SW.library.save();
+    $('sw-link-row').hidden = true;
+    renderSaveWork();
+    ui.closeAllPopovers && ui.closeAllPopovers();
+    ui.openSheet('save-work-sheet');
+    if (nameMissing()) setTimeout(() => $('sw-name').focus(), 60);
+  }
+  function takeName() {
+    const n = $('sw-name').value.trim();
+    if (!n) { $('sw-name').classList.add('input-error'); $('sw-name').focus(); return false; }
+    setStudentName(n);
+    renderSaveWork();
+    return true;
+  }
+  /* the name is needed before a link or a file (when the teacher asked for it) */
+  function nameFirst() {
+    if (!nameMissing()) return true;
+    renderSaveWork();
+    $('sw-name').classList.add('input-error');
+    $('sw-name').focus();
+    ui.toast('Type your name first');
+    return false;
+  }
+  function saveWorkLink() {
+    if (!policy.save.link || !nameFirst()) return;
+    const link = SW.library.shortLinkFor(workPayload(), 'work');
+    SW.library.offerLink(link, $('sw-link-input'), $('sw-link-row'), $('sw-link-copy-text'), $('sw-link-feedback'));
+  }
+  function saveWorkFile() {
+    if (!policy.save.file || !nameFirst()) return;
+    downloadJson(workPayload(), workFileName());
+    ui.toast('Saved “' + workFileName() + '” to your downloads');
+  }
+  /* one of their own files, back into this version (what is on the page goes) */
+  function openWorkFile(json) {
+    if (!json || json.kind !== 'student-work' || !json.song || !json.song.score) {
+      ui.toast('That file isn’t work saved from Song Writer');
+      return;
+    }
+    const vid = json.version && json.version.id;
+    if (vid && lessonMeta && lessonMeta.id && vid !== lessonMeta.id) {
+      ui.toast('That file was saved from a different student version — open it from the link it came with');
+      return;
+    }
+    if (!confirm('Open “' + (json.title || 'your saved work') + '” in place of what is on the page now?')) return;
+    const L = SW.library;
+    const id = L.currentId();
+    const score = L.normalizeSong({ id, title: L.currentTitle(), score: json.song.score }, id).score;
+    if (previewing) SW.score.render(score);            // a preview saves nothing
+    else {
+      const library = L.getStoredLibrary();
+      library[id] = L.normalizeSong(Object.assign({}, library[id] || {}, { id, score, updatedAt: Date.now() }), id);
+      L.saveStoredLibrary(library);
+      L.loadSongById(id);
+    }
+    if (asksName() && !studentName().trim() && json.student && json.student.name) setStudentName(json.student.name);
+    ui.closeSheet('save-work-sheet');
+    ui.toast('Opened your saved work');
+  }
+
+  /* ==================================================================
+     RETURNED WORK, FOR THE TEACHER (2026-11-15). A #work= link, or Share
+     & backup → Restore from a backup given a 'student-work' or a
+     'student-version' file, asks one question first (#returned-sheet):
+       • Open as they had it — VIEWING: the restricted shell, the song held
+         in memory (library.js holdVisiting) and the layout too
+         (settings.js holdLayout), a bar like the preview's; nothing filed,
+         nothing saved;
+       • Open with everything — filed into the library as a received song
+         (read-only, with Save my copy, as links are), titled
+         “Title — Name”, and opened in the whole app.
+     Never in the Recording Studio's frame (as lessons).
+     ================================================================== */
+  const VIEW_ID = 'viewing_student_work';
+  let viewing = null;       // { data, back } while a student's work is open as they had it
+  let pendingReturned = null;
+
+  function checkUrlForWork() {
+    const raw = ui.linkParam('work');
+    if (!raw) return null;
+    const data = ui.decodeJson(raw);
+    return (data && data.kind === 'student-work' && data.song) ? data : false;
+  }
+  function returnedParts(data) {
+    const work = data.kind === 'student-work';
+    const song = work ? data.song : (Array.isArray(data.songs) ? data.songs[0] : null);
+    const name = work && data.student && data.student.name ? String(data.student.name).trim().slice(0, 40) : '';
+    const songTitle = (song && typeof song.title === 'string' && song.title.trim()) || (typeof data.title === 'string' && data.title.trim()) || 'Untitled Song';
+    const versionTitle = work ? (data.version && data.version.title) || '' : (data.title || '');
+    return { work, song, name, songTitle, versionTitle, filedTitle: name ? songTitle + ' — ' + name : songTitle };
+  }
+  function offerReturned(data) {
+    if (window.EVM_STUDIO_EMBED || !data) return false;
+    const r = returnedParts(data);
+    if (!r.song || (!r.song.score && !r.song.content)) return false;
+    pendingReturned = data;
+    $('rt-title').textContent = r.work ? (r.name ? r.name + '’s work' : 'A student’s work') : 'A student version';
+    $('rt-sub').textContent = r.work
+      ? '“' + r.songTitle + '”' + (r.versionTitle && r.versionTitle !== r.songTitle ? ', from the student version “' + r.versionTitle + '”' : '') + '. How do you want to open it?'
+      : '“' + (r.versionTitle || r.songTitle) + '”, made from “' + r.songTitle + '”. How do you want to open it?';
+    $('rt-as-had-note').textContent = r.work
+      ? 'In the smaller app they worked in, just as they had it. Nothing is added to your library.'
+      : 'The smaller app, as your students get it. Nothing is added to your library.';
+    $('rt-everything-note').textContent = 'Adds it to your library as a shared song, “' + r.filedTitle + '”, and opens it with every tool.';
+    ui.closeSheet('importExportModal');
+    ui.openSheet('returned-sheet');
+    return true;
+  }
+
+  function fileReturned(data, quiet) {
+    const L = SW.library;
+    if (!quiet && !L.okToLeave('opens their work')) return;
+    L.save();
+    const r = returnedParts(data);
+    // one copy a student a version: their next hand-in replaces it (two students never share one)
+    const tag = alnumTag(r.work ? data.version && data.version.id : data.id) || 'x';
+    const id = r.work ? 'work_' + tag + '_' + (r.name ? slugify(r.name) : alnumTag(Date.now())) : 'version_' + tag;
+    const library = L.getStoredLibrary();
+    const now = Date.now();
+    const was = library[id];
+    const rec = L.normalizeSong(Object.assign({}, r.song, { id, title: r.filedTitle, isCustom: true, received: true, receivedAt: now,
+      createdAt: (was && was.createdAt) || now, updatedAt: now }), id);
+    ['layout', 'book', 'derivedFrom'].forEach(k => { delete rec[k]; });
+    library[id] = rec;
+    L.saveStoredLibrary(library);
+    L.loadSongById(id);
+    L.renderLibrarySongList();
+    ui.toast((was ? 'Updated “' : 'Added “') + rec.title + '” — in your library, under Shared with you');
+  }
+
+  function startViewing(data) {
+    const L = SW.library;
+    if (previewing) return;
+    if (!L.okToLeave('opens their work')) return;
+    L.save();
+    const r = returnedParts(data);
+    const p = data.policy ? normalizePolicy(Object.assign({}, data.policy, { kind: 'student-version' })) : null;
+    if (!p) { ui.toast('That work came without its settings, so it can only open with everything'); return; }
+    viewing = { data, back: L.currentId() };
+    L.holdVisiting(VIEW_ID, Object.assign({}, r.song, { title: r.songTitle, isCustom: true }));
+    policy = p;
+    lessonMeta = { title: r.versionTitle || r.songTitle, songIds: [VIEW_ID], id: '', kind: p.kind };
+    previewing = true;
+    SW.settings.holdLayout(data.layout);
+    $('viewing-text').textContent = r.work
+      ? (r.name ? 'Viewing ' + r.name + '’s work as they had it' : 'Viewing this work as they had it')
+      : 'Viewing “' + (r.versionTitle || r.songTitle) + '” as your students have it';
+    $('viewing-bar').hidden = false;
+    ['returned-sheet', 'importExportModal', 'library-sheet', 'save-work-sheet'].forEach(id => ui.closeSheet(id));
+    SW.settings.applyPolicyToShell();
+    L.loadSongById(VIEW_ID);
+  }
+  /* back to the whole app; the held song stays until the next one is open (a save
+     before then finds it received, and writes nothing) */
+  function endViewing() {
+    if (!viewing) return null;
+    const v = viewing;
+    viewing = null;
+    previewing = false;
+    policy = null;
+    lessonMeta = null;
+    $('viewing-bar').hidden = true;
+    SW.settings.releaseLayout();
+    SW.settings.applyPolicyToShell();
+    return v;
+  }
+  function closeViewing() {
+    const v = endViewing();
+    if (!v) return;
+    const L = SW.library;
+    const library = L.getStoredLibrary();
+    L.loadSongById(v.back && v.back !== VIEW_ID && library[v.back] ? v.back : L.ensureSandbox());
+    L.dropVisiting(VIEW_ID);
+  }
+  function viewingToEverything() {
+    const v = endViewing();
+    if (!v) return;
+    fileReturned(v.data, true);
+    SW.library.dropVisiting(VIEW_ID);
+  }
+
+  /* app.js start(), once everything is up: a #work= link asks its question */
+  function afterStart() {
+    if (window.EVM_STUDIO_EMBED) return;
+    const work = checkUrlForWork();
+    if (work === null) return;
+    SW.library.clearLinkFromAddress();
+    if (work === false) {
+      ui.toast('This link to a student’s work came through incomplete, so it can’t open — it was probably cut short. Ask them for the link again, or for the file.', 10000);
+      return;
+    }
+    offerReturned(work);
+  }
 
   /* ---------------- wiring ---------------- */
   function init() {
@@ -537,16 +1178,106 @@
       const input = $('lesson-link-input');
       if (input.value) SW.library.offerLink(input.value, input, null, $('lesson-link-copy-text'), $('lesson-link-feedback'));
     });
+    wireVersionSheet();
+    wireSaveWork();
+    wireReturned();
+  }
+
+  function wireVersionSheet() {
+    $('studentVersionBtn').addEventListener('click', openVersionSheet);
+    $('sv-tempo-seg').addEventListener('click', e => {
+      const b = e.target.closest('.seg-btn');
+      if (!b) return;
+      sv.policy.tempo.mode = b.dataset.tempo;
+      renderVersionSheet(true);
+    });
+    const readRange = () => {
+      const t = sv.policy.tempo;
+      const lo = parseInt($('sv-tempo-min').value, 10), hi = parseInt($('sv-tempo-max').value, 10);
+      if (!isNaN(lo)) t.min = SW.meters.clampBpm(lo);
+      if (!isNaN(hi)) t.max = SW.meters.clampBpm(hi);
+      if (t.min > t.max) { const x = t.min; t.min = t.max; t.max = x; }
+    };
+    ['change', 'blur'].forEach(ev => {
+      $('sv-tempo-min').addEventListener(ev, () => { readRange(); renderVersionSheet(true); });
+      $('sv-tempo-max').addEventListener(ev, () => { readRange(); renderVersionSheet(true); });
+    });
+    $('sv-save-link').addEventListener('change', e => { sv.policy.save.link = e.target.checked; renderVersionSheet(true); });
+    $('sv-save-file').addEventListener('change', e => { sv.policy.save.file = e.target.checked; renderVersionSheet(true); });
+    $('sv-note').addEventListener('input', e => { sv.policy.task.note = e.target.value.slice(0, 160); });
+    $('sv-title').addEventListener('input', e => { sv.title = e.target.value; });
+    $('sv-preview-btn').addEventListener('click', previewVersion);
+    $('sv-link-btn').addEventListener('click', () => {
+      if (!versionRecord()) { ui.toast('That song is no longer in your library'); return; }
+      ensureVersionTitle();
+      storeVersion();
+      renderSavedVersions();
+      const link = SW.library.shortLinkFor(versionPayload(), 'lesson');
+      SW.library.offerLink(link, $('sv-link-input'), $('sv-link-row'), $('sv-link-copy-text'), $('sv-link-feedback'));
+    });
+    $('sv-link-copy').addEventListener('click', () => {
+      const input = $('sv-link-input');
+      if (input.value) SW.library.offerLink(input.value, input, null, $('sv-link-copy-text'), $('sv-link-feedback'));
+    });
+    $('sv-file-btn').addEventListener('click', () => {
+      if (!versionRecord()) { ui.toast('That song is no longer in your library'); return; }
+      ensureVersionTitle();
+      storeVersion();
+      renderSavedVersions();
+      const name = (fileSafe(sv.title) || 'Student version') + '.json';
+      downloadJson(versionPayload(), name);
+      ui.toast('Saved “' + name + '” to your downloads');
+    });
+  }
+
+  function wireSaveWork() {
+    $('save-work-btn').addEventListener('click', openSaveWork);
+    $('sw-name-ok').addEventListener('click', takeName);
+    $('sw-name').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); takeName(); } });
+    $('sw-name').addEventListener('input', e => {
+      // once they have a name, changes to it are kept as they type (cleared: asked for again)
+      if (!$('sw-name-ok').hidden) return;
+      setStudentName(e.target.value.trim());
+      $('sw-file-note').textContent = 'Saves “' + workFileName() + '” to your downloads, to upload or email — or to open here again later.';
+      if (!e.target.value.trim()) renderSaveWork();
+    });
+    $('sw-link').addEventListener('click', saveWorkLink);
+    $('sw-link-copy').addEventListener('click', () => {
+      const input = $('sw-link-input');
+      if (input.value) SW.library.offerLink(input.value, input, null, $('sw-link-copy-text'), $('sw-link-feedback'));
+    });
+    $('sw-file').addEventListener('click', saveWorkFile);
+    $('sw-open').addEventListener('click', () => $('sw-open-input').click());
+    $('sw-open-input').addEventListener('change', e => readJsonFile(e.target, openWorkFile));
+  }
+
+  function wireReturned() {
+    $('rt-as-had').addEventListener('click', () => {
+      const d = pendingReturned;
+      pendingReturned = null;
+      ui.closeSheet('returned-sheet');
+      if (d) startViewing(d);
+    });
+    $('rt-everything').addEventListener('click', () => {
+      const d = pendingReturned;
+      pendingReturned = null;
+      ui.closeSheet('returned-sheet');
+      if (d) fileReturned(d);
+    });
+    $('viewing-close-btn').addEventListener('click', closeViewing);
+    $('viewing-everything-btn').addEventListener('click', viewingToEverything);
   }
 
   // the exercise open in this tab, for a reload
   SW.bus.on('song:opened', d => { if (lessonMeta && !previewing) rememberOpenLesson(d.id); });
 
   SW.lessons = {
-    init, bootFromUrl, restoreSong,
+    init, bootFromUrl, restoreSong, afterStart,
     policy: () => policy,
     meta: () => lessonMeta,
     isPreviewing: () => previewing,
-    shellAllows, libraryMode, taskBlurb
+    isViewing: () => !!viewing,
+    shellAllows, libraryMode, taskBlurb, isStudentVersion, saveOffered, offerReturned,
+    normalizePolicy
   };
 })();

@@ -128,6 +128,11 @@
       <svg class="autosave-icon" viewBox="0 0 24 24" aria-hidden="true"></svg>
       <span class="autosave-label" id="autosave-label">Auto-save</span>
     </button>
+    <!-- Only in a student version that lets them hand their work in (js/lessons.js SAVE MY WORK, 2026-11-15). -->
+    <button class="autosave-toggle save-work-btn" id="save-work-btn" type="button" hidden title="Save my work — a link or a file to hand in">
+      <svg class="autosave-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span class="autosave-label">Save my work</span>
+    </button>
     <button class="song-chip" id="song-chip" title="Library">
       <span class="song-chip-text">
         <span class="song-chip-kicker" id="song-chip-kicker">Library</span>
@@ -458,39 +463,41 @@
   </div>
 
   <!-- LOOK -->
+  <!-- (.look-size: Scale · Text size · Lyric font, and .look-page: the Music Page rows — a lesson's
+       'view' and 'lookPage' shell keys, settings.js syncLook; one switch, 'view', until 2026-11-15) -->
   <div class="sl-pane" id="look-pane" role="tabpanel" aria-label="Look">
-    <div class="popover-title">Scale</div>
-    <div class="seg seg-wide" role="group" aria-label="How big the music is">
+    <div class="popover-title look-size">Scale</div>
+    <div class="seg seg-wide look-size" role="group" aria-label="How big the music is">
       <button class="seg-btn" id="block-auto-btn">Justify&nbsp;width</button>
       <button class="seg-btn" id="block-fixed-btn">Fixed</button>
     </div>
-    <div class="zoom-row">
+    <div class="zoom-row look-size">
       <button class="zoom-btn" id="block-smaller-btn" title="Smaller" aria-label="Smaller">−</button>
       <input type="range" class="zoom-slider" id="block-size-slider" min="50" max="160" step="5" value="100" aria-label="Scale">
       <button class="zoom-btn" id="block-bigger-btn" title="Bigger" aria-label="Bigger">+</button>
     </div>
-    <div class="zoom-readout"><span id="block-size-value">100%</span><button class="text-tool" id="block-size-reset-btn">Reset</button></div>
+    <div class="zoom-readout look-size"><span id="block-size-value">100%</span><button class="text-tool" id="block-size-reset-btn">Reset</button></div>
 
-    <div class="popover-title">Text size</div>
-    <div class="zoom-row">
+    <div class="popover-title look-size">Text size</div>
+    <div class="zoom-row look-size">
       <button class="zoom-btn" id="text-smaller-btn" title="Smaller words" aria-label="Smaller words">−</button>
       <input type="range" class="zoom-slider" id="text-size-slider" min="60" max="250" step="5" value="100" aria-label="Text size">
       <button class="zoom-btn" id="text-bigger-btn" title="Bigger words" aria-label="Bigger words">+</button>
     </div>
-    <div class="zoom-readout"><span id="text-size-value">100%</span><button class="text-tool" id="text-size-reset-btn">Reset</button></div>
+    <div class="zoom-readout look-size"><span id="text-size-value">100%</span><button class="text-tool" id="text-size-reset-btn">Reset</button></div>
 
-    <div class="popover-title">Lyric font</div>
-    <div class="chip-row" id="lyric-font-row" role="group" aria-label="Lyric font">
+    <div class="popover-title look-size">Lyric font</div>
+    <div class="chip-row look-size" id="lyric-font-row" role="group" aria-label="Lyric font">
       <button class="chip font-chip" data-font="rounded">Rounded</button>
       <button class="chip font-chip" data-font="reader">Early reader</button>
       <button class="chip font-chip" data-font="clear">Big &amp; clear</button>
       <button class="chip font-chip" data-font="story">Storybook</button>
     </div>
 
-    <div class="popover-title">Music Page</div>
+    <div class="popover-title" id="look-page-title">Music Page</div>
     <!-- the selected note, and the one sounding while it plays (settings.js
          applyView → body.light-note / .light-box; staff.js, style.css) -->
-    <div class="seg-block" id="play-light-row">
+    <div class="seg-block look-page" id="play-light-row">
       <span class="size-row-name">Light up selected/played</span>
       <div class="seg seg-wide" role="radiogroup" aria-label="Light up selected/played" id="play-light-seg">
         <button class="seg-btn" type="button" role="radio" data-pl="note">Note</button>
@@ -499,7 +506,7 @@
         <button class="seg-btn" type="button" role="radio" data-pl="off">Off</button>
       </div>
     </div>
-    <div class="switch-list" id="look-switches"></div>
+    <div class="switch-list look-page" id="look-switches"></div>
     <!-- the song's chords in the music: showLane (the chord track) and chordRhythm (its dots), as one
          three-way choice since 2026-10-31 (two switches until then) -->
     <div class="seg-block" id="chords-show-row">
@@ -519,7 +526,7 @@
       </div>
     </div>
     <!-- the note names: the toolbar's glasses until 2026-10-31 (score.js setNames, staff.js) -->
-    <div class="seg-block" id="names-row">
+    <div class="seg-block look-page" id="names-row">
       <span class="size-row-name">Display Note Names</span>
       <div class="seg seg-wide" role="radiogroup" aria-label="Display Note Names" id="names-seg">
         <button class="seg-btn" type="button" role="radio" data-nn="off">Off</button>
@@ -806,12 +813,12 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         Send this song by link
       </div>
-      <p class="card-desc">Anyone who opens the link gets a copy in their own library. A link made from the sandbox lands in their sandbox.</p>
-      <label class="inline-check" for="lock-layout-on-share">
-        <input type="checkbox" id="lock-layout-on-share" />
-        <span>Lock my layout settings into the link <em>(they get the same notes, chords and note values, and cannot widen them)</em></span>
-      </label>
-      <button class="btn btn-primary" id="generateShareLinkBtn">Create a link</button>
+      <p class="card-desc">A link shares the whole app: whoever opens it gets a copy of this song in their own library, with every tool. A link made from the sandbox lands in their sandbox.
+        A <b>student version</b> is a smaller app instead &mdash; this one song, only the tools you leave on, and a way to hand their work back to you.</p>
+      <div class="lesson-foot">
+        <button class="btn btn-primary" id="generateShareLinkBtn">Create a link</button>
+        <button class="btn" id="studentVersionBtn">Make a student version…</button>
+      </div>
       <div class="share-row" id="shareLinkContainer" hidden>
         <input type="text" id="shareLinkInput" class="text-field" readonly />
         <button class="btn" id="copyShareLinkBtn"><span id="copyShareLinkBtnText">Copy</span></button>
@@ -1114,6 +1121,193 @@
   <button class="btn" id="preview-exit-btn">Leave preview</button>
 </div>
 
+<!-- ============ VIEWING BAR (teacher only): a student's work opened as they had it (js/lessons.js VIEWING) ============ -->
+<div class="preview-bar viewing-bar" id="viewing-bar" hidden>
+  <span id="viewing-text">Viewing their work as they had it</span>
+  <button class="btn" id="viewing-everything-btn">Open with everything</button>
+  <button class="btn" id="viewing-close-btn">Close</button>
+</div>
+
+<!-- ============ SHEET: MAKE A STUDENT VERSION (js/lessons.js THE STUDENT VERSION SHEET, 2026-11-15) ============
+     A one-song lesson: the same policy, link and opening as Set up for
+     students, with the melody split into Pitch and Rhythm, the bottom row
+     switch by switch, and a way to hand the work back (Save my work). -->
+<div class="sheet-backdrop" id="student-version-sheet">
+  <div class="sheet sheet-lg">
+    <div class="sheet-head">
+      <h2>Make a student version</h2>
+      <button class="sheet-close" data-close="student-version-sheet" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <p class="sheet-sub">
+      A smaller Song Writer made from <b id="sv-song-title">this song</b>. What you switch off
+      isn&rsquo;t there for them &mdash; not greyed out, simply not there. Each switch that is on
+      is something they have.
+    </p>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        What they can change in the music
+      </div>
+      <div class="switch-list" id="sv-music"></div>
+      <p class="card-desc lesson-hint" id="sv-music-note"></p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>
+        What they can adjust
+      </div>
+      <p class="card-desc">The bottom row &mdash; Setup · Sound/Look · Options · Present. Play, the ‹ › arrows and the Pitch · Notation · Rhythm pages always stay: they only change how the song is seen.</p>
+      <div class="lesson-sub">Tempo (speed up / slow down)</div>
+      <div class="seg" id="sv-tempo-seg" role="group" aria-label="Tempo">
+        <button class="seg-btn" data-tempo="any">Any</button>
+        <button class="seg-btn" data-tempo="range">Between</button>
+        <button class="seg-btn" data-tempo="locked">Locked</button>
+      </div>
+      <div class="tempo-range-row" id="sv-tempo-range">
+        <span>From</span>
+        <input type="number" class="text-field num-field" id="sv-tempo-min" min="30" max="300" inputmode="numeric" aria-label="Slowest tempo" />
+        <span>to</span>
+        <input type="number" class="text-field num-field" id="sv-tempo-max" min="30" max="300" inputmode="numeric" aria-label="Fastest tempo" />
+        <span>BPM</span>
+      </div>
+      <p class="card-desc lesson-hint" id="sv-tempo-note"></p>
+      <div class="switch-list" id="sv-adjust"></div>
+      <p class="card-desc lesson-hint" id="sv-adjust-note"></p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Library
+      </div>
+      <div class="switch-list" id="sv-library"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        How they hand it back
+      </div>
+      <p class="card-desc">Their work always saves in their own browser as they go. These are the ways to hand it in &mdash; a <b>Save my work</b> button at the top offers the ones you tick.</p>
+      <label class="inline-check" for="sv-save-link">
+        <input type="checkbox" id="sv-save-link" />
+        <span>Save as a link <em>(they copy a short link and send it to you)</em></span>
+      </label>
+      <label class="inline-check" for="sv-save-file">
+        <input type="checkbox" id="sv-save-file" />
+        <span>Save as a file <em>(a .json file to upload or email &mdash; and to open again later, in this version)</em></span>
+      </label>
+      <p class="card-desc lesson-hint" id="sv-save-note"></p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+        Student name
+      </div>
+      <div class="switch-list" id="sv-student"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/></svg>
+        Notes, chords and values
+      </div>
+      <div class="layout-summary" id="sv-layout-summary"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        The link
+      </div>
+      <div class="lesson-sub">Note to the student</div>
+      <input type="text" id="sv-note" class="text-field" maxlength="160" autocomplete="off" />
+      <p class="card-desc lesson-hint">This sentence sits above their work the whole time.</p>
+      <div class="lesson-sub">Name of this version</div>
+      <input type="text" id="sv-title" class="text-field" maxlength="60" autocomplete="off" placeholder="e.g. Twinkle &mdash; write the words" />
+      <p class="card-desc">
+        The link is one-way: it opens this version and stays there. Keep working in your
+        own copy here &mdash; nothing you send changes it.
+      </p>
+      <div class="lesson-foot">
+        <button class="btn" id="sv-preview-btn">Preview as a student</button>
+        <button class="btn btn-primary" id="sv-link-btn">Create the link</button>
+        <button class="btn" id="sv-file-btn">Download as a file</button>
+      </div>
+      <div class="share-row" id="sv-link-row" hidden>
+        <input type="text" id="sv-link-input" class="text-field" readonly />
+        <button class="btn" id="sv-link-copy"><span id="sv-link-copy-text">Copy</span></button>
+        <span class="status-msg" id="sv-link-feedback"></span>
+      </div>
+    </div>
+
+    <div class="card" id="sv-saved-card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/></svg>
+        Versions you have made
+      </div>
+      <div class="lesson-saved-list" id="sv-saved-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHEET: SAVE MY WORK (a student version's top-bar button — js/lessons.js SAVE MY WORK) ============ -->
+<div class="sheet-backdrop" id="save-work-sheet">
+  <div class="sheet sheet-sm" role="dialog" aria-labelledby="sw-heading">
+    <div class="sheet-head">
+      <h2 id="sw-heading">Save my work</h2>
+      <button class="sheet-close" data-close="save-work-sheet" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <p class="sheet-sub" id="sw-sub">Your work is kept in this browser as you go. To hand it in:</p>
+    <div class="sw-name" id="sw-name-row">
+      <label class="lesson-sub" for="sw-name">Your name</label>
+      <div class="sw-name-line">
+        <input type="text" id="sw-name" class="text-field" maxlength="40" autocomplete="off" placeholder="First and last name" />
+        <button class="btn btn-primary" id="sw-name-ok" type="button">Continue</button>
+      </div>
+      <p class="card-desc lesson-hint" id="sw-name-note">Your name goes with your work, so your teacher knows it is yours.</p>
+    </div>
+    <div class="kc-choices" id="sw-choices">
+      <button class="kc-choice" id="sw-link" type="button"><b>Copy a link to send</b><span>Then paste it wherever your teacher asked &mdash; a message, an email, an assignment.</span></button>
+      <div class="share-row sw-link-row" id="sw-link-row" hidden>
+        <input type="text" id="sw-link-input" class="text-field" readonly />
+        <button class="btn" id="sw-link-copy"><span id="sw-link-copy-text">Copy</span></button>
+        <span class="status-msg" id="sw-link-feedback"></span>
+      </div>
+      <button class="kc-choice" id="sw-file" type="button"><b>Download a file</b><span id="sw-file-note"></span></button>
+    </div>
+    <button class="popover-link sw-open" id="sw-open" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      Open a saved file…
+    </button>
+    <input type="file" id="sw-open-input" accept=".json,application/json" hidden />
+    <div class="sheet-foot">
+      <button class="btn" data-close="save-work-sheet">Back to my song</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHEET: A STUDENT'S WORK — how to open it (a #work= link, or a student-work / student-version file; js/lessons.js) ============ -->
+<div class="sheet-backdrop" id="returned-sheet">
+  <div class="sheet sheet-sm" role="dialog" aria-labelledby="rt-title">
+    <div class="sheet-head">
+      <h2 id="rt-title">A student&rsquo;s work</h2>
+      <button class="sheet-close" data-close="returned-sheet" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <p class="sheet-sub" id="rt-sub"></p>
+    <div class="kc-choices">
+      <button class="kc-choice" id="rt-as-had" type="button"><b>Open as they had it</b><span id="rt-as-had-note"></span></button>
+      <button class="kc-choice" id="rt-everything" type="button"><b>Open with everything</b><span id="rt-everything-note"></span></button>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn" data-close="returned-sheet">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ SHEET: HOW THIS WORKS ============ -->
 <div class="sheet-backdrop" id="help-sheet">
   <div class="sheet sheet-md">
@@ -1171,6 +1365,8 @@
       <li><span class="help-key">I</span><div><b>The chord track</b> draws the chords over the words, and the bars after the melody as a chord chart. Tap a chord to hear it; the Edit box’s <b>Chords</b> tab is where they change (in Edit they only show; locked, the notes stay put there): select one and press a chord key to change it, <span class="help-key">⌫</span> to silence it, <span class="help-key">←</span> <span class="help-key">→</span> to walk the chords. <b>Double-click</b> a chord for <b>Just here</b>: change that one bar — one chord or two, any rhythm — and the progression stays as it is. Play starts from a selected chord.</div></li>
       <li><span class="help-key edit">✎</span><div><b>Change a chord</b>: while the song can change, the pencil on any chord opens its editor — root, quality, a 7th or an inversion stuck to it, its name — and <b>Back to the scale’s chord</b> undoes it. Re-chorded places are saved with the song. Under the panel, the corner shows the chord in hand and its notes; the keyboard’s Octaves and Focus sit below them.</div></li>
       <li><span class="help-key">⛶</span><div><b>Present</b> hides every control and fills the screen. Play and the step arrows stay. Press <span class="help-key">Esc</span> to come back.</div></li>
+      <li><span class="help-key">🔗</span><div><b>Sharing</b> (Library → <b>Share &amp; backup</b>). <b>Create a link</b> shares the whole app: whoever opens it gets a copy of the song with every tool. <b>Make a student version…</b> makes a smaller app instead &mdash; this one song, and only what you leave on: what they can change in the music (<b>Pitch</b>, <b>Rhythm</b>, <b>Chords</b>, <b>Lyrics</b>; adding and deleting lines needs the first three and Lyrics), what they can adjust in the bottom row (the tempo, the key, Sound, sizes and fonts, the music page, the keyboard, the chord panel, Options, Present, Save a picture) and the Library. What is off is not there at all. Your Layout settings go with it, locked. <b>Preview as a student</b> shows it first; <b>Create the link</b> or <b>Download as a file</b> sends it.
+        Students hand their work back with <b>Save my work</b> at the top (if you tick a link, a file or both): their name first if you ask for it, then a link to copy or a file (<i>Song - Name.json</i>); their work also saves in their browser as they go. Open their link here &mdash; or their file in <b>Restore from a backup</b> &mdash; and choose <b>Open as they had it</b> (the same smaller app; nothing is added to your library) or <b>Open with everything</b> (it is added as a shared song, <i>Song — Name</i>, with every tool). <b>Set up for students</b>, in the Library, still makes lessons of several songs.</div></li>
       <li><span class="help-key">♯</span><div><b>Changing key</b> — <b>Look → When the key is changed</b>. <b>Transpose</b> (to start): a key from <b>Setup</b> moves the music you are in, every note keeping its solfège; in a song that changes key, only the stretch the selected note is in (with nothing selected, the whole song). <b>Create Key Change</b>: the new key starts on the first beat of the bar the selected note is in — and stays with that note: if a rhythm change moves it, the key change moves to the start of its new bar, and any notes that cross the bar line are written in the key they land in (with ♯ ♭ as needed) so they sound as before. Everything after it is written in that key — if notes are already written there, choose <b>Transpose</b> (they move into the new key) or <b>Remain unchanged</b> (they keep their pitches, written in the new key — the chords there too). The staff writes the new key signature; the blocks show a flag with the key's name. In this mode notes can go from A♭2 to G6 in any key; the letter keys still follow the key you are in.</div></li>
       <li><span class="help-key">␣</span><div><b>Spacebar</b> plays from the selected note, and stops — and the next Play carries on from where it stopped. <b>Setup</b> (the button that shows the key and the tempo) sets the key, the time signature, the scale, the tempo, the swing (None, 8th or 16th — the notes stay written straight) and the count-in; <b>Sound</b> (the speaker and eye button, with <b>Look</b>) a steady beat, the sounds, and what happens at the end.</div></li>
     </ul>
@@ -1196,7 +1392,7 @@
     <div class="about-grid">
       <div class="about-item"><span>▶</span><div><b>Interactive playback.</b> Step through in real time with the on-screen arrows or your keyboard’s left and right arrows — tap in rhythm to bring the melody to life — or press Play.</div></div>
       <div class="about-item"><span>🎨</span><div><b>Full creative control.</b> Compose original tunes, edit existing songs, and transpose to any key.</div></div>
-      <div class="about-item"><span>🔗</span><div><b>Easy sharing &amp; printing.</b> Share by link, send a lesson, or save a picture ready for printing.</div></div>
+      <div class="about-item"><span>🔗</span><div><b>Easy sharing &amp; printing.</b> Share the whole app by link, or make a student version &mdash; one song, only the tools you choose, and a way for them to hand their work back. Send a lesson, or save a picture ready for printing.</div></div>
       <div class="about-item"><span>📁</span><div><b>Offline song library.</b> Organise and back up your songs right on your computer — no accounts, nothing leaves your browser.</div></div>
     </div>
     <div class="about-new">

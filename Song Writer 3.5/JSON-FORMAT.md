@@ -32,12 +32,14 @@ import rule are shared by every Eagle View Music app and are defined in
 | Share link | `#song=~<base64url deflated JSON>` (since 2026-10-13); `#song=<base64 JSON>` before, `?song=` before 2026-09-28 | link payload | 4 |
 | Backup file | *Share & backup → Download* | `{ app, version: 2, songs }` | 5 |
 | Lesson link | `#lesson=~<base64url deflated JSON>` (since 2026-10-13); `#lesson=<base64 JSON>` before | lesson payload | 6 |
+| Student version | *Share & backup → Make a student version…*: the same `#lesson=~…`, or a `.json` file | lesson payload, `kind: "student-version"` | 6a |
+| A student's work | *Save my work* in a student version: `#work=~<base64url deflated JSON>`, or `<Title> - <Name>.json` | `kind: "student-work"` | 6b |
 | Layout settings | `localStorage.song_writer_2_layout_v1`, `record.layout`, links, lessons | layout | 7 |
 | Teacher Library shelf | `localStorage.evm_shelf_out_v1`, `…evm_shelf_index_v1` | books out; last index | 8 |
 | Everything else | `…_active_song_v1`, `…_view_prefs_v1`, lesson keys, sessionStorage `…_open_lesson_v1` | this device only; never travels | — |
 
 Base64 in links is UTF-8 bytes → `btoa` (see `ui.encodeJson` / `ui.decodeJson`
-in `js/core.js`). **Short links (2026-10-13):** a `~` after `song=` or `lesson=`
+in `js/core.js`). **Short links (2026-10-13):** a `~` after `song=`, `lesson=` or `work=` (2026-11-15)
 means the UTF-8 JSON was deflated first (`CompressionStream('deflate')`, zlib
 format) and written in base64url (`-` `_`, no `=` padding) — about a tenth of
 the length (a 56-bar song: 15,800 characters → about 1,500). See
@@ -234,7 +236,9 @@ Back or a reload still opens its own song.
   The receiver's settings take it, locked; and since a record's own `layout`
   (§1) has the same name, the shared song is filed carrying it too. Without
   the tick the link carries no `layout`, and the song opens with the
-  receiver's own settings.
+  receiver's own settings. **The tick went on 2026-11-15** (a student
+  version, §6a, always carries the layout locked); links made with it are
+  still read exactly as before, and a song link made now carries no `layout`.
 - Also read: 2.0 links made before 2026-09-28 (`?song=`), and 1.0 links, `#song=` with `{ "title", "content" }`.
 - On arrival: `EVM.file` (EVM Library README §2) — filed once, as a shared song.
 
@@ -265,11 +269,12 @@ and/or `content`).
 ```json
 { "lesson": 1, "v": 1, "id": "lsn_1790115314073", "title": "Write a melody",
   "policy": { "v": 1,
-              "task": { "melodyLocked": false, "wordsLocked": true, "chordsLocked": false, "note": "" },
+              "task": { "pitchLocked": false, "rhythmLocked": false, "melodyLocked": false,
+                        "wordsLocked": true, "chordsLocked": false, "note": "" },
               "key": { "locked": false },
               "tempo": { "mode": "range", "min": 60, "max": 120 },
-              "shell": { "sound": true, "view": true, "strip": true, "dock": true, "sections": true,
-                         "textEditor": true, "picture": true, "present": true, "library": "lesson" } },
+              "shell": { "sound": true, "view": true, "lookPage": true, "strip": true, "dock": true, "sections": true,
+                         "textEditor": true, "picture": true, "present": true, "options": true, "library": "lesson" } },
   "layout": { … },
   "songs": [ { "id": "…", "title": "…", "score": { … }, "isCustom": true } ] }
 ```
@@ -293,13 +298,100 @@ Added 2026-09-25 (all optional; a lesson without them opens exactly as before):
 | `policy.shell.present` | the Present button | `true` |
 | `policy.task.chordsLocked` | **2.5, 2026-10-03.** `true`: *Chords: listen only* — the chord progressions and the chord track can be seen and heard, not changed | `false` |
 
+Added 2026-11-15 (all optional; a lesson without them opens exactly as before):
+
+| Field | Values | Missing means |
+| --- | --- | --- |
+| `policy.task.pitchLocked` | `true`: which note is fixed — the Pitch page blocks, the letter/arrow keys, ♯ ♭, harmony, connected notes, the clef | `melodyLocked` |
+| `policy.task.rhythmLocked` | `true`: how long is fixed — the values, Dotted, Tie, rests, the Rhythm page circles, the time signature | `melodyLocked` |
+| `policy.task.melodyLocked` | the melody as one (until 2026-11-15). Still **written**, as `pitchLocked \|\| rhythmLocked`, for older readers; read only when the two above are missing | `false` |
+| `policy.shell.lookPage` | Look's Music Page rows (lights, Follow along, section colours, Display Chords, Display Note Names) | `policy.shell.view` (which covered them) |
+| `policy.shell.options` | the Options button | `true` |
+
+Adding, moving, copying and deleting notes and lines needs pitch, rhythm and
+words all free (`can('structure')`), as it needed the melody and the words.
+
 `range` narrows the BPM chip and its slider to `min`–`max` (a song saved
 outside them starts at the nearest); `locked` leaves the BPM as plain text
 at each exercise's own tempo.
 
 The lesson open in a tab is also kept in **sessionStorage**
-(`song_writer_2_open_lesson_v1`: `{ title, songIds, policy, current }`), so a
+(`song_writer_35_open_lesson_v1`: `{ title, songIds, id, policy, current }`), so a
 reload does not end it. It never leaves the device.
+
+## 6a. Student version — `#lesson=` with `kind: "student-version"` (2026-11-15)
+
+*Share & backup → Make a student version…* A **one-song lesson**: the same
+payload, link and opening as §6 (so the work is kept as
+`lesson_<slug>_<id-tail>_0` in the student's browser, and Start again works),
+plus:
+
+```json
+{ "lesson": 1, "v": 1, "kind": "student-version", "id": "sv_1794796898013", "title": "Twinkle words",
+  "policy": { "v": 1, "kind": "student-version",
+              "task": { "pitchLocked": true, "rhythmLocked": true, "melodyLocked": true,
+                        "wordsLocked": false, "chordsLocked": true, "note": "Write new words for Twinkle." },
+              "key": { "locked": true },
+              "tempo": { "mode": "any", "min": 60, "max": 120 },
+              "shell": { "sound": true, "view": true, "lookPage": false, "strip": false, "dock": false,
+                         "sections": true, "textEditor": true, "picture": false, "present": false,
+                         "options": false, "library": "none" },
+              "save": { "link": true, "file": true },
+              "student": { "askName": true },
+              "look": { "playLight": "note", "followScroll": true, "colours": true,
+                        "showLane": true, "chordRhythm": true, "noteNames": "off" } },
+  "layout": { … },
+  "songs": [ { "id": "…", "title": "Twinkle Twinkle", "score": { … }, "isCustom": true } ] }
+```
+
+The same `.json` is what *Download as a file* saves. In a student version:
+
+| Field | Meaning |
+| --- | --- |
+| `policy.kind` | `"student-version"` (anything else, or missing: a lesson) |
+| `policy.save.link`, `.file` | the **Save my work** button (top bar) and what it offers: a `#work=` link, a file. Both `false`: no button |
+| `policy.student.askName` | their name is asked before they can make the link or the file (kept for the session: sessionStorage `song_writer_35_student_name_v1`) |
+| `policy.look` | sent only with `shell.lookPage` off: the teacher's Music Page choices, put on for this song only — the student's own view prefs (§9) are never written over |
+| `policy.shell.view` | only Look's Scale, Text size and Lyric font here (the Music Page rows are `lookPage`) |
+| `policy.shell.strip` | only the chord panel (the Edit box's Chords tab) here: the song's chords are always seen and heard; `task.chordsLocked` alone decides whether they change |
+| `policy.shell.options` | off: no Options button. It also goes by itself when nothing is left in it (the lock, Parts, the keyboard's rows) |
+
+"When the key is changed" (Create Key Change) shows only with the pitch and the
+key free; otherwise the key only transposes. The layout always travels locked.
+The teacher's copy is kept in `song_writer_35_lessons_v1` beside the lessons,
+as `{ id, kind: "student-version", title, policy, songIds: [songId], savedAt }`.
+
+## 6b. A student's work — `#work=` / `kind: "student-work"` (2026-11-15)
+
+What *Save my work* hands back, as a short link (`#work=~…`, deflated as
+above) or a file named `<Song title> - <Name>.json`:
+
+```json
+{ "v": 1, "kind": "student-work", "title": "Twinkle Twinkle",
+  "version": { "id": "sv_1794796898013", "title": "Twinkle words" },
+  "student": { "name": "Maya" },
+  "policy": { … the version's policy (§6a) … },
+  "layout": { … },
+  "song": { "id": "lesson_twinkle-words_96898013_0", "title": "Twinkle Twinkle", "score": { … },
+            "isCustom": true, "createdAt": …, "updatedAt": … },
+  "savedAt": "2026-11-15T21:40:00.000Z" }
+```
+
+In the regular app a `#work=` link — or *Share & backup → Restore from a
+backup* given a `student-work` or `student-version` file (checked before
+`EVM.readItems`) — asks first:
+
+- **Open as they had it** — the version's shell, the song and layout held in
+  memory only, a bar "Viewing Maya's work as they had it · Open with
+  everything · Close". Nothing is filed or saved.
+- **Open with everything** — filed as a received song (read-only, Save my
+  copy) titled `Title — Name`, id `work_<version-id-tail>_<name-slug>` (a
+  student's next hand-in replaces it; a student version file:
+  `version_<id-tail>`), and opened in the whole app.
+
+*Open a saved file*, on the student's Save my work sheet, takes a file back
+into the same version (another version's file is refused). None of this
+opens in the Recording Studio's frame.
 
 ## 7. Layout settings
 

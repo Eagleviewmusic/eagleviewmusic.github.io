@@ -176,7 +176,7 @@
      only a lesson that leaves the chords out altogether silences them */
   // Sound → Chords; and chords hidden (the Chords switch / Look → Display Chords Off) only while Sound → Hear hidden parts is on
   function chordsHeard() {
-    return !!SW.settings.view.laneChordsPlay && (!SW.lessons || SW.lessons.shellAllows('strip')) &&
+    return !!SW.settings.view.laneChordsPlay && SW.settings.can('chordsListen') &&
       (SW.settings.shows('lane') || SW.settings.view.hearHidden !== false);
   }
 

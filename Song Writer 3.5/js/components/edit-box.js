@@ -297,6 +297,10 @@
     const shown = [secValues, secNote, secWords].filter(s => !s.hidden && !s.classList.contains('policy-off'));
     [secValues, secNote, secWords].forEach(s => s.classList.toggle('eb-first', !lyricsOn && s === shown[0]));
     empty.hidden = shown.length > 0;
+    // (a student version with the words fixed too — only its chords to change: 2026-11-15)
+    empty.textContent = can('words') ? 'Tap a word to type it.'
+      : chordsAvail() ? 'The notes and the words stay as they are — the chords change in the Chords tab.'
+      : 'The notes and the words stay as they are.';
   }
 
   let timer = 0;
@@ -468,7 +472,7 @@
   const titleEl = document.getElementById('eb-title');
   S.editPane = 'edit';
   let shownPane = 'edit';
-  const chordsAvail = () => can('chordsListen');
+  const chordsAvail = () => can('chordsListen') && can('chordPanel');   // (the same thing outside a student version)
   function pane() { return isOpen() && chordsAvail() && S.editPane === 'chords' ? 'chords' : 'edit'; }
   function syncPane() {
     const avail = chordsAvail(), p = pane();

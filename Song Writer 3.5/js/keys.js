@@ -105,7 +105,11 @@
     });
   }
 
-  function mode() { return SW.settings && SW.settings.view.keyMode === 'change' ? 'change' : 'transpose'; }
+  function mode() {
+    // a student version that keeps the notes (or the key) fixed hides the choice: the key only ever transposes there
+    if (SW.lessons && SW.lessons.isStudentVersion && SW.lessons.isStudentVersion() && !SW.settings.can('keyMode')) return 'transpose';
+    return SW.settings && SW.settings.view.keyMode === 'change' ? 'change' : 'transpose';
+  }
   /* Part 1 is on the page: the key changes are the page's (PARTS) */
   const lead = () => !SW.parts || SW.parts.focused() === 0;
 

@@ -259,6 +259,27 @@ html.in-iframe .home-link { display: none; }
 .preview-bar[hidden] { display: none; }
 .preview-bar .btn { height: 34px; padding: 0 13px; font-size: 13px; }
 body.show-dock .preview-bar { bottom: calc(var(--toolbar-real) + var(--dock-h) + 28px); }
+/* (the viewing bar — a student's work opened as they had it — is a preview bar with two buttons) */
+.viewing-bar { gap: 8px; }
+.viewing-bar span { margin-right: 4px; overflow: hidden; text-overflow: ellipsis; }
+
+/* ============================================================
+   STUDENT VERSIONS (2026-11-15, js/lessons.js) — Save my work in the
+   top bar (an auto-save toggle's shape, in the accent: it is the way
+   out for their work), its sheet, the returned-work sheet
+   ============================================================ */
+.save-work-btn { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.save-work-btn:hover, .save-work-btn:active { background: var(--accent); color: #fff; }
+.sw-name { margin: 12px 0 4px; }
+.sw-name[hidden], .sw-choices[hidden], #sw-choices[hidden] { display: none; }
+.sw-name-line { display: flex; gap: 8px; align-items: center; }
+.sw-name-line .text-field { flex: 1; min-width: 0; }
+.sw-name-line .btn[hidden] { display: none; }
+.sw-link-row { margin: 0 0 4px; }
+.sw-open { margin-top: 6px; }
+.sw-open[hidden] { display: none; }
+#sw-choices .kc-choice[hidden], .kc-choices[hidden] { display: none; }
+#sv-saved-list .library-song-item.active .library-song-title { color: var(--accent); }
 
 /* ============================================================
    WORKSPACE — the grid that keeps the keyboard under the score
@@ -3661,17 +3682,21 @@ button.rp-circle:hover, button.rp-circle:active { transform: scale(1.12); }
    words left — the pills keep their width (the notes sit on the circles' centres) at no height */
 /* …and the same with the score locked (2026-10-31, the user: circles that cannot change anything
    are away; edit-box.js sets body.notes-locked — the Edit box's Edit tab brings them back) */
+/* …and in a student version with Rhythm off (2026-11-15: settings.js sets body.rhythm-fixed) */
 body.rp-no-circles .rhythm-page .rp-circles,
-body.notes-locked .rhythm-page .rp-circles {
+body.notes-locked .rhythm-page .rp-circles,
+body.rhythm-fixed .rhythm-page .rp-circles {
   visibility: hidden; height: 0; min-height: 0; padding-top: 0; padding-bottom: 0;
   border-color: transparent; background: transparent; box-shadow: none; overflow: hidden;
 }
 body.rp-no-circles .rhythm-page .rp-measure,
-body.notes-locked .rhythm-page .rp-measure { padding-top: 26px; }
+body.notes-locked .rhythm-page .rp-measure,
+body.rhythm-fixed .rhythm-page .rp-measure { padding-top: 26px; }
 /* the cycle's first step: the notes in ink (the words and the circles keep their colours) */
 body.rp-mono .rhythm-page .rp-notes .engraving g[data-a] .head { fill: var(--ink); }
 body.rp-no-circles .rhythm-page .rp-notes,
-body.notes-locked .rhythm-page .rp-notes { margin-top: 0; }
+body.notes-locked .rhythm-page .rp-notes,
+body.rhythm-fixed .rhythm-page .rp-notes { margin-top: 0; }
 /* the head inside an ink ring, as on the Notation page; --ring (glyph units) is set per picture */
 .rp-notes .engraving g[data-a] .head { fill: var(--c, var(--ink)); stroke: var(--ink); stroke-width: var(--ring, 20); stroke-linejoin: round; }
 .rp-notes .engraving g.block { opacity: .55; }
@@ -3837,4 +3862,5 @@ body.page-rhythm .part-tail { display: none; }
 .rp-part .rp-words { grid-row: 2; }
 .rp-part .rp-circles { padding-top: 5px; padding-bottom: 5px; min-height: 0; }
 .rp-part .rp-circle { width: var(--rp-dot); height: var(--rp-dot); }
-body.notes-locked .rhythm-page .rp-part .rp-measure { padding-top: 0; }
+body.notes-locked .rhythm-page .rp-part .rp-measure,
+body.rhythm-fixed .rhythm-page .rp-part .rp-measure { padding-top: 0; }

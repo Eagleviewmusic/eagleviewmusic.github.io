@@ -28,7 +28,16 @@
      5. the everyday toggles — names, the arrows — are never lockable.
 
    The lesson POLICY itself lives in lessons.js; can() below is the one
-   place both are asked.
+   place both are asked. Since 2026-11-15 (lessons.js STUDENT VERSIONS) it
+   asks pitch and rhythm apart (a lesson's melodyLocked is both), and in a
+   student version: the chords change by their own switch, the song's
+   chords are always seen and heard ('chordsListen'), 'strip' is only the
+   chord panel ('chordPanel'), 'view' only Look's sizes and fonts and
+   'lookPage' its Music Page rows — left out, the teacher's choices are
+   put on for that song only and the student's own stay stored (pinLook);
+   Options goes when nothing is left in it. A student's returned work
+   opened "as they had it" brings its layout for that moment only
+   (holdLayout), never stored.
    ========================================================================== */
 (function () {
   'use strict';
@@ -193,7 +202,43 @@
     if (view.keyMode !== 'change') view.keyMode = 'transpose';
   }
   function saveView() {
-    try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (e) {}
+    // a student version's pinned Music Page is on screen only: what is stored is the student's own (pinLook)
+    const out = ownLook ? Object.assign({}, view, ownLook) : view;
+    try { localStorage.setItem(VIEW_KEY, JSON.stringify(out)); } catch (e) {}
+  }
+
+  /* A STUDENT VERSION'S MUSIC PAGE (2026-11-15). With its Music Page rows
+     left out (shell.lookPage off), a student version carries the
+     teacher's choices for them (policy.look) and they are put on for this
+     song only: the student's own are kept aside (ownLook) and are what
+     saveView stores, and they come back as soon as the version is left
+     (the policy pass: unpinLook). */
+  const PAGE_LOOK = ['playLight', 'followScroll', 'colours', 'showLane', 'chordRhythm', 'noteNames'];
+  let ownLook = null;
+  function pageLook() {
+    const o = {};
+    PAGE_LOOK.forEach(k => { o[k] = view[k]; });
+    return o;
+  }
+  function lookChanged() {
+    applyView();
+    if (SW.score && SW.score.setNames) SW.score.setNames(view.noteNames);
+  }
+  function pinLook(look) {
+    const before = ui.stableStringify(pageLook());
+    if (!ownLook) ownLook = pageLook();
+    const L = Object.assign({}, ownLook, look || {});
+    view.playLight = PLAY_LIGHTS.indexOf(L.playLight) !== -1 ? L.playLight : ownLook.playLight;
+    view.noteNames = NOTE_NAMES.indexOf(L.noteNames) !== -1 ? L.noteNames : ownLook.noteNames;
+    ['followScroll', 'colours', 'showLane', 'chordRhythm'].forEach(k => { view[k] = !!L[k]; });
+    if (ui.stableStringify(pageLook()) !== before) lookChanged();
+  }
+  function unpinLook() {
+    if (!ownLook) return;
+    const before = ui.stableStringify(pageLook());
+    Object.assign(view, ownLook);
+    ownLook = null;
+    if (ui.stableStringify(pageLook()) !== before) lookChanged();
   }
 
   function workspaceFor(v) {
@@ -210,7 +255,7 @@
   function shows(part) {
     const allow = SW.lessons ? SW.lessons.shellAllows : () => true;
     if (part === 'strip') return view.showStrip && allow('strip');
-    if (part === 'lane') return view.showLane && allow('strip');
+    if (part === 'lane') return view.showLane && can('chordsListen');   // (a student version always has the song's chords to see)
     if (part === 'dock') return view.showDock && allow('dock');
     return true;
   }
@@ -438,22 +483,44 @@
     radio('#chords-show-seg .seg-btn', 'cs', chordsShown());
     radio('#names-seg .seg-btn', 'nn', view.noteNames);
     radio('#key-mode-seg .seg-btn', 'km', view.keyMode);
-    // the key's row goes when a lesson fixes the key (there is nothing to change it with)
-    showHide($('key-mode-row'), can('key'));
-    // the chords' row goes with the chords a lesson leaves in
-    showHide($('chords-show-row'), allows('strip'));
+    // Look's two halves (2026-11-15): the sizes and fonts (a lesson's 'view') and the Music Page rows
+    // ('lookPage' — the same switch outside a student version, as it was)
+    document.querySelectorAll('#look-pane .look-size').forEach(el => showHide(el, allows('view')));
+    document.querySelectorAll('#look-pane .look-page').forEach(el => showHide(el, allows('lookPage')));
+    // the key's row goes when a lesson fixes the key (there is nothing to change it with) — and in a
+    // student version with the notes fixed (can: keyMode)
+    showHide($('key-mode-row'), can('keyMode'));
+    showHide($('look-page-title'), allows('lookPage') || can('keyMode'));
+    // the chords' row goes with the chords a lesson leaves out
+    showHide($('chords-show-row'), allows('lookPage') && can('chordsListen'));
   }
+  const inVersion = () => !!(SW.lessons && SW.lessons.isStudentVersion && SW.lessons.isStudentVersion());
+  /* Look has something in it: its sizes, or (a student version) its Music Page or the key's row */
+  function lookAllowed() { return allows('view') || (inVersion() && (allows('lookPage') || can('keyMode'))); }
 
+  /* In a student version 'view' is only Look's sizes and fonts: the lock
+     comes with anything to edit, Staging with the keyboard. */
   function syncOptions() {
+    const sv = inVersion();
     const look = allows('view');
-    showHide($('lock-title'), fillSwitches('page-switches', look ? PAGE_SWITCHES : []) > 0);
-    // the keyboard's rows (Staging) go with the keyboard a lesson leaves in
-    showHide($('kb-lights-row'), look && allows('dock'));
-    showHide($('kb-colors-row'), look && allows('dock'));
+    showHide($('lock-title'), fillSwitches('page-switches', (sv || look) ? PAGE_SWITCHES : []) > 0);
+    // the keyboard's rows (Staging) go with the keyboard a lesson leaves out
+    const stage = (sv || look) && allows('dock');
+    showHide($('kb-lights-row'), stage);
+    showHide($('kb-colors-row'), stage);
     radio('#kb-lights-seg .seg-btn', 'kl', view.kbLights);
     syncKeyColours();
-    showHide($('stage-title'), look && allows('dock'));
+    showHide($('stage-title'), stage);
   }
+  /* The Options button: a lesson's to leave out (shell.options), and in a
+     student version gone by itself when nothing is left in it (How this
+     works is in About too; Layout settings is never in a lesson). */
+  function syncOptionsBtn() {
+    let on = allows('options');
+    if (on && inVersion()) on = can('edit') || allows('dock') || !!(SW.partsUI && SW.partsUI.shown && SW.partsUI.shown());
+    showHide($('options-btn'), on);
+  }
+  SW.bus.on('score:loaded', () => syncOptionsBtn());
 
   function syncViewControls() {
     syncLook();
@@ -463,12 +530,12 @@
   /* The Sound/Look popover's two tabs (each is a lesson's to leave out:
      shell keys 'sound' and 'view'); with one left, no tabs. */
   function slTab() {
-    const sound = allows('sound'), look = allows('view');
+    const sound = allows('sound'), look = lookAllowed();
     return (view.slTab === 'sound' ? sound || !look : !look) ? 'sound' : 'look';
   }
   function syncSoundLook() {
     const tab = slTab();
-    showHide($('sl-tabs'), allows('sound') && allows('view'));
+    showHide($('sl-tabs'), allows('sound') && lookAllowed());
     document.querySelectorAll('#sl-tabs .seg-btn').forEach(b => {
       const on = b.dataset.sl === tab;
       b.classList.toggle('active', on);
@@ -549,7 +616,7 @@
     const setSound = (k, v) => { snd[k] = v; syncSoundControls(); SW.bus.emit('sound:changed', { sound: snd }); };
     list.innerHTML = '';
     list.appendChild(ui.switchRow('Melody', 'The notes of the song', snd.melody, () => setSound('melody', !snd.melody)));
-    if (!SW.lessons || SW.lessons.shellAllows('strip')) {
+    if (can('chordsListen')) {
       list.appendChild(ui.switchRow('Chords', 'The song’s chords, in their rhythm — whatever is on the stage',
         !!view.laneChordsPlay, () => { setView({ laneChordsPlay: !view.laneChordsPlay }, { quiet: true }); SW.bus.emit('sound:changed', { sound: snd }); }));
     }
@@ -604,7 +671,7 @@
     $('chord-volume-value').textContent = view.chordVolume + '%';
     $('room-value').textContent = view.room + '%';
     // the chords' sound goes with the chords a lesson leaves in
-    showHide($('chord-mix'), !SW.lessons || SW.lessons.shellAllows('strip'));
+    showHide($('chord-mix'), can('chordsListen'));
   }
   function setMix(patch) {
     setView(patch, { quiet: true });
@@ -841,6 +908,25 @@
     if (ui.stableStringify(layout) !== before) announceLayout();
   }
 
+  /* A layout on screen for a moment and never stored (2026-11-15): a
+     student's returned work opened "as they had it" (lessons.js
+     VIEWING). Locked; releaseLayout brings the stored one back. */
+  let heldLayout = false;
+  function holdLayout(snap) {
+    heldLayout = true;
+    pieceLayoutInMemory = true;               // (saveLayout leaves storage alone)
+    layout = normalizeLayout(snap || layoutSnapshot());
+    layout.locked = true;
+    announceLayout();
+  }
+  function releaseLayout() {
+    if (!heldLayout) return;
+    heldLayout = false;
+    pieceLayoutInMemory = false;
+    loadLayout();
+    announceLayout();
+  }
+
   /* ---- the questions the rest of the app asks ---- */
   /* The rungs that may be written. Layout settings' range (a choice of the
      twenty-two, each key's own) when it is narrowed; otherwise all twenty-two
@@ -863,29 +949,44 @@
   }
   function allowedKeys() { return layout.keys || M.KEYS; }
 
+  /* The melody is two halves since 2026-11-15 (lessons.js STUDENT
+     VERSIONS): PITCH (which note — ♯ ♭, harmony, connected notes, the
+     clef, Create Key Change) and RHYTHM (how long — the values, rests,
+     the time signature). A lesson made before reads its melodyLocked as
+     both, so each case below answers as it did. Adding, moving and
+     deleting notes and lines ('structure') needs both and the words. */
   function can(what) {
     const L = SW.lessons;
     const p = L && L.policy();
-    const melody = !p || !p.task.melodyLocked;
+    const sv = !!(p && p.kind === 'student-version');
+    const pitch = !p || !p.task.pitchLocked;
+    const rhythm = !p || !p.task.rhythmLocked;
+    const melody = pitch && rhythm;
     const words = !p || !p.task.wordsLocked;
     const shell = k => !L || L.shellAllows(k);
     switch (what) {
-      case 'edit': return melody || words;
-      case 'pitch': return melody;
-      case 'accidentals': return melody && layout.accidentals;
-      case 'rest': return melody && layout.rests;
-      case 'harmony': return melody && layout.harmony;
-      case 'connected': return melody && layout.connected;
-      case 'values': return melody;
-      case 'meter': return melody;
-      case 'chords': return melody && shell('strip') && !(p && p.task.chordsLocked);
-      case 'chordsListen': return shell('strip');                    // the chord progressions, to look at and hear (listen only)
+      case 'edit': return pitch || rhythm || words || can('chords');
+      case 'pitch': return pitch;
+      case 'accidentals': return pitch && layout.accidentals;
+      case 'rest': return rhythm && layout.rests;
+      case 'harmony': return pitch && layout.harmony;
+      case 'connected': return pitch && layout.connected;
+      case 'values': return rhythm;
+      case 'meter': return rhythm;
+      // a student version's Chords switch stands on its own; a lesson's chords need the melody (and its Chords)
+      case 'chords': return (sv || (melody && shell('strip'))) && !(p && p.task.chordsLocked);
+      // the chord progressions, to look at and hear (listen only) — always, in a student version
+      case 'chordsListen': return sv || shell('strip');
+      // the chord panel: the Edit box's Chords tab (in a lesson: what comes with its Chords)
+      case 'chordPanel': return shell('strip');
       case 'words': return words;
       case 'structure': return melody && words;
       case 'sections': return melody && words && shell('sections');
-      case 'textEditor': return melody && words && shell('textEditor');
+      case 'textEditor': return melody && words && shell('textEditor');   // (it rewrites notes as well as words)
       case 'key': return !p || !p.key.locked;
       case 'scale': return !p || !p.key.locked;                      // the scale goes with the key
+      // Look → When the key is changed: in a student version only with the notes theirs (Create Key Change rewrites them)
+      case 'keyMode': return (!p || !p.key.locked) && (!sv || pitch);
       case 'tempo': return !p || !p.tempo || p.tempo.mode !== 'locked';
       default: return true;
     }
@@ -924,6 +1025,8 @@
     showHide($('add-line-row'), can('structure'));
     document.body.classList.toggle('chords-locked', !can('chords'));
     document.body.classList.toggle('sections-locked', !can('sections'));
+    // a student version with Rhythm off: the Rhythm page's circles are away, as with the lock (style.css)
+    document.body.classList.toggle('rhythm-fixed', inVersion() && !can('values'));
 
     // (key + time + tempo: plain text when they cannot change — in Setup since 2026-10-31: app.js syncSetup, on policy:changed)
 
@@ -935,7 +1038,14 @@
     showHide(chTab, shell('strip'));
     // the page switch is never a lesson's to take away: it only changes how the song is seen (rule 1)
 
-    showHide($('soundlook-btn'), shell('sound') || shell('view'));
+    showHide($('soundlook-btn'), shell('sound') || lookAllowed());
+    syncOptionsBtn();
+    // a student version: the Save my work button (lessons.js), and its Music Page put on for this song
+    const sw = $('save-work-btn');
+    if (sw) sw.hidden = !(L && L.saveOffered && L.saveOffered());
+    const pol = L && L.policy();
+    if (pol && pol.kind === 'student-version' && !shell('lookPage') && pol.look) pinLook(pol.look);
+    else unpinLook();
     showHide($('tg-present'), shell('present'));
     showHide($('song-chip'), !L || L.libraryMode() !== 'none');
     showHide($('copyVisualBtn'), shell('picture'));
@@ -1161,10 +1271,10 @@
   SW.settings = {
     init, view, get layout() { return layout; },
     VIEW_DEFAULTS, WORKSPACES,
-    setView, setKeyboard, setWorkspace, setPage, page, toggleStrip, applyView, shows, panelOut, blockScale, syncSoundControls, lightColour,
+    setView, setKeyboard, setWorkspace, setPage, page, toggleStrip, applyView, shows, panelOut, blockScale, syncSoundControls, lightColour, pageLook,
     can, allowedNotes, allowedValues, allowedKeys, tempoRange, clampTempo,
     layoutSnapshot, applyLayoutSnapshot, resetLayout, layoutEditable, layoutSummary,
-    usePieceLayout,
+    usePieceLayout, holdLayout, releaseLayout,
     applyPolicyToShell, openLayoutSheet
   };
 })();

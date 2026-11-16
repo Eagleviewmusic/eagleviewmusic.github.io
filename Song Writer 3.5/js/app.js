@@ -517,6 +517,8 @@
     SW.staff.render();
     // fonts change widths; re-seat the keyboard once they have arrived
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => SW.dock.align());
+    // a student's work in the address (#work=) asks how to open it (js/lessons.js RETURNED WORK)
+    SW.lessons.afterStart();
   }
 
   // a short link (#song=~… / #lesson=~…) is unpacked first (core.js SHORT LINKS)

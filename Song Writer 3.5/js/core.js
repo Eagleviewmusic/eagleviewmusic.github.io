@@ -1099,9 +1099,10 @@
     }
     return null;
   };
-  ui.needsUnpack = () => ['song', 'lesson'].some(k => (ui.linkParam(k) || '').charAt(0) === '~');
+  // (#work=~…: a student's work handed back from a student version — lessons.js, 2026-11-15)
+  ui.needsUnpack = () => ['song', 'lesson', 'work'].some(k => (ui.linkParam(k) || '').charAt(0) === '~');
   ui.unpackLinks = async function () {
-    for (const k of ['song', 'lesson']) {
+    for (const k of ['song', 'lesson', 'work']) {
       const v = ui.linkParam(k);
       if (!v || v.charAt(0) !== '~' || !canPack) continue;
       try {

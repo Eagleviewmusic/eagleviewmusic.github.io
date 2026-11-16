@@ -55,8 +55,15 @@
 
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const can = what => !SW.settings || SW.settings.can(what);
-  const allowed = () => !SW.lessons || SW.lessons.shellAllows('view');
+  /* A STUDENT VERSION (2026-11-15): Options → Parts is there when the song
+     can be built (adding or removing a part needs the notes, the rhythm and
+     the words), or when Sound is on and the song has parts — then only each
+     part's sound and volume (toneEditable). In a lesson: with Look options. */
+  const inVersion = () => !!(SW.lessons && SW.lessons.isStudentVersion && SW.lessons.isStudentVersion());
+  const allowed = () => !inVersion() ? (!SW.lessons || SW.lessons.shellAllows('view'))
+    : can('structure') || (SW.lessons.shellAllows('sound') && P.count() > 1);
   const editable = () => !!S.editing && can('structure');
+  const toneEditable = () => editable() || (inVersion() && SW.lessons.shellAllows('sound'));
   let quiet = false;                    // a slider on the move: the block is left as it is
 
   function tabs(cls) {
@@ -83,7 +90,7 @@
   }
   /* the Chords switch: while the song has chords (and a lesson leaves them in) */
   function chordsTab() {
-    if (!SW.track || !SW.track.hasChords() || (SW.lessons && !SW.lessons.shellAllows('strip'))) return '';
+    if (!SW.track || !SW.track.hasChords() || !SW.settings.can('chordsListen')) return '';
     const on = SW.settings.shows('lane');
     return '<button type="button" class="ps-tab ps-switch ps-chords' + (on ? ' on' : '') + '" aria-pressed="' + on + '" data-chords' +
       ' title="' + (on ? 'Hide the chords' : 'Show the chords') + '">Chords</button>';
@@ -112,16 +119,16 @@
     block.hidden = !show;
     if (title) title.hidden = !show;
     if (!show) return;
-    const f = P.focused(), n = P.count(), meta = P.meta(f), edit = editable();
+    const f = P.focused(), n = P.count(), meta = P.meta(f), edit = editable(), tone = toneEditable();
     let html = '<div class="pt-tabs" role="tablist" aria-label="Parts">' + tabs('pt-tab') + '</div>';
     if (edit && n < P.MAX) html += '<button type="button" class="popover-link pt-add" data-add><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>Add a part</button>';
     html += '<div class="pt-card">' +
       '<label class="pt-row"><span class="pt-k">Name</span><input type="text" class="pt-name" maxlength="24" placeholder="' + esc(P.label(f)) + '" value="' + esc(meta.name) + '"' + (edit ? '' : ' disabled') + ' aria-label="Name of this part"></label>' +
-      '<label class="pt-row"><span class="pt-k">Sound</span><select class="sound-select pt-sound"' + (edit ? '' : ' disabled') + ' aria-label="Sound of this part">' + soundOptions(meta.sound) + '</select></label>' +
-      '<div class="mix-level pt-row"><span class="pt-k">Volume</span><input type="range" class="zoom-slider pt-volume" min="0" max="100" step="1" value="' + meta.volume + '" style="--fill:' + meta.volume + '%"' + (edit ? '' : ' disabled') + ' aria-label="Volume of this part"><output class="pt-volume-value">' + meta.volume + '%</output></div>' +
+      '<label class="pt-row"><span class="pt-k">Sound</span><select class="sound-select pt-sound"' + (tone ? '' : ' disabled') + ' aria-label="Sound of this part">' + soundOptions(meta.sound) + '</select></label>' +
+      '<div class="mix-level pt-row"><span class="pt-k">Volume</span><input type="range" class="zoom-slider pt-volume" min="0" max="100" step="1" value="' + meta.volume + '" style="--fill:' + meta.volume + '%"' + (tone ? '' : ' disabled') + ' aria-label="Volume of this part"><output class="pt-volume-value">' + meta.volume + '%</output></div>' +
       (edit && n > 1 ? '<button type="button" class="popover-link pt-remove" data-remove>Remove ' + esc(P.label(f)) + '</button>' : '') +
       '</div>';
-    if (!edit) html += '<p class="popover-note">Open the Edit box to add, name or remove parts.</p>';
+    if (!edit && (can('structure') || !inVersion())) html += '<p class="popover-note">Open the Edit box to add, name or remove parts.</p>';
     block.innerHTML = html;
   }
 
@@ -254,5 +261,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);
   else render();
 
-  SW.partsUI = { render, askNew };
+  SW.partsUI = { render, askNew, shown: allowed };
 })();

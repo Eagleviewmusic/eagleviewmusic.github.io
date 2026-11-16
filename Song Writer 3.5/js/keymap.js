@@ -187,7 +187,7 @@
     if (which === 'accordion' || which === 'mirror') {
       // mirrored: the right hand's key for the place, unless a lesson keeps the chords away
       const place = which === 'accordion' ? SW.chords.placeForKey(k)
-        : own(PLACE_OF_RIGHT, k) && SW.settings.can('chordsListen') ? PLACE_OF_RIGHT[k] : null;
+        : own(PLACE_OF_RIGHT, k) && SW.settings.can('chordPanel') ? PLACE_OF_RIGHT[k] : null;
       if (place) {
         event.preventDefault();
         // held until the key comes up (the panel's Z X C V B buttons were taken off, 2026-10-30: they no longer change it)
