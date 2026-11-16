@@ -1,7 +1,7 @@
 {
   "format": "evm-index",
   "formatVersion": 1,
-  "generatedAt": "2026-11-04T19:42:32.068Z",
+  "generatedAt": "2026-11-16T05:23:58.023Z",
   "items": [
     {
       "app": "music-stand",
@@ -64,6 +64,24 @@
       "title": "Pitty Patty Polt",
       "updatedAt": 1789352699141,
       "path": "rhythm-poetry--song_1789352699141.json",
+      "book": "More songs"
+    },
+    {
+      "app": "song-writer",
+      "kind": "song",
+      "id": "song_1794804976170_e7e1",
+      "title": "A Pumpkin Ran Away",
+      "updatedAt": 1794805473463,
+      "path": "song-writer--song_1794804976170_e7e1.json",
+      "book": "More songs"
+    },
+    {
+      "app": "song-writer",
+      "kind": "song",
+      "id": "song_1794806222915_nzyg",
+      "title": "A Pumpkin Ran Away with Chords",
+      "updatedAt": 1794806510052,
+      "path": "song-writer--song_1794806222915_nzyg.json",
       "book": "More songs"
     },
     {
