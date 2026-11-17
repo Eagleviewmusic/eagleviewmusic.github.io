@@ -11,9 +11,15 @@
      TIME LINE ('song', the second tab) — components/chord-timeline.js:
        the song in bars, its sections and their chords, a draft until
        Apply (a dot on the tab while one waits).
-     FOCUS ('focus', no tab) — components/chord-focus.js: one chord's notes
-       on a grand staff, gone into from a card, Create Chord, a double-click
-       on the music or on the Time Line — and come back out of.
+     THE CHORD EDITOR ('focus', no tab) — components/chord-focus.js: one
+       chord's notes on a grand staff and its buttons (sus4, 6/4 …), gone
+       into from a card, Create Chord, a double-click on the Time Line — and
+       come back out of. From a double-click on the MUSIC the window is
+       smaller (`compact`, 2026-11-16): the chord's name and Notes · Rhythm
+       in the head (#pw-slot), no Chord Chart · Time Line.
+     COMPARE ('compare', no tab — 2026-11-16) — components/chord-compare.js:
+       the gold chords side by side. Its button (#pw-compare) sits left of
+       the tabs while any chart card's gold circle is on.
 
    Here: the tabs, ↶ ↷ (Focus undoes its notes, the Time Line its draft, the
    chart the song), the keys (app.js hands them over while the window is on
@@ -31,7 +37,7 @@
    with the redesign — Y1; old songs are still read, track.js.)
 
    API  SW.progWin.open(_, 'chart' | 'song' | 'focus') · openHere(tick) · close() · isOpen() · onTop() ·
-        keyDown(e) · render() · tab() · setTab(t)
+        keyDown(e) · render() · tab() · setTab(t) · syncHead()
    ========================================================================== */
 (function () {
   'use strict';
@@ -48,8 +54,10 @@
   const undoBtn = document.getElementById('pw-undo');
   const redoBtn = document.getElementById('pw-redo');
   const tabsEl = document.getElementById('pw-tabs');
+  const slotEl = document.getElementById('pw-slot');
+  const compareBtn = document.getElementById('pw-compare');
 
-  let tab = 'chart';         // 'chart' (Chord Chart) | 'song' (Time Line) | 'focus' (Focus, no tab)
+  let tab = 'chart';         // 'chart' (Chord Chart) | 'song' (Time Line) | 'focus' (the chord editor, no tab) | 'compare' (no tab)
   let drawn = null;          // the tab last drawn
   let renderTimer = 0;
 
@@ -67,14 +75,22 @@
     const label = document.getElementById('song-chip-label');
     songEl.textContent = label ? '· ' + label.textContent : '';
     if (tab === 'focus' && (readOnly() || !SW.chordFocus.isOpen())) tab = 'chart';   // listen only: no chord to change
-    const bodyTop = drawn === tab ? body.scrollTop : 0;          // the tab drawn again keeps its place
-    drawn = tab;
+    if (tab === 'compare' && (readOnly() || !SW.chordCompare || !SW.chordCompare.isOpen())) tab = 'chart';
+    const sub = tab === 'focus' ? SW.chordFocus.tab() : null;
+    const bodyTop = drawn === tab + sub ? body.scrollTop : 0;    // the page drawn again keeps its place
+    drawn = tab + sub;
+    const small = tab === 'focus' && SW.chordFocus.compact();    // a chord in the music: the smaller window
     sheet.classList.toggle('readonly', readOnly());
+    sheet.classList.toggle('compact', small);
     body.classList.toggle('chart', tab === 'chart');
     body.classList.toggle('tline', tab === 'song');
-    body.classList.toggle('focus', tab === 'focus');
-    body.classList.toggle('fx', tab === 'focus');
-    if (tab === 'focus') SW.chordFocus.render(body, foot);
+    body.classList.toggle('focus', tab === 'focus' || tab === 'compare');
+    body.classList.toggle('fx', tab === 'focus' || tab === 'compare');
+    body.classList.toggle('fx-rhy', tab === 'focus' && sub === 'rhythm');
+    body.classList.toggle('cx', tab === 'compare');
+    if (slotEl && !small) slotEl.innerHTML = '';
+    if (tab === 'focus') { SW.chordFocus.render(body, foot, slotEl); body.scrollTop = bodyTop; }
+    else if (tab === 'compare') { SW.chordCompare.render(body, foot); body.scrollTop = bodyTop; }
     else {
       foot.innerHTML = '';
       if (tab === 'song') SW.chordTimeline.render(body); else SW.chordChart.render(body);
@@ -94,14 +110,30 @@
       b.classList.toggle('active', b.dataset.tab === tab);
       if (b.dataset.tab === 'song') b.classList.toggle('pw-dot', wait);
     });
+    syncHead();
   }
+  /* the Compare button: there while any chart card's gold circle is on (2026-11-16, user), pressed on Compare */
+  function syncHead() {
+    if (!compareBtn) return;
+    const n = !readOnly() && SW.chordChart && SW.chordChart.golds ? SW.chordChart.golds().length : 0;
+    compareBtn.hidden = !n && tab !== 'compare';
+    compareBtn.classList.toggle('active', tab === 'compare');
+    compareBtn.setAttribute('aria-pressed', tab === 'compare');
+    const c = compareBtn.querySelector('.pw-cmp-n');
+    if (c) c.textContent = tab === 'compare' && SW.chordCompare ? SW.chordCompare.count() : n;
+  }
+  if (compareBtn) compareBtn.addEventListener('click', () => { if (tab !== 'compare') setTab('compare'); });
   function setTab(t) {
     if (t === tab) return;
     if (t === 'focus' && (readOnly() || !SW.chordFocus.isOpen())) return;
-    // out of Focus with changes: its question first (Save · Save as New · Don't save), then here
+    if (t === 'compare' && readOnly()) return;
+    // out of the editor or Compare with changes: its question first (Save · Save as New · Don't save), then here
     if (tab === 'focus' && SW.chordFocus.dirty()) { SW.chordFocus.leave(() => setTab(t)); return; }
+    if (tab === 'compare' && SW.chordCompare.dirty()) { SW.chordCompare.leave(() => setTab(t)); return; }
+    if (t === 'compare' && !SW.chordCompare.open()) { syncHead(); return; }      // no gold chords (any more)
     // out of the Time Line: no question — the draft stays as it is, the tab's dot says one waits
     if (tab === 'focus') SW.chordFocus.closed();
+    if (tab === 'compare') SW.chordCompare.closed();
     if (tab === 'song' && t !== 'focus') SW.chordTimeline.closed();
     if (tab === 'chart' && SW.songWave) SW.songWave.stop();      // the wave's music stays with the wave
     tab = t;
@@ -115,7 +147,8 @@
     canUndo: () => SW.history.canUndo(SW.history.forChords()), canRedo: () => SW.history.canRedo(SW.history.forChords()),
     undo: () => SW.history.undo(SW.history.forChords()), redo: () => SW.history.redo(SW.history.forChords())
   };
-  const undoer = () => (tab === 'focus' ? SW.chordFocus : tab === 'song' ? SW.chordTimeline : songUndo);
+  // the editor's Rhythm tab writes the song (track.js spotRhythm): its ↶ ↷ are the song's
+  const undoer = () => (tab === 'focus' ? (SW.chordFocus.tab() === 'rhythm' ? songUndo : SW.chordFocus) : tab === 'compare' ? SW.chordCompare : tab === 'song' ? SW.chordTimeline : songUndo);
   function syncUndo() {
     const H = undoer();
     if (!H) return;
@@ -159,6 +192,7 @@
       return true;
     }
     if (tab === 'focus') return SW.chordFocus.keyDown(e);
+    if (tab === 'compare') return SW.chordCompare.keyDown(e);
     if (tab === 'song') return SW.chordTimeline.keyDown(e);
     return SW.chordChart.keyDown(e);
   }
@@ -187,7 +221,7 @@
     if (!SW.settings.can('chords') && !SW.settings.can('chordsListen')) return;
     drawn = null;
     if (which === 'song' || which === 'chart') tab = which;
-    else if (tab === 'focus') tab = 'chart';
+    else if (tab === 'focus' || tab === 'compare') tab = 'chart';
     if (SW.player && SW.player.playing) SW.player.stop();
     ui.openSheet('prog-sheet');
     render();
@@ -206,19 +240,30 @@
   /* ×, Esc, a tap outside: Focus goes back to the page it was opened from (its question first, with
      changes) and the window stays open; Focus from the music closes it. Everything else just closes. */
   ui.guardSheet('prog-sheet', closeNow => {
+    if (tab === 'compare' && SW.chordCompare && SW.chordCompare.isOpen()) {
+      if (escaping && SW.chordCompare.escape()) return false;              // Esc: a picked note is let go of first
+      SW.chordCompare.leave();
+      return false;
+    }
     if (tab !== 'focus' || !SW.chordFocus || !SW.chordFocus.isOpen()) return true;
+    if (escaping && SW.chordFocus.escape()) return false;
     if (SW.chordFocus.origin() !== 'music') { SW.chordFocus.leave(); return false; }
     if (SW.chordFocus.dirty()) { SW.chordFocus.leave(closeNow); return false; }
     return true;
   });
+  // Esc (rather than × or a tap outside) — app.js closes the top sheet on it
+  let escaping = false;
+  window.addEventListener('keydown', e => { if (e.key === 'Escape' && isOpen()) { escaping = true; setTimeout(() => { escaping = false; }, 0); } }, true);
 
   SW.bus.on('sheet:closed', d => {
     if (d.id !== 'prog-sheet') return;
     C.clearMods();
     if (SW.chordChart) SW.chordChart.closed();
     if (SW.chordFocus) SW.chordFocus.closed();
+    if (SW.chordCompare) SW.chordCompare.closed();
     if (SW.chordTimeline) SW.chordTimeline.closed();
-    if (tab === 'focus') tab = 'chart';
+    if (tab === 'focus' || tab === 'compare') tab = 'chart';
+    sheet.classList.remove('compact');
   });
   // the song changed (a step, Undo, another song), or how chords are named: draw it again
   ['score:changed', 'score:loaded', 'chords:changed', 'names:changed', 'meter:changed', 'key:changed', 'layout:changed'].forEach(evt => SW.bus.on(evt, () => { if (isOpen()) schedule(); }));
@@ -233,5 +278,5 @@
     if (tab === 'song') schedule(); else SW.chordStrip.fitLabels(body.querySelector('.pw-board'));
   });
 
-  SW.progWin = { open, openHere, close, isOpen, onTop, keyDown, render, tab: () => tab, setTab };
+  SW.progWin = { open, openHere, close, isOpen, onTop, keyDown, render, tab: () => tab, setTab, syncHead };
 })();

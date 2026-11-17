@@ -66,7 +66,13 @@
    the speed it was chosen at (q e s). Choosing one writes it to every
    chord from the card, laid in step with the bar (chartRhythm); a chord
    put on later from the card in empty time takes it too (putChord). The
-   chords keep their own copies — the Rhythm page can still change one.
+   chords keep their own copies.
+   ALL CHORDS AND A CHORD'S OWN (2026-11-16, user): a card whose rhythm came
+   from "All Chords" carries `all: true` — a card made later (on the chart,
+   or a new chord on the music) takes that rhythm too. A chord in the song
+   given a rhythm of its own (a double-click on it, its Rhythm tab:
+   spotRhythm) carries `ownRhythm: true` — a card's choice, All Chords or
+   This Chord, passes it by; any chord without it plays its card's.
    ARPEGGIOS — a chord (loose) may carry `arp`: a preset ('up', 'down',
    'updown', 'downup', 'out', 'in', 'alberti', 'oompah', 'bassdown',
    'random') or { o: [[ranks], …], n } — groups of its notes by rank, low
@@ -97,7 +103,8 @@
                        writers, the old Time Line's group writers and Just here went with the old window)
      the chart         chart() · chartEntry(k) · isChartShape() · chartFrom(g?) (what useChart would make) ·
                        useChart() · chartAdd(spec, index?) · chartSet(k, patch) · chartMove(k, index) ·
-                       chartRemove(k, keepSpots) · chartRhythm(ks, spec) · cardSpot(card, at, end, g?) · batch(fn)
+                       chartRemove(k, keepSpots) · chartRhythm(ks, spec, { all }) · cardSpot(card, at, end, g?) · batch(fn) ·
+                       spotRhythm(at, spec | null) (one chord's own; null: its card's again) · allSpec()
      arpeggios         ARPS · arpOrder(arp, n) · strikeNotes(list, st) · strikeHold(st)
      the Time Line     draftPieces(g?) · draftEvents(list, g?) · soundSig(evs, g?, voices) · applyDraft(list) · flatOps
      selfTest()        pure checks of the rhythm and timing rules
@@ -322,6 +329,7 @@
     }
     const arp = chord !== null ? cleanArp(s.arp) : null;                                   // its notes one by one
     if (arp) st.arp = arp;
+    if (chord !== null && s.ownRhythm === true) st.ownRhythm = true;                       // its rhythm its own: a card's choice passes it by (2026-11-16)
     return st;
   }
   /* the chart: cards with ids k1, k2 … (unique, never reused), each a chord (never "no chord") */
@@ -345,6 +353,7 @@
         const arp = cleanArp(e.arp);
         if (arp && r !== HELD) o.arp = arp;
         if (BYS.indexOf(e.by) !== -1 && o.arp) o.by = e.by;
+        if (e.all === true) o.all = true;                    // its rhythm came from All Chords (2026-11-16): new cards take it too
       }
       if (o.id) used.add(o.id);
       out.push(o);
@@ -354,7 +363,7 @@
     // the key order a card is written in
     return out.map(o => {
       const t = { id: o.id, chord: o.chord };
-      ['place', 'voice', 'name', 'rhythm', 'arp', 'by'].forEach(f => { if (o[f]) t[f] = o[f]; });
+      ['place', 'voice', 'name', 'rhythm', 'arp', 'by', 'all'].forEach(f => { if (o[f]) t[f] = o[f]; });
       if (o.hidden) t.hidden = true;
       return t;
     });
@@ -682,7 +691,7 @@
             if (e <= a) continue;
             if (s >= z) break;
             const st = p.chords[i];
-            pieces.push({ at: Math.max(s, a), end: Math.min(e, z), from: s, id: st.chord, step: i, pass: n, own: ownCells(st, lens[i]), rhythm: st.rhythm, place: st.place, k: st.k, sv: st.voice, arp: st.arp });
+            pieces.push({ at: Math.max(s, a), end: Math.min(e, z), from: s, id: st.chord, step: i, pass: n, own: ownCells(st, lens[i]), rhythm: st.rhythm, place: st.place, k: st.k, sv: st.voice, arp: st.arp, or: st.ownRhythm });
           }
         }
         (r.here || []).forEach((h, hi) => {
@@ -699,7 +708,7 @@
           h.chords.forEach((ch, ci) => {
             const len = toTicks(ch.beats, g.b);
             const at = Math.max(s, c0), e = Math.min(s + len, c1);
-            if (e > at) kept.push({ at, end: e, from: s, id: ch.chord, step: null, pass: null, here: true, hereIndex: hi, hereStep: ci, own: ownCells(ch, len), rhythm: ch.rhythm, place: ch.place, k: ch.k, sv: ch.voice, arp: ch.arp });
+            if (e > at) kept.push({ at, end: e, from: s, id: ch.chord, step: null, pass: null, here: true, hereIndex: hi, hereStep: ci, own: ownCells(ch, len), rhythm: ch.rhythm, place: ch.place, k: ch.k, sv: ch.voice, arp: ch.arp, or: ch.ownRhythm });
             s += len;
           });
           pieces = kept;
@@ -709,7 +718,7 @@
         (r.chords || []).forEach((st, i) => {
           const len = toTicks(st.beats || mt.beats, g.b);
           const e = s + len;
-          if (s < z && e > a) pieces.push({ at: Math.max(s, a), end: Math.min(e, z), from: s, id: st.chord, step: i, pass: 0, own: ownCells(st, len), rhythm: st.rhythm, place: st.place, k: st.k, sv: st.voice, arp: st.arp });
+          if (s < z && e > a) pieces.push({ at: Math.max(s, a), end: Math.min(e, z), from: s, id: st.chord, step: i, pass: 0, own: ownCells(st, len), rhythm: st.rhythm, place: st.place, k: st.k, sv: st.voice, arp: st.arp, or: st.ownRhythm });
           s = e;
         });
       }
@@ -720,7 +729,7 @@
           here: !!pc.here, hereIndex: pc.here ? pc.hereIndex : null, hereStep: pc.here ? pc.hereStep : null,
           place: pc.place || null, rhythm: ownSpan(pc),
           k: pc.id && pc.k ? pc.k : null, sv: pc.id && pc.sv ? pc.sv : null, voice: pc.id ? voiceOf(pc) : null,
-          arp: pc.id && pc.arp ? pc.arp : null,
+          arp: pc.id && pc.arp ? pc.arp : null, ownRhythm: !!(pc.id && pc.or),
           strikes: pc.id ? (pc.arp ? arpStrikes(strikesOf(pc, pattern, origin), pc, g, notesIn(pc.id, voiceOf(pc))) : strikesOf(pc, pattern, origin)) : []
         });
       });
@@ -847,6 +856,7 @@
       if (e.sv) o.voice = e.sv;
       if (e.rhythm) o.rhythm = e.rhythm;
       if (e.arp) o.arp = e.arp;
+      if (e.ownRhythm) o.ownRhythm = true;
       return o;
     });
   }
@@ -880,7 +890,7 @@
     const pts = Array.from(edges).sort((a, b) => a - b);
     const find = (L, t) => L.find(pc => pc.at <= t && t < pc.end) || null;
     const say = (pc, s, e) => !pc ? '' : [pc.chord, pc.place || '', pc.k || '', pc.voice ? JSON.stringify(pc.voice) : '', pc.at === s ? 1 : 0,
-      pc.rhythm === HELD ? HELD : pc.rhythm ? pc.rhythm.slice((s - pc.at) / CELL, (e - pc.at) / CELL) : '', pc.arp ? JSON.stringify(pc.arp) : ''].join('|');
+      pc.rhythm === HELD ? HELD : pc.rhythm ? pc.rhythm.slice((s - pc.at) / CELL, (e - pc.at) / CELL) : '', pc.arp ? JSON.stringify(pc.arp) : '', pc.ownRhythm ? 'own' : ''].join('|');
     const out = [];
     for (let i = 0; i + 1 < pts.length; i++) {
       const s = pts[i], e = pts[i + 1];
@@ -930,6 +940,7 @@
         if (p2.voice) st.voice = p2.voice;
         if (p2.rhythm) st.rhythm = p2.rhythm === HELD ? HELD : rhythmOf(p2.rhythm);
         if (p2.arp) st.arp = p2.arp;
+        if (p2.ownRhythm) st.ownRhythm = true;
         steps.push(st);
       }
       t = pc.end;
@@ -1068,15 +1079,20 @@
       if (!o.k || !chartEntry(o.k)) {
         const mine = S.chart.filter(x => !x.hidden && x.chord === o.chord);
         let e = mine.find(x => (x.place || '') === (o.place || '')) || mine[0];
+        let made = false;
         if (!e) {
           e = { id: nextK(S.chart), chord: o.chord };
           if (o.place) e.place = o.place;
           if (o.voice) e.voice = clone(o.voice);
+          takeAll(e);                                            // All Chords' rhythm, when the song has one (2026-11-16)
           S.chart.push(e);
+          made = true;
         }
         if (o.place && !e.place) e.place = o.place;              // its key, the first time it is picked from the panel
         o.k = e.id;
         if (e.voice) o.voice = clone(e.voice); else delete o.voice;
+        // a chord new to the song with nothing of its own plays its new card's rhythm (All Chords reaches it)
+        if (made && e.rhythm && !o.rhythm && !o.arp && !o.ownRhythm) Object.assign(o, cardSpot(e, o.at, o.end, g));
       }
       if (o.rhythm === HELD) delete o.rhythm;
       return o;
@@ -1102,6 +1118,8 @@
     if (spec.voice) e.voice = clone(spec.voice);
     if (spec.name) e.name = spec.name;
     ['rhythm', 'arp', 'by'].forEach(f => { if (spec[f]) e[f] = clone(spec[f]); });     // Save as New: the card's rhythm comes too
+    if (spec.all && e.rhythm) e.all = true;
+    if (!e.rhythm) takeAll(e);                                 // none of its own: All Chords' rhythm, when the song has one (2026-11-16)
     S.chart.splice(chartIndex(index), 0, e);
     if (typeof spot === 'number') {
       const g = grid();
@@ -1158,34 +1176,80 @@
     const mine = S.chart.filter(x => !x.hidden && x.chord === step.chord);
     return mine.find(x => (x.place || '') === (step.place || '')) || mine[0] || null;
   }
+  /* a spec as a card keeps it: { rhythm: 'held' | one bar's rhythm string, arp?, by? } — null: none */
+  function cardRhythmOf(spec, g) {
+    let r = null;
+    if (spec && spec.rhythm) r = spec.rhythm === HELD ? HELD : cleanRhythm(/^[XOR]+$/.test(spec.rhythm) ? rhythmOf(spec.rhythm) : spec.rhythm, g.B / CELL);
+    if (!r) return null;
+    const o = { rhythm: r };
+    const arp = r !== HELD && spec ? cleanArp(spec.arp) : null;
+    if (arp) { o.arp = clone(arp); if (BYS.indexOf(spec.by) !== -1) o.by = spec.by; }
+    return o;
+  }
+  /* the rhythm All Chords gave the song (a card carrying `all`), or null */
+  function allSpec() {
+    const e = S.chart.find(x => x.all && x.rhythm);
+    if (!e) return null;
+    const o = { rhythm: e.rhythm };
+    if (e.arp) o.arp = clone(e.arp);
+    if (e.by) o.by = e.by;
+    return o;
+  }
+  /* a card made with no rhythm of its own takes All Chords' (and is one of "all" from then on) */
+  function takeAll(e) {
+    const a = allSpec();
+    if (!a || e.rhythm) return;
+    Object.assign(e, a, { all: true });
+  }
   /* the cards `ks` play `spec` — { rhythm: 'held' | a bar of cells or a rhythm string, arp?, by? }, or
-     null (none chosen: the chords keep what they play) — and every chord from them, at once. One Undo step. */
-  function chartRhythm(ks, spec) {
+     null (none chosen: the chords keep what they play) — and every chord from them, at once, except a
+     chord with a rhythm of its own (ownRhythm, 2026-11-16 — set on that chord alone, it stays). o.all:
+     All Chords chose it (the cards remember, and cards made later take it); else This Chord (they
+     forget). One Undo step. */
+  function chartRhythm(ks, spec, o) {
     if (!isChartShape()) toChartShape();
     const g = grid();
     const set = new Set((ks || []).filter(k => chartEntry(k)));
     if (!set.size) return false;
-    let r = null;
-    if (spec && spec.rhythm) r = spec.rhythm === HELD ? HELD : cleanRhythm(/^[XOR]+$/.test(spec.rhythm) ? rhythmOf(spec.rhythm) : spec.rhythm, g.B / CELL);
-    const arp = r && r !== HELD && spec ? cleanArp(spec.arp) : null;
+    const cr = cardRhythmOf(spec, g);
+    const all = !!(o && o.all);
     S.chart.forEach(e => {
       if (!set.has(e.id)) return;
-      delete e.rhythm; delete e.arp; delete e.by;
-      if (!r) return;
-      e.rhythm = r;
-      if (arp) { e.arp = clone(arp); if (BYS.indexOf(spec.by) !== -1) e.by = spec.by; }
+      delete e.rhythm; delete e.arp; delete e.by; delete e.all;
+      if (!cr) return;
+      Object.assign(e, clone(cr));
+      if (all) e.all = true;
     });
-    if (r) {
+    if (cr) {
       S.track = looseTrack(flat(g).map(pc => {
-        const o = Object.assign({}, pc);
-        if (o.rhythm === HELD) delete o.rhythm;
-        if (!set.has(pc.k)) return o;
-        delete o.rhythm; delete o.arp;
-        return Object.assign(o, cardSpot(chartEntry(pc.k), o.at, o.end, g));
+        const o2 = Object.assign({}, pc);
+        if (o2.rhythm === HELD) delete o2.rhythm;
+        if (!set.has(pc.k) || pc.ownRhythm) return o2;
+        delete o2.rhythm; delete o2.arp;
+        return Object.assign(o2, cardSpot(chartEntry(pc.k), o2.at, o2.end, g));
       }), g);
     }
     commit('chart');
     return true;
+  }
+  /* ONE CHORD'S OWN RHYTHM (2026-11-16, user: a double-click on a chord in the music, its Rhythm tab): the
+     chord sounding at `at` plays `spec` (as a card's: one bar laid in step with the bar, an arpeggio's
+     order) and keeps it — a card's choice passes it by (ownRhythm). null: it plays its card's again
+     (none: struck once, held). One Undo step; the player keeps playing. → the piece, or null */
+  function spotRhythm(at, spec) {
+    const g = grid();
+    const list = flat(g);
+    const pc = list.find(x => x.at <= at && at < x.end);
+    if (!pc) return null;
+    const o = Object.assign({}, pc);
+    delete o.rhythm; delete o.arp; delete o.ownRhythm;
+    if (spec) {
+      const cr = cardRhythmOf(spec, g) || { rhythm: HELD };
+      Object.assign(o, cardSpot(cr, o.at, o.end, g));
+      o.ownRhythm = true;
+    } else if (o.k && chartEntry(o.k)) Object.assign(o, cardSpot(chartEntry(o.k), o.at, o.end, g));
+    writeFlat(layFlat(list, o), 'chart');
+    return o;
   }
   function chartMove(k, index) {
     if (!isChartShape()) toChartShape();
@@ -1232,6 +1296,7 @@
       const r = bake(e);
       if (r !== HELD) pc.rhythm = r;
       if (e.arp) pc.arp = clone(e.arp);
+      if (e.ownRhythm) pc.ownRhythm = true;
       return pc;
     });
   }
@@ -1262,6 +1327,7 @@
       if (pc.voice) o.voice = clone(pc.voice);
       if (pc.rhythm && pc.rhythm !== HELD) o.rhythm = pc.rhythm;
       if (pc.arp) o.arp = clone(pc.arp);
+      if (pc.ownRhythm) o.ownRhythm = true;
       const e = o.k ? chartEntry(o.k) : null;
       if (e) {
         o.chord = e.chord;
@@ -1750,6 +1816,13 @@
     eq('arp rings to the same note again', arpEv[0].strikes.slice(0, 2).map(st => st.ring / 6), [2 * MI, 2 * MI]);
     eq('arp from the chord start', arpEv[1].strikes.map(st => st.n.length), [1, 1, 1]);
     eq('strike notes', strikeNotes([67, 60, 64], { n: [0, 2] }), [60, 67]);
+    // A CHORD'S OWN RHYTHM, ALL CHORDS (2026-11-16): kept through cleaning, the expansion and flat pieces
+    const m44 = meterOf('4/4');
+    eq('ownRhythm kept', [cleanStep({ chord: 'I', beats: 4, ownRhythm: true }, m44, 4).ownRhythm, cleanStep({ chord: null, beats: 4, ownRhythm: true }, m44, 4).ownRhythm], [true, undefined]);
+    eq('all kept with a rhythm', cleanChart([{ chord: 'I', rhythm: 'q q q q', all: true }, { chord: 'V', all: true }], m44).map(e => !!e.all), [true, false]);
+    const ownEv = expand([], [{ from: 1, to: 2, chords: [{ chord: 'I', beats: 4, rhythm: 'h h', ownRhythm: true }, { chord: 'V', beats: 4 }] }], g4);
+    eq('ownRhythm on events and flat pieces', [ownEv[0].ownRhythm, ownEv[1].ownRhythm, !!flatOf(ownEv)[0].ownRhythm, !!flatOf(ownEv)[1].ownRhythm], [true, false, true, false]);
+    eq('ownRhythm is a difference', diffFlat([{ at: 0, end: 96, chord: 'I' }], [{ at: 0, end: 96, chord: 'I', ownRhythm: true }]).length, 1);
     return { ok: !failures.length, failures, checks };
   }
 
@@ -1771,7 +1844,7 @@
     // the Chord Chart (2026-10-28)
     chart: () => S.chart, chartEntry, isChartShape, chartFrom, useChart, chartAdd, chartSet, chartMove, chartRemove, usesOf, bake,
     // a card's rhythm, arpeggios (2026-10-30)
-    chartRhythm, cardSpot, batch, ARPS, arpOrder, strikeNotes, strikeHold, cleanArp,
+    chartRhythm, cardSpot, batch, ARPS, arpOrder, strikeNotes, strikeHold, cleanArp, spotRhythm, allSpec,
     // the Time Line's draft (2026-10-29)
     draftPieces, draftEvents, soundSig, applyDraft,
     flatOps: { cut: cutFlat, lay: layFlat, trim: trimPiece, clip: clipFlat, refit, tidy: tidyCells },

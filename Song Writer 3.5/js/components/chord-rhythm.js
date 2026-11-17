@@ -25,10 +25,21 @@
          for the bottom, its top for the top — track.js arpOrder).
        The part playing says so.
    Every choice is one Undo step (track.js chartRhythm) and reaches every
-   chord from the card(s) in the song at once, laid in step with the bar;
-   the wave, playing, plays it at once. ▶ plays two bars of it.
+   chord from the card(s) in the song at once, laid in step with the bar —
+   except a chord given a rhythm of its own in the music (below), which
+   keeps it; the wave, playing, plays it at once. ▶ plays two bars of it.
+   ALL CHORDS (2026-11-16, user: "it doesn't always feel like it does"):
+   switching to All Chords gives every card the rhythm the open card plays
+   at once, and the cards remember it came from All Chords — a chord put
+   in later, on the chart or straight on the music, plays it too.
 
-   API  SW.chordRhythm.html(cards) · attach(body) · toggle(k) · lit(k) · close() · loop(card) → { stop() } | null
+   ONE CHORD IN THE MUSIC (2026-11-16, user): the same three tabs in the
+   chord editor's Rhythm tab (chord-focus.js, a double-click on a chord in
+   the music) — for that chord alone (track.js spotRhythm: it keeps it,
+   whatever the chart's cards play after), or back to the Chord Chart's.
+
+   API  SW.chordRhythm.html(cards) · attach(body) · toggle(k) · lit(k) · close() · loop(card) → { stop() } | null ·
+        spotHtml(at, notes) · spotAttach(body)
    ========================================================================== */
 (function () {
   'use strict';
@@ -46,7 +57,11 @@
   let all = false;              // This Chord · All Chords
   let tab = null;               // 'block' | 'arp' | 'build' — null: the one the card's rhythm is on
   let by = 'e';                 // an arpeggio's speed: q e s
-  const grids = new Map();      // card → { by, n, cols: [[ranks] | null, …] } the note order being built
+  const grids = new Map();      // card (or 'spot:' + tick) → { by, n, cols: [[ranks] | null, …] } the note order being built
+  // one chord in the music (the chord editor's Rhythm tab)
+  let spot = null;              // { at, notes } — the chord the editor is on, its notes as they are there
+  let sTab = null, sBy = 'e';
+  const chosen = new Map();     // tick → the spec last chosen there (what its tiles show)
 
   const meter = () => SW.meters.byId(S.meter);
   const barCells = () => meter().barTicks / CELL;
@@ -93,14 +108,57 @@
   /* ---------------- writing ---------------- */
   function write(spec, hearIt) {
     if (!openK) return;
-    T.chartRhythm(targets(), spec);
+    T.chartRhythm(targets(), spec, { all });
     if (hearIt) setTimeout(() => hear(1), 30);
+  }
+  /* the chord the section is about, as a card would hold it, and how to write it — the chart's open card, or
+     the chord in the music the editor is on (`kind` 'spot': its own rhythm, or its card's while it follows) */
+  function chartCtx() {
+    const e = cardOf(openK);
+    return e ? { kind: 'card', e, key: e.id, write: (spec, h) => write(spec, h), hear: n => hear(n) } : null;
+  }
+  function spotPiece() { return spot ? T.flat().find(pc => pc.at <= spot.at && spot.at < pc.end) || null : null; }
+  /* a chord in the music as a card: its own rhythm read back as one bar (as chosen here, else from its cells), or its card's */
+  function spotCard() {
+    const pc = spotPiece();
+    if (!pc) return null;
+    const card = pc.k ? T.chartEntry(pc.k) : null;
+    const e = { id: 'spot', chord: pc.chord, voice: spot.notes || pc.voice || (card && card.voice) || null, own: !!pc.ownRhythm, card, at: pc.at };
+    if (!pc.ownRhythm) {
+      if (card && card.rhythm) { e.rhythm = card.rhythm; if (card.arp) e.arp = card.arp; if (card.by) e.by = card.by; }
+      return e;
+    }
+    const was = chosen.get(pc.at);
+    if (was) { Object.assign(e, was); return e; }
+    if (!pc.rhythm) { e.rhythm = T.HELD; return e; }
+    const g = T.grid(), n = barCells();
+    const lead = ((pc.at - g.T(g.barAt(pc.at))) / CELL) % n;
+    const bar = new Array(n).fill('R');
+    for (let i = 0; i < pc.rhythm.length; i++) bar[(lead + i) % n] = pc.rhythm[i];
+    e.rhythm = T.rhythmOf(T.fit(bar.join(''), n));
+    if (pc.arp) {
+      e.arp = pc.arp;
+      const xs = []; for (let i = 0; i < pc.rhythm.length; i++) if (pc.rhythm[i] === 'X') xs.push(i + lead);
+      e.by = xs.every(i => i % perBeat() === 0) ? 'q' : xs.every(i => i % 2 === 0) ? 'e' : 's';
+    }
+    return e;
+  }
+  function spotWrite(spec, hearIt) {
+    if (!spot) return;
+    if (spec) chosen.set(spot.at, JSON.parse(JSON.stringify(spec))); else chosen.delete(spot.at);
+    T.spotRhythm(spot.at, spec);
+    if (hearIt) setTimeout(() => spotHear(1), 30);
+  }
+  function spotCtx() {
+    const e = spot ? spotCard() : null;
+    return e ? { kind: 'spot', e, key: 'spot:' + e.at, write: spotWrite, hear: n => spotHear(n) } : null;
   }
 
   /* ---------------- the note order being built ---------------- */
-  function gridOf(e) {
+  function gridOf(e, key) {
     const n = notesOf(e);
-    let gs = grids.get(e.id);
+    key = key || e.id;
+    let gs = grids.get(key);
     if (gs && gs.n === n) return gs;
     const b = e.by && e.arp ? e.by : 'e';
     gs = { by: b, n, cols: null };
@@ -121,7 +179,7 @@
       const seq = T.arpOrder(typeof e.arp === 'string' && e.arp !== 'random' ? e.arp : 'up', n);
       gs.cols = fill(seq, colsOf(b));
     }
-    grids.set(e.id, gs);
+    grids.set(key, gs);
     return gs;
   }
   const fill = (seq, count) => Array.from({ length: count }, (x, i) => (seq.length ? seq[i % seq.length].slice() : null));
@@ -179,9 +237,36 @@
           '<button type="button" class="cr-close" data-cr="close" title="Close the rhythm" aria-label="Close the rhythm">' + ICON_X + '</button>' +
         '</div>' +
       '</div>' +
-      '<div class="cr-body" role="tabpanel">' + (t === 'block' ? blockHtml(e, ch) : t === 'arp' ? arpHtml(e, ch) : buildHtml(e, ch, d)) + '</div>' +
+      '<div class="cr-body" role="tabpanel">' + bodyHtml(t, e, ch, d, chartCtx(), by) + '</div>' +
     '</section>';
   }
+  const bodyHtml = (t, e, ch, d, ctx, speed) => (t === 'block' ? blockHtml(e, ch) : t === 'arp' ? arpHtml(e, ch, speed) : buildHtml(e, ch, d, ctx));
+  /* THE CHORD EDITOR’S RHYTHM TAB — one chord in the music (`at`), its notes as the editor has them */
+  function spotHtml(at, notes) {
+    spot = { at, notes: notes || null };
+    const ctx = spotCtx();
+    if (!ctx) return '<p class="fx-none">No chord here</p>';
+    const e = ctx.e;
+    const ch = choiceOf(e);
+    const t = sTab || (ch ? ch.tab : 'block');
+    const d = C.describeVoiced(e.chord, e.voice);
+    const cardName = e.card ? C.labelHTML(C.nameOf(C.describeVoiced(e.card.chord, e.card.voice))) : '';
+    const tabBtn = (id, label) => '<button type="button" class="cr-tab' + (t === id ? ' on' : '') + '" data-crtab="' + id + '" role="tab" aria-selected="' + (t === id) + '">' + label + '</button>';
+    // whose rhythm it plays: its own (from here), or its card's on the Chord Chart
+    const say = e.own
+      ? '<span class="cr-whose own">Its own rhythm</span>' + (e.card ? '<button type="button" class="btn pw-small-btn" data-crfollow>Use the Chord Chart’s</button>' : '')
+      : '<span class="cr-whose">' + (e.card ? 'Follows the Chord Chart’s <span class="cr-chip">' + cardName + '</span>' + (ch ? '' : ': struck once, ringing') : 'Struck once, ringing') + '</span>' +
+        '<span class="cr-whose-hint">— tap a rhythm to give this chord its own</span>';
+    return '<section class="cr-panel cr-spot" data-crctx="spot" style="--c:' + d.color + ';--cink:' + SW.chordStrip.inkOn(d.color) + '" aria-label="Its rhythm">' +
+      '<div class="cr-follow">' + say + '</div>' +
+      '<div class="cr-head">' +
+        '<div class="cr-tabs" role="tablist">' + tabBtn('block', 'Block Chords') + tabBtn('arp', 'Arpeggios') + tabBtn('build', 'Build Your Own') + '</div>' +
+        '<div class="cr-headr"><button type="button" class="cr-hear" data-cr="hear" title="Hear two bars of it">' + ICON_PLAY + '<span>Hear it</span></button></div>' +
+      '</div>' +
+      '<div class="cr-body" role="tabpanel">' + bodyHtml(t, e, e.own ? ch : null, d, ctx, ch && ch.tab === 'arp' ? ch.by : sBy) + '</div>' +
+    '</section>';
+  }
+  function spotAttach(body) { const p = body.querySelector('.cr-spot'); if (p) SW.rhythmBox.layout(p); }
   const ICON_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg>';
   const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   const tick = '<i class="cr-on" aria-hidden="true">✓</i>';
@@ -201,8 +286,8 @@
     return '<div class="seg cr-speed" role="group" aria-label="How fast">' + SPEEDS().map(([b, label]) =>
       '<button type="button" class="seg-btn' + (cur === b ? ' active' : '') + '" data-' + attr + '="' + b + '" aria-pressed="' + (cur === b) + '">' + label + '</button>').join('') + '</div>';
   }
-  function arpHtml(e, ch) {
-    const cur = ch && ch.tab === 'arp' ? ch.by : by;
+  function arpHtml(e, ch, speed) {
+    const cur = ch && ch.tab === 'arp' ? ch.by : speed || by;
     const n = notesOf(e);
     let h = '<div class="cr-row"><span class="cr-label">Speed</span>' + speedHtml(cur, 'crby') + '</div><div class="cr-tiles arp">';
     T.ARPS.forEach(id => {
@@ -213,16 +298,16 @@
     });
     return h + '</div>';
   }
-  function circleScope(e, d) {
+  function circleScope(e, d, ctx) {
     const c = e.rhythm && e.rhythm !== T.HELD && !e.arp ? barOf(e) : T.defaultCells(meter(), 1);
     return {
-      key: 'cr:' + e.id, kind: 'bar', cells: c, held: false, bars: 1, colour: d ? d.color : '#888', readOnly: false, bare: true,
-      write: v => write({ rhythm: v === T.HELD ? T.HELD : v }), redraw: () => SW.progWin.render()
+      key: 'cr:' + (ctx ? ctx.key : e.id), kind: 'bar', cells: c, held: false, bars: 1, colour: d ? d.color : '#888', readOnly: false, bare: true,
+      write: v => (ctx || chartCtx()).write({ rhythm: v === T.HELD ? T.HELD : v }), redraw: () => SW.progWin.render()
     };
   }
-  function buildHtml(e, ch, d) {
+  function buildHtml(e, ch, d, ctx) {
     const usingC = !!ch && ch.id === 'circles', usingO = !!ch && ch.id === 'order';
-    const gs = gridOf(e);
+    const gs = gridOf(e, ctx && ctx.key);
     const notes = C.voiceNotes(e.voice || C.voiceOf(e.chord));
     const span = spanOf(gs.by), pb = perBeat();
     let grid = '';
@@ -246,12 +331,12 @@
       '<div class="cr-part' + (usingC ? ' using' : '') + '">' +
         '<div class="cr-part-head"><b>Block chord rhythm</b>' + (usingC ? '<span class="cr-using">Playing</span>' : '') + '</div>' +
         '<p class="cr-hint">Tap the circles: orange strikes the chord, yellow lets it ring on, grey is silence.</p>' +
-        SW.rhythmBox.html(circleScope(e, d)) +
+        SW.rhythmBox.html(circleScope(e, d, ctx)) +
       '</div>' +
       '<div class="cr-part' + (usingO ? ' using' : '') + '">' +
         '<div class="cr-part-head"><b>The notes in order</b>' + (usingO ? '<span class="cr-using">Playing</span>' : '') + speedHtml(gs.by, 'crgby') + '</div>' +
         '<p class="cr-hint">Tap a circle and that note plays there — two or more in a column play together; an empty column lets the notes ring on.' +
-          (all ? ' Built on ' + C.labelHTML(C.nameOf(d)) + '; every other chord plays the same pattern.' : '') + '</p>' +
+          (all && (!ctx || ctx.kind === 'card') ? ' Built on ' + C.labelHTML(C.nameOf(d)) + '; every other chord plays the same pattern.' : '') + '</p>' +
         '<div class="cr-grid" style="--cols:' + gs.cols.length + '">' + '<span class="cr-gname"></span>' + counts + grid + '</div>' +
         '<div class="cr-row cr-gtools"><button type="button" class="btn pw-small-btn" data-crclear>Clear</button>' +
           '<button type="button" class="btn pw-small-btn" data-crfill="up">Start from Up</button>' +
@@ -322,6 +407,13 @@
     const x = cardEvent(cardOf(openK), bars || 2);
     if (x) sounding = strikeAll(x, SW.audio.now() + 0.06);
   }
+  // … and a chord in the music, with the notes the editor has for it
+  function spotHear(bars) {
+    stopHear();
+    const e = spot ? spotCard() : null;
+    const x = e ? cardEvent(e, bars || 2) : null;
+    if (x) sounding = strikeAll(x, SW.audio.now() + 0.06);
+  }
   /* A CARD HELD DOWN on the chart (2026-10-30, user): its rhythm, a bar at a time, round and round from now
      until stop() — what has sounded rings out, what has not is not heard. Null: it has no rhythm to play.
      o.t0 (the panel's Chord Chart set, live): the audio time the chord was pressed — the rhythm keeps that
@@ -356,34 +448,48 @@
   }
 
   /* ---------------- taps ---------------- */
+  /* the spec a card plays now (for All Chords to hand on) */
+  const specOf = e => (!e || !e.rhythm ? null : Object.assign({ rhythm: e.rhythm }, e.arp ? { arp: e.arp } : {}, e.by ? { by: e.by } : {}));
   bodyEl.addEventListener('click', ev => {
-    if (!active() || !openK) return;
     const b = ev.target.closest('.cr-panel button');
-    if (!b) return;
+    if (!b || !SW.progWin || !SW.progWin.isOpen()) return;
+    const isSpot = !!b.closest('[data-crctx="spot"]');
+    if (isSpot ? !spot : !active() || !openK) return;
+    const ctx = isSpot ? spotCtx() : chartCtx();
+    if (!ctx) return;
     const d = b.dataset;
-    const e = cardOf(openK);
-    if (!e) return;
+    const e = ctx.e;
+    const setTab = t => { if (isSpot) sTab = t; else tab = t; };
+    const speed = () => (isSpot ? sBy : by);
+    const setSpeed = v => { if (isSpot) sBy = v; else by = v; };
+    const own = isSpot && !e.own ? null : choiceOf(e);         // following the chart: nothing of its own is ticked
     if (d.cr === 'close') { close(); return; }
-    if (d.cr === 'hear') { hear(2); return; }
-    if (d.crscope) { all = d.crscope === 'all'; SW.progWin.render(); return; }
-    if (d.crtab) { tab = d.crtab; SW.progWin.render(); return; }
-    if (d.crblock) { tab = 'block'; write({ rhythm: d.crblock === 'held' ? T.HELD : d.crblock }, true); return; }
+    if (d.cr === 'hear') { ctx.hear(2); return; }
+    if (d.crfollow !== undefined) { spotWrite(null); return; }
+    if (d.crscope) {
+      all = d.crscope === 'all';
+      // All Chords (2026-11-16, user): every card plays what the open card plays, now
+      const sp = specOf(e);
+      if (all && sp) T.chartRhythm(cardsNow().map(x => x.id), sp, { all: true });
+      else SW.progWin.render();
+      return;
+    }
+    if (d.crtab) { setTab(d.crtab); SW.progWin.render(); return; }
+    if (d.crblock) { setTab('block'); ctx.write({ rhythm: d.crblock === 'held' ? T.HELD : d.crblock }, true); return; }
     if (d.crby) {
-      by = d.crby;
-      const ch = choiceOf(e);
-      if (ch && ch.tab === 'arp') write({ rhythm: speedCells(by), arp: ch.id, by }, true);     // the arpeggio playing, at the new speed
+      setSpeed(d.crby);
+      if (own && own.tab === 'arp') ctx.write({ rhythm: speedCells(speed()), arp: own.id, by: speed() }, true);     // the arpeggio playing, at the new speed
       else SW.progWin.render();
       return;
     }
     if (d.crarp) {
-      const ch = choiceOf(e);
-      if (ch && ch.tab === 'arp') by = ch.by;
-      tab = 'arp';
-      write({ rhythm: speedCells(by), arp: d.crarp, by }, true);
+      if (own && own.tab === 'arp') setSpeed(own.by);
+      setTab('arp');
+      ctx.write({ rhythm: speedCells(speed()), arp: d.crarp, by: speed() }, true);
       return;
     }
     if (d.crgby || d.cg !== undefined || d.crclear !== undefined || d.crfill) {
-      const gs = gridOf(e);
+      const gs = gridOf(e, ctx.key);
       if (d.crgby) {                                       // the same order, laid at the new speed (round again to fill the bar)
         const seq = gs.cols.filter(x => x && x.length);
         gs.by = d.crgby;
@@ -398,16 +504,15 @@
         if (at === -1 && f) SW.audio.playChordFrequencies([f], undefined, 0.5);
       } else if (d.crclear !== undefined) gs.cols = gs.cols.map(() => null);
       else gs.cols = fill(T.arpOrder(d.crfill, gs.n), colsOf(gs.by));
-      tab = 'build';
+      setTab('build');
       const spec = gridSpec(gs);
-      const ch = choiceOf(e);
       // the order plays once it has notes (and it changes what plays only when it is what plays, or when it was built here)
-      if (spec && (d.cg !== undefined || d.crfill || (ch && ch.id === 'order'))) write(spec);
+      if (spec && (d.cg !== undefined || d.crfill || (own && own.id === 'order'))) ctx.write(spec);
       else SW.progWin.render();
       return;
     }
-    const sc = circleScope(e, C.describeVoiced(e.chord, e.voice));
-    if (SW.rhythmBox.click(b, sc)) tab = 'build';
+    const sc = circleScope(e, C.describeVoiced(e.chord, e.voice), ctx);
+    if (SW.rhythmBox.click(b, sc)) setTab('build');
   });
 
   /* ---------------- opening, closing ---------------- */
@@ -432,10 +537,12 @@
     tab = null;
     if (active()) SW.progWin.render();
   }
-  SW.bus.on('song:opened', () => { openK = null; all = false; tab = null; grids.clear(); });
+  SW.bus.on('song:opened', () => { openK = null; all = false; tab = null; grids.clear(); spot = null; sTab = null; chosen.clear(); });
+  /* the chord editor left a chord: its tab forgets (the next chord opens on its own rhythm's tab) */
+  function spotDone() { spot = null; sTab = null; stopHear(); }
   SW.bus.on('sheet:closed', d => { if (d.id === 'prog-sheet') stopHear(); });
   // a new key, a new scale, a card's notes saved: the note order is drawn again from the card
   ['key:changed', 'chords:changed', 'meter:changed'].forEach(evt => SW.bus.on(evt, () => grids.clear()));
 
-  SW.chordRhythm = { html, attach, toggle, lit, close, loop, isOpen: () => !!openK };
+  SW.chordRhythm = { html, attach, toggle, lit, close, loop, isOpen: () => !!openK, spotHtml, spotAttach, spotDone };
 })();

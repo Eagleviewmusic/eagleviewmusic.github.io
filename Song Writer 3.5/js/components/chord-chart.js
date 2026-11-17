@@ -27,8 +27,10 @@
        (its upper left corner, on every card — 2026-10-30) or Enter opens
        FOCUS on it — its own notes (chord-focus.js), its name then
        following them. Beside the tune button a small round toggle glows
-       gold when on: Focus on any chord then shows every gold chord beside
-       it, to compare and voice-lead them (kept while the song is open).
+       gold when on — and says "compare" (2026-11-16, user: it was not
+       obvious); while any is on, a Compare button at the top of the window
+       opens every gold chord side by side (chord-compare.js) to compare and
+       voice-lead them (kept while the song is open).
        The round ♪ under a card opens its Rhythm section; dragged along the chart it
        moves there; dragged off it (down, away), it leaves the chart —
        a chord the song uses asks first: take it out of the song too, or
@@ -118,11 +120,16 @@
     const g = gold.has(e.id);
     const rOn = SW.chordRhythm && SW.chordRhythm.lit(e.id);
     const has = !!e.rhythm;
-    return '<button type="button" class="cc-cbtn cc-tune" data-tune="' + e.id + '" title="Its notes — Focus (Enter)" aria-label="Its notes">' + ICON_TUNE + '</button>' +
-      '<button type="button" class="cc-cbtn cc-gold' + (g ? ' on' : '') + '" data-gold="' + e.id + '" aria-pressed="' + g + '" title="' +
-        (g ? 'Shown beside any chord in Focus — tap to stop' : 'Show this chord beside any chord in Focus, to compare them') + '" aria-label="Compare in Focus"></button>' +
+    return '<button type="button" class="cc-cbtn cc-tune" data-tune="' + e.id + '" title="Change its notes (Enter)" aria-label="Change its notes">' + ICON_TUNE + '</button>' +
+      goldHtml(e.id, g) +
       '<button type="button" class="cc-cbtn cc-rhy' + (rOn ? ' on' : '') + (has ? ' has' : '') + '" data-rhy="' + e.id + '" aria-pressed="' + !!rOn + '" title="' +
         (rOn ? 'Close its rhythm' : 'Its rhythm — block chords, arpeggios, or your own') + '" aria-label="Its rhythm">' + ICON_EIGHTH + '</button>';
+  }
+  /* the gold toggle: a glowing dot that says "compare" while it is on (2026-11-16, user) */
+  function goldHtml(k, g) {
+    return '<button type="button" class="cc-cbtn cc-gold' + (g ? ' on' : '') + '" data-gold="' + k + '" aria-pressed="' + g + '" title="' +
+      (g ? 'In Compare (the button at the top) — tap to take it out' : 'Compare this chord with others: light two or more, then Compare at the top') + '" aria-label="Compare">' +
+      '<i class="cc-gdot" aria-hidden="true"></i>' + (g ? '<span class="cc-gword">compare</span>' : '') + '</button>';
   }
   /* the gold cards, in the chart's order */
   function golds() {
@@ -480,9 +487,8 @@
     if (gd) {
       const k = gd.dataset.gold, on = !gold.has(k);
       if (on) gold.add(k); else gold.delete(k);
-      gd.classList.toggle('on', on);
-      gd.setAttribute('aria-pressed', on);
-      gd.title = on ? 'Shown beside any chord in Focus — tap to stop' : 'Show this chord beside any chord in Focus, to compare them';
+      gd.outerHTML = goldHtml(k, on);
+      SW.progWin.syncHead();                                         // the Compare button at the top
       return;
     }
     const rh = t.closest('.cc-rhy');

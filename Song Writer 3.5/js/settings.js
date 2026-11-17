@@ -72,8 +72,9 @@
     kbColor: '#9C168E',     //   the one colour, for 'single' (Song Writer's plum to start)
     kbLights: 'both',       // View → Keyboard notes light up the: 'melody' | 'chords' | 'both' | 'neither' (2026-10-08; was kbChordLights, a switch for the chords' wash)
     dockHeight: 'md',       // the keyboard: 'sm' | 'md' | 'lg', or px from its grip
-    chordSet: 'chart',      // the chord panel: 'chart' | 'full' | 'extended' | 'extreme' | 'everything' (js/chords.js PANEL_SETS; 'core' until 2026-10-30)
-    chordSetV2: false,      //   set once the panel's sets changed (2026-10-30): every panel starts on the Chord Chart once
+    chordSet: 'full',       // the chord panel: 'full' | 'extended' | 'extreme' | 'everything' | 'chart' (js/chords.js PANEL_SETS; 'core' until 2026-10-30, 'chart' to start until 2026-11-16)
+    chordSetV2: false,      //   set once the panel's sets changed (2026-10-30)
+    chordSetV3: false,      //   set once the panel's sets were reordered (2026-11-16, user): a panel on the Chord Chart goes to Full once
     chordNames: 'roman',    // the panel's names: 'roman' (I IV V) | 'letter' (C F G) — the I/C button on the panel
     chordTones: false,      // ♪ notes: the notes inside every chord block
     modSlots: ['sus2', 'add9', 'sus4', 'b7', 'maj7'],   // what Z X C V B do (js/chords.js MOD_FUNCS ids, or null)
@@ -99,6 +100,7 @@
     waveOpen: false,        // 2026-10-29 the Chord Chart's sound wave: false = folded to ▶ and the wave, true = all of it (song-wave.js)
     chartBoard: 'circle',   // 2026-10-29 the Chord Chart's chords: 'circle' (the circle of fifths in blocks, chord-circle.js) | 'panel'
     circleNames: 'letter',  //   and the circle's names: 'letter' (C Am B♭) | 'roman' (I vi ♭VII) — its own C · I switch
+    chordMove: 'key',       // 2026-11-16 the chord editor and Compare: ↑ ↓ move a note along the 'key' (the scale) | 'chromatic' (half steps)
     tlZoom: 'close',        // 2026-10-29 the Time Line's zoom: 'close' (every beat) | 'mid' (about 20 bars) | 'top' (about 36 bars) (chord-timeline.js)
     chordRhythm: true,      // 2.5 the chord track shows its strikes as dots (chord-track.js)
     editOpen: false,        // 2026-10-31 the Edit box is out (the rail's › — edit-box.js THE RAIL)
@@ -181,7 +183,8 @@
       view[k] = isNaN(n) ? VIEW_DEFAULTS[k] : ui.clamp(n, 0, 100);
     });
     if (SW.chords) {
-      if (!view.chordSetV2) { view.chordSet = VIEW_DEFAULTS.chordSet; view.chordSetV2 = true; }   // once: the new sets start on the Chord Chart
+      if (!view.chordSetV2) { view.chordSet = VIEW_DEFAULTS.chordSet; view.chordSetV2 = true; }   // once: the new sets (2026-10-30)
+      if (!view.chordSetV3) { if (view.chordSet === 'chart') view.chordSet = 'full'; view.chordSetV3 = true; }   // once: Full first, the Chord Chart last (2026-11-16)
       if (!SW.chords.PANEL_SETS.some(c => c.id === view.chordSet)) view.chordSet = VIEW_DEFAULTS.chordSet;
       if (view.chordNames !== 'letter') view.chordNames = 'roman';
       view.chordTones = !!view.chordTones;

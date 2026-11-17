@@ -91,16 +91,17 @@
     { id: 'extreme', name: 'Extreme', short: 'Xtrm', places: '12345', desc: 'everything, the number row too' }
   ];
   const EXTREME = CHORD_SETS.length - 1;
-  /* THE PANEL'S SETS (2026-10-30, user): what the set button cycles through — the song's Chord Chart to
-     start, then Full, Extended, Extreme (the places, as CHORD_SETS: Core left the cycle) and Everything (all
-     24 majors and minors round the circle of fifths, tonic on top — chord-strip.js draws the two new ones).
-     Stored as View pref chordSet; Chart and Everything offer every place to the rest of the app. */
+  /* THE PANEL'S SETS (2026-10-30, user): what the set button cycles through — Full (2026-11-16, user: the
+     panel starts on Full; it started on the Chord Chart), Extended, Extreme (the places, as CHORD_SETS: Core
+     left the cycle), Everything (all 24 majors and minors round the circle of fifths, tonic on top), and last
+     the song's own Chord Chart (chord-strip.js draws the two new ones). Stored as View pref chordSet; Chart
+     and Everything offer every place to the rest of the app. */
   const PANEL_SETS = [
-    { id: 'chart', name: 'Chord Chart', short: 'Chart' },
     { id: 'full', name: 'Full', short: 'Full' },
     { id: 'extended', name: 'Extended', short: 'Extd' },
     { id: 'extreme', name: 'Extreme', short: 'Xtrm' },
-    { id: 'everything', name: 'Everything', short: 'All' }
+    { id: 'everything', name: 'Everything', short: 'All' },
+    { id: 'chart', name: 'Chord Chart', short: 'Chart' }
   ];
   const SET_OF = {};
   CHORD_SETS.forEach((s, i) => s.places.split('').forEach(p => { SET_OF[p] = i; }));
@@ -262,7 +263,7 @@
   const everyAllowed = () => PLACES.every(placeAllowed);
   function panelSet() {
     const id = view().chordSet;
-    if ((id === 'chart' || id === 'everything') && !everyAllowed()) return PANEL_SETS[3];
+    if ((id === 'chart' || id === 'everything') && !everyAllowed()) return PANEL_SETS.find(p => p.id === 'extreme');
     return PANEL_SETS.find(p => p.id === id) || PANEL_SETS[0];
   }
   /* the next set the button gives */

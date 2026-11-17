@@ -2885,7 +2885,9 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
   .cc-card .cc-tune { width: 26px; height: 26px; top: -9px; left: -9px; }
   .cc-card .cc-tune svg { width: 14px; height: 14px; }
   .cc-card .cc-gold { width: 18px; height: 18px; top: -5px; left: 20px; }
-  .cc-card .cc-gold::after { width: 8px; height: 8px; }
+  .cc-card .cc-gold.on { width: auto; padding: 0 5px 0 4px; gap: 3px; }
+  .cc-card .cc-gdot { width: 8px; height: 8px; }
+  .cc-card .cc-gword { font-size: 9px; }
   .cc-card .cc-rhy { width: 26px; height: 26px; margin-left: -13px; bottom: -17px; }
   .cc-card .cc-rhy svg { width: 16px; height: 16px; }
   .cc-dots { top: 21px; }
@@ -2924,11 +2926,14 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .cc-cbtn:hover { background: var(--paper-2); }
 .cc-tune { top: -11px; left: -11px; width: 30px; height: 30px; }
 .cc-tune svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
-.cc-gold { top: -6px; left: 23px; width: 21px; height: 21px; }
-.cc-gold::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--hairline-2); transition: background .13s, box-shadow .13s; }
-.cc-gold:hover::after { background: #E9C44A; }
+.cc-gold { top: -6px; left: 23px; width: 21px; height: 21px; border-radius: 999px; display: flex; align-items: center; justify-content: center; gap: 4px; }
+.cc-gdot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--hairline-2); transition: background .13s, box-shadow .13s; }
+.cc-gold:hover .cc-gdot { background: #E9C44A; }
 .cc-gold.on, .cc-gold.on:hover { background: #FFF5D1; box-shadow: 0 0 0 2px var(--gold), 0 0 14px 4px rgba(245,184,0,.7); }
-.cc-gold.on::after { background: var(--gold); box-shadow: 0 0 6px 1px var(--gold); }
+.cc-gold.on .cc-gdot { background: var(--gold); box-shadow: 0 0 6px 1px var(--gold); }
+/* on (2026-11-16, user): it says "compare", so several lit read as the chords to compare */
+.cc-gold.on { width: auto; padding: 0 7px 0 5px; }
+.cc-gword { font-size: 10.5px; font-weight: 900; line-height: 1; letter-spacing: .02em; color: #7A5C00; white-space: nowrap; }
 .cc-rhy { bottom: -19px; left: 50%; margin-left: -15px; width: 30px; height: 30px; }   /* clear of the card's letter name */
 .cc-rhy svg { width: 18px; height: 18px; }
 .pw-body svg.cc-note8 { stroke: none; }
@@ -3034,12 +3039,10 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .fx-big { font-family: var(--font-block); font-size: 42px; font-weight: 600; line-height: 1; color: var(--ink); white-space: nowrap; }
 .fx-big.notes { font-family: var(--font); font-size: 26px; font-weight: 900; letter-spacing: .04em; color: var(--ink-2); }
 .fx-small { font-family: var(--font-block); font-size: 21px; font-weight: 600; color: var(--ink-3); white-space: nowrap; }
-.fx-lock { margin-left: auto; }
-.fx-lock .seg-btn { display: inline-flex; align-items: center; gap: 7px; }
-.fx-lock svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; }
-.fx-lock .seg-btn.active svg rect { fill: currentColor; fill-opacity: .15; }
-.fx-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 10px 22px 30px; min-height: 0; }
-.fx-stage { position: relative; flex: none; max-width: 100%; }
+.fx-main { flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 14px; padding: 12px 22px 30px; }
+.fx-main > :first-child { margin-top: auto; }      /* centred while it fits; never pushed up past the top (2026-11-16: the */
+.fx-main > :last-child { margin-bottom: auto; }    /*   comparing names rode up into the head when the window was short) */
+.fx-stage { position: relative; flex: none; width: min(var(--sw, 560px), 100%); }
 .fx-staff { display: block; width: 100%; height: auto; flex: none; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
 .pw-body svg.fx-staff { stroke: none; }   /* the app's svg[viewbox] { stroke } would outline every shape (it outranks a bare class) */
 .fx-staff.nudge { animation: fx-nudge .28s; }
@@ -3072,21 +3075,85 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 .fx-acc { width: 44px; height: 40px; border-radius: 11px; background: var(--paper-2); font-size: 22px; font-weight: 900; color: var(--ink-2); }
 .fx-acc.on { background: var(--edit); color: #fff; }
 .fx-none { margin: auto; color: var(--ink-3); font-weight: 800; }
-/* COMPARING (2026-10-30, user): the gold chords beside the one gone into — each named over its notes (a tap: the
-   one being changed, its band behind it), a dot on a chord changed; Let me Decide asks Save or Save as New for each */
-.fx-comparing { padding: 5px 11px; border-radius: 999px; background: #FFF5D1; box-shadow: inset 0 0 0 1.5px var(--gold); font-size: 12.5px; font-weight: 900; color: #7A5C00; white-space: nowrap; }
-.fx-cols { position: relative; height: 40px; }
-.fx-col {
-  position: absolute; top: 2px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 12px;
-  border-radius: 11px; background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--hairline-2), inset 0 -4px 0 var(--c); white-space: nowrap;
-  transition: background .13s, box-shadow .13s, color .13s;
+/* THE CHORD EDITOR (2026-11-16, user): the staff and the chord's buttons side by side, Key · Chromatic under the staff */
+.fx-edit { display: flex; align-items: center; justify-content: center; gap: 22px; width: 100%; flex-wrap: wrap; }
+/* the staff as wide as it is drawn, the window's width — and short enough to leave the keyboard in view (a staff never under 250 px tall) */
+.fx-left { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 0 1 auto; min-width: 0;
+  width: min(var(--sw, 560px), 100%, max(calc(250px * var(--ar, 1.35)), calc((min(880px, 92vh) - 420px) * var(--ar, 1.35)))); }
+.fx-left .fx-stage { width: 100%; }
+.fx-movebar { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 12px; }
+.fx-movesay { font-size: 13px; font-weight: 800; color: var(--ink-3); white-space: nowrap; }
+.fx-mode .seg-btn { padding: 7px 14px; font-size: 13.5px; }
+.fx-movebar .fx-accs { margin-left: 0; }
+.fx-movebar .fx-acc { width: 38px; height: 34px; font-size: 19px; }
+.fx-mods { flex: 0 0 auto; width: 248px; display: flex; flex-direction: column; gap: 12px; padding: 14px 14px 12px; border-radius: 18px; background: var(--paper-2); }
+.fx-mgroup { display: flex; flex-direction: column; gap: 6px; }
+.fx-mlabel { font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.fx-mrow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.fx-mod {
+  height: 40px; min-width: 0; padding: 0 2px; border-radius: 11px; background: var(--surface); color: var(--ink-2);
+  font-size: 13.5px; font-weight: 900; box-shadow: inset 0 0 0 1.5px var(--hairline-2); transition: background .12s, color .12s, box-shadow .12s;
 }
-.fx-col:hover { box-shadow: inset 0 0 0 2px var(--c), inset 0 -4px 0 var(--c); }
-.fx-col.cur { background: var(--c); color: var(--cink); box-shadow: inset 0 -3px 0 rgba(0,0,0,.16), 0 2px 6px rgba(43,29,56,.18); }
-.fx-col.gold:not(.cur) { box-shadow: inset 0 0 0 2px var(--gold), inset 0 -4px 0 var(--c); }
-.fx-col.sounding { transform: translateX(-50%) scale(1.12); }
-.fx-cname { font-family: var(--font-block); font-size: 19px; font-weight: 600; line-height: 1; }
-.fx-cname.notes { font-family: var(--font); font-size: 13px; font-weight: 900; }
+.fx-mod:hover { box-shadow: inset 0 0 0 2px var(--accent); color: var(--ink); }
+.fx-mod.on { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(156,22,142,.3); }
+.fx-mod { display: inline-flex; align-items: center; justify-content: center; }
+.fx-mod .figs { display: inline-flex; flex-direction: column; justify-content: center; line-height: .95; font-size: 12px; }
+.fx-mod .figs i { font-style: normal; }
+.fx-msay { margin: 0; min-height: 34px; font-size: 12.5px; font-weight: 700; line-height: 1.35; color: var(--ink-3); }
+.fx-msay b { color: var(--accent); }
+.fx-msay .figs { display: inline-flex; flex-direction: column; vertical-align: middle; line-height: .9; font-size: 10px; }
+.fx-msay .figs i { font-style: normal; }
+.fx-name .fx-cdot { align-self: center; }
+.fx-wk.sel, .fx-bk.sel { box-shadow: inset 0 0 0 3px var(--edit); }
+.fx-tochart { height: 40px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 900; color: var(--accent); background: none; }
+.fx-tochart:hover { background: var(--accent-soft); }
+/* THE SMALLER WINDOW: a chord in the music (2026-11-16, user) — its name and Notes · Rhythm in the window's head */
+.pw-slot { display: none; }
+#prog-sheet.compact .sheet.prog-sheet { max-width: 860px; height: min(700px, 92vh); }   /* one height for Notes and Rhythm: the tabs stay put */
+#prog-sheet.compact .pw-head h2, #prog-sheet.compact .pw-song, #prog-sheet.compact .pw-tabs, #prog-sheet.compact .pw-compare { display: none; }
+#prog-sheet.compact .pw-slot { display: block; flex: 1; min-width: 0; }
+.fx-slot { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.fx-slot .fx-chip { width: 36px; height: 36px; border-radius: 11px; }
+.fx-slot .fx-big { font-size: 32px; }
+.fx-slot .fx-small { font-size: 17px; }
+.fx-slot .fx-tabs { margin-left: auto; }
+.fx-tabs .seg-btn { padding: 8px 18px; font-size: 14.5px; }
+#prog-sheet.compact .fx-main { padding: 14px 18px 26px; gap: 12px; }
+#prog-sheet.compact .fx-keys { height: 70px; width: min(760px, 100%); }
+#prog-sheet.compact .fx-edit { gap: 16px; }
+.pw-body.fx-rhy { display: block; overflow-y: auto; }
+.fx-rhythm .cr-panel { margin: 14px 16px 16px; }
+.cr-follow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0 0 10px; font-size: 14px; font-weight: 800; color: var(--ink-2); }
+.cr-whose { line-height: 1.6; }
+.cr-whose .cr-chip { display: inline-block; vertical-align: middle; margin: 0 2px; }
+.cr-whose.own { padding: 4px 11px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.cr-whose-hint { font-weight: 700; color: var(--ink-3); }
+/* COMPARE (2026-11-16, user): the gold chords side by side, each named over its notes — the names placed by the staff's own numbers */
+.pw-compare {
+  display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 8px 0 15px; border-radius: 999px; flex: none;
+  background: #FFF5D1; color: #6B5000; font-size: 14px; font-weight: 900; box-shadow: inset 0 0 0 2px var(--gold), 0 0 12px 2px rgba(245,184,0,.45);
+}
+.pw-compare[hidden] { display: none; }
+.pw-compare:hover { background: #FFEDB0; }
+.pw-compare.active { background: var(--gold); color: #3D2E00; }
+.pw-cmp-n { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--gold); color: #3D2E00; font-size: 12.5px; line-height: 22px; text-align: center; }
+.pw-compare.active .pw-cmp-n { background: #fff; }
+.cx-head { gap: 12px; }
+.cx-title { margin: 0; font-family: var(--font-round); font-size: 24px; font-weight: 700; color: var(--ink); }
+.cx-count { padding: 5px 11px; border-radius: 999px; background: #FFF5D1; box-shadow: inset 0 0 0 1.5px var(--gold); font-size: 12.5px; font-weight: 900; color: #7A5C00; white-space: nowrap; }
+.cx-stage { position: relative; flex: none; width: min(var(--sw, 900px), 100%, max(calc(250px * var(--ar, 2.6)), calc((min(880px, 92vh) - 470px) * var(--ar, 2.6)))); }
+.cx-names { position: relative; height: 46px; }
+.cx-name {
+  position: absolute; top: 4px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 13px;
+  border-radius: 11px; background: var(--surface); color: var(--ink); white-space: nowrap;
+  box-shadow: inset 0 0 0 2px var(--gold), inset 0 -4px 0 var(--c); transition: background .13s, box-shadow .13s, color .13s, transform .13s;
+}
+.cx-name:hover { box-shadow: inset 0 0 0 2.5px var(--c), inset 0 -4px 0 var(--c); }
+.cx-name.cur { background: var(--c); color: var(--cink); box-shadow: inset 0 -3px 0 rgba(0,0,0,.16), 0 2px 6px rgba(43,29,56,.18); }
+.cx-name.sounding { transform: translateX(-50%) scale(1.12); }
+.cx-cname { font-family: var(--font-block); font-size: 20px; font-weight: 600; line-height: 1; }
+.cx-cname.notes { font-family: var(--font); font-size: 13px; font-weight: 900; }
+.cx-main { gap: 10px; }
 .fx-cdot { width: 8px; height: 8px; border-radius: 50%; background: var(--edit); box-shadow: 0 0 0 2px #fff; }
 .fx-band { fill: #F7EDF6; }
 .fx-inorder { display: inline-flex; align-items: center; gap: 6px; }
@@ -3102,10 +3169,16 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
 @media (max-width: 640px) {
   .fx-head { padding: 10px 14px; gap: 10px; }
   .fx-big { font-size: 34px; }
-  .fx-lock .seg-btn span { display: none; }
-  .fx-comparing { display: none; }
-  .fx-col { height: 30px; padding: 0 8px; }
-  .fx-cname { font-size: 15px; }
+  .cx-name { height: 30px; padding: 0 8px; }
+  .cx-cname { font-size: 15px; }
+  .fx-mods { width: 100%; }
+  .fx-slot .fx-big { font-size: 26px; }
+  .fx-slot .fx-small { display: none; }
+  .fx-tabs .seg-btn { padding: 7px 12px; }
+  .pw-compare { padding: 0 6px 0 11px; font-size: 13px; }
+  #prog-sheet.compact .pw-foot { flex-wrap: wrap; row-gap: 8px; }
+  #prog-sheet.compact .pw-foot .pw-gap { flex-basis: 100%; height: 0; }
+  #prog-sheet.compact .pw-foot .pw-gap ~ .btn { flex: 1; }
   .fx-main { padding: 8px 12px 26px; }
   .fx-keys { height: 76px; }
   .fx-kname { font-size: 9px; }
