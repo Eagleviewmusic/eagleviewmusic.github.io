@@ -1,0 +1,27 @@
+The recorded instruments in Virtual Keyboard 2.0
+
+Every note in these folders comes from two free sample libraries by
+Versilian Studios, both released under Creative Commons Zero (CC0 1.0):
+public domain, free for any use, no credit required. Credited here anyway.
+
+  VCSL — Versilian Community Sample Library
+  https://github.com/sgossner/VCSL
+    grand-piano      Grand Piano, Steinway B (Sus, close mics, velocity layer 3)
+    harpsichord      Harpsichord, English (Zuckermann kit, Normal)
+    pipe-organ       Pipe Organ (Quiet)
+    concert-harp     Concert Harp (mf)
+    vibraphone       Vibraphone (soft mallets)
+    concert-marimba  Marimba (Outrigger, medium)
+    xylophone        Xylophone (medium mallets, ff)
+
+  VSCO 2 CE — Versilian Studios Chamber Orchestra 2, Community Edition
+  https://github.com/sgossner/VSCO-2-CE
+    violins          Violin Section (sustain, vibrato)
+    flute            Flute (sustain, no vibrato)
+    trumpet          Trumpet (sustain)
+
+What was changed (by _build/build-samples.mjs): a few notes per instrument
+were kept (the keyboard bends the nearest one to fill the gaps), made mono,
+trimmed, shortened with a fade, looped where the sound is held, evened out
+in loudness, and saved as 112 kbps MP3. Each file is named for the note it
+really sounds (the libraries disagree on whether middle C is C3 or C4).

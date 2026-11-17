@@ -1,0 +1,77 @@
+/* ==========================================================================
+   EVM Count-in — the card
+   Authoritative copy: Claude Apps/EVM Library/evm-count-in.css; see the .js.
+
+   Everything here is stated outright rather than borrowed from the app it
+   sits in, so the card is the same card in all of them. It takes no
+   clicks: Stop, and anything else on the page, stays reachable under it.
+   ========================================================================== */
+
+.evm-count {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  pointer-events: none;
+  visibility: hidden;
+}
+.evm-count.open { visibility: visible; }
+
+.evm-count-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: min(300px, 100%);
+  max-width: 100%;
+  padding: 20px clamp(24px, 5vw, 46px) 22px;
+  border-radius: 28px;
+  background: #FFFFFF;
+  border: 1px solid rgba(22, 27, 45, .07);
+  box-shadow: 0 24px 70px rgba(22, 27, 45, .26), 0 3px 10px rgba(22, 27, 45, .10);
+  opacity: 0;
+  transform: translateY(10px) scale(.94);
+  transition: opacity .16s ease, transform .22s cubic-bezier(.2, .9, .3, 1.2);
+}
+.evm-count.open .evm-count-card { opacity: 1; transform: none; }
+.evm-count.leaving .evm-count-card {
+  opacity: 0;
+  transform: scale(1.04);
+  transition: opacity .18s ease, transform .18s ease;
+}
+
+.evm-count-title {
+  font: 800 13px/1 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #8B93A7;
+}
+
+.evm-count-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 3vw, 22px);
+}
+/* between two bars of a two-bar count */
+.evm-count-bar { width: clamp(4px, 1.6vw, 12px); }
+
+.evm-count-num {
+  min-width: .62em;
+  text-align: center;
+  font: 700 clamp(48px, 12vw, 96px)/1.05 'Baloo 2', 'Nunito', system-ui, sans-serif;
+  color: #E2E6EE;
+  transition: color .1s ease, opacity .1s ease, transform .2s cubic-bezier(.2, .9, .3, 1.5);
+}
+/* counted: keeps its colour, so the row fills up as the count goes */
+.evm-count-num.done { color: var(--c); opacity: .45; }
+/* the one being counted now */
+.evm-count-num.lit { color: var(--c); opacity: 1; transform: scale(1.24); }
+
+@media (prefers-reduced-motion: reduce) {
+  .evm-count-card,
+  .evm-count.leaving .evm-count-card { transform: none; transition: opacity .12s ease; }
+  .evm-count-num { transition: color .1s ease, opacity .1s ease; }
+  .evm-count-num.lit { transform: none; }
+}

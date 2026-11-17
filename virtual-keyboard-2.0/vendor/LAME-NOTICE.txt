@@ -1,0 +1,8 @@
+lame.min.js — lamejs 1.2.1 (https://github.com/zhuker/lamejs), a JavaScript port
+of the LAME MP3 encoder (https://lame.sourceforge.io). Used, unmodified, by the
+Virtual Keyboard's recorder to write MP3 files in the browser.
+
+LAME and lamejs are licensed under the GNU Lesser General Public License,
+version 3 (LGPL-3.0): https://www.gnu.org/licenses/lgpl-3.0.html
+This file is kept separate from the app's own code, as the LGPL asks, and may
+be replaced by any compatible build of lamejs.
