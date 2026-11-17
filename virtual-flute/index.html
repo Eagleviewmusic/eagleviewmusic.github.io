@@ -73,6 +73,84 @@
       height: 140px;
       display: block;
     }
+    /* The flute: a 3D model you can turn (flute-3d.js), or the flat drawing (Settings → Flute picture).
+       In 3D, updateScale gives the box whatever height the window has to spare. */
+    #fluteBox {
+      position: relative;
+      width: 1100px;
+      height: 240px;
+      border-radius: 14px;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #flute3d { position: absolute; inset: 0; }
+    #fluteBox #flute { position: absolute; left: 0; top: 50%; transform: translateY(-50%); }
+    #fluteBox.drawing { height: 140px; touch-action: auto; }
+    #fluteBox.drawing #flute3d, #fluteBox.drawing .view-bar, #fluteBox.drawing .f-hint, #fluteBox.drawing .f-note { display: none; }
+    #fluteBox:not(.drawing) #flute { display: none; }
+    .f-note {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      color: #6b7280;
+      pointer-events: none;
+    }
+    .f-hint {
+      position: absolute;
+      top: 6px;
+      left: 10px;
+      font-size: 12px;
+      color: #7b8794;
+      pointer-events: none;
+      transition: opacity 0.6s;
+    }
+    .f-hint.used, .parts .f-hint { opacity: 0; }
+    .f-apart {
+      position: absolute;
+      left: 10px;
+      top: 26px;
+      max-width: 380px;
+      padding: 5px 10px;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+      font-size: 12.5px;
+      line-height: 1.35;
+      color: #374151;
+      pointer-events: none;
+    }
+    .f-apart[hidden], #fluteBox.drawing .f-apart, #fluteBox.parts .f-apart { display: none; }   /* (Parts: the name tags need the top row) */
+    .view-bar {
+      position: absolute;
+      left: 50%;
+      bottom: 4px;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 4px;
+      padding: 3px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.78);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+    }
+    .view-bar button {
+      height: 24px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 9999px;
+      background: transparent;
+      font: 600 12px/1 system-ui, -apple-system, sans-serif;
+      color: #4b5563;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .view-bar button:hover { background: rgba(59, 110, 168, 0.12); }
+    .view-bar button[aria-pressed="true"] { background: #3b6ea8; color: #ffffff; }
+    .view-bar .sep { width: 1px; margin: 3px 2px; background: #d1d5db; }
+    .view-bar[hidden], .f-hint[hidden] { display: none; }
 
     /* The notes, laid out like a piano: low B at the left, sharps and flats on top between the letters */
     .note-pad {
@@ -235,6 +313,15 @@
     /* Opens the whole fingering chart */
     .chart-btn { right: 136px; min-width: 64px; }
     @media (max-width: 560px) { .chart-btn { display: none; } }   /* it is in Settings too */
+    /* 3D on/off: lit = the turnable 3D flute, dark = the flat drawing (also in Settings → Flute picture) */
+    .d3-btn { right: 208px; min-width: 52px; padding: 0 12px; }
+    .d3-btn[aria-pressed="true"] { background: #74B9FF; border-color: #74B9FF; color: #0f172a; }
+    .d3-btn[aria-pressed="true"]:hover { background: #9ccbff; color: #0f172a; }
+    .d3-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    /* narrower, the title needs the middle: 3D moves to the left, beside the back button */
+    @media (max-width: 660px) { .d3-btn { right: auto; left: 172px; } }
+    @media (max-width: 640px) { .d3-btn { left: 56px; } }   /* the back button is just the arrow now */
+    @media (max-width: 360px) { .d3-btn { min-width: 44px; padding: 0 8px; } }
 
     /* ----- the whole fingering chart, the page a band book prints ----- */
     .chart-sheet {
@@ -363,6 +450,7 @@
     .sp-ends { display: flex; justify-content: space-between; font-size: 11px; color: #9ca3af; }
     .sp-hint { margin-top: 3px; font-size: 11.5px; color: #6b7280; }
     .seg { display: flex; margin-top: 6px; border: 1.5px solid #d1d5db; border-radius: 9px; overflow: hidden; }
+    .seg[hidden] { display: none; }
     .seg button {
       flex: 1;
       padding: 7px 4px;
@@ -436,6 +524,7 @@
           Virtual Flute
         </h1>
     </a>
+    <button type="button" class="labels-btn d3-btn" id="d3Btn" aria-pressed="true" aria-label="3D flute" title="3D on: the flute you can turn round. Off: the flat drawing">3D</button>
     <button type="button" class="labels-btn chart-btn" id="chartBtn" title="The whole fingering chart">Chart</button>
     <button type="button" class="labels-btn" id="labelsBtn" aria-label="Flute labels: Keys">Keys</button>
     <button type="button" class="gear-btn" id="settingsBtn" title="Settings" aria-label="Settings" aria-expanded="false" aria-controls="settingsPanel">
@@ -450,7 +539,29 @@
           <svg id="staff" viewBox="0 0 260 170" role="img" aria-label="Staff"></svg>
           <svg id="chart" viewBox="50 36 902 278" role="img" aria-label="Fingering chart"></svg>
         </div>
-        <svg id="flute" viewBox="-34 56 1101 140" role="img" aria-label="Flute"></svg>
+        <div id="fluteBox">
+          <div id="flute3d" role="img" aria-label="A flute you can turn around"></div>
+          <svg id="flute" viewBox="-34 56 1101 140" role="img" aria-label="Flute"></svg>
+          <div class="f-note" id="fluteNote">Loading the flute…</div>
+          <div class="f-apart" id="apartHint" hidden>Twist gently as the joints come apart. Putting it back, turn them until the blue lines meet: the embouchure hole in line with the keys, the foot's rod with the middle of the last key on the body.</div>
+          <div class="f-hint" id="fluteHint">Drag to turn the flute · scroll or pinch to zoom · tap a key to see its name · double-click to put it back</div>
+          <div class="view-bar" id="viewBar" role="group" aria-label="Look at the flute from">
+            <button type="button" data-look="front" aria-pressed="true">Front</button>
+            <button type="button" data-look="player" aria-pressed="false">Player's view</button>
+            <button type="button" data-look="top" aria-pressed="false">Top</button>
+            <button type="button" data-look="under" aria-pressed="false">Under</button>
+            <button type="button" data-look="back" aria-pressed="false">Back</button>
+            <button type="button" data-look="foot" aria-pressed="false">Foot end</button>
+            <span class="sep" aria-hidden="true"></span>
+            <button type="button" data-look="head" aria-pressed="false" title="Close-up: the head joint">Head</button>
+            <button type="button" data-look="left" aria-pressed="false" title="Close-up: the left hand's keys">Left hand</button>
+            <button type="button" data-look="right" aria-pressed="false" title="Close-up: the right hand's keys">Right hand</button>
+            <button type="button" data-look="footkeys" aria-pressed="false" title="Close-up: the foot joint">Foot keys</button>
+            <span class="sep" aria-hidden="true"></span>
+            <button type="button" id="spinBtn" aria-pressed="false" title="Turn slowly by itself">⟳ Spin</button>
+            <button type="button" id="apartBtn" aria-pressed="false" title="Take the flute apart: head joint, body, foot joint">⇔ Apart</button>
+          </div>
+        </div>
         <div class="note-pad" id="notePad"></div>
         <div class="tip-area" id="tipArea" aria-live="polite"></div>
       </div>
@@ -466,6 +577,17 @@
       <div class="view-choice" role="radiogroup" aria-label="Notes to show">
         <button type="button" role="radio" data-view="first"><b>First notes</b><small>F to high B♭, the B♭ scale, keys 1 to 0</small></button>
         <button type="button" role="radio" data-view="chromatic"><b>Every note</b><small>Low B to top C, with every sharp and flat</small></button>
+      </div>
+    </div>
+    <div class="sp-section">
+      <h3>Flute picture</h3>
+      <div class="seg" role="radiogroup" aria-label="Flute picture" id="pictureSeg">
+        <button type="button" role="radio" data-picture="3d">3D: turn it round</button>
+        <button type="button" role="radio" data-picture="drawing">Flat drawing</button>
+      </div>
+      <div class="seg" role="radiogroup" aria-label="3D detail" id="detailSeg" style="margin-top: 8px">
+        <button type="button" role="radio" data-detail="high">Mirror reflections</button>
+        <button type="button" role="radio" data-detail="low">Simple (faster)</button>
       </div>
     </div>
     <div class="sp-section">
@@ -622,11 +744,13 @@
       try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; }
     }
     function saveSettings() {
-      try { localStorage.setItem(STORE_KEY, JSON.stringify({ version: 1, view, labels: labelView, sound: soundSettings })); } catch (e) { /* private window */ }
+      try { localStorage.setItem(STORE_KEY, JSON.stringify({ version: 1, view, labels: labelView, picture, detail, sound: soundSettings })); } catch (e) { /* private window */ }
     }
     const saved = loadSettings();
     let view = saved.view === 'first' ? 'first' : 'chromatic';
-    let labelView = ['fingers', 'names'].includes(saved.labels) ? saved.labels : 'keys';   // what the flute's keys say
+    let labelView = ['fingers', 'names', 'parts'].includes(saved.labels) ? saved.labels : 'keys';   // what the flute's keys say (Parts: 3D only)
+    let picture = saved.picture === 'drawing' ? 'drawing' : '3d';   // the 3D flute, or the flat drawing
+    let detail = saved.detail === 'low' ? 'low' : 'high';            // 3D: the flute mirrored in itself, or the studio only (slow computers)
     let keyMap = {};   // e.code -> pitch, for the view on screen
 
     // Which fingering each note shows, when it has more than one (kept while the page is open)
@@ -1282,7 +1406,78 @@
       out += eFlatMarkup(keys.has('Eb'), paint, eFlatOpen) + littleFingerKeys(keys, paint);
       svg.innerHTML = out;
       svg.setAttribute('aria-label', note ? `Fingering for ${note.name}` : 'Flute');
+      if (flute3d) flute3d.setKeys(keys, note ? note.color : null, note && note.sharp ? note.upperColor : null);
     }
+
+    // ----- the 3D flute -----
+    // flute-3d.js draws the whole flute in 3D (three.js, kept in lib/ so nothing loads from another site). This page
+    // only tells it which keys a fingering presses (it works out the linked cups itself), the note's colour, and what
+    // to label. If it cannot start (no WebGL), the flat drawing above takes its place.
+    const fluteBox = document.getElementById('fluteBox');
+    const fluteNote = document.getElementById('fluteNote');
+    const viewBar = document.getElementById('viewBar');
+    const spinBtn = document.getElementById('spinBtn');
+    const LABEL_MODES = { keys: 'off', fingers: 'fingers', names: 'names', parts: 'parts' };
+    let flute3d = null, flute3dFailed = false, spinning = false;
+    function markLook(name) {
+      viewBar.querySelectorAll('[data-look]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.look === name)));
+    }
+    // Two ways in. On a web address the page loads flute-3d.js itself (an ES module). A page opened by double-click
+    // (file://) is not allowed to load modules, so there, and anywhere the module fails, it loads flute-3d.bundle.js:
+    // the same code and three.js as ONE ordinary script. Rebuild it after every edit of flute-3d.js
+    // (sh _tools/build-bundle.sh).
+    function loadBundle() {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'flute-3d.bundle.js';
+        s.onload = () => (window.Flute3D && window.Flute3D.createFlute)
+          ? resolve(window.Flute3D) : reject(new Error('flute-3d.bundle.js loaded without createFlute'));
+        s.onerror = () => reject(new Error('flute-3d.bundle.js could not be loaded'));
+        document.head.appendChild(s);
+      });
+    }
+    let loading3d = null;
+    function start3d() {
+      if (flute3d || flute3dFailed || loading3d) return;
+      loading3d = (location.protocol === 'file:' ? loadBundle() : import('./flute-3d.js').catch(loadBundle)).then(m => {
+        flute3d = m.createFlute(document.getElementById('flute3d'), { labels: LABEL_MODES[labelView], view: 'front', reflections: detail });
+        fluteNote.remove();
+        if (flute3d.onViewChange) flute3d.onViewChange(() => {
+          markLook(null);
+          document.getElementById('fluteHint').classList.add('used');
+        });
+        window.flute3d = flute3d;
+        updateScale();
+        showNote(shownNote);
+      }).catch(err => {
+        console.warn('[Virtual Flute] the 3D flute could not start:', err);
+        flute3dFailed = true;
+        setPicture('drawing', true);
+      });
+    }
+    viewBar.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b || !flute3d) return;
+      if (b.id === 'apartBtn') {
+        const on = b.getAttribute('aria-pressed') !== 'true';
+        b.setAttribute('aria-pressed', String(on));
+        flute3d.setApart(on);
+        document.getElementById('apartHint').hidden = !on;
+        return;
+      }
+      if (b === spinBtn) {
+        spinning = !spinning;
+        spinBtn.setAttribute('aria-pressed', String(spinning));
+        flute3d.setAutoRotate(spinning);
+        if (spinning) markLook(null);
+        return;
+      }
+      flute3d.setView(b.dataset.look);
+      markLook(b.dataset.look);
+    });
+    // Double-click on the flute puts it back to the front view (flute-3d.js does the move)
+    fluteBox.addEventListener('dblclick', e => { if (!e.target.closest('.view-bar')) markLook('front'); });
+    fluteBox.addEventListener('keydown', e => { if (e.key === 'Home' && e.target.closest('#flute3d')) markLook('front'); });
 
     // ----- the printed chart's symbol for the same fingering -----
     // The common flute fingering chart, in the units of the chart the app was designed from (it lies the way the flute
@@ -1614,23 +1809,26 @@
     document.body.addEventListener('pointerdown', e => {
       if (e.target.closest('.settings-panel, #app-header, .chart-sheet')) return;
       if (!e.target.closest('.note-btn')) closeSettings();
-      if (!e.target.closest('.note-btn, .alt-btn')) showNote(null);
+      if (!e.target.closest('.note-btn, .alt-btn, #fluteBox')) showNote(null);
     });
 
     // ----- the Keys / Fingers / Names button -----
-    const LABEL_VIEWS = { keys: 'Keys', fingers: 'Fingers', names: 'Names' };
+    const LABEL_VIEWS = { keys: 'Keys', fingers: 'Fingers', names: 'Names', parts: 'Parts' };   // Parts: the 3D flute's part names
     const labelsBtn = document.getElementById('labelsBtn');
     function showLabelButton() {
       labelsBtn.textContent = LABEL_VIEWS[labelView];
       labelsBtn.setAttribute('aria-label', `Flute labels: ${LABEL_VIEWS[labelView]}`);
     }
     labelsBtn.addEventListener('click', () => {
-      const order = Object.keys(LABEL_VIEWS);
+      const order = picture === '3d' && !flute3dFailed ? Object.keys(LABEL_VIEWS) : ['keys', 'fingers', 'names'];
       labelView = order[(order.indexOf(labelView) + 1) % order.length];
       showLabelButton();
       saveSettings();
+      fluteBox.classList.toggle('parts', labelView === 'parts');   // the name tags need the hint's corner
+      if (flute3d) flute3d.setLabels(LABEL_MODES[labelView]);
       showNote(shownNote);
     });
+    fluteBox.classList.toggle('parts', labelView === 'parts');
     showLabelButton();
 
     // ----- the whole fingering chart -----
@@ -1757,6 +1955,41 @@
     settingsPanel.querySelectorAll('[data-view]').forEach(b =>
       b.addEventListener('click', () => setView(b.dataset.view)));
 
+    // Flute picture: the 3D flute or the flat drawing (the 3D button at the top, or Settings → Flute picture)
+    const d3Btn = document.getElementById('d3Btn');
+    function setPicture(p, quiet) {
+      picture = p === 'drawing' ? 'drawing' : '3d';
+      if (picture === '3d' && flute3dFailed) picture = 'drawing';
+      fluteBox.classList.toggle('drawing', picture === 'drawing');
+      if (picture === 'drawing' && labelView === 'parts') { labelView = 'keys'; showLabelButton(); if (flute3d) flute3d.setLabels('off'); fluteBox.classList.remove('parts'); }
+      settingsPanel.querySelectorAll('[data-picture]').forEach(b => {
+        b.setAttribute('aria-checked', String(b.dataset.picture === picture));
+        if (b.dataset.picture === '3d') b.disabled = flute3dFailed;
+      });
+      d3Btn.setAttribute('aria-pressed', String(picture === '3d'));
+      d3Btn.disabled = flute3dFailed;
+      d3Btn.title = flute3dFailed ? 'The 3D flute cannot start on this computer, so the flat drawing is shown'
+        : picture === '3d' ? '3D is on: click for the flat drawing' : '3D is off: click for the flute you can turn round';
+      if (!quiet) saveSettings();
+      if (picture === '3d') start3d();
+      setDetail(detail);
+      if (spinning && flute3d) flute3d.setAutoRotate(picture === '3d');
+      updateScale();
+      showNote(shownNote);
+    }
+    settingsPanel.querySelectorAll('[data-picture]').forEach(b =>
+      b.addEventListener('click', () => setPicture(b.dataset.picture)));
+    d3Btn.addEventListener('click', () => setPicture(picture === '3d' ? 'drawing' : '3d'));
+    // 3D detail: the slower computers can turn the mirror reflections off (the 3D flute also does so by itself if it gets slow)
+    function setDetail(d) {
+      detail = d === 'low' ? 'low' : 'high';
+      settingsPanel.querySelectorAll('[data-detail]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.detail === detail)));
+      document.getElementById('detailSeg').hidden = picture !== '3d' || flute3dFailed;
+      if (flute3d) flute3d.setQuality(detail);
+    }
+    settingsPanel.querySelectorAll('[data-detail]').forEach(b =>
+      b.addEventListener('click', () => { setDetail(b.dataset.detail); saveSettings(); }));
+
     function setSound(key, value) {
       soundSettings[key] = value;
       saveSettings();
@@ -1855,6 +2088,7 @@
     // The rows close up when the window is short, so the instrument stays as big as it can be, and share out
     // whatever height is left over when the width is what limits the size.
     const ROW_GAP_MIN = 6, ROW_GAP_EXTRA = 22;
+    const F_MIN = 230;   // the 3D flute's box: at least this tall, and it takes whatever height is spare
     function updateScale() {
       const outer = document.getElementById('scaling-outer');
       const wrapper = document.getElementById('scaling-wrapper');
@@ -1865,6 +2099,23 @@
       document.getElementById('settingsPanel').style.top = headerHeight + 'px';
 
       wrapper.style.gap = ROW_GAP_MIN + 'px';
+      if (picture === '3d') {
+        fluteBox.style.height = F_MIN + 'px';
+        const baseHeight = wrapper.offsetHeight || 640;
+        const designWidth = wrapper.offsetWidth || 1100;
+        const availableHeight = window.innerHeight - headerHeight - 14;
+        const availableWidth = window.innerWidth - 16;
+        const fMax = window.innerHeight > window.innerWidth ? 640 : 560;   // (a flute is long and thin: more height is only blank page)
+        const widthScale = availableWidth / designWidth;
+        const room = availableHeight / widthScale - (baseHeight - F_MIN);   // what the flute could have at full width
+        let scale = widthScale, height = Math.min(room, fMax);
+        if (room < F_MIN) { scale = availableHeight / baseHeight; height = F_MIN; }
+        fluteBox.style.height = Math.round(height) + 'px';
+        outer.style.transform = `scale(${Math.max(0.1, scale)})`;
+        if (flute3d) flute3d.resize();
+        return;
+      }
+      fluteBox.style.height = '';
       const designHeight = wrapper.offsetHeight || 540;
       const designWidth = wrapper.offsetWidth || 1100;
       const availableHeight = window.innerHeight - headerHeight - 16;
@@ -1876,7 +2127,7 @@
     }
     window.addEventListener('resize', updateScale);
     window.addEventListener('load', updateScale);
-    updateScale();
+    setPicture(picture, true);   // the 3D flute (or the drawing), then the first layout
   </script>
 </body>
 </html>
