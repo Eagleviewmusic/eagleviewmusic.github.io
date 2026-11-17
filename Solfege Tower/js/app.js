@@ -320,6 +320,12 @@
       releaseKey(key);
     });
 
+    // Embedded (Google Sites, another page): the notes cancel their mousedown / touchstart, and a
+    // cancelled press does not give the frame the keyboard, so the hotkeys went to the outside page
+    // even after a note was clicked. Any press inside the frame now takes the keyboard, as the
+    // original Melody and Chord Towers did with window.focus() (lost in the merge; found 2026-11-16).
+    if (inIframe) document.addEventListener('pointerdown', () => { if (!document.hasFocus()) window.focus(); }, true);
+
     document.addEventListener('mouseup', () => KINDS.forEach(k => towers[k].mouseUpAnywhere()));
     document.addEventListener('touchend', (e) => KINDS.forEach(k => towers[k].touchEnd(e)));
     document.addEventListener('touchcancel', (e) => KINDS.forEach(k => towers[k].touchEnd(e)));
