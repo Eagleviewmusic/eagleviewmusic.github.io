@@ -716,18 +716,21 @@
     // Where each finger goes: the centre of its pad, which side it reaches in from, its size and tilt.
     // The left hand's fingers come in from the left, the right hand's from the right.
     const FINGERS = {
-      1: { x: 68, y: 214, side: -1, size: 1, tilt: -5 },
-      2: { x: 68, y: 247, side: -1, size: 1 },
-      3: { x: 68, y: 280, side: -1, size: 1 },
-      4: { x: 68, y: 313, side: 1, size: 1 },
-      5: { x: 68, y: 342, side: 1, size: 0.95 },
-      6: { x: 67, y: 368, side: 1, size: 0.92 },
-      7: { x: 68, y: 399, side: 1, size: 0.88, tilt: -14 },
+      1: { x: 68, y: 214, side: -1, size: 1, tilt: -7 },
+      2: { x: 68, y: 247, side: -1, size: 1, tilt: -1 },
+      3: { x: 68, y: 280, side: -1, size: 1, tilt: 6 },
+      4: { x: 68, y: 313, side: 1, size: 1, tilt: 5 },
+      5: { x: 68, y: 342, side: 1, size: 0.95, tilt: 1 },
+      6: { x: 67, y: 368, side: 1, size: 0.92, tilt: -3 },
+      7: { x: 68, y: 399, side: 1, size: 0.88, tilt: -13 },
     };
-    // A finger reaching in from the left, its pad centred on (0, 0)
-    const FINGER_PATH = 'M2,-16 C11,-16 16,-8 16,1 C16,10 10,16 1,16 C-6,16 -10,12 -13,8 ' +
-      'C-19,6 -27,6 -33,6.5 C-38,7 -39.5,3.5 -39.5,1 C-39.5,-2.5 -37,-5 -33,-5 ' +
-      'C-24,-5 -17,-8 -12,-13 C-9,-15.5 -4,-16 2,-16 Z';
+    // A cartoon finger reaching in from the left, its tip centred on (0, 0): a plump sausage with a rounded tip,
+    // a fingernail over the hole and two knuckle creases further back
+    const FINGER_PATH = 'M-33,-11.5 C-22,-12 -8,-12.6 3,-12.6 C11,-12.6 16,-7 16,0 C16,7 11,12.6 3,12.6 ' +
+      'C-8,12.6 -22,12 -33,11.5 C-37.5,11.3 -39.5,6 -39.5,0 C-39.5,-6 -37.5,-11.3 -33,-11.5 Z';
+    const FINGER_NAIL = 'M5,-7.2 C9.5,-8.2 13.6,-5 13.6,0 C13.6,5 9.5,8.2 5,7.2 C3.5,4 3.5,-4 5,-7.2 Z';
+    const FINGER_CREASES = 'M-27,-5.2 C-25.3,-2 -25.3,2 -27,5.2 M-22.5,-3.6 C-21.4,-1.4 -21.4,1.4 -22.5,3.6';
+    const NAME_AT = -8;                  // how far back from the tip the note's name sits, between nail and knuckle
     // The small hole of each double hole: what stays open when only the big hole is covered
     const SMALL_HOLES = {
       6: '<circle cx="72.5" cy="369" r="2.7" />',
@@ -824,22 +827,35 @@
       let out = recorderBody() + thumbHole(fingering.thumb);
 
       if (note && down.length) {
-        // Outlines first, then the colour on top, so touching fingers read as one hand
-        const fill = note.sharp ? 'url(#sharpFill)' : note.color;
+        // Each finger is its own cartoon finger: colour, a bold outline, then its nail and knuckle creases
         const edge = darken(mix(note.color, note.upperColor, 0.5), 0.62);
         if (note.sharp) {
           out += `<defs><linearGradient id="sharpFill" gradientUnits="userSpaceOnUse" x1="0" y1="${FINGER_BOTTOM}" x2="0" y2="${FINGER_TOP}">
             <stop offset="0" stop-color="${note.color}" /><stop offset="1" stop-color="${note.upperColor}" /></linearGradient></defs>`;
         }
-        const fingerPaths = down.map(h => `<path d="${FINGER_PATH}" transform="${fingerTransform(FINGERS[h])}" />`).join('');
-        out += `<g fill="${edge}" stroke="${edge}" stroke-width="3.4" stroke-linejoin="round">${fingerPaths}</g>`;
-        if (note.sharp) {
-          // One blend down the whole hand: the fingers cut it out of a rectangle
-          out += `<clipPath id="fingerClip">${fingerPaths}</clipPath>
-            <rect x="0" y="${FINGER_TOP - 10}" width="145" height="${FINGER_BOTTOM - FINGER_TOP + 20}" fill="${fill}" clip-path="url(#fingerClip)" />`;
-        } else {
-          out += `<g fill="${fill}">${fingerPaths}</g>`;
-        }
+        // The finger that carries the note's name: the lowest one covering its whole hole
+        // (never a half hole, where the name would hide the little open hole)
+        const full = down.filter(h => fingering.holes[h - 1] === 2);
+        const named = (full.length ? full : down).pop();
+        down.forEach(h => {
+          const f = FINGERS[h], t = fingerTransform(f);
+          // A two-letter name (F♯) needs the room the knuckle creases take
+          const creases = h === named && note.name.length > 1 ? '' : `<path d="${FINGER_CREASES}" stroke-width="1.4" />`;
+          const skin = note.sharp ? colorAt(note, f.y) : note.color;
+          const shape = `<path d="${FINGER_PATH}" transform="${t}" />`;
+          if (note.sharp) {
+            // One blend down the whole hand: each finger cuts its piece out of a rectangle
+            out += `<clipPath id="fingerClip${h}">${shape}</clipPath>
+              <rect x="0" y="${FINGER_TOP - 10}" width="145" height="${FINGER_BOTTOM - FINGER_TOP + 20}" fill="url(#sharpFill)" clip-path="url(#fingerClip${h})" />`;
+          } else {
+            out += `<g fill="${skin}">${shape}</g>`;
+          }
+          out += `<g transform="${t}" fill="none" stroke="${edge}" stroke-linecap="round" stroke-linejoin="round">
+              <path d="${FINGER_PATH}" stroke-width="2.2" />
+              <path d="${FINGER_NAIL}" fill="${mix(skin, '#ffffff', 0.6)}" stroke-width="1.3" />
+              ${creases}
+            </g>`;
+        });
 
         // Half holes: the small hole stays open
         [6, 7].filter(h => fingering.holes[h - 1] === 1).forEach(h => {
@@ -851,12 +867,12 @@
             </g>`;
         });
 
-        // The note's name goes on the lowest finger that covers its whole hole
-        // (never on a half hole, where it would hide the little open hole)
-        const full = down.filter(h => fingering.holes[h - 1] === 2);
-        const low = FINGERS[(full.length ? full : down).pop()];
+        const low = FINGERS[named];
         const pad = note.sharp ? colorAt(note, low.y) : note.color;
-        out += `<text x="${low.x}" y="${low.y + 6.5}" font-family="Arial, Helvetica, sans-serif" font-weight="bold"
+        // It sits on the finger behind the nail, following the finger's tilt
+        const along = -low.side * low.size * NAME_AT, tilt = (low.tilt || 0) * Math.PI / 180;
+        const nameX = (low.x + along * Math.cos(tilt)).toFixed(1), nameY = (low.y + along * Math.sin(tilt)).toFixed(1);
+        out += `<text x="${nameX}" y="${+nameY + 6.5}" font-family="Arial, Helvetica, sans-serif" font-weight="bold"
           font-size="${note.sharp ? 16 : 19}" text-anchor="middle" fill="${textColorOn(pad)}">${nameMarkup(note.name)}</text>`;
       } else if (note) {
         // No fingers down at all: name the note beside the recorder instead
