@@ -21,7 +21,7 @@ const CLIP_MARK = 'walbys-pdf-generator:items:';
 const PREF_KEY = 'walbys-pdf-generator:prefs';
 const TYPE_NAMES = { image: 'Photo', pdfpage: 'PDF page', text: 'Text', line: 'Line', rect: 'Rectangle',
   ellipse: 'Ellipse', pen: 'Drawing' };
-const TOOL_NAMES = { pen: 'Freehand', line: 'Line', arrow: 'Arrow', rect: 'Rectangle', ellipse: 'Ellipse', text: 'Text' };
+const TOOL_NAMES = { pen: 'Freehand', line: 'Line', arrow: 'Arrow', rect: 'Rectangle', ellipse: 'Ellipse', text: 'Text', cut: 'Cut away' };
 
 const S = {
   doc: null,
@@ -34,6 +34,7 @@ const S = {
   guides: true,
   snap: [],
   editing: null,     // id of the text box being typed in
+  cut: null,         // the Cut tool's box { x0, y0, x1, y1 } on this page, or null
   style: {
     stroke: '#1f1f1f', fill: 'none', width: 2, dash: 'solid', radius: 0,
     font: 'sans', size: 24, bold: false, italic: false, align: 'left', color: '#1f1f1f',
@@ -125,7 +126,9 @@ function checkpoint(key = null) {
 function restore(snap) {
   const o = JSON.parse(snap);
   S.doc = o.doc;
+  const was = S.page;
   S.page = clamp(o.page, 0, S.doc.pages.length - 1);
+  if (S.page !== was) S.cut = null;
   S.sel = o.sel.filter((id) => findItem(id));
   coalesceKey = null;
   changed();
@@ -233,7 +236,190 @@ function renderOverlay() {
     const a = drag.start, b = drag.cur;
     s += `<rect x="${Math.min(a.x, b.x)}" y="${Math.min(a.y, b.y)}" width="${Math.abs(b.x - a.x)}" height="${Math.abs(b.y - a.y)}" fill="rgba(47,107,255,.08)" stroke="#2f6bff" stroke-width="${px}"/>`;
   }
+  if (S.tool === 'cut') s += cutOverlay(px);
   gOver.innerHTML = s;
+}
+
+/* ---------------- the Cut tool's box ---------------- */
+const CUT_RED = '#d92d20';
+const CUT_TIP = 'Delete cuts it away  ·  Shift+Delete also closes the gap';
+let tipWidth = 0;
+function measureTip() {
+  if (!tipWidth) {
+    const g = document.createElement('canvas').getContext('2d');
+    g.font = '600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+    tipWidth = Math.ceil(g.measureText(CUT_TIP).width) + 22;
+  }
+  return tipWidth;
+}
+
+function cutOverlay(px) {
+  const [W, H] = pageWH();
+  // Every photo and PDF page gets a faint outline, so the pieces a cut leaves show.
+  let s = curPage().items.filter(isPicture).map((it) =>
+    `<polygon points="${corners(it).map((p) => `${p.x},${p.y}`).join(' ')}" fill="none" stroke="#8b93a1" stroke-width="${px}" stroke-dasharray="${3 * px} ${3 * px}" opacity=".75"/>`).join('');
+  const b = S.cut;
+  if (!b) return s;
+  const w = b.x1 - b.x0, h = b.y1 - b.y0, busy = drag && drag.kind === 'cut';
+  s += `<rect data-ch="move" x="${b.x0}" y="${b.y0}" width="${w}" height="${h}" fill="rgba(217,45,32,.13)" stroke="${CUT_RED}" stroke-width="${1.5 * px}" stroke-dasharray="${6 * px} ${4 * px}"` +
+    (busy ? '' : ` pointer-events="all" style="cursor:move"`) + '/>';
+  if (busy) return s;
+  const hs = 9 * px;
+  for (const [name, [hx, hy]] of Object.entries(DIRS)) {
+    const x = b.x0 + ((hx + 1) / 2) * w, y = b.y0 + ((hy + 1) / 2) * h;
+    s += `<rect data-ch="${name}" x="${x - hs / 2}" y="${y - hs / 2}" width="${hs}" height="${hs}" rx="${1.5 * px}" fill="#fff" stroke="${CUT_RED}" stroke-width="${1.5 * px}" style="cursor:${handleCursor(hx, hy, 0)}" pointer-events="all"/>`;
+  }
+  // The how-to pill: under the box when there's room, else above it, else inside.
+  const tw = measureTip() * px, th = 24 * px, gap = 10 * px;
+  const tx = clamp(b.x0, 0, Math.max(0, W - tw));
+  const ty = b.y1 + gap + th <= H ? b.y1 + gap : b.y0 - gap - th >= 0 ? b.y0 - gap - th : b.y0 + gap;
+  s += `<g transform="translate(${tx} ${ty}) scale(${px})"><rect width="${measureTip()}" height="24" rx="12" fill="${CUT_RED}"/>` +
+    `<text x="11" y="16" fill="#fff" font-size="12" font-weight="600" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' xml:space="preserve">${CUT_TIP}</text></g>`;
+  return s;
+}
+
+/* Edges a cut box's sides stick to: the page's edges and every picture's. */
+function cutSnapLines() {
+  const [W, H] = pageWH(), xs = [0, W], ys = [0, H];
+  for (const it of curPage().items) {
+    if (!isPicture(it)) continue;
+    const bb = bounds([it]);
+    xs.push(bb.x, bb.x + bb.w); ys.push(bb.y, bb.y + bb.h);
+  }
+  return { xs, ys };
+}
+
+function snapTo(v, lines, axis, on) {
+  if (!on) return v;
+  let best = null;
+  for (const t of lines) if (Math.abs(t - v) < 6 / S.zoom && (best == null || Math.abs(t - v) < Math.abs(best - v))) best = t;
+  if (best == null) return v;
+  S.snap.push({ [axis]: best });
+  return best;
+}
+
+function dragCut(p, e) {
+  const [W, H] = pageWH(), L = cutSnapLines(), on = !e.altKey;
+  S.snap = [];
+  const X = (v) => snapTo(clamp(v, 0, W), L.xs, 'x', on), Y = (v) => snapTo(clamp(v, 0, H), L.ys, 'y', on);
+  const o = drag.orig, m = drag.mode;
+  let b;
+  if (m === 'new') {
+    const ax = X(drag.start.x), ay = Y(drag.start.y), bx = X(p.x), by = Y(p.y);
+    b = { x0: Math.min(ax, bx), y0: Math.min(ay, by), x1: Math.max(ax, bx), y1: Math.max(ay, by) };
+  } else if (m === 'move') {
+    const w = o.x1 - o.x0, h = o.y1 - o.y0;
+    let dx = p.x - drag.start.x, dy = p.y - drag.start.y;
+    if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+    let x0 = clamp(o.x0 + dx, 0, W - w), y0 = clamp(o.y0 + dy, 0, H - h);
+    // Snap whichever side is closer to an edge, keeping the size.
+    const sx0 = X(x0), sx1 = X(x0 + w), sy0 = Y(y0), sy1 = Y(y0 + h);
+    S.snap = [];
+    if (sx0 !== x0) { x0 = sx0; S.snap.push({ x: sx0 }); } else if (sx1 !== x0 + w) { x0 = sx1 - w; S.snap.push({ x: sx1 }); }
+    if (sy0 !== y0) { y0 = sy0; S.snap.push({ y: sy0 }); } else if (sy1 !== y0 + h) { y0 = sy1 - h; S.snap.push({ y: sy1 }); }
+    b = { x0, y0, x1: x0 + w, y1: y0 + h };
+  } else {
+    const [hx, hy] = DIRS[m];
+    b = { ...o };
+    if (hx < 0) b.x0 = X(p.x); if (hx > 0) b.x1 = X(p.x);
+    if (hy < 0) b.y0 = Y(p.y); if (hy > 0) b.y1 = Y(p.y);
+    b = { x0: Math.min(b.x0, b.x1), y0: Math.min(b.y0, b.y1), x1: Math.max(b.x0, b.x1), y1: Math.max(b.y0, b.y1) };
+  }
+  S.cut = b;
+  renderOverlay();
+}
+
+/* One photo / PDF page minus the box R (page coordinates) → the pieces that
+   are left, each showing its own part of the picture (`crop`, 0..1 of the
+   whole picture). [] = the box covers it all; false = they don't really
+   touch; null = it's turned at an angle a straight box can't follow. */
+function cutPicture(it, R) {
+  const rot = it.rot || 0;
+  if (Math.abs(rot - Math.round(rot / 90) * 90) > 0.5) return null;
+  const c = center(it), w = it.w, h = it.h;
+  const loc = [[R.x0, R.y0], [R.x1, R.y0], [R.x1, R.y1], [R.x0, R.y1]].map(([x, y]) => {
+    const d = rotatePt(x - c.x, y - c.y, -rot);
+    return [d.x + w / 2, d.y + h / 2];
+  });
+  // The box in the picture's own frame; a sliver under 1.5 pt is cut too.
+  const edge = (v, max) => { v = clamp(v, 0, max); return v < 1.5 ? 0 : max - v < 1.5 ? max : v; };
+  const u0 = edge(Math.min(...loc.map((q) => q[0])), w), u1 = edge(Math.max(...loc.map((q) => q[0])), w);
+  const v0 = edge(Math.min(...loc.map((q) => q[1])), h), v1 = edge(Math.max(...loc.map((q) => q[1])), h);
+  if (u1 - u0 < 0.5 || v1 - v0 < 0.5) return false;
+  // What's beside the box keeps its full height on the page; what's above and
+  // below it is only as wide as the box — so "close the gap" can slide the part
+  // below straight up without landing on the sides.
+  const side = Math.round(rot / 90) % 2 !== 0;
+  const rects = (side
+    ? [[0, 0, w, v0], [0, v1, w, h], [0, v0, u0, v1], [u1, v0, w, v1]]
+    : [[0, 0, u0, h], [u1, 0, w, h], [u0, 0, u1, v0], [u0, v1, u1, h]])
+    .filter(([a, b, a2, b2]) => a2 - a > 0.01 && b2 - b > 0.01);
+  const cr = it.crop || { x: 0, y: 0, w: 1, h: 1 };
+  const r6 = (v) => Math.round(v * 1e6) / 1e6;
+  return rects.map(([a, b, a2, b2]) => {
+    const pw = a2 - a, ph = b2 - b;
+    const off = rotatePt((a + a2) / 2 - w / 2, (b + b2) / 2 - h / 2, rot);
+    const piece = deepCopy(it);
+    piece.id = uid();
+    piece.x = c.x + off.x - pw / 2; piece.y = c.y + off.y - ph / 2; piece.w = pw; piece.h = ph;
+    piece.crop = { x: r6(cr.x + (a / w) * cr.w), y: r6(cr.y + (b / h) * cr.h), w: r6((cr.w * pw) / w), h: r6((cr.h * ph) / h) };
+    return piece;
+  });
+}
+
+/* Delete with the Cut tool: every photo and PDF page under the box loses that
+   part (what's left becomes pieces); anything else wholly inside the box is
+   deleted. `close` then slides whatever was under the box up by its height. */
+function doCut(close) {
+  const box = S.cut;
+  if (!box) { toast('Drag a box over the part you want to cut away first.'); return; }
+  const pg = curPage(), [W, H] = pageWH();
+  // A side on the page's edge reaches past it, so a picture that runs off the
+  // page is cut all the way across.
+  const far = 1e5;
+  const R = { x0: box.x0 <= 0.01 ? -far : box.x0, y0: box.y0 <= 0.01 ? -far : box.y0,
+    x1: box.x1 >= W - 0.01 ? far : box.x1, y1: box.y1 >= H - 0.01 ? far : box.y1 };
+  const out = [];
+  let cut = 0, removed = 0, locked = 0, tilted = 0;
+  for (const it of pg.items) {
+    const bb = bounds([it]);
+    const touches = bb.x < R.x1 && bb.x + bb.w > R.x0 && bb.y < R.y1 && bb.y + bb.h > R.y0;
+    if (!touches) { out.push(it); continue; }
+    if (it.locked) { locked++; out.push(it); continue; }
+    if (isPicture(it)) {
+      const parts = cutPicture(it, R);
+      if (parts === null) tilted++;
+      if (!parts) { out.push(it); continue; }
+      cut++;
+      out.push(...parts);
+      continue;
+    }
+    const inside = bb.x >= R.x0 - 0.5 && bb.y >= R.y0 - 0.5 && bb.x + bb.w <= R.x1 + 0.5 && bb.y + bb.h <= R.y1 + 0.5;
+    if (inside) { removed++; continue; }
+    out.push(it);
+  }
+  if (!cut && !removed) {
+    toast(locked ? 'That’s locked — choose Select (V), click it, then Unlock.'
+      : tilted ? 'That picture is turned at an angle. Turn it straight (0°, 90°…) to cut it.'
+      : 'Nothing to cut there — the box needs to cover part of a photo or PDF page.');
+    return;
+  }
+  checkpoint();
+  pg.items = out;
+  let slid = 0;
+  if (close) {
+    const gap = box.y1 - box.y0;
+    for (const it of pg.items) {
+      if (it.locked) continue;
+      const bb = bounds([it]);
+      if (bb.y >= box.y1 - 0.5 && bb.x < R.x1 - 0.5 && bb.x + bb.w > R.x0 + 0.5) { moveItem(it, 0, -gap); slid++; }
+    }
+  }
+  S.cut = null;
+  S.sel = [];
+  changed();
+  toast((close && slid ? 'Cut away, and the gap closed.' : 'Cut away.') +
+    (locked ? ' (Locked things were left alone.)' : '') + ' ⌘Z undoes it · V to move the pieces.');
 }
 
 function handlesFor(it, px) {
@@ -358,6 +544,12 @@ svg.addEventListener('pointerdown', (e) => {
   closeMenus();
   const p = toPage(e);
   svg.setPointerCapture(e.pointerId);
+  if (S.tool === 'cut') {
+    // On the box's handles or inside it: change that box. Anywhere else: a new box.
+    const ch = S.cut && e.target.closest && e.target.closest('[data-ch]');
+    drag = { kind: 'cut', mode: ch ? ch.dataset.ch : 'new', start: p, orig: S.cut ? { ...S.cut } : null, moved: false };
+    return;
+  }
   const h = e.target.closest && e.target.closest('[data-h]');
   if (h && S.sel.length === 1) {
     const it = findItem(S.sel[0]);
@@ -419,6 +611,7 @@ svg.addEventListener('pointermove', (e) => {
   else if (drag.kind === 'handle') dragHandle(p, e);
   else if (drag.kind === 'marquee') { drag.cur = p; renderOverlay(); }
   else if (drag.kind === 'create') dragCreate(p, e);
+  else if (drag.kind === 'cut') dragCut(p, e);
 });
 
 svg.addEventListener('pointerup', (e) => endDrag(e));
@@ -461,6 +654,11 @@ function endDrag(e) {
     changed();
   } else if (d.kind === 'create') {
     finishCreate(d, e ? toPage(e) : d.start);
+  } else if (d.kind === 'cut') {
+    // A click (no drag) away from the box clears it; a box too thin to see is dropped.
+    if (!d.moved && d.mode === 'new') S.cut = null;
+    if (S.cut && (S.cut.x1 - S.cut.x0 < 2 || S.cut.y1 - S.cut.y0 < 2)) S.cut = null;
+    renderAll();
   }
 }
 
@@ -468,7 +666,7 @@ function dragMove(p, e) {
   let dx = p.x - drag.start.x, dy = p.y - drag.start.y;
   if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
   S.snap = [];
-  if (S.guides && !e.altKey) ({ dx, dy } = snapDelta(drag.bb, dx, dy));
+  if (S.guides && !e.altKey) ({ dx, dy } = snapDelta(drag.bb, dx, dy, new Set(drag.orig.map((o) => o.id))));
   for (const o of drag.orig) {
     const it = findItem(o.id);
     if (!it) continue;
@@ -480,9 +678,17 @@ function dragMove(p, e) {
 }
 
 /* Snap the moving selection's edges / middle to the page's edges, middle and
-   half-inch margin. Alt (Option) turns snapping off for one drag. */
-function snapDelta(bb, dx, dy) {
+   half-inch margin, and to the edges of everything else on the page (so a
+   cut piece butts up against the next one). Alt (Option) turns snapping off
+   for one drag. */
+function snapDelta(bb, dx, dy, skip = new Set()) {
   const [W, H] = pageWH(), tol = 6 / S.zoom;
+  const xs = [0, MARGIN, W / 2, W - MARGIN, W], ys = [0, MARGIN, H / 2, H - MARGIN, H];
+  for (const it of curPage().items) {
+    if (skip.has(it.id)) continue;
+    const b = bounds([it]);
+    xs.push(b.x, b.x + b.w); ys.push(b.y, b.y + b.h);
+  }
   const best = (targets, edges, d) => {
     let b = null;
     for (const t of targets) for (const ed of edges) {
@@ -491,8 +697,8 @@ function snapDelta(bb, dx, dy) {
     }
     return b;
   };
-  const bx = best([0, MARGIN, W / 2, W - MARGIN, W], [bb.x, bb.x + bb.w / 2, bb.x + bb.w], dx);
-  const by = best([0, MARGIN, H / 2, H - MARGIN, H], [bb.y, bb.y + bb.h / 2, bb.y + bb.h], dy);
+  const bx = best(xs, [bb.x, bb.x + bb.w / 2, bb.x + bb.w], dx);
+  const by = best(ys, [bb.y, bb.y + bb.h / 2, bb.y + bb.h], dy);
   if (bx) { dx += bx.off; S.snap.push({ x: bx.t }); }
   if (by) { dy += by.off; S.snap.push({ y: by.t }); }
   return { dx, dy };
@@ -662,6 +868,7 @@ function setTool(t, render = true) {
   if (S.editing && t !== 'select') commitText();
   S.tool = t;
   S.hover = null;
+  S.cut = null;
   if (t !== 'select') S.sel = [];
   $$('#tools [data-tool]').forEach((b) => b.classList.toggle('on', b.dataset.tool === t));
   if (render) renderAll();
@@ -728,6 +935,7 @@ function renderInspector() {
     corner: has('rect'),
     text: has('text'),
     common: ctx.mode === 'sel',
+    cut: ctx.mode === 'tool' && S.tool === 'cut',
   };
   $$('#inspector [data-show]').forEach((el) => { el.hidden = !show[el.dataset.show]; });
 
@@ -778,6 +986,7 @@ function renderInspector() {
     $$('#alignSeg button').forEach((b) => b.classList.toggle('on', b.dataset.align === al));
     mark('color', valueOf(ctx, 'color'));
   }
+  if (show.cut) { $('#cutBtn').disabled = !S.cut; $('#cutCloseBtn').disabled = !S.cut; }
   if (show.common) {
     const op = valueOf(ctx, 'opacity');
     $('#opacityRange').value = op; $('#opacityVal').textContent = Math.round(op * 100) + '%';
@@ -811,9 +1020,9 @@ function bindInspector() {
 function natural(it) {
   const a = assets.get(it.asset);
   if (!a) return { w: it.w, h: it.h };
-  if (it.type === 'image') return { w: a.w, h: a.h };
-  const p = a.pages[it.page] || { w: it.w, h: it.h };
-  return { w: p.w, h: p.h };
+  const p = it.type === 'image' ? a : a.pages[it.page] || { w: it.w, h: it.h };
+  const c = it.crop || { w: 1, h: 1 };   // a piece left by the Cut tool: just its part
+  return { w: p.w * c.w, h: p.h * c.h };
 }
 
 function placePicture(it, how) {
@@ -886,6 +1095,8 @@ function act(a) {
       changed();
       break;
     }
+    case 'cut': doCut(false); break;
+    case 'cutClose': doCut(true); break;
     case 'dupPage': duplicatePage(S.page); break;
     case 'delPage': deletePage(S.page); break;
     default: break;
@@ -897,7 +1108,7 @@ function goPage(i) {
   commitText();
   i = clamp(i, 0, S.doc.pages.length - 1);
   if (i === S.page) return;
-  S.page = i; S.sel = []; S.hover = null;
+  S.page = i; S.sel = []; S.hover = null; S.cut = null;
   renderAll();
   renderThumbs();
   const el = $('#thumbs').children[i];
@@ -963,7 +1174,8 @@ function setOrientation(o) {
   pg.items.forEach((it) => {
     const b0 = bounds([it]);
     // A photo / PDF page that filled the old sheet is fitted to the new one…
-    if (isPicture(it) && !it.locked && (b0.w >= W0 - 2 || b0.h >= H0 - 2)) { placePicture(it, 'fitPage'); return; }
+    // (Not a cut piece: the pieces of one page would all land on top of each other.)
+    if (isPicture(it) && !it.locked && !it.crop && (b0.w >= W0 - 2 || b0.h >= H0 - 2)) { placePicture(it, 'fitPage'); return; }
     // …everything else keeps its place relative to the middle, nudged back
     // onto the paper if the turn pushed it off an edge.
     moveItem(it, (W1 - W0) / 2, (H1 - H0) / 2);
@@ -1252,7 +1464,7 @@ function bindClipboard() {
 }
 
 /* ---------------- keyboard ---------------- */
-const TOOL_KEYS = { v: 'select', p: 'pen', l: 'line', a: 'arrow', r: 'rect', o: 'ellipse', t: 'text' };
+const TOOL_KEYS = { v: 'select', p: 'pen', l: 'line', a: 'arrow', r: 'rect', o: 'ellipse', t: 'text', c: 'cut' };
 
 function bindKeys() {
   window.addEventListener('keydown', (e) => {
@@ -1269,9 +1481,14 @@ function bindKeys() {
     if (mod && k === 'd') { e.preventDefault(); act('duplicate'); return; }
     if (mod && k === 'a') { e.preventDefault(); setTool('select', false); S.sel = curPage().items.filter((i) => !i.locked).map((i) => i.id); renderAll(); return; }
     if (mod) return;
-    if (k === 'delete' || k === 'backspace') { e.preventDefault(); act('delete'); return; }
+    if (k === 'delete' || k === 'backspace') {
+      e.preventDefault();
+      if (S.tool === 'cut') doCut(e.shiftKey); else act('delete');
+      return;
+    }
     if (k === 'escape') {
       if (drag) return;
+      if (S.tool === 'cut' && S.cut) { S.cut = null; renderAll(); return; }
       if (S.tool !== 'select') setTool('select');
       else if (S.sel.length) { S.sel = []; renderAll(); }
       closeMenus();
@@ -1381,6 +1598,12 @@ function bindTopbar() {
     const wrap = $('#stageWrap');
     if (e.target === wrap && (e.offsetX > wrap.clientWidth || e.offsetY > wrap.clientHeight)) return; // scrollbar
     if (S.editing) ta.blur();
+    if (S.tool === 'cut') {
+      // Starting beside the page makes it easy to cut all the way across.
+      svg.setPointerCapture(e.pointerId);
+      drag = { kind: 'cut', mode: 'new', start: toPage(e), orig: null, moved: false };
+      return;
+    }
     if (S.tool !== 'select') { if (S.sel.length) { S.sel = []; renderAll(); } return; }
     if (!e.shiftKey) S.sel = [];
     svg.setPointerCapture(e.pointerId);

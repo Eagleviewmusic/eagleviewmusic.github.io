@@ -26,19 +26,23 @@ function pathEl(p, extra = '') {
       : ' stroke="none"') + `${extra}/>`;
 }
 
+/* A picture in its 1 × 1 box. A piece left by the Cut tool has a `crop`
+   (the part of the whole picture it shows, 0..1): the whole picture is drawn
+   inside a nested <svg> whose viewBox is that part, and the <svg> clips the rest. */
+const c6 = (v) => +v.toFixed(6);
+function pictureEl(url, it, blank) {
+  if (!url) return `<rect x="-0.5" y="-0.5" width="1" height="1" fill="${blank}"/>`;
+  const c = it.crop;
+  if (!c) return `<image href="${url}" x="-0.5" y="-0.5" width="1" height="1" preserveAspectRatio="none"/>`;
+  return `<svg x="-0.5" y="-0.5" width="1" height="1" viewBox="${c6(c.x)} ${c6(c.y)} ${c6(c.w)} ${c6(c.h)}" preserveAspectRatio="none" overflow="hidden">` +
+    `<image href="${url}" x="0" y="0" width="1" height="1" preserveAspectRatio="none"/></svg>`;
+}
+
 /* The item's content in its own frame (centre = 0,0). `hit` adds invisible
    wide strokes so thin lines are easy to click. */
 export function itemInner(it, { hit = false, zoom = 1 } = {}) {
-  if (it.type === 'image') {
-    const url = imageUrl(it.asset);
-    return url ? `<image href="${url}" x="-0.5" y="-0.5" width="1" height="1" preserveAspectRatio="none"/>`
-      : `<rect x="-0.5" y="-0.5" width="1" height="1" fill="#eee"/>`;
-  }
-  if (it.type === 'pdfpage') {
-    const url = previewUrl(it.asset, it.page);
-    return url ? `<image href="${url}" x="-0.5" y="-0.5" width="1" height="1" preserveAspectRatio="none"/>`
-      : `<rect x="-0.5" y="-0.5" width="1" height="1" fill="#f1efeb"/>`;
-  }
+  if (it.type === 'image') return pictureEl(imageUrl(it.asset), it, '#eee');
+  if (it.type === 'pdfpage') return pictureEl(previewUrl(it.asset, it.page), it, '#f1efeb');
   if (it.type === 'text') {
     const lay = layoutText(it);
     const lh = it.size * LINE;

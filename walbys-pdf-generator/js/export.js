@@ -5,7 +5,10 @@
    - Locked (encrypted) PDFs can't be copied that way; their pages are drawn
      as high-resolution pictures instead.
    - Lines, shapes and freehand are real vector paths; text uses the PDF's
-     built-in fonts (text in characters those fonts lack becomes a picture). */
+     built-in fonts (text in characters those fonts lack becomes a picture).
+   - Pieces left by the Cut tool draw the whole photo / page through a
+     clipping box (cropFrame). The cut-away part is hidden, not erased: a
+     PDF page's hidden words are still in the file. */
 
 import { pageSize, hexToRgb01, rad } from './util.js';
 import { center, vectorParts, dashArray } from './shapes.js';
@@ -29,6 +32,23 @@ function inFrame(page, H, cx, cy, deg, fn) {
 function rotateHere(page, deg) {
   const r = rad(-deg), c = Math.cos(r), s = Math.sin(r);
   page.pushOperators(PDFLib.concatTransformationMatrix(c, s, -s, c, 0, 0));
+}
+
+/* Inside inFrame: a picture's size as drawn. A piece left by the Cut tool
+   (it.crop = the part of the whole picture it shows, 0..1, y down) clips to
+   its own box and moves the origin to where the WHOLE picture's centre falls,
+   so the caller draws the whole picture at the returned size — the same
+   picture the stage shows through its nested <svg>. */
+function cropFrame(page, it) {
+  const cr = it.crop;
+  if (!cr) return { w: it.w, h: it.h };
+  const { rectangle, clip, endPath, concatTransformationMatrix } = PDFLib;
+  const FW = it.w / cr.w, FH = it.h / cr.h;
+  const fx = -it.w / 2 - cr.x * FW + FW / 2;
+  const fyDown = -it.h / 2 - cr.y * FH + FH / 2;
+  page.pushOperators(rectangle(-it.w / 2, -it.h / 2, it.w, it.h), clip(), endPath(),
+    concatTransformationMatrix(1, 0, 0, 1, fx, -fyDown));
+  return { w: FW, h: FH };
 }
 
 /* Draw every annotation that has an appearance (Preview's pen marks, text
@@ -177,8 +197,10 @@ export async function buildPdf(doc, progress = () => {}) {
       if (it.type === 'image') {
         if (!assets.has(it.asset)) continue;
         const img = await image(it.asset);
-        inFrame(page, H, c.x, c.y, it.rot, () =>
-          page.drawImage(img, { x: -it.w / 2, y: -it.h / 2, width: it.w, height: it.h, opacity: op }));
+        inFrame(page, H, c.x, c.y, it.rot, () => {
+          const f = cropFrame(page, it);
+          page.drawImage(img, { x: -f.w / 2, y: -f.h / 2, width: f.w, height: f.h, opacity: op });
+        });
       } else if (it.type === 'pdfpage') {
         const a = assets.get(it.asset);
         if (!a) continue;
@@ -187,15 +209,18 @@ export async function buildPdf(doc, progress = () => {}) {
           // The source page's own /Rotate: pdf.js showed it turned, so turn it here too.
           const srot = (a.pages[it.page] && a.pages[it.page].rot) || 0;
           const side = srot === 90 || srot === 270;
-          const uw = side ? it.h : it.w, uh = side ? it.w : it.h;
           inFrame(page, H, c.x, c.y, it.rot, () => {
+            const f = cropFrame(page, it);
+            const uw = side ? f.h : f.w, uh = side ? f.w : f.h;
             if (srot) rotateHere(page, srot);
             page.drawPage(emb, { x: -uw / 2, y: -uh / 2, width: uw, height: uh, opacity: op });
           });
         } else {
           const img = await rasterPage(it.asset, it.page);
-          inFrame(page, H, c.x, c.y, it.rot, () =>
-            page.drawImage(img, { x: -it.w / 2, y: -it.h / 2, width: it.w, height: it.h, opacity: op }));
+          inFrame(page, H, c.x, c.y, it.rot, () => {
+            const f = cropFrame(page, it);
+            page.drawImage(img, { x: -f.w / 2, y: -f.h / 2, width: f.w, height: f.h, opacity: op });
+          });
         }
       } else if (it.type === 'text') {
         if (!String(it.text || '').trim()) continue;
