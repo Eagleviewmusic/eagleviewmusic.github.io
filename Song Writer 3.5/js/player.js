@@ -174,7 +174,7 @@
 
   /* Sound → Chords alone (2026-10-05): not the chord track being out, not the workspace, not Edit —
      only a lesson that leaves the chords out altogether silences them */
-  // Sound → Chords; and chords hidden (the Chords switch / Look → Display Chords Off) only while Sound → Hear hidden parts is on
+  // Sound → Chords; and chords hidden (the part strip's Chords switch) only while Sound → Hear hidden parts is on
   function chordsHeard() {
     return !!SW.settings.view.laneChordsPlay && SW.settings.can('chordsListen') &&
       (SW.settings.shows('lane') || SW.settings.view.hearHidden !== false);

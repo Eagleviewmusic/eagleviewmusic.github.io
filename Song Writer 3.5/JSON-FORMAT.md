@@ -306,7 +306,7 @@ Added 2026-11-15 (all optional; a lesson without them opens exactly as before):
 | `policy.task.pitchLocked` | `true`: which note is fixed — the Pitch page blocks, the letter/arrow keys, ♯ ♭, harmony, connected notes, the clef | `melodyLocked` |
 | `policy.task.rhythmLocked` | `true`: how long is fixed — the values, Dotted, Tie, rests, the Rhythm page circles, the time signature | `melodyLocked` |
 | `policy.task.melodyLocked` | the melody as one (until 2026-11-15). Still **written**, as `pitchLocked \|\| rhythmLocked`, for older readers; read only when the two above are missing | `false` |
-| `policy.shell.lookPage` | Look's Music Page rows (lights, Follow along, section colours, Display Chords, Display Note Names) | `policy.shell.view` (which covered them) |
+| `policy.shell.lookPage` | Look's Music Page rows (lights, Follow along, section colours, Display Note Names) and the part strip's Chords show/hide (Display Chords until 2026-11-17) | `policy.shell.view` (which covered them) |
 | `policy.shell.options` | the Options button | `true` |
 
 Adding, moving, copying and deleting notes and lines needs pitch, rhythm and
@@ -340,7 +340,7 @@ plus:
               "save": { "link": true, "file": true },
               "student": { "askName": true },
               "look": { "playLight": "note", "followScroll": true, "colours": true,
-                        "showLane": true, "chordRhythm": true, "noteNames": "off" } },
+                        "showLane": true, "noteNames": "off" } },
   "layout": { … },
   "songs": [ { "id": "…", "title": "Twinkle Twinkle", "score": { … }, "isCustom": true } ] }
 ```
@@ -377,6 +377,40 @@ above) or a file named `<Song title> - <Name>.json`:
             "isCustom": true, "createdAt": …, "updatedAt": … },
   "savedAt": "2026-11-15T21:40:00.000Z" }
 ```
+
+**Links are off for students since 2026-11-17** (`lessons.js STUDENT_LINKS`): Save my work makes only the file; `policy.save.link` is still read (a version with only a link gives its students the file) and `#work=` links still open for the teacher.
+
+**The link, shorter (`w: 2`, 2026-11-17).** The `#work=~…` link no longer
+carries the file above. It carries what the teacher's side reads, and
+`lessons.js expandWork` turns it back into that shape before anything else
+sees it (files are unchanged):
+
+```json
+{ "w": 2, "t": "Twinkle Twinkle", "i": "sv_1794796898013", "vt": "Twinkle words",
+  "n": "Maya", "st": "…only when the song's title differs from t…",
+  "p": { "task": { "wordsLocked": true } },
+  "l": { … },
+  "c": { "v": 2, "key": "C", "lines": "A|5O Twin|5O kle,|…\nB|…" } }
+```
+
+- `p`, `l` — the policy and layout **only where they differ** from the
+  frozen `WORK2_POLICY` (a new student version's own start, with the
+  Music Page `look` of a fresh browser) and `WORK2_LAYOUT` (the blank
+  layout). Objects key by key; keys the default has and the work lacks are
+  listed under `"-"`. Never edit the two defaults: new ones mean `w: 3`.
+- `c` — the score with every `lines` (Part 1's, and each part's) as one
+  string: **COMPACT LINES** (`js/core.js`). A row a line —
+  `label[^pickup[^bars]]`, then `|` + each syllable: its columns
+  (`[value 0–8 = w. w h. h q. q e. e s][@a–m key change][notes][~ tie][! ghost]`,
+  a note = a rung letter `A–Z a–i` (do,, … ti″′, the 35 rungs low to high)
+  `[# sharp | _ flat][* rest][>rung step]`), `,` between columns, `-` for
+  `hy`, a space, then the text up to the next `|`. Written only when it reads
+  back exactly; otherwise `s` holds the score as it is.
+- `t` title, `i`/`vt` the version's id and title (`vt` only when it differs
+  from `t`), `n` the student's name. `savedAt` and the song's record fields
+  (`id`, `createdAt`, …) are not sent: the teacher's side makes its own.
+
+A link without `w` is read as before.
 
 In the regular app a `#work=` link — or *Share & backup → Restore from a
 backup* given a `student-work` or `student-version` file (checked before
@@ -448,6 +482,8 @@ must still read:
 | `circleNames` | `letter` · `roman`, default `letter` | 2026-10-29: the circle's names (its own C · I switch; `chordNames` is the panel's). |
 | `tlZoom` | `close` · `mid` · `top`, default `close` | 2026-10-29: the Time Line's zoom — every beat, about 20 bars across, about 36 bars across. |
 | `partMinis` | boolean, default `true` | 2026-11-03: Options → Parts → Show the other parts small — the parts not on the page drawn small under the part tabs (`js/components/parts-ui.js`). |
+| `chordRhythm` | *no longer kept* (2026-11-17) | Look → Display Chords went: the chord track's rhythm dots always show. A stored value is ignored. |
+| `chordsBackV1` | boolean | 2026-11-17, once: a `showLane` left `false` by Display Chords Off is turned back on (the part strip's Chords tab shows and hides them since). |
 
 Sound's Melody, Steady beat, Count-in and At the end are not stored (reset
 each visit, as Rhythm Poetry's switches are).

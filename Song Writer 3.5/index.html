@@ -129,7 +129,7 @@
       <span class="autosave-label" id="autosave-label">Auto-save</span>
     </button>
     <!-- Only in a student version that lets them hand their work in (js/lessons.js SAVE MY WORK, 2026-11-15). -->
-    <button class="autosave-toggle save-work-btn" id="save-work-btn" type="button" hidden title="Save my work — a link or a file to hand in">
+    <button class="autosave-toggle save-work-btn" id="save-work-btn" type="button" hidden title="Save my work — a file to hand in">
       <svg class="autosave-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       <span class="autosave-label">Save my work</span>
     </button>
@@ -507,16 +507,9 @@
       </div>
     </div>
     <div class="switch-list look-page" id="look-switches"></div>
-    <!-- the song's chords in the music: showLane (the chord track) and chordRhythm (its dots), as one
-         three-way choice since 2026-10-31 (two switches until then) -->
-    <div class="seg-block" id="chords-show-row">
-      <span class="size-row-name">Display Chords</span>
-      <div class="seg seg-wide" role="radiogroup" aria-label="Display Chords" id="chords-show-seg">
-        <button class="seg-btn" type="button" role="radio" data-cs="off">Off</button>
-        <button class="seg-btn" type="button" role="radio" data-cs="names">Chord Names</button>
-        <button class="seg-btn" type="button" role="radio" data-cs="rhythms">+Rhythms</button>
-      </div>
-    </div>
+    <!-- Display Chords (Off · Chord Names · +Rhythms) went 2026-11-17 (user): turned Off, the chords could only come
+         back from here. The chords in the music always show their rhythms now; the Chords tab at the start of the
+         part strip (parts-ui.js) shows or hides them (view pref showLane). -->
     <!-- KEY CHANGES (js/keys.js, 2026-10-31): what Setup's key chips do -->
     <div class="seg-block" id="key-mode-row">
       <span class="size-row-name">When the key is changed:</span>
@@ -1193,7 +1186,7 @@
         How they hand it back
       </div>
       <p class="card-desc">Their work always saves in their own browser as they go. These are the ways to hand it in &mdash; a <b>Save my work</b> button at the top offers the ones you tick.</p>
-      <label class="inline-check" for="sv-save-link">
+      <label class="inline-check" for="sv-save-link" id="sv-save-link-row">
         <input type="checkbox" id="sv-save-link" />
         <span>Save as a link <em>(they copy a short link and send it to you)</em></span>
       </label>
@@ -1368,7 +1361,7 @@
       <li><span class="help-key edit">✎</span><div><b>Change a chord</b>: while the song can change, the pencil on any chord opens its editor — root, quality, a 7th or an inversion stuck to it, its name — and <b>Back to the scale’s chord</b> undoes it. Re-chorded places are saved with the song. Under the panel, the corner shows the chord in hand and its notes; the keyboard’s Octaves and Focus sit below them.</div></li>
       <li><span class="help-key">⛶</span><div><b>Present</b> hides every control and fills the screen. Play and the step arrows stay. Press <span class="help-key">Esc</span> to come back.</div></li>
       <li><span class="help-key">🔗</span><div><b>Sharing</b> (Library → <b>Share &amp; backup</b>). <b>Create a link</b> shares the whole app: whoever opens it gets a copy of the song with every tool. <b>Make a student version…</b> makes a smaller app instead &mdash; this one song, and only what you leave on: what they can change in the music (<b>Pitch</b>, <b>Rhythm</b>, <b>Chords</b>, <b>Lyrics</b>; adding and deleting lines needs the first three and Lyrics), what they can adjust in the bottom row (the tempo, the key, Sound, sizes and fonts, the music page, the keyboard, the chord panel, Options, Present, Save a picture) and the Library. What is off is not there at all. Your Layout settings go with it, locked. <b>Preview as a student</b> shows it first; <b>Create the link</b> or <b>Download as a file</b> sends it.
-        Students hand their work back with <b>Save my work</b> at the top (if you tick a link, a file or both): their name first if you ask for it, then a link to copy or a file (<i>Song - Name.json</i>); their work also saves in their browser as they go. Open their link here &mdash; or their file in <b>Restore from a backup</b> &mdash; and choose <b>Open as they had it</b> (the same smaller app; nothing is added to your library) or <b>Open with everything</b> (it is added as a shared song, <i>Song — Name</i>, with every tool). <b>Set up for students</b>, in the Library, still makes lessons of several songs.</div></li>
+        Students hand their work back with <b>Save my work</b> at the top (if you tick Save as a file): their name first if you ask for it, then a file (<i>Song - Name.json</i>) to upload or email; their work also saves in their browser as they go. (A link to copy is turned off for now, 2026-11-17.) Open their link here &mdash; or their file in <b>Restore from a backup</b> &mdash; and choose <b>Open as they had it</b> (the same smaller app; nothing is added to your library) or <b>Open with everything</b> (it is added as a shared song, <i>Song — Name</i>, with every tool). <b>Set up for students</b>, in the Library, still makes lessons of several songs.</div></li>
       <li><span class="help-key">♯</span><div><b>Changing key</b> — <b>Look → When the key is changed</b>. <b>Transpose</b> (to start): a key from <b>Setup</b> moves the music you are in, every note keeping its solfège; in a song that changes key, only the stretch the selected note is in (with nothing selected, the whole song). <b>Create Key Change</b>: the new key starts on the first beat of the bar the selected note is in — and stays with that note: if a rhythm change moves it, the key change moves to the start of its new bar, and any notes that cross the bar line are written in the key they land in (with ♯ ♭ as needed) so they sound as before. Everything after it is written in that key — if notes are already written there, choose <b>Transpose</b> (they move into the new key) or <b>Remain unchanged</b> (they keep their pitches, written in the new key — the chords there too). The staff writes the new key signature; the blocks show a flag with the key's name. In this mode notes can go from A♭2 to G6 in any key; the letter keys still follow the key you are in.</div></li>
       <li><span class="help-key">␣</span><div><b>Spacebar</b> plays from the selected note, and stops — and the next Play carries on from where it stopped. <b>Setup</b> (the button that shows the key and the tempo) sets the key, the time signature, the scale, the tempo, the swing (None, 8th or 16th — the notes stay written straight) and the count-in; <b>Sound</b> (the speaker and eye button, with <b>Look</b>) a steady beat, the sounds, and what happens at the end.</div></li>
     </ul>
@@ -1402,7 +1395,7 @@
       <ul>
         <li>The same frame, toolbar and windows as Rhythm Poetry, Ostinato Builder and the Music Stand.</li>
         <li>A lock sits beside Play, as a switch: unlock it and every tool — the value circles, ♯ ♭, harmony, and the word and line tools — is in one Edit box you can drag anywhere on the screen.</li>
-        <li>Pitch · Notation · Rhythm at the top: the coloured blocks where you decide the notes, the staff where you fine-tune and add chords, and Rhythm Poetry’s circles where you shape the rhythm. The keyboard is the Edit box’s <b>Piano</b> button, and its <b>Chords</b> tab brings the chord panel; the song’s chords show wherever <b>Look → Display Chords</b> is not Off, and sound wherever <b>Sound → Chords</b> is on.</li>
+        <li>Pitch · Notation · Rhythm at the top: the coloured blocks where you decide the notes, the staff where you fine-tune and add chords, and Rhythm Poetry’s circles where you shape the rhythm. The keyboard is the Edit box’s <b>Piano</b> button, and its <b>Chords</b> tab brings the chord panel; the song’s chords show in the music with their rhythms — the <b>Chords</b> tab at the start of the part tabs hides or shows them — and sound wherever <b>Sound → Chords</b> is on.</li>
         <li>Present mode, a count-in, a steady beat, and Go round or This line at the end — for practising a line over and over.</li>
         <li>Staff notation one note at a time, bar numbers, a tempo from 30 to 300, Save picture, and lesson tempo rules.</li>
         <li>Digital Accordion’s chord panel: the scale’s fourteen chords on the same keys in every scale (F D S A G R E Q W, 1–5), the song’s Chord Chart · Full · Extended · Extreme · Everything, a chord editor for 7ths and inversions, and a scale menu in Setup.</li>

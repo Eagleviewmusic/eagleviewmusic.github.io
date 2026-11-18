@@ -87,7 +87,7 @@
          before; a new policy still writes melodyLocked = either, for
          readers older than this);
        shell.lookPage — Look's Music Page rows (lights, follow along,
-         section colours, Display Chords, note names). Off: policy.look
+         section colours, the chords shown or not, note names). Off: policy.look
          carries the teacher's choices, put on for this song only
          (settings.js pinLook — never written over the student's own);
          an older policy reads it as shell.view, which covered them;
@@ -100,7 +100,7 @@
      only the chord panel (the chords on the music are always seen and
      heard — can('chordsListen')), and the chords change by
      task.chordsLocked alone, not through the melody. */
-  const PAGE_LOOK_KEYS = ['playLight', 'followScroll', 'colours', 'showLane', 'chordRhythm', 'noteNames'];
+  const PAGE_LOOK_KEYS = ['playLight', 'followScroll', 'colours', 'showLane', 'noteNames'];   // (chordRhythm went 2026-11-17: an older look's is passed by)
 
   function blankPolicy() {
     return {
@@ -619,7 +619,7 @@
     p.key.locked = true;                         // Key & scale: off to start
     p.shell = { sound: true, view: true, lookPage: false, strip: true, dock: true, sections: true, textEditor: true,
                 picture: false, present: true, options: true, library: 'none' };
-    p.save = { link: true, file: true };
+    p.save = { link: STUDENT_LINKS, file: true };   // (LINKS OFF: no link to start)
     p.student = { askName: true };
     return { id: null, title: '', policy: p, songId };
   }
@@ -636,7 +636,7 @@
     { name: 'Key & scale', desc: 'The key and the scale in Setup. Off: the key reads as plain text', get: p => !p.key.locked, set: (p, on) => { p.key.locked = !on; } },
     { shell: 'sound', name: 'Sound', desc: 'The melody, chord and part sounds and volumes, Room, At the end, the steady beat and the count-in' },
     { shell: 'view', name: 'Sizes & fonts', desc: 'Look → Scale, Text size, Lyric font' },
-    { shell: 'lookPage', name: 'Music page display', desc: 'Look → Note/Box lights, Follow along, section colours, Display Chords, Display Note Names. Off: the way you have them now, for this song only — their own settings are left alone' },
+    { shell: 'lookPage', name: 'Music page display', desc: 'Look → Note/Box lights, Follow along, section colours, Display Note Names, and whether the chords show. Off: the way you have them now, for this song only — their own settings are left alone' },
     { shell: 'dock', name: 'Keyboard', desc: 'The Piano button, and the keyboard’s rows in Options' },
     { shell: 'strip', name: 'Chord panel', desc: 'The Edit box’s Chords tab: the chord panel, to play chords and put them on the music' },
     { shell: 'options', name: 'Options button', desc: 'The lock, Parts and the keyboard’s rows. It goes by itself when none of them is left. (Layout settings… is never in a student version)' },
@@ -733,14 +733,15 @@
     lib.appendChild(ui.switchRow('Library', 'The song chip at the top, with Start again (and Save a picture, if it is on). Off: they have only this song',
       p.shell.library !== 'none', () => { p.shell.library = p.shell.library === 'none' ? 'lesson' : 'none'; renderVersionSheet(true); }));
     $('sv-save-link').checked = !!p.save.link;
-    $('sv-save-file').checked = !!p.save.file;
+    $('sv-save-link-row').style.display = STUDENT_LINKS ? '' : 'none';   // LINKS OFF: the file is the way back (.inline-check beats [hidden])
+    $('sv-save-file').checked = !!(p.save.file || (!STUDENT_LINKS && p.save.link));   // (LINKS OFF: a link-only version hands back a file)
     $('sv-save-note').textContent = (p.save.link || p.save.file)
       ? 'Whatever they send carries their song, the settings they had, and their name.'
       : 'No Save my work button: their work stays in their browser — a read-and-sing link, say.';
     const st = $('sv-student');
     st.innerHTML = '';
     st.appendChild(ui.switchRow('Ask for their name',
-      'Asked the first time they press Save my work, and needed before they can make the link or the file. It goes on the file’s name and the title you see: Song — Name',
+      'Asked the first time they press Save my work, and needed before they can ' + (STUDENT_LINKS ? 'make the link or the file' : 'save the file') + '. It goes on the file’s name and the title you see: Song — Name',
       !!p.student.askName, () => { p.student.askName = !p.student.askName; renderVersionSheet(true); }));
   }
 
@@ -861,6 +862,14 @@
      asked the first time, kept for the session (sessionStorage), and
      editable on the sheet.
      ================================================================== */
+  /* LINKS OFF (2026-11-17, the user: "remove the link option for the students right now, just keep the
+     download option" — other plans are coming for getting work back). false: no Copy a link on Save my
+     work, no "Save as a link" on the version sheet, and a version that offered only a link offers the file
+     instead, so its students can still hand in. The link code below (THE WORK LINK, SHORTER) stays, and a
+     #work= link a teacher is sent still opens. true brings it all back. */
+  const STUDENT_LINKS = false;
+  const linkOffered = () => !!(STUDENT_LINKS && policy && policy.save.link);
+  const fileOffered = () => !!(policy && (policy.save.file || (!STUDENT_LINKS && policy.save.link)));
   const NAME_KEY = 'song_writer_35_student_name_v1';     // sessionStorage
   let nameInMemory = '';
   function studentName() {
@@ -915,9 +924,10 @@
       ? 'First, your name — it goes with your work, so your teacher knows it is yours.'
       : 'Your name goes with your work. You can change it here.';
     $('sw-choices').hidden = waiting;
-    $('sw-link').hidden = !policy.save.link;
-    $('sw-file').hidden = !policy.save.file;
-    $('sw-open').hidden = !policy.save.file;
+    $('sw-link').hidden = !linkOffered();
+    if (!linkOffered()) $('sw-link-row').hidden = true;
+    $('sw-file').hidden = !fileOffered();
+    $('sw-open').hidden = !fileOffered();
     $('sw-file-note').textContent = 'Saves “' + workFileName() + '” to your downloads, to upload or email — or to open here again later.';
     $('sw-sub').textContent = waiting ? 'Your work is kept in this browser as you go.' : 'Your work is kept in this browser as you go. To hand it in:';
   }
@@ -946,13 +956,99 @@
     ui.toast('Type your name first');
     return false;
   }
+  /* THE WORK LINK, SHORTER (2026-11-17, the user: "schoology isn't reading the links the students are
+     creating"). The link carried the whole file: every policy switch, the whole layout, the song's record
+     and the time — 950 characters for Mary Had a Little Lamb, 2,100 for the Star Spangled Banner, where
+     other apps' links had already been cut in Schoology at about 500. Now (`w: 2`) it carries what the
+     teacher's side reads — the title, the version, the name, the score (core.js COMPACT LINES) — and the
+     policy and layout only where they differ from WORK2_POLICY / WORK2_LAYOUT. Those two are FROZEN: the
+     defaults as they were that day; a new default goes in a w: 3, never here. expandWork makes it the same
+     object a file holds, and saveWorkLink checks it does, or sends the full one (as before). Files are
+     unchanged (no length to keep down). */
+  // (a new student version's own start — newVersionDraft — and the Music Page a fresh browser has, its `look`)
+  const WORK2_POLICY = {
+    v: 1, kind: 'student-version',
+    task: { pitchLocked: false, rhythmLocked: false, wordsLocked: false, chordsLocked: false, note: '', melodyLocked: false },
+    key: { locked: true },
+    tempo: { mode: 'any', min: 60, max: 120 },
+    shell: { sound: true, view: true, lookPage: false, strip: true, dock: true, sections: true, textEditor: true, picture: false, present: true, options: true, library: 'none' },
+    save: { link: true, file: true },
+    student: { askName: true },
+    look: { playLight: 'note', followScroll: true, colours: true, showLane: true, noteNames: 'off' }
+  };
+  const WORK2_LAYOUT = {
+    v: 1, notes: null, accidentals: true, rests: true, harmony: true, connected: true, chords: null, values: null, keys: null,
+    scaleMorph: true, chordBend: true, show: { sectionTitles: true, keycaps: true, barNumbers: true }, locked: false
+  };
+  const plainObj = x => !!x && typeof x === 'object' && !Array.isArray(x);
+  /* what `cur` changes in `base`: the keys that differ (objects key by key), undefined when nothing does;
+     keys `base` has and `cur` lacks are listed under '-', so they can be taken out again */
+  function diffFrom(base, cur) {
+    if (ui.stableStringify(base) === ui.stableStringify(cur)) return undefined;
+    if (!plainObj(base) || !plainObj(cur)) return cur;
+    const out = {};
+    Object.keys(cur).forEach(k => { const d = diffFrom(base[k], cur[k]); if (d !== undefined) out[k] = d; });
+    const gone = Object.keys(base).filter(k => !(k in cur));
+    if (gone.length) out['-'] = gone;
+    return out;
+  }
+  function mergeOnto(base, d) {
+    if (d === undefined) return cloneJson(base);
+    if (!plainObj(base) || !plainObj(d)) return cloneJson(d);
+    const out = cloneJson(base);
+    Object.keys(d).forEach(k => { if (k !== '-') out[k] = mergeOnto(base[k], d[k]); });
+    (Array.isArray(d['-']) ? d['-'] : []).forEach(k => { delete out[k]; });
+    return out;
+  }
+  function workLinkData(full) {
+    const song = full.song || {};
+    const d = { w: 2, t: full.title };
+    if (full.version && full.version.id) d.i = full.version.id;
+    if (full.version && full.version.title && full.version.title !== full.title) d.vt = full.version.title;
+    if (full.student && full.student.name) d.n = full.student.name;
+    if (song.title !== full.title) d.st = song.title;
+    const p = diffFrom(WORK2_POLICY, full.policy);
+    if (p !== undefined) d.p = p;
+    const l = diffFrom(WORK2_LAYOUT, full.layout);
+    if (l !== undefined) d.l = l;
+    const packed = ui.packScore(song.score);
+    if (packed) d.c = packed; else d.s = song.score;
+    return d;
+  }
+  /* a #work= link's data as the file's shape (an older link, or not w: 2, as it came) */
+  function expandWork(d) {
+    if (!d || d.w !== 2) return d;
+    const title = typeof d.t === 'string' ? d.t : '';
+    let score = null;
+    try { score = d.c ? ui.unpackScore(d.c) : d.s; } catch (e) { score = null; }
+    if (!score) return false;
+    return {
+      v: 1, kind: 'student-work', title,
+      version: { id: d.i || '', title: d.vt || title },
+      student: { name: d.n || '' },
+      policy: mergeOnto(WORK2_POLICY, d.p),
+      layout: mergeOnto(WORK2_LAYOUT, d.l),
+      song: { title: d.st !== undefined ? d.st : title, score }
+    };
+  }
+  /* the shorter link, when it reads back as this work; else the whole file, as before */
+  function workForLink(full) {
+    try {
+      const d = workLinkData(full);
+      const back = expandWork(JSON.parse(JSON.stringify(d)));
+      const same = (a, b) => ui.stableStringify(a) === ui.stableStringify(b);
+      if (back && same(back.policy, full.policy) && same(back.layout, full.layout) && same(back.song.score, full.song.score) &&
+          back.song.title === full.song.title && back.title === full.title && same(back.version, full.version) && same(back.student, full.student)) return d;
+    } catch (e) {}
+    return full;
+  }
   function saveWorkLink() {
-    if (!policy.save.link || !nameFirst()) return;
-    const link = SW.library.shortLinkFor(workPayload(), 'work');
+    if (!linkOffered() || !nameFirst()) return;
+    const link = SW.library.shortLinkFor(workForLink(workPayload()), 'work');
     SW.library.offerLink(link, $('sw-link-input'), $('sw-link-row'), $('sw-link-copy-text'), $('sw-link-feedback'));
   }
   function saveWorkFile() {
-    if (!policy.save.file || !nameFirst()) return;
+    if (!fileOffered() || !nameFirst()) return;
     downloadJson(workPayload(), workFileName());
     ui.toast('Saved “' + workFileName() + '” to your downloads');
   }
@@ -1003,7 +1099,7 @@
   function checkUrlForWork() {
     const raw = ui.linkParam('work');
     if (!raw) return null;
-    const data = ui.decodeJson(raw);
+    const data = expandWork(ui.decodeJson(raw));        // (w: 2, the shorter link — THE WORK LINK, SHORTER)
     return (data && data.kind === 'student-work' && data.song) ? data : false;
   }
   function returnedParts(data) {
@@ -1203,7 +1299,11 @@
       $('sv-tempo-max').addEventListener(ev, () => { readRange(); renderVersionSheet(true); });
     });
     $('sv-save-link').addEventListener('change', e => { sv.policy.save.link = e.target.checked; renderVersionSheet(true); });
-    $('sv-save-file').addEventListener('change', e => { sv.policy.save.file = e.target.checked; renderVersionSheet(true); });
+    $('sv-save-file').addEventListener('change', e => {
+      sv.policy.save.file = e.target.checked;
+      if (!STUDENT_LINKS) sv.policy.save.link = false;       // LINKS OFF: the file box is the whole choice
+      renderVersionSheet(true);
+    });
     $('sv-note').addEventListener('input', e => { sv.policy.task.note = e.target.value.slice(0, 160); });
     $('sv-title').addEventListener('input', e => { sv.title = e.target.value; });
     $('sv-preview-btn').addEventListener('click', previewVersion);

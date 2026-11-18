@@ -17,7 +17,8 @@
                nearest part on; the last part on stays on.
    CHORDS (then the user): when the song has chords, a Chords switch
    comes first, on every page — the chords are shown or not (the same
-   thing as Look → Display Chords Off, view pref showLane). Hidden, they
+   thing as Look → Display Chords Off was, view pref showLane — since
+   2026-11-17 this tab is the one way to hide them). Hidden, they
    still play unless Sound → Hear hidden parts is off (player.js).
    A one-part song gets the strip too once a chord is placed
    (Chords | Part 1 | +); Part 1 is then the one part that stays on.

@@ -129,7 +129,13 @@
       return e;
     }
     const was = chosen.get(pc.at);
-    if (was) { Object.assign(e, was); return e; }
+    if (was) {
+      Object.assign(e, was);
+      // a choice keeps its bar as cells ('XOXO…'); a card's rhythm is a rhythm string — what cardSpot,
+      // choiceOf and hearing it read (2026-11-17: raw cells read as no rhythm, so a choice here was silent)
+      if (e.rhythm !== T.HELD && /^[XOR]+$/.test(e.rhythm)) e.rhythm = T.rhythmOf(T.fit(e.rhythm, barCells()));
+      return e;
+    }
     if (!pc.rhythm) { e.rhythm = T.HELD; return e; }
     const g = T.grid(), n = barCells();
     const lead = ((pc.at - g.T(g.barAt(pc.at))) / CELL) % n;

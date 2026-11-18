@@ -369,7 +369,7 @@
       : 'left:' + o.left.toFixed(1) + 'px;top:' + o.top + 'px;width:' + o.width.toFixed(1) + 'px;height:' + o.height + 'px;';
     const name = e.id ? C.labelHTML(l.name) : '—';
     let dots = '';
-    if (view().chordRhythm !== false && o.dots && o.dots.length) {
+    if (o.dots && o.dots.length) {   // always (2026-11-17: Look → Display Chords, and its Chord Names without them, went)
       dots = '<span class="cb-dots" aria-hidden="true">' + o.dots.map(([x, ex]) =>
         (o.pct ? '<i style="left:' + x.toFixed(2) + '%"></i>' + (ex > x + 2 ? '<b style="left:' + x.toFixed(2) + '%;width:' + (ex - x).toFixed(2) + '%"></b>' : '')
                : '<i style="left:' + x.toFixed(1) + 'px"></i>' + (ex > x + 6 ? '<b style="left:' + x.toFixed(1) + 'px;width:' + (ex - x).toFixed(1) + 'px"></b>' : ''))

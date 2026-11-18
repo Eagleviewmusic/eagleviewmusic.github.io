@@ -615,7 +615,7 @@
      (chord-track.js chip), laid on this page's own time: a chord runs from the left edge
      of the beat pill it starts in (or its share of it) to where it ends, its strikes as
      dots under the circles they sound with. Shown while the chords are (the Chords switch,
-     Look → Display Chords); a tap hears one; the player lights the one sounding. */
+     the part strip's Chords tab); a tap hears one; the player lights the one sounding. */
   function fillChords(PB) {
     const lanes = el.querySelectorAll('.rp-chords');
     if (!lanes.length || !SW.ctrack || !SW.ctrack.chip) return;

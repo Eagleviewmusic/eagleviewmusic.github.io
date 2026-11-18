@@ -102,7 +102,8 @@
     circleNames: 'letter',  //   and the circle's names: 'letter' (C Am B♭) | 'roman' (I vi ♭VII) — its own C · I switch
     chordMove: 'key',       // 2026-11-16 the chord editor and Compare: ↑ ↓ move a note along the 'key' (the scale) | 'chromatic' (half steps)
     tlZoom: 'close',        // 2026-10-29 the Time Line's zoom: 'close' (every beat) | 'mid' (about 20 bars) | 'top' (about 36 bars) (chord-timeline.js)
-    chordRhythm: true,      // 2.5 the chord track shows its strikes as dots (chord-track.js)
+    // chordRhythm (the chord track's dots) went 2026-11-17 with Look → Display Chords (user): the dots always show
+    chordsBackV1: false,    //   once: a Display Chords left Off is turned back on (showLane) — it had no other way back but that row
     editOpen: false,        // 2026-10-31 the Edit box is out (the rail's › — edit-box.js THE RAIL)
     lockScore: false,       // 2026-10-31 the lock (the rail's small circle, Options → Lock the score): the score only
                             //   changes with the Edit box open, and its Chords pane never changes the music's chords
@@ -161,6 +162,7 @@
     } catch (e) {}
     if (OLD_WORKSPACE[view.workspace]) view.workspace = OLD_WORKSPACE[view.workspace];
     if (!view.trackOwn) { view.showLane = true; view.trackOwn = true; }   // once: the stored value was the workspace's
+    if (!view.chordsBackV1) { view.showLane = true; view.chordsBackV1 = true; }   // once (2026-11-17): Display Chords is gone
     // Display Chord Panel left Options on 2026-11-01 (user): a panel left out would have nothing to put it away
     view.showStrip = false;
     if (!WORKSPACES[view.workspace]) view.workspace = workspaceFor(view);
@@ -216,7 +218,7 @@
      song only: the student's own are kept aside (ownLook) and are what
      saveView stores, and they come back as soon as the version is left
      (the policy pass: unpinLook). */
-  const PAGE_LOOK = ['playLight', 'followScroll', 'colours', 'showLane', 'chordRhythm', 'noteNames'];
+  const PAGE_LOOK = ['playLight', 'followScroll', 'colours', 'showLane', 'noteNames'];
   let ownLook = null;
   function pageLook() {
     const o = {};
@@ -233,7 +235,7 @@
     const L = Object.assign({}, ownLook, look || {});
     view.playLight = PLAY_LIGHTS.indexOf(L.playLight) !== -1 ? L.playLight : ownLook.playLight;
     view.noteNames = NOTE_NAMES.indexOf(L.noteNames) !== -1 ? L.noteNames : ownLook.noteNames;
-    ['followScroll', 'colours', 'showLane', 'chordRhythm'].forEach(k => { view[k] = !!L[k]; });
+    ['followScroll', 'colours', 'showLane'].forEach(k => { view[k] = !!L[k]; });
     if (ui.stableStringify(pageLook()) !== before) lookChanged();
   }
   function unpinLook() {
@@ -427,8 +429,10 @@
      split in two. LOOK, the everyday tools: Scale · Text size · Lyric font,
      then Music Page — Light up selected/played · Follow along as song plays
      · Background Section Colors · Display Chords (Off · Chord Names ·
-     +Rhythms: showLane and chordRhythm, two switches until then) · Display
-     Note Names (Off · Letters · Solfège: the toolbar's glasses until then).
+     +Rhythms: showLane and chordRhythm, two switches until then — the row
+     went 2026-11-17, user: Off left the chords with no way back but it; the
+     dots always show, and the part strip's Chords tab shows or hides them) ·
+     Display Note Names (Off · Letters · Solfège: the toolbar's glasses until then).
      OPTIONS, the deeper customising: the lock, Staging (Keyboard notes
      light up the · Keyboard Colors), Layout settings… and How this works.
      Display Chord Panel and Display Keyboard left Staging on 2026-11-01
@@ -457,8 +461,6 @@
     });
     return list.children.length;
   }
-  /* Display Chords: Off · Chord Names (the chord track) · +Rhythms (and its dots) */
-  function chordsShown() { return !view.showLane ? 'off' : view.chordRhythm ? 'rhythms' : 'names'; }
   function radio(sel, key, val) {
     document.querySelectorAll(sel).forEach(b => {
       const on = b.dataset[key] === val;
@@ -483,7 +485,6 @@
     $('text-bigger-btn').disabled = view.textPct >= 250;
     document.querySelectorAll('#lyric-font-row .font-chip').forEach(c => c.classList.toggle('active', c.dataset.font === view.lyricFont));
     radio('#play-light-seg .seg-btn', 'pl', view.playLight);
-    radio('#chords-show-seg .seg-btn', 'cs', chordsShown());
     radio('#names-seg .seg-btn', 'nn', view.noteNames);
     radio('#key-mode-seg .seg-btn', 'km', view.keyMode);
     // Look's two halves (2026-11-15): the sizes and fonts (a lesson's 'view') and the Music Page rows
@@ -494,8 +495,6 @@
     // student version with the notes fixed (can: keyMode)
     showHide($('key-mode-row'), can('keyMode'));
     showHide($('look-page-title'), allows('lookPage') || can('keyMode'));
-    // the chords' row goes with the chords a lesson leaves out
-    showHide($('chords-show-row'), allows('lookPage') && can('chordsListen'));
   }
   const inVersion = () => !!(SW.lessons && SW.lessons.isStudentVersion && SW.lessons.isStudentVersion());
   /* Look has something in it: its sizes, or (a student version) its Music Page or the key's row */
@@ -625,7 +624,7 @@
     }
     list.appendChild(ui.switchRow('Steady beat', 'A soft tick on every beat', snd.beat, () => setSound('beat', !snd.beat)));
     // PARTS (2026-11-03, the user): a part turned off on Notation or Rhythm (parts.js SHOWN) — heard or not; remembered.
-    // Only while the song has parts or chords (hidden chords: the Chords switch, Display Chords Off); the music goes on with
+    // Only while the song has parts or chords (hidden chords: the part strip’s Chords switch); the music goes on with
     // the change (player.js). The Pitch page always plays its part alone
     if ((SW.parts && SW.parts.count() > 1) || (SW.track && SW.track.hasChords())) {
       list.appendChild(ui.switchRow('Hear hidden parts', 'Parts and chords you hide still play — turn off to hear only what you can see. Pitch plays its one part', !!view.hearHidden,
@@ -741,10 +740,6 @@
     });
     wireKeyColours();
     $('play-light-seg').addEventListener('click', e => { const b = e.target.closest('.seg-btn'); if (b) setView({ playLight: b.dataset.pl }); });
-    $('chords-show-seg').addEventListener('click', e => {
-      const b = e.target.closest('.seg-btn');
-      if (b && b.dataset.cs !== chordsShown()) setView({ showLane: b.dataset.cs !== 'off', chordRhythm: b.dataset.cs === 'rhythms' });
-    });
     $('key-mode-seg').addEventListener('click', e => {
       const b = e.target.closest('.seg-btn');
       if (b && b.dataset.km !== view.keyMode) setView({ keyMode: b.dataset.km });   // the range follows (allowedNotes)

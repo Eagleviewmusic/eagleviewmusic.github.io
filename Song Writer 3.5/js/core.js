@@ -1113,6 +1113,142 @@
     }
   };
 
+  /* COMPACT LINES (2026-11-17, the user: Schoology wasn't reading the links
+     students made with Save my work — 950 to 2,100 characters). Deflate
+     alone still spells out every key of every note ({"text":"Twin","cols":
+     [{"notes":[{"n":"do"}]}]}); here a song's lines are one string, a line
+     to a row (\n), its syllables after `|`:
+
+       row       label [^pickup [^bars]] (|syllable)*        an instrumental line: label^^bars, no syllables
+       syllable  col(,col)*[-] text                          `-` = hy; the text runs from the first space to the next |
+       col       [value][@key] note+ [~][!]                  value 0…8 = w. w h. h q. q e. e s (none: a block);
+                                                             @ + a…m = a key change (C … B); ~ tie; ! ghost
+       note      rung [#|_] [*] [>rung]                      rung A…Z a…i = do,, … ti″′ (35, low to high);
+                                                             # sharp, _ flat, * rest, > its step
+
+     Only what this can spell exactly is packed: ui.packScore writes it,
+     reads it back and compares (stableStringify); anything else (a key it
+     does not know, a | in a word, scale fine-tuning `alt`) and the score
+     goes as plain JSON. The letters are FROZEN — never reorder them; a
+     new rung or value goes on the end.
+     API  ui.packScore(score) → a copy with every `lines` a string, or null · ui.unpackScore(packed) → the score */
+  const LC_RUNGS = ['do-low2', 're-low2', 'mi-low2', 'fa-low2', 'so-low2', 'la-low2', 'ti-low2',
+    'do-low', 're-low', 'mi-low', 'fa-low', 'so-low', 'la-low', 'ti-low',
+    'do', 're', 'mi', 'fa', 'so', 'la', 'ti',
+    'do-high', 're-high', 'mi-high', 'fa-high', 'so-high', 'la-high', 'ti-high',
+    'do-high2', 're-high2', 'mi-high2', 'fa-high2', 'so-high2', 'la-high2', 'ti-high2'];
+  const LC_RUNG_CH = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi';
+  const LC_VALUES = ['w.', 'w', 'h.', 'h', 'q.', 'q', 'e.', 'e', 's'];
+  const LC_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+  const LC_KEY_CH = 'abcdefghijklm';
+  const only = (o, keys) => !!o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).every(k => keys.indexOf(k) !== -1);
+  function lcNote(n) {
+    if (!only(n, ['n', 'acc', 'rest', 'step'])) return null;
+    const r = LC_RUNGS.indexOf(n.n);
+    if (r === -1) return null;
+    let s = LC_RUNG_CH[r];
+    if (n.acc !== undefined) { if (n.acc === 'sharp') s += '#'; else if (n.acc === 'flat') s += '_'; else return null; }
+    if (n.rest !== undefined) { if (n.rest !== true) return null; s += '*'; }
+    if (n.step !== undefined) { const st = LC_RUNGS.indexOf(n.step); if (st === -1) return null; s += '>' + LC_RUNG_CH[st]; }
+    return s;
+  }
+  function lcCol(c) {
+    if (!only(c, ['v', 'key', 'notes', 'tie', 'ghost']) || !Array.isArray(c.notes) || !c.notes.length) return null;
+    let s = '';
+    if (c.v !== undefined) { const v = LC_VALUES.indexOf(c.v); if (v === -1) return null; s += v; }
+    if (c.key !== undefined) { const k = LC_KEYS.indexOf(c.key); if (k === -1) return null; s += '@' + LC_KEY_CH[k]; }
+    for (const n of c.notes) { const t = lcNote(n); if (t === null) return null; s += t; }
+    if (c.tie !== undefined) { if (c.tie !== true) return null; s += '~'; }
+    if (c.ghost !== undefined) { if (c.ghost !== true) return null; s += '!'; }
+    return s;
+  }
+  const lcText = t => typeof t === 'string' && !/[|\n\r]/.test(t);
+  function lcLine(l) {
+    if (!only(l, ['label', 'syllables', 'pickup', 'bars'])) return null;
+    const label = l.label === undefined ? '' : l.label;
+    if (!lcText(label) || label.indexOf('^') !== -1) return null;
+    let s = label;
+    if (l.pickup !== undefined || l.bars !== undefined) s += '^' + (l.pickup === undefined ? '' : String(l.pickup));
+    if (l.bars !== undefined) s += '^' + l.bars;
+    if (l.bars !== undefined) return l.syllables === undefined ? s : null;      // (an instrumental line is written as bars alone)
+    if (!Array.isArray(l.syllables)) return null;
+    for (const sy of l.syllables) {
+      if (!only(sy, ['text', 'cols', 'hy']) || !lcText(sy.text) || !Array.isArray(sy.cols) || !sy.cols.length) return null;
+      const cols = sy.cols.map(lcCol);
+      if (cols.indexOf(null) !== -1) return null;
+      if (sy.hy !== undefined && sy.hy !== true) return null;
+      s += '|' + cols.join(',') + (sy.hy ? '-' : '') + ' ' + sy.text;
+    }
+    return s;
+  }
+  function lcUnCol(s) {
+    const c = {};
+    let i = 0;
+    if (/[0-8]/.test(s[i])) c.v = LC_VALUES[+s[i++]];
+    if (s[i] === '@') { c.key = LC_KEYS[LC_KEY_CH.indexOf(s[i + 1])]; i += 2; }
+    c.notes = [];
+    while (i < s.length && LC_RUNG_CH.indexOf(s[i]) !== -1) {
+      const n = { n: LC_RUNGS[LC_RUNG_CH.indexOf(s[i++])] };
+      if (s[i] === '#') { n.acc = 'sharp'; i++; } else if (s[i] === '_') { n.acc = 'flat'; i++; }
+      if (s[i] === '*') { n.rest = true; i++; }
+      if (s[i] === '>') { n.step = LC_RUNGS[LC_RUNG_CH.indexOf(s[i + 1])]; i += 2; }
+      c.notes.push(n);
+    }
+    if (s[i] === '~') { c.tie = true; i++; }
+    if (s[i] === '!') { c.ghost = true; i++; }
+    if (i !== s.length) throw new Error('compact column');
+    return c;
+  }
+  function lcUnLine(row) {
+    const parts = row.split('|');
+    const head = parts[0].split('^');
+    const l = { label: head[0] };
+    if (head.length > 1 && head[1] !== '') l.pickup = head[1];
+    if (head.length > 2) { l.bars = +head[2]; return l; }
+    l.syllables = parts.slice(1).map(t => {
+      const sp = t.indexOf(' ');
+      let code = t.slice(0, sp);
+      const sy = { text: t.slice(sp + 1) };
+      if (code.slice(-1) === '-') { sy.hy = true; code = code.slice(0, -1); }
+      sy.cols = code.split(',').map(lcUnCol);
+      return sy;
+    });
+    return l;
+  }
+  const lcPackLines = lines => {
+    if (!Array.isArray(lines)) return null;
+    const rows = lines.map(lcLine);
+    return rows.indexOf(null) === -1 ? rows.join('\n') : null;
+  };
+  const lcUnpackLines = str => (str === '' ? [] : str.split('\n').map(lcUnLine));
+  ui.packScore = function (score) {
+    try {
+      if (!score || typeof score !== 'object') return null;
+      const out = JSON.parse(JSON.stringify(score));
+      const main = lcPackLines(out.lines);
+      if (main === null) return null;
+      out.lines = main;
+      if (Array.isArray(out.parts)) {
+        for (const p of out.parts) {
+          if (!p || p.lines === undefined) continue;
+          const pl = lcPackLines(p.lines);
+          if (pl === null) return null;
+          p.lines = pl;
+        }
+      }
+      // what it spells must read back as exactly this score, or the score goes as it is
+      return ui.stableStringify(ui.unpackScore(JSON.parse(JSON.stringify(out)))) === ui.stableStringify(score) ? out : null;
+    } catch (e) {
+      return null;
+    }
+  };
+  ui.unpackScore = function (packed) {
+    const out = JSON.parse(JSON.stringify(packed));
+    if (typeof out.lines === 'string') out.lines = lcUnpackLines(out.lines);
+    if (Array.isArray(out.parts)) out.parts.forEach(p => { if (p && typeof p.lines === 'string') p.lines = lcUnpackLines(p.lines); });
+    return out;
+  };
+
   ui.switchRow = function (name, desc, on, onClick, opts) {
     const o = opts || {};
     const btn = document.createElement('button');
