@@ -638,10 +638,14 @@
   </div>
 </div>
 
-<!-- audio.js and theory.js are copies of the files in Digital Accordion/: change them there, then copy them here.
+<!-- theory.js is a copy of the file in Digital Accordion/: change it there, then copy it here. audio.js WAS one too;
+     2.0 adds recorded instruments to it (the sample voice), so it is now this app's own (its header says what changed).
+     samples.js + samples/ = the recorded instruments (VCSL and VSCO 2 CE, CC0; samples/CREDITS.txt), made by _build/build-samples.mjs.
      lib/evm-count-in.* are copies of EVM Library/'s (check-copies.sh); vendor/lame.min.js is lamejs (LAME-NOTICE.txt). -->
 <link rel="stylesheet" href="lib/evm-count-in.css">
 <script src="audio.js"></script>
+<script src="samples/manifest.js"></script>
+<script src="samples.js"></script>
 <script src="theory.js"></script>
 <script src="lib/evm-count-in.js"></script>
 <script src="vendor/lame.min.js"></script>

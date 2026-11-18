@@ -13,7 +13,18 @@
    instrument's stand-in synth sound plays, so a key is never silent.
    ========================================================================== */
 const Samples = (() => {
-  const MANIFEST = window.VK_SAMPLE_MANIFEST || { instruments: {} };
+  /* Inside the Recording Studio (?embed=studio) the keyboard keeps to its
+     synth sounds, as before 2.0 replaced 1.0 (2026-11-17): the studio plays its
+     tracks back on its own sound engine, which has no recorded instruments, so
+     a Violins take would come back as Piano. With no instruments listed here,
+     none reach the sound menu, and a saved recorded sound falls back to Piano. */
+  const inStudio = (() => {
+    try {
+      return new URLSearchParams(location.search).get('embed') === 'studio'
+        && window.parent !== window && !!window.parent.EVMStudio;
+    } catch (e) { return false; }
+  })();
+  const MANIFEST = inStudio ? { instruments: {} } : (window.VK_SAMPLE_MANIFEST || { instruments: {} });
   const BASE = 'samples/';
 
   /* How each one plays: release = seconds to fade once the key is let go

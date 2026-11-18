@@ -617,6 +617,13 @@
     R.priming = recording ? 'recording' : 'playing';
     renderTransport();
     if (count) EVMCountIn.open(count, barBeats());
+    // 2.0: every recorded instrument the song needs has its notes in before the first one is laid down
+    if (window.Samples) {
+      const need = P.tracks.filter(t => !t.muted && t.notes.length).map(t => t.sound).concat(recording ? [currentSound] : []);
+      if (need.some(id => Samples.status(id).state === 'loading' || Samples.status(id).state === 'idle')) toast('Loading the recorded instruments…');
+      await Samples.ready(need);
+      if (token !== runToken) return;
+    }
     const ok = await EVMCountIn.prime(ctx, { warm: count ? 0.35 : 0.12 });
     if (token !== runToken) return;
     if (!ok) {
@@ -2476,6 +2483,7 @@
       sound.setAttribute('aria-label', `Track ${i + 1} sound`);
       sound.addEventListener('change', () => {
         P.tracks[i].sound = sound.value;
+        if (window.Samples) Samples.want(sound.value); // a recorded instrument: start its download now
         if (i === R.armed) { currentSound = sound.value; renderChrome(); }
         sound.blur(); // hand the computer keyboard back to the piano
         save();
@@ -3191,6 +3199,12 @@
     try {
       saveStatus.textContent = 'Mixing the tracks…';
       await pause();
+      if (window.Samples) {   // 2.0: the recorded instruments in the song, loaded before mixing
+        const need = song.parts.flatMap(p => p.notes.map(n => n.preset));
+        if (need.some(id => Samples.status(id).state !== 'none' && Samples.status(id).state !== 'ready')) saveStatus.textContent = 'Loading the recorded instruments…';
+        await Samples.ready(need);
+        saveStatus.textContent = 'Mixing the tracks…';
+      }
       const buffer = await Audio.render(song);
       const blob = await encodeMp3(buffer, p => { saveStatus.textContent = `Making the MP3… ${Math.round(p * 100)}%`; });
       const filename = `${fileBase()}.mp3`;

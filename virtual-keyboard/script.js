@@ -940,6 +940,8 @@ const soundSelect = document.getElementById('sound-select');
 // Key Blocks' sounds, grouped for the menu. Anything Key Blocks adds later
 // lands in "More sounds" until it is given a group here.
 const soundGroups = [
+  // 2.0: real instruments, recorded (samples.js) — the synth sounds below are all still here
+  { label: 'Recorded instruments', ids: window.Samples ? Samples.ids : [] },
   { label: 'Keyboards', ids: ['piano', 'epiano', 'organ'] },
   { label: 'Mallets & plucks', ids: ['marimba', 'bell', 'pluck'] },
   { label: 'Long tones', ids: ['pad', 'strings', 'voice'] },
@@ -952,6 +954,7 @@ function fillSoundSelect() {
   const groups = extra.length ? [...soundGroups, { label: 'More sounds', ids: extra }] : soundGroups;
   soundSelect.innerHTML = '';
   groups.forEach(g => {
+    if (!g.ids.some(id => Audio.PRESETS[id])) return;
     const og = document.createElement('optgroup');
     og.label = g.label;
     g.ids.filter(id => Audio.PRESETS[id]).forEach(id => {
@@ -974,8 +977,33 @@ function previewSound() {
 
 soundSelect.addEventListener('change', (e) => {
   currentSound = e.target.value;
-  previewSound();
+  if (window.Samples && Samples.status(currentSound).state !== 'none' && Samples.status(currentSound).state !== 'ready') {
+    // a recorded instrument heard for the first time: its notes download first (the stand-in plays meanwhile)
+    const id = currentSound, picked = performance.now();
+    Samples.want(id);
+    toast(`Loading ${Audio.PRESETS[id].name}…`);
+    Samples.ready(id).then(() => {
+      if (currentSound !== id || performance.now() - picked > 15000) return;
+      if (Samples.status(id).state === 'ready') { toast(`${Audio.PRESETS[id].name} is ready.`); previewSound(); }
+    });
+  } else {
+    previewSound();
+  }
   e.target.blur(); // hand the computer keyboard back to the piano
+});
+
+// While a recorded instrument loads, its name in every sound menu (the keyboard's
+// and the tracks') says so; if it cannot load, the stand-in sound keeps playing.
+if (window.Samples) Samples.onChange((id, st) => {
+  const base = Audio.PRESETS[id].name;
+  const label = st.state === 'loading' ? `${base} ${Math.round(100 * st.got / st.total)}%`
+    : st.state === 'failed' ? `${base} (did not load)` : base;
+  document.querySelectorAll(`select option[value="${id}"]`).forEach(o => { if (o.textContent !== label) o.textContent = label; });
+  if (st.state === 'failed' && currentSound === id) {
+    toast(location.protocol === 'file:'
+      ? 'Recorded instruments need the page opened from a web address, not a file.'
+      : `${base} did not load. The stand-in sound plays instead — pick it again to retry.`);
+  }
 });
 
 // -------- DISPLAY STATE --------
@@ -1284,6 +1312,7 @@ function renderChrome() {
   });
   document.querySelectorAll('.oct-btn').forEach(b => b.setAttribute('aria-checked', String(+b.dataset.octaves === currentOctaves)));
   soundSelect.value = currentSound;
+  if (window.Samples) Samples.want(currentSound); // a recorded instrument (from a link, a workspace, a track) starts loading
   focusBtn.setAttribute('aria-pressed', String(currentToggleStates.focus === 1));
   const chromatic = currentToggleStates.layout === 't-blue';
   const letters = showHotkeys && !keysView;
