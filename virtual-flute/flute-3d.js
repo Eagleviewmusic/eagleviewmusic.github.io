@@ -214,13 +214,21 @@ const F = {
   rodFoot: { th: 18, R: 13.4, x0: 485, x1: 647 },   // crosses the front just above the axis
   rodGiz:  { th: 56, R: 12.9, x0: 509, x1: 592 },
   rodTrill:{ th: -80, R: 20.6, x0: 186, x1: 458 },   // the long trill rod: a second rod below the main one in front
-  rodThumb:{ th: -178, R: 13.6, x0: 238, x1: 296 },
+  axThumb: { th: -152, R: 12.0, x: 301.5 },            // the thumb keys' short axle lies ACROSS the tube (see TH below)
 };
 // the head joint's outside tapers a little toward the crown (about 89 % of the body's width there)
 const headR = x => 9.5 - 0.9 * Math.pow(clamp((110 - x) / 172, 0, 1), 2);
 const rad = (x, th, R) => V3(x, R * Math.sin(th * RAD), R * Math.cos(th * RAD));
 const nrm = th => V3(0, Math.sin(th * RAD), Math.cos(th * RAD));          // outward, round the tube
 const tan = th => V3(0, Math.cos(th * RAD), -Math.sin(th * RAD));         // round the tube, toward larger θ... (d/dθ of nrm)
+// The thumb keys (the B key and the Briccialdi B♭ lever) are two long see-saw levers lying along the back of the tube.
+// They rock on one short steel axle that crosses the tube 36 mm foot-side of the thumb hole: a straight line, tangent
+// to a circle of 12 mm about the tube's axis at θ -152, from a ball post low on the back (θ -172) up to a taller post
+// on the rod side (θ -110). Measured from two photographs of real flutes seen from the back.
+const TH = (() => {
+  const a = F.axThumb, ax = tan(a.th), c0 = rad(a.x, a.th, a.R);
+  return { x: a.x, ax, pv: c0, ang: 5 * RAD, at: s => c0.clone().addScaledVector(ax, s), sOf: th => a.R * Math.tan((th - a.th) * RAD) };
+})();
 
 // The cups: tone hole position, angle round the tube, cup radius, the rod it turns on, open at rest or not.
 // Names are the page's: a hole is named by the note it sounds as the highest open hole; `name` is what flutists
@@ -245,7 +253,7 @@ const CUPS = [
   { id: 'trD', x: 211,   th: -125, r: 5.4, rod: 'rodTrill', shut: true, name: 'D trill' },
   { id: 'GsR', x: 353.5, th: -136, r: 7.7, rod: 'rodBody', shut: true, name: 'G♯' },
   // the thumb's cup on the back (the B key) and its hole
-  { id: 'Th',  x: 265,   th: -145, r: F.cupR, rod: 'rodThumb', finger: 'LT', name: 'thumb B' },
+  { id: 'Th',  x: 265,   th: -140, r: 8.7, rod: 'axThumb', finger: 'LT', name: 'thumb B' },
 ];
 
 /* ------------------------------------------------------------------ *
@@ -396,6 +404,36 @@ function touchPad(x, th, R, len, wid, thick, o = {}) {
   g.computeVertexNormals();
   return g;
 }
+// A plate with any outline: `pts` = the outline's control points [[u, v], ...] (a closed smooth curve through them),
+// `centre` = a point inside that sees the whole outline, `map(u, v, h)` = where the plate's own point (u, v) at height h
+// lies in the flute. A low dome on top, a rounded edge, a flat back.
+function plateGeo(pts, centre, map, o = {}) {
+  const NT = o.NT || 112, NR = o.NR || 9, NE = o.NE || 7, T = o.thick || 1.4, dome = o.dome || 0, e = o.edge || 0.12;
+  const ol = new THREE.CatmullRomCurve3(pts.map(([u, v]) => V3(u, v, 0)), true, 'centripetal').getSpacedPoints(NT).slice(0, NT);
+  const prof = [];
+  if (o.pillow) {                                   // one smooth swelling from edge to edge (a spoon), no flat and no bevel
+    const ht = T / 2 + dome, hb = -T / 2 + 0.3 * T, N = NR + 5;
+    for (let j = 1; j <= N; j++) { const a = j / N * Math.PI / 2; prof.push([Math.sin(a), hb + (ht - hb) * Math.cos(a)]); }
+    prof.push([0.985, -T / 2 + 0.1 * T], [0.93, -T / 2]);
+    for (let j = NR - 1; j >= 1; j--) prof.push([0.93 * j / NR, -T / 2]);
+  } else {
+    for (let j = 1; j <= NR; j++) { const r = j / NR; prof.push([r * (1 - e), T / 2 + dome * (1 - r * r)]); }
+    for (let i = 1; i < NE; i++) { const a = i / NE * Math.PI; prof.push([1 - e + e * Math.sin(a), T / 2 * Math.cos(a)]); }
+    for (let j = NR; j >= 1; j--) { const r = j / NR; prof.push([r * (1 - e), -T / 2]); }
+  }
+  const pos = [], idx = [], put = q => pos.push(q.x, q.y, q.z);
+  put(map(centre[0], centre[1], T / 2 + dome + (o.top ? o.top(centre[0], centre[1], 0) : 0)));
+  // o.top(u, v, rho): extra height on the face (a dish, a curve), fading out round the edge
+  for (const [rho, h] of prof) for (let k = 0; k < NT; k++) { const u = centre[0] + (ol[k].x - centre[0]) * rho, v = centre[1] + (ol[k].y - centre[1]) * rho; put(map(u, v, h + (o.top && h > 0 ? o.top(u, v, rho) * Math.min(1, h / (T / 2)) : 0))); }
+  put(map(centre[0], centre[1], -T / 2));
+  const ring = i => 1 + i * NT, last = 1 + prof.length * NT, nP = prof.length;
+  for (let k = 0; k < NT; k++) { const k1 = (k + 1) % NT; idx.push(0, ring(0) + k, ring(0) + k1, last, ring(nP - 1) + k1, ring(nP - 1) + k); }
+  for (let i = 0; i < nP - 1; i++) for (let k = 0; k < NT; k++) { const k1 = (k + 1) % NT, a = ring(i) + k, b = ring(i) + k1, c = ring(i + 1) + k, d = ring(i + 1) + k1; idx.push(a, c, b, b, c, d); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  const up = map(centre[0], centre[1], 1).sub(map(centre[0], centre[1], 0)), n0 = V3().fromBufferAttribute(g.attributes.normal, 0);
+  if (n0.dot(up) < 0) { const ix = g.index.array; for (let i = 0; i < ix.length; i += 3) { const t = ix[i + 1]; ix[i + 1] = ix[i + 2]; ix[i + 2] = t; } g.computeVertexNormals(); }
+  return g;
+}
 // a thin rib soldered along the tube under a rod's posts
 function rib(x0, x1, th, w = 4.2) {
   const P = [rad(x0, th, F.R + 0.25), rad(x1, th, F.R + 0.25)];
@@ -408,11 +446,13 @@ function post(x, rd) {
   return [pillar, ball(b, 2.75, 26)];
 }
 // the cup: a lathe about +Y, y = 0 at the pad's face; scaled to radius r
-function cupShell(r) {
+function cupShell(r, plain) {
   const s = r / 9.3, h = Math.sqrt(s);
   // skirt, rounded shoulder, a flat ring, a small step, then the low dome in the middle (the ring every cup shows)
   const prof = [[0.36, 8.32], [0.3, 8.86], [0.62, 9.3], [2.3, 9.3], [2.95, 9.12], [3.42, 8.62], [3.72, 7.9], [3.86, 7.2], [3.96, 6.3], [4.0, 5.4], [4.0, 5.25], [4.1, 5.1], [4.13, 4.9], [4.34, 3.2], [4.46, 1.5], [4.5, 0]];
-  const g = lathe(prof.map(([y, rr]) => [y * h, rr * s]), { segs: 88, crease: 50 });
+  // (plain: one smooth low dome, no ring: the thumb's cup)
+  const profP = [[0.36, 8.32], [0.3, 8.86], [0.62, 9.3], [2.3, 9.3], [2.95, 9.12], [3.42, 8.62], [3.72, 7.9], [3.9, 7.0], [4.06, 5.8], [4.22, 4.4], [4.36, 2.9], [4.46, 1.5], [4.5, 0]];
+  const g = lathe((plain ? profP : prof).map(([y, rr]) => [y * h, rr * s]), { segs: 88, crease: 50 });
   const pos = g.attributes.position, col = [];
   for (let i = 0; i < pos.count; i++) { const v = 0.42 + 0.58 * smooth(0.4 * h, 3.3 * h, pos.getY(i)); col.push(v, v, v); }
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
@@ -593,7 +633,9 @@ function buildFlute() {
   const shadeTube = g => {
     const pos = g.attributes.position, col = new Float32Array(pos.count * 3), P = V3(), d = V3();
     const cups = CUPS.filter(c => !c.plate).map(c => ({ seat: rad(c.x, c.th, F.seat), n: nrm(c.th), r: c.r, x: c.x, th: c.th, rod: F[c.rod] }));
-    const rods = ['rodBody', 'rodG', 'rodFoot', 'rodGiz', 'rodTrill', 'rodThumb'].map(k => F[k]);
+    const rods = ['rodBody', 'rodG', 'rodFoot', 'rodGiz', 'rodTrill'].map(k => F[k]);
+    // the thumb levers and their axle: [x0, x1, θ0, θ1, depth] (soft-edged patches)
+    const patches = [[273, 298, -179, -141, 0.72], [296, 329, -150, -126, 0.62], [276, 300, -134, -120, 0.3], [TH.x - 2.4, TH.x + 2.4, -181, -106, 0.6], [TH.x - 2.4, TH.x + 2.4, -238, -160, 0.3]];
     for (let i = 0; i < pos.count; i++) {
       P.fromBufferAttribute(pos, i);
       let k = 1;
@@ -608,6 +650,11 @@ function buildFlute() {
           // the tail's shadow, from the cup toward its rod
           const tp = rad(c.x, (c.th + c.rod.th) / 2, F.R), dt = Math.hypot(P.x - c.x, P.y - tp.y, P.z - tp.z);
           k *= 1 - 0.45 * smooth(5.5, 1.5, dt);
+        }
+        for (const [x0, x1, t0, t1, dep] of patches) {
+          if (P.x < x0 - 4 || P.x > x1 + 4) continue;
+          const tm = (t0 + t1) / 2, a = Math.abs(((thP - tm) + 540) % 360 - 180), hw = (t1 - t0) / 2;
+          k *= 1 - dep * smooth(hw + 9, hw - 4, a) * smooth(x0 - 3.5, x0 + 1.5, P.x) * smooth(x1 + 3.5, x1 - 1.5, P.x);
         }
         for (const rd of rods) {
           if (P.x < rd.x0 - 3 || P.x > rd.x1 + 3) continue;
@@ -660,10 +707,10 @@ function buildFlute() {
   // ---- rods, ribs, posts ----
   const rodLine = (rd, x0 = rd.x0, x1 = rd.x1, r = 1.9) => { const p = rad(0, rd.th, rd.R); return cylX(x0, x1, p.y, p.z, r, 18); };
   const gaps = (rd, xs) => { for (const x of xs) { const p = rad(0, rd.th, rd.R); add('satin', cylX(x - 0.35, x + 0.35, p.y, p.z, 1.93, 16)); } };
-  for (const key of ['rodBody', 'rodG', 'rodFoot', 'rodGiz', 'rodTrill', 'rodThumb']) add('silver', rodLine(F[key]));
+  for (const key of ['rodBody', 'rodG', 'rodFoot', 'rodGiz', 'rodTrill']) add('silver', rodLine(F[key]));
   gaps(F.rodBody, [238.5, 249.5, 271.5, 292.5, 316.5, 341.5, 366, 389.5, 395.2, 421, 451.5]);
   gaps(F.rodFoot, [503, 516, 552, 589]);
-  const posts = { rodBody: [216, 271.5, 316.5, 387.5, 475.5], rodG: [316, 366], rodFoot: [483.5, 552, 647], rodGiz: [509, 592], rodTrill: [186, 300, 458], rodThumb: [238, 296] };
+  const posts = { rodBody: [216, 271.5, 316.5, 387.5, 475.5], rodG: [316, 366], rodFoot: [483.5, 552, 647], rodGiz: [509, 592], rodTrill: [186, 284, 458] };
   for (const [key, xs] of Object.entries(posts)) {
     const rd = F[key];
     for (const x of xs) add('silver', ...post(x, rd));
@@ -674,7 +721,7 @@ function buildFlute() {
       const slot = new THREE.BoxGeometry(0.3, 2.1, 0.32); slot.rotateX(-rd.th * RAD); slot.translate(x1 + dir * 0.02, c.y, c.z);
       add('dark', slot);
     }
-    if (key !== 'rodGiz') add('silver', rib(xs[0] - 3.5, xs[xs.length - 1] + 3.5, rd.th, key === 'rodThumb' ? 3.8 : 4.4));
+    if (key !== 'rodGiz') add('silver', rib(xs[0] - 3.5, xs[xs.length - 1] + 3.5, rd.th, 4.4));
     else add('silver', rib(xs[0] - 3, xs[0] + 3, rd.th, 4), rib(xs[1] - 3, xs[1] + 3, rd.th, 4));
   }
   // adjusting screws: a small lug on the hinge tube beside the arms of the linked keys, a slotted screw in each
@@ -686,7 +733,7 @@ function buildFlute() {
   // needle springs: a blued-steel wire from a little spring post on the rib to a hook on each key's hinge tube,
   // lying between the rod and the tube (the thin dark line a real flute shows under its rod)
   for (const c of CUPS) {
-    if (c.shut || c.plate || c.foot) continue;                                          // (the foot's read as dashes in front: left out)
+    if (c.shut || c.plate || c.foot || c.id === 'Th') continue;                         // (the foot's read as dashes in front: left out)
     const rd = F[c.rod], th = rd.th + 14, R = F.R + 2.1;   // (the foot's lie beyond its rod, out of the front view)
     const x0 = c.x - (c.foot ? 13 : 11), x1 = c.x - 3;
     add('spring', sweep([rad(x0, th, R), rad(x1, th, R + 0.4)], 0.26, { segs: 8, capA: true, capB: true }));
@@ -696,11 +743,11 @@ function buildFlute() {
   // ---- the moving parts ----
   const parts = {};               // id -> { group, pivot, sign, angle, mats: [materials to paint], anchor, out }
   const mkPart = (id, rdKey, opt = {}) => {
-    const rd = F[rdKey], piv = rad(0, rd.th, rd.R);
+    const rd = F[rdKey], piv = opt.pivot ? opt.pivot.clone() : rad(0, rd.th, rd.R);
     const g = new THREE.Group(); g.name = id; g.position.copy(piv);
     const joint = joints[jointOf(opt.xMid)]; joint.add(g);
     const mat = M.silver.clone(); mat.name = 'key:' + id; mat.clearcoat = 0.001; mat.roughness = 0.06; mat.color.set(0xe9e8e1); mat.vertexColors = true;
-    const p = { id, group: g, pivot: piv, sign: 1, angle: opt.angle || 7 * RAD, mat, meshes: [], x: 0, v: 0, to: 0, paint: 0, paintTo: 0, col: new THREE.Color(0xf0f0f1), colTo: new THREE.Color(0xf0f0f1), out: opt.out || null, anchor: opt.anchor || null, xMid: opt.xMid, joint };
+    const p = { id, group: g, pivot: piv, sign: 1, angle: opt.angle || 7 * RAD, mat, meshes: [], x: 0, v: 0, to: 0, paint: 0, paintTo: 0, col: new THREE.Color(0xf0f0f1), colTo: new THREE.Color(0xf0f0f1), out: opt.out || null, anchor: opt.anchor || null, xMid: opt.xMid, joint, axis: opt.axis || null, rot: 0 };   // axis: null = about its rod (along x)
     parts[id] = p;
     return p;
   };
@@ -713,17 +760,19 @@ function buildFlute() {
   };
   // which way round the rod makes `probe` move along `want` (out of / into the tube)
   const chooseSign = (p, probe, want) => {
-    const v = probe.clone().sub(p.pivot), a = v.clone().applyAxisAngle(AX, 0.01).sub(v);
+    const v = probe.clone().sub(p.pivot), a = v.clone().applyAxisAngle(p.axis || AX, 0.01).sub(v);
     p.sign = a.dot(want) >= 0 ? 1 : -1;
   };
 
   // Cups: shell + pad, the arm to the rod, a hinge tube
   for (const c of CUPS) {
     const rd = F[c.rod], n = nrm(c.th), seat = rad(c.x, c.th, F.seat);
-    const p = mkPart(c.id, c.rod, { angle: (c.shut ? 7.5 : 8.5) * RAD, out: n.clone(), xMid: c.x });
+    const isTh = c.id === 'Th';      // the thumb's cup rocks on the cross axle; its lever is built with the thumb keys below
+    const p = mkPart(c.id, c.rod, isTh ? { angle: TH.ang, out: n.clone(), xMid: c.x, pivot: TH.pv, axis: TH.ax } : { angle: (c.shut ? 7.5 : 8.5) * RAD, out: n.clone(), xMid: c.x });
     p.cup = c; p.size = c.r; p.anchor = seat.clone().addScaledVector(n, 4.3 * Math.sqrt(c.r / 9.3));
-    partAdd(p, 'key', place(cupShell(c.r), seat.clone(), n));
+    partAdd(p, 'key', place(cupShell(c.r, isTh), seat.clone(), n));
     if (!c.plate) partAdd(p, 'pad', place(cupPad(c.r), seat.clone().addScaledVector(n, 0.02), n));
+    if (isTh) { chooseSign(p, seat, n); continue; }
     // the arm: from the cup's side nearest the rod, down to the hinge tube
     const piv = rad(c.x, rd.th, rd.R);
     const toRod = piv.clone().sub(seat); toRod.addScaledVector(n, -toRod.dot(n)).normalize();
@@ -745,7 +794,7 @@ function buildFlute() {
       const k35 = 3.4 / wMax;
       // (waisted: broad where it leaves the rim, drawing in quickly, then a slim neck down to the hinge tube)
       partAdd(p, 'key', sweep(P, (s, L) => { const t = clamp((s / L - 0.1) / 0.55, 0, 1); return k35 + (1 - k35) * (1 - t) * (1 - t); }, { up: AX, scaleN: wMax / 2, scaleB: 0.95, sq: 3.4, segs: 18, capA: true, capB: true }));
-      if (!c.plate && c.id !== 'Th') {
+      if (!c.plate) {
         // the pointed arm: up over the rim and along the cup's top, narrowing to a point at the middle
         const S = spline([piv.clone().lerp(out, 0.55).addScaledVector(n, 0.9), seat.clone().addScaledVector(toRod, c.r + 0.75).addScaledVector(n, 2.5 * h), seat.clone().addScaledVector(toRod, c.r * 0.84).addScaledVector(n, 3.72 * h + 0.42), seat.clone().addScaledVector(toRod, c.r * 0.45).addScaledVector(n, 4.26 * h + 0.36), seat.clone().addScaledVector(toRod, -c.r * 0.08).addScaledVector(n, 4.5 * h + 0.1)], 36);
         partAdd(p, 'key', sweep(S, (s, L) => 1 - 0.95 * smooth(0.42, 1, s / L), { up: AX, scaleN: Math.min(1.12, c.r * 0.12), scaleB: 0.6, sq: 3.6, segs: 14, capA: true, capB: true }));
@@ -765,8 +814,8 @@ function buildFlute() {
   }
 
   // Touches. A pressed touch dips toward the tube by `angle` about its rod.
-  const touch = (id, rdKey, gs, anchor, out, angle = 5) => {
-    const p = mkPart(id, rdKey, { angle: angle * RAD, out, anchor, xMid: anchor.x });
+  const touch = (id, rdKey, gs, anchor, out, angle = 5, o = {}) => {
+    const p = mkPart(id, rdKey, Object.assign({ angle: angle * RAD, out, anchor, xMid: anchor.x }, o));
     partAdd(p, 'key', ...gs);
     chooseSign(p, anchor, out.clone().negate());
     p.touch = true; p.xMid = anchor.x;
@@ -795,14 +844,74 @@ function buildFlute() {
     const arm = strap(spline([rad(x, -34, 11.8), rad(x, -58, 11.3), rad(x, -74, 12.6), rad(x, -80, 16.0), rad(x, F.rodTrill.th, F.rodTrill.R)], 24), 3.0, 1.5);
     touch(id + ':t', 'rodTrill', [pill, arm], rad(x, -12, 13.2), nrm(-12), 6);    // (the cup at the back keeps the plain id)
   }
-  // thumb keys on the back: the B key is the thumb's cup itself; the B♭ thumb lever is a Γ-shaped plate head-side of it
+  // ---- the thumb keys, on the back (from two photographs of real flutes seen from behind) ----
+  // Two long levers lie along the tube and rock like see-saws on the short axle that crosses it (TH):
+  //  * the B key: the thumb's cup, a gently dished leaf-shaped plate for the thumb foot-side of it, whose top edge runs
+  //    on into a square bar that grows out of the leaf, crosses the axle and ends in a tail;
+  //  * the Briccialdi B♭ lever: a comma-shaped domed paddle lying over the cup (pressing it shuts the cup too), a stout
+  //    half-round arm from the paddle's rod-side corner that steps down onto the axle beside the bar, and a tail that
+  //    lifts the two little feet of the B♭ key.
   {
-    // the thumb B♭ key: a tongue about 9 mm wide running footward from under the round thumb plate's edge
-    const tongue = sweep(spline([rad(266, -158, 14.4), rad(274, -160, 15.0), rad(283, -164, 15.4), rad(293, -168, 15.5), rad(303, -170, 15.2), rad(309, -170, 14.6)], 44),
-      (s, L) => { const t = s / L; return (0.42 + 0.58 * smooth(0.12, 0.72, t)) * Math.sqrt(Math.max(0.03, 1 - Math.pow(Math.max(0, (t - 0.86) / 0.14), 2))); },
-      { up: tan(-166), scaleN: 4.9, scaleB: 1.05, sq: 2.5, segs: 28, capA: true, capB: true });
-    const tab = touchPad(250.5, -150, 15.3, 15, 11.5, 1.8, { sq: 3.2 });     // the thumb plate's wing, on the cup's own piece in a real flute
-    touch('Tb', 'rodThumb', [tongue, tab], rad(288, -168, 15.8), nrm(-168), 5);
+    const cTh = CUPS.find(c => c.id === 'Th'), th0 = cTh.th, hh = Math.sqrt(cTh.r / 9.3), n = nrm(th0), t = tan(th0), seat = rad(cTh.x, th0, F.seat), pTh = parts.Th;
+    const rotM = ang => new THREE.Matrix4().makeTranslation(TH.pv.x, TH.pv.y, TH.pv.z).multiply(new THREE.Matrix4().makeRotationAxis(TH.ax, ang)).multiply(new THREE.Matrix4().makeTranslation(-TH.pv.x, -TH.pv.y, -TH.pv.z));
+    const Mopen = rotM(pTh.sign * TH.ang);               // from "cup shut" to the key at rest (cup up, tail down)
+    const hingeTube = (s0, s1, r = 1.9) => place(lathe([[0, 0], [0, r - 0.32], [0.32, r], [s1 - s0 - 0.32, r], [s1 - s0, r - 0.32], [s1 - s0, 0]], { segs: 22, crease: 40 }), TH.at(s0), TH.ax);
+
+    // -- the B key (drawn at rest, as in the photographs: plate and bar level with the tube; then turned to "cup shut",
+    //    the pose every cup is built in). The plate lies in a plane 14.1 mm from the axis, facing θ -158. --
+    const Mshut = rotM(-pTh.sign * TH.ang), thL = -158, nL = nrm(thL), tL = tan(thL), RL = 14.1;
+    const leafPt = (u, w, h) => V3(265 + u, 0, 0).addScaledVector(nL, RL + h).addScaledVector(tL, w);      // u from the cup's middle, w across (+ = the rod's side)
+    const LEAF = [[9.0, 4.85], [13, 4.85], [18, 4.85], [23, 4.85], [28, 4.85], [31.6, 4.8], [32.3, 3.3], [31.6, 1.8], [30.2, 1.5], [28.9, 0.8], [27.7, -0.6], [25.6, -2.6], [22, -4.2], [17.5, -4.85], [12.8, -4.75], [9.6, -3.9], [7.9, -2.0], [7.5, 0.6], [7.8, 3.2]];
+    // a shallow dish, deepest along the middle, rising to a rounded rim
+    const leaf = plateGeo(LEAF, [16, 1.2], leafPt, { thick: 1.5, dome: 0, edge: 0.075, NT: 168, NR: 12, top: (u, w, rho) => -0.6 * (1 - Math.pow(rho, 6)) * (1 - Math.pow(Math.abs(w + 0.4) / 5.25, 2.4)) });
+    // the bar grows out of the leaf's upper edge: a low ridge along that edge at first (its outer side always ON the
+    // edge), widening and rising to the full square bar by the neck
+    const bar0 = 265 + 24.5, barEnd = 327.6, grow = x => smooth(0, 6.2, x - bar0), barK = x => 0.5 + 0.5 * grow(x);
+    const bar = sweep(densify([bar0, 265 + 31.5, TH.x, 314, barEnd].map(x => V3(x, 0, 0)), 0.6).map(q => { const x = q.x; return q.addScaledVector(nL, RL + 0.15 + 1.25 * grow(x) - 1.1 * barK(x)).addScaledVector(tL, 4.85 - 1.6 * barK(x)); }),
+      (s, L) => (0.5 + 0.5 * smooth(0, 6.2, s)) * (1 - 0.2 * smooth(L - 1.1, L, s)), { up: tL, scaleN: 1.6, scaleB: 1.1, sq: 6, segs: 24, capA: true, capB: true });
+    partAdd(pTh, 'key', bar.applyMatrix4(Mshut), leaf.applyMatrix4(Mshut), hingeTube(-2.1, 2.9));
+    pTh.anchor = leafPt(17, 0, 1.0).applyMatrix4(Mshut); pTh.out = nL.clone();       // the thumb's place is the leaf
+
+    // -- the Briccialdi lever (built at rest: the paddle just over the open cup) --
+    const Tp = 1.5, dome = 1.6, C = seat.clone().addScaledVector(n, 4.5 * hh + 0.3 + Tp / 2).addScaledVector(AX, 3.0).addScaledVector(t, -0.6);
+    const padPt = (u, v, h) => C.clone().addScaledVector(AX, u).addScaledVector(t, v).addScaledVector(n, h).applyMatrix4(Mopen);
+    // an egg, broad across the top and narrower below, its foot-side edge slanting back; the arm leaving its top makes it a comma
+    const PADDLE = [[1.5, 6.4], [5.0, 5.2], [6.3, 2.2], [5.6, -1.2], [4.0, -4.0], [1.2, -5.9], [-2.2, -5.4], [-4.8, -2.8], [-5.9, 0.8], [-4.9, 4.0], [-2.2, 6.0]];
+    const paddle = plateGeo(PADDLE, [0.3, 0.3], padPt, { thick: Tp, dome, pillow: true, NR: 12, NT: 144 });
+    // a little web rounding the corner between the arm and the paddle's foot-side edge
+    const web = plateGeo([[5.5, 4.7], [7.2, 4.55], [9.2, 4.5], [7.7, 3.85], [6.85, 2.9], [6.4, 1.4], [5.8, 2.4], [5.5, 3.6]], [6.3, 3.9], (u, v, h) => padPt(u, v, h - 0.3), { thick: 1.2, dome: 0.15, edge: 0.2, NT: 64, NR: 5 });
+    const neck = padPt(6.4, 5.3, -0.35), Rn = Math.hypot(neck.y, neck.z), thN = Math.atan2(neck.y, neck.z) / RAD;      // the arm leaves the paddle level
+    const tT = thN - 7, RT = 16.6;                         // its tail lies beside the bar's rod-side edge
+    const armEnd = barEnd - 4.8, bendAt = x => { const q = smooth(293, 308, x); return rad(x, thN + (tT - thN) * q, (Rn - 0.45) + (RT + 0.1 - (Rn - 0.45)) * q); };
+    const arm = sweep(spline([padPt(0.0, 4.6, 0.2), padPt(3.4, 5.1, 0.05), neck, rad(280, thN, Rn - 0.1), rad(287, thN, Rn - 0.25), ...[293, 296, 299, 302, 305, 308].map(bendAt), rad(314, tT, RT), rad(armEnd, tT, RT - 0.1)], 110),
+      (s, L) => (0.66 + 0.34 * smooth(4, 24, s) - 0.15 * smooth(36, 46, s)) * (1 - 0.2 * smooth(L - 1.0, L, s)),
+      { up: tan(thN), scaleN: 1.7, scaleB: 1.15, sq: 2.3, segs: 24, capA: true, capB: true });
+    const sA = TH.sOf(tT), boss = sweep([TH.at(sA), TH.at(sA).addScaledVector(nrm(tT), 4.9)], 1, { up: AX, scaleN: 1.35, scaleB: 1.3, sq: 4, segs: 16, capA: true, capB: true });
+    const pTb = touch('Tb', 'axThumb', [paddle, web, arm, boss, hingeTube(3.2, 8.4)], padPt(0, 0, Tp / 2 + dome), nrm(th0), 5, { pivot: TH.pv, axis: TH.ax });
+    pTb.angle = TH.ang;
+
+    // -- the axle and its two posts (still) --
+    const sB = TH.sOf(-172), sT = TH.sOf(-110), pB = TH.at(sB), pT = TH.at(sT), rB = 1.95;
+    add('satin', place(lathe([[0, 0], [0, 1.0], [sT - sB, 1.0], [sT - sB, 0]], { segs: 14 }), pB.clone(), TH.ax));
+    // the low post: a plain ball on a short neck, on a long pointed foot that lies on round the tube; one small hole for the pivot screw
+    add('silver', ball(pB, rB, 28), place(lathe([[0, 0], [0, 2.6], [0.45, 2.25], [1.2, 1.5], [3.2, 1.5], [3.2, 0]], { segs: 18 }), rad(TH.x, -172, F.R + 0.25), nrm(-172)));
+    { const P = []; for (let k = 0; k <= 34; k++) { const q = k / 34, w = 1 - 0.95 * smooth(0.7, 1, q); P.push(rad(TH.x, -160 - 70 * q, F.R + 0.03 + 0.42 * w)); }       // (thinning down ONTO the tube: no lifted tip)
+      add('silver', sweep(P, (s, L) => (1 - 0.95 * smooth(0.7, 1, s / L)) * Math.sqrt(Math.max(0.06, 1 - Math.pow(Math.max(0, 1 - s / 2.4), 2))), { up: AX, scaleN: 2.2, scaleB: 0.45, sq: 3, segs: 14, capA: true, capB: true })); }
+    { const hole = new THREE.CircleGeometry(0.5, 20); hole.applyMatrix4(new THREE.Matrix4().makeBasis(AX, nrm(F.axThumb.th), TH.ax.clone().negate()).setPosition(TH.at(sB - rB - 0.015))); add('dark', hole); }
+    // the tall post on the rod side: a pillar with a round head the axle's end sits in
+    { const a = rad(TH.x, -110, F.R + 0.4), len = pT.distanceTo(a);
+      add('silver', place(lathe([[0, 0], [0, 2.7], [0.55, 2.4], [1.5, 1.6], [len - 0.4, 1.6], [len, 0]], { segs: 18 }), a, nrm(-110)), rib(TH.x - 3.4, TH.x + 3.4, -110, 3.8), ball(pT, 2.05, 28)); }
+
+    // -- the B♭ key's feet: an arm from the main rod round under the trill rod, ending in two short pointed feet side by
+    //    side that rest on the Briccialdi's tail (drawn at rest, then turned to the B♭ cup's "shut" pose) --
+    { const pBb = parts.Bb, rd = F.rodBody, q = rad(0, rd.th, rd.R), x = armEnd - 1.6;
+      const M = new THREE.Matrix4().makeTranslation(q.x, q.y, q.z).multiply(new THREE.Matrix4().makeRotationX(-pBb.sign * pBb.angle)).multiply(new THREE.Matrix4().makeTranslation(-q.x, -q.y, -q.z));
+      const A = rad(x, -110, 20.3), B = rad(x, tT, RT + 1.0 + 0.55), e = B.clone().sub(A), len = e.length(); e.normalize();
+      const nF = V3().crossVectors(e, AX); if (nF.dot(A) < 0) nF.negate();
+      const pieces = [sweep(spline([rad(x, rd.th, rd.R), rad(x, -80, 16.2), rad(x, -96, 17.3), rad(x, -106, 19.3), A.clone().addScaledVector(e, 0.5).addScaledVector(nF, -0.25)], 32), (s, L) => 1 - 0.3 * smooth(0.6, 1, s / L), { up: AX, scaleN: 1.15, scaleB: 1.0, sq: 2.3, segs: 18, capA: true, capB: true })];
+      for (const dx of [-1.32, 1.32]) pieces.push(plateGeo([[0, -1.1], [0, 1.1], [2.6, 1.15], [len - 2.3, 1.15], [len, 0], [len - 2.3, -1.15], [2.6, -1.15]], [len * 0.45, 0],
+        (u, v, h) => A.clone().addScaledVector(e, u).addScaledVector(AX, v + dx).addScaledVector(nF, h), { thick: 1.0, dome: 0.2, edge: 0.16, NT: 64, NR: 5 }));
+      partAdd(pBb, 'key', cylX(x - 2.4, x + 2.4, q.y, q.z, 2.12, 18), ...pieces.map(g => g.applyMatrix4(M))); }
   }
   // E♭ (right little finger): a touch beside the socket below the tube, its strap round the front up to the foot rod
   {
@@ -929,7 +1038,7 @@ const PARTS = [
   ['Body', [175, 9.5, 0.5], null],
   ['Rod', [258, -15, 8], [0, -0.9, 0.45]],
   ['Post', [216, -15, 8], [0, -0.9, 0.45]],
-  ['Thumb keys', [265, -8.9, -12.7], [0, -0.57, -0.82]],
+  ['Thumb keys', [268, -12, -18.5], [0, -0.57, -0.82]],
   ['Trill keys', [421, -2.7, 12.9], [0, -0.2, 1]],
   ['G♯ key', [327, 22.0, 4.2], [0, 0.2, 1]],
   ['Foot joint', [630, 9.5, 0.5], null],
@@ -1180,6 +1289,7 @@ export function createFlute(container, options = {}) {
 
   /* ---- the keys ---- */
   const SILVER = new THREE.Color(0xe9e8e1);
+  const turn = (p, a) => { p.rot = a; if (p.axis) p.group.quaternion.setFromAxisAngle(p.axis, a); else p.group.rotation.x = a; };
   let lastT = 0;
   function animate(now) {
     const dt = Math.min(0.05, lastT ? (now - lastT) / 1000 : 0.016); lastT = now;
@@ -1190,7 +1300,7 @@ export function createFlute(container, options = {}) {
         const w = 58, z = 0.78;
         let t = dt; while (t > 0) { const h = Math.min(t, 0.004); p.v += (w * w * (p.to - p.x) - 2 * z * w * p.v) * h; p.x += p.v * h; t -= h; }
         if (Math.abs(p.to - p.x) < 5e-4 && Math.abs(p.v) < 0.02) { p.x = p.to; p.v = 0; }
-        p.group.rotation.x = p.sign * p.angle * clamp(p.x, -0.06, 1.06); busy = true;
+        turn(p, p.sign * p.angle * clamp(p.x, -0.06, 1.06)); busy = true;
       }
       if (Math.abs(p.paintTo - p.paint) > 1e-3) { p.paint += (p.paintTo - p.paint) * Math.min(1, dt * 20); if (Math.abs(p.paintTo - p.paint) < 0.004) p.paint = p.paintTo; busy = true; }
       const k = p.paint, m = p.mat;
@@ -1219,7 +1329,7 @@ export function createFlute(container, options = {}) {
     return busy;
   }
   // rest positions: open-at-rest cups up, the rest down
-  for (const p of PAINTABLE) { p.to = p.x = p.cup && !p.cup.shut ? 1 : 0; p.group.rotation.x = p.sign * p.angle * p.x; }
+  for (const p of PAINTABLE) { p.to = p.x = p.cup && !p.cup.shut ? 1 : 0; turn(p, p.sign * p.angle * p.x); }
 
   /* ---- name tags and chips ---- */
   const tags = [], chips = [];
@@ -1311,7 +1421,7 @@ export function createFlute(container, options = {}) {
   // a part's anchor where it is now (it turns with its key)
   function anchorNow(p, out) {
     p.group.updateMatrixWorld();
-    out.copy(p.anchor).sub(p.pivot).applyAxisAngle(AX, p.group.rotation.x).add(p.pivot);
+    out.copy(p.anchor).sub(p.pivot).applyAxisAngle(p.axis || AX, p.rot).add(p.pivot);
     p.joint.updateMatrix();
     return out.applyMatrix4(p.joint.matrix);
   }
@@ -1334,6 +1444,7 @@ export function createFlute(container, options = {}) {
         // a finger's key round the back or underneath (the thumb, the little fingers) still says so, faded and dashed
         let behind = false;
         if (a < 0.5 && labelMode === 'fingers' && c.prio === 0 && !c.only) { a = 0.62; behind = true; }
+        if (labelMode === 'fingers' && c.pid === 'Th' && pressedNow.has('Tb')) { a = 0; behind = false; }
         if (s.behind) a = 0;
         // how big the key is on the screen: its radius in pixels
         camR.setFromMatrixColumn(camera.matrixWorld, 0);
