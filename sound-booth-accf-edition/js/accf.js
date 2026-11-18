@@ -22,6 +22,7 @@
     { name: 'Lunar Lullaby - Piano [2022]', file: 'lunar-lullaby-piano-2022.mp3' },
     { name: 'Paruparong Bukid Accompaniment 120BPM', file: 'paruparong-bukid-accompaniment-120-bpm.mp3' },
     { name: 'Paruparong Bukid Accompaniment 142BPM', file: 'paruparong-bukid-accompaniment-142-bpm.mp3' },
+    { name: 'Paruparong Ring BPM 76', file: 'paruparong-ring-76-bpm.mp3' },
     { name: 'Shine Accompaniment', file: 'shine-accompaniment.mp3' },
     { name: 'Shine Accompaniment+voice part', file: 'shine-accompaniment-voice-part.mp3' },
     { name: 'Sotuko In Accompaniment', file: 'sotuko-in-accompaniment.mp3' }

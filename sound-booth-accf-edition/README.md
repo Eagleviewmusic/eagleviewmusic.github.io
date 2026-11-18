@@ -10,13 +10,13 @@ Run it locally: launch entry `sound-booth-accf` (port 8848). Tests use `sound-bo
 
 ## This edition
 
-- `js/accf.js` holds the song list, the window that picks one, and the loading. `songs/` holds the 12 MP3s, unchanged from the files the user supplied (only the file names were made web-safe). To add a song: put the MP3 in `songs/` and add one line to `SONGS`. The window sorts A to Z by itself.
+- `js/accf.js` holds the song list, the window that picks one, and the loading. `songs/` holds the 13 MP3s, unchanged from the files the user supplied (only the file names were made web-safe). To add a song: put the MP3 in `songs/` and add one line to `SONGS`. The window sorts A to Z by itself.
 - A song arrives through the same `importFile` as an added MP3, so it counts as an added file: it plays, edits, saves and exports like one, and Export leaves it unticked.
 - A song goes on the track whose button was pressed, at 0:00, and the track takes its name. If that leaves nowhere to sing, a voice track appears. Songs replace whatever was on the track. A track with singing on it asks first. Undo brings back whatever was replaced.
 - A song already fetched for this project is reused, with no second download and no second copy in the browser.
 - Its saved project and settings are its own (`sound-booth-accf` database, `sound_booth_accf_` keys, its own one-tab lock), so it never shares work with Vocal Booth on the same site.
 - Tracks are 16 px taller than Vocal Booth's (20 on phones) to fit the button. The long name goes on two lines at 1110 px and below, so the top bar is no taller than Vocal Booth's.
-- `node tools/test-accf.mjs` (Bash sandbox off, same server): 74 checks on the list, all 12 songs decoding, loading, changing, undo, the singing question, saving, failures and layouts.
+- `node tools/test-accf.mjs` (Bash sandbox off, same server): 75 checks on the list, all 13 songs decoding, loading, changing, undo, the singing question, saving, failures and layouts.
 
 ## What it does
 
