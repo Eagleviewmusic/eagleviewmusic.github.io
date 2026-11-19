@@ -86,6 +86,9 @@
   // -------- THE LINK --------
   window.EVMStudio = {
     version: 1,
+    // this studio plays the Virtual Keyboard's recorded instruments back (lib/samples.js, 2026-11-18):
+    // a keyboard or Song Writer framed here lists them (their samples.js leaves them out for an older studio)
+    samples: true,
     join(win, app) {
       const src = BY_APP[app];
       if (!src) return null;

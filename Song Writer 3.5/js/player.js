@@ -417,6 +417,12 @@
     if (count && into) count -= mt.beats - Math.ceil(into / mt.beatTicks);
     if (count) EVMCountIn.open(count, mt.beats);
 
+    // a recorded instrument the song uses has all its notes in before the first is laid down (2026-11-18)
+    const sounds = SW.audio.soundsInUse();
+    if (SW.audio.loading(sounds)) SW.ui.toast('Loading the recorded instruments…', 4000);
+    await SW.audio.ready(sounds);
+    if (token !== playToken) return;              // stopped while they loaded
+
     const ac = ctx();
     const ready = window.EVMCountIn ? await EVMCountIn.prime(ac, { warm: count ? 0.35 : 0.12 }) : true;
     if (token !== playToken) return;              // stopped while it was getting ready

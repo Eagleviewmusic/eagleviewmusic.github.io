@@ -10,6 +10,11 @@
    A third, render(), plays a whole song into a buffer faster than real
    time through the same voices and chain, for a file to download (the
    Virtual Keyboard's recorder).
+
+   VIRTUAL KEYBOARD 2.0: this copy is no longer identical to Digital
+   Accordion's. It adds one more kind of voice, 'sample': a recorded
+   instrument (samples.js loads them and calls setSamples). Everything else
+   is Digital Accordion's code, untouched.
    ========================================================================== */
 const Audio = (() => {
   let ctx = null;
@@ -101,10 +106,67 @@ const Audio = (() => {
   function setLevel(side, v) { sideGain(side); sides[side].level = v; sides[side].gain.gain.setTargetAtTime(v, ctx.currentTime, 0.02); }
   function setReverb(v) { ensure(); reverbGain.gain.setTargetAtTime(v * 0.7, ctx.currentTime, 0.05); }
 
+  /* ---- Recorded instruments (2.0) ----
+     A sampled preset is { kind: 'sample', attack, release, gain, fallback }.
+     Its notes come from setSamples(id, zones), zones = [{ m (MIDI of the
+     recording), buffer, start (s, where the sound begins), ls, le (loop, s),
+     tune (cents to correct) }]. Until they are loaded the preset's
+     `fallback` synth voice plays instead, so a key is never silent. */
+  const SAMPLES = new Map();   // preset id -> zone for each MIDI note 0–127
+  function setSamples(id, zones) {
+    const list = zones.filter(z => z && z.buffer).sort((a, b) => a.m - b.m);
+    if (!list.length) { SAMPLES.delete(id); return; }
+    const pick = [];
+    for (let m = 0; m < 128; m++) {
+      // the nearest recording; between two, the one above (a note bent down sounds truer than one bent up)
+      let best = list[0];
+      list.forEach(z => { const d = Math.abs(z.m - m), bd = Math.abs(best.m - m); if (d < bd || (d === bd && z.m > best.m)) best = z; });
+      pick.push(best);
+    }
+    SAMPLES.set(id, pick);
+  }
+  const hasSamples = (id) => SAMPLES.has(id);
+
+  function buildSample(freq, P, preset, out, when, velocity) {
+    const ctx = out.context;
+    const midi = 69 + 12 * Math.log2(freq / 440);
+    const z = SAMPLES.get(preset)[Math.max(0, Math.min(127, Math.round(midi)))];
+    const src = ctx.createBufferSource();
+    src.buffer = z.buffer;
+    src.playbackRate.value = Math.pow(2, (midi - z.m - (z.tune || 0) / 100) / 12);
+    if (z.le > z.ls) { src.loop = true; src.loopStart = z.ls; src.loopEnd = z.le; }
+    const env = ctx.createGain();
+    const peak = P.gain * velocity;
+    env.gain.setValueAtTime(0, when);
+    env.gain.linearRampToValueAtTime(peak, when + P.attack);
+    src.connect(env); env.connect(out);
+    src.start(when, z.start || 0);
+    const done = () => { try { src.disconnect(); env.disconnect(); } catch (e) {} };
+    src.onended = done;
+    return {
+      stop(t) {
+        const rel = P.release;
+        env.gain.cancelScheduledValues(t);
+        env.gain.setValueAtTime(Math.max(env.gain.value, 0.0001), t);
+        env.gain.exponentialRampToValueAtTime(0.0001, t + rel);
+        try { src.stop(t + rel + 0.05); } catch (e) {}
+      },
+      release(t) {
+        const rel = P.release;
+        env.gain.setTargetAtTime(0.0001, t, rel / 4);
+        try { src.stop(t + rel + 0.05); } catch (e) {}
+      }
+    };
+  }
+
   /* Build one note of a voice. Returns { stop(when) } */
   function buildNote(freq, preset, out, when, velocity) {
     const ctx = out.context; // the live context, or render()'s offline one
     const P = PRESETS[preset] || PRESETS.piano;
+    if (P.kind === 'sample') {
+      if (SAMPLES.has(preset)) return buildSample(freq, P, preset, out, when, velocity);
+      return buildNote(freq, P.fallback || 'piano', out, when, velocity);   // still loading: a stand-in
+    }
     const now = when;
     const env = ctx.createGain(); env.gain.value = 0;
     const filt = ctx.createBiquadFilter(); filt.type = 'lowpass'; filt.Q.value = P.q;
@@ -247,5 +309,5 @@ const Audio = (() => {
   }
   function stopAll() { [...voices.keys(), ...timed.keys()].forEach(stop); }
 
-  return { ensure, play, schedule, render, stop, stopAll, setLevel, setReverb, PRESETS, PRESET_ORDER };
+  return { ensure, play, schedule, render, stop, stopAll, setLevel, setReverb, setSamples, hasSamples, PRESETS, PRESET_ORDER };
 })();

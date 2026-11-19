@@ -239,7 +239,7 @@
       if (e.target.classList.contains('pt-name')) P.setMeta(f, { name: e.target.value });
       else if (e.target.classList.contains('pt-sound')) {
         P.setMeta(f, { sound: e.target.value });
-        SW.audio.previewPart(P.meta(f));
+        SW.audio.picked(P.meta(f).sound, () => SW.audio.previewPart(P.meta(f)));   // a recorded instrument: once its notes are in
         e.target.blur();                              // hand the keys back to the song
       } else if (e.target.classList.contains('pt-volume')) { quiet = false; render(); SW.audio.previewPart(P.meta(f)); }
     });

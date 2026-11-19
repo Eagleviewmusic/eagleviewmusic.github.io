@@ -11,21 +11,32 @@
    kind 'sample'). Nothing is downloaded until an instrument is picked:
    want(id) starts it, ready(ids) waits for it. Until its notes are in, the
    instrument's stand-in synth sound plays, so a key is never silent.
+
+   SHARED (2026-11-18): this file is the authoritative copy. Byte-identical
+   copies live in `Song Writer 3.5/lib/samples.js` and
+   `Recording Studio/lib/samples.js` — change it here, then copy it there.
+   Those apps load THIS folder's notes (one set on the site, one download
+   the browser keeps for all three): their pages load
+   ../virtual-keyboard/samples/manifest.js and name the folder on the tag,
+     <script src="lib/samples.js" data-base="../virtual-keyboard/samples/">
+   Their audio.js must be this folder's (it has the 'sample' voice).
    ========================================================================== */
 const Samples = (() => {
-  /* Inside the Recording Studio (?embed=studio) the keyboard keeps to its
-     synth sounds, as before 2.0 replaced 1.0 (2026-11-17): the studio plays its
-     tracks back on its own sound engine, which has no recorded instruments, so
-     a Violins take would come back as Piano. With no instruments listed here,
+  /* Framed by the Recording Studio (?embed=studio — the keyboard, or Song
+     Writer's Bring in): the studio plays its tracks back on its own sound
+     engine. One that says it knows the recorded instruments
+     (EVMStudio.samples, 2026-11-18) gets them all; an older studio does not,
+     and a Violins take would come back as Piano — so there none are listed,
      none reach the sound menu, and a saved recorded sound falls back to Piano. */
-  const inStudio = (() => {
+  const inOldStudio = (() => {
     try {
       return new URLSearchParams(location.search).get('embed') === 'studio'
-        && window.parent !== window && !!window.parent.EVMStudio;
+        && window.parent !== window && !!window.parent.EVMStudio && !window.parent.EVMStudio.samples;
     } catch (e) { return false; }
   })();
-  const MANIFEST = inStudio ? { instruments: {} } : (window.VK_SAMPLE_MANIFEST || { instruments: {} });
-  const BASE = 'samples/';
+  const MANIFEST = inOldStudio ? { instruments: {} } : (window.VK_SAMPLE_MANIFEST || { instruments: {} });
+  // where the notes are: the tag's data-base (another app), else beside the page (the keyboard)
+  const BASE = (document.currentScript && document.currentScript.dataset.base) || 'samples/';
 
   /* How each one plays: release = seconds to fade once the key is let go
      (short for dampers and wind, long for things that ring); gain = how loud,

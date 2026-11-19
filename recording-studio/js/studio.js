@@ -714,6 +714,50 @@
   // What a track's note sounds like now: the track's own sound when it has one.
   const notePreset = (tr, n) => tr.sound || (n && n.s) || (tr.kind === 'xylophone' ? 'vibraphone' : 'piano');
 
+  // -------- THE RECORDED INSTRUMENTS (2026-11-18) --------
+  // The Virtual Keyboard's real instruments (lib/samples.js, their notes in
+  // ../virtual-keyboard/samples/) are note-track sounds like any other: a
+  // keyboard take played on Violins, a Song Writer melody on Grand Piano.
+  // Their notes download the first time one is needed — until then its
+  // stand-in synth plays (audio.js) — and Play and a song file wait for them.
+  // (Their ids live in the note engine's list; the xylophone's own
+  // 'vibraphone' and 'marimba' are another engine's and are never these.)
+  const SAMPLES = window.Samples || null;
+  const isSampled = id => !!(SAMPLES && SAMPLES.isSampled(id));
+  const wantSound = id => { if (isSampled(id)) SAMPLES.want(id); };
+  // the recorded sounds the tracks that will be heard play with
+  function soundsToLoad() {
+    const ids = new Set();
+    P.tracks.forEach(tr => {
+      if (!audible(tr) || engineOf(tr) !== 'notes') return;
+      tr.notes.forEach(n => ids.add(notePreset(tr, n)));
+    });
+    return [...ids].filter(isSampled);
+  }
+  // waits for them; say() first if any must still come in
+  async function loadSounds(say) {
+    const need = soundsToLoad();
+    if (!need.length) return;
+    if (need.some(id => SAMPLES.status(id).state !== 'ready')) say();
+    await SAMPLES.ready(need);
+  }
+  function sampleLabel(id) {
+    const name = Audio.PRESETS[id] ? Audio.PRESETS[id].name : id;
+    if (!isSampled(id)) return name;
+    const st = SAMPLES.status(id);
+    if (st.state === 'loading') return `${name} ${Math.round(100 * st.got / st.total)}%`;
+    return st.state === 'failed' ? `${name} (did not load)` : name;
+  }
+  // while one loads, its name in every note-sound menu says how far along
+  if (SAMPLES) SAMPLES.onChange((id, st) => {
+    const label = sampleLabel(id);
+    document.querySelectorAll(`select[data-engine="notes"] option[value="${id}"]`).forEach(o => { if (o.textContent !== label) o.textContent = label; });
+    if (st.state === 'failed') {
+      toast(FROM_FILE ? 'Recorded instruments need the studio opened with “Open the Recording Studio”.'
+        : `${Audio.PRESETS[id].name} did not load. Its stand-in sound plays instead.`);
+    }
+  });
+
   // Opened straight from its file, the browser walls the instrument frames and the
   // microphone recorder off from the page: there is nothing to record from.
   const FROM_FILE = location.protocol === 'file:';
@@ -748,6 +792,9 @@
     }
     // the clock at the takes' own rate, so they play back untouched
     await StudioVoice.matchRate();
+    if (token !== runToken) return;
+    // every recorded instrument the tracks play with has its notes in before the first is laid down
+    await loadSounds(() => toast('Loading the recorded instruments…'));
     if (token !== runToken) return;
     ctx = wakeAudio();
     if (count) EVMCountIn.open(count, barBeats());
@@ -2229,6 +2276,7 @@
         Xylo.strike(auditionBus, midiFreq(m), preset, ctx.currentTime + 0.005, prefs.volume);
       } else {
         Audio.setLevel('audition', BASE * prefs.volume);
+        wantSound(preset);   // a recorded instrument: its stand-in until the notes are in
         Audio.schedule('audition', [midiFreq(m)], preset, ctx.currentTime + 0.005, 0.28, 0.9);
       }
     } catch (err) {}
@@ -2930,6 +2978,26 @@
   const soundOptions = tr => (engineOf(tr) === 'strikes'
     ? Xylo.SOUNDS.map(([id, label]) => [id, label])
     : Audio.PRESET_ORDER.map(id => [id, Audio.PRESETS[id].name]));
+  // A note track's menu is grouped as the Virtual Keyboard's is, the recorded
+  // instruments first; the xylophone's two sounds are a plain list.
+  const NOTE_SOUND_GROUPS = [
+    { label: 'Recorded instruments', ids: SAMPLES ? SAMPLES.ids : [] },
+    { label: 'Keyboards', ids: ['piano', 'epiano', 'organ'] },
+    { label: 'Mallets & plucks', ids: ['marimba', 'bell', 'pluck'] },
+    { label: 'Long tones', ids: ['pad', 'strings', 'voice'] },
+    { label: 'Simple waves', ids: ['sine', 'triangle', 'square', 'sawtooth'] }
+  ];
+  function soundMenu(tr, chosen) {
+    const opt = (id, label) => `<option value="${id}"${chosen === id ? ' selected' : ''}>${esc(label)}</option>`;
+    if (engineOf(tr) === 'strikes') return soundOptions(tr).map(([id, label]) => opt(id, label)).join('');
+    const grouped = new Set(NOTE_SOUND_GROUPS.flatMap(g => g.ids));
+    const extra = Audio.PRESET_ORDER.filter(id => !grouped.has(id));
+    const groups = extra.length ? NOTE_SOUND_GROUPS.concat([{ label: 'More sounds', ids: extra }]) : NOTE_SOUND_GROUPS;
+    return groups.map(g => {
+      const ids = g.ids.filter(id => Audio.PRESETS[id]);
+      return ids.length ? `<optgroup label="${esc(g.label)}">${ids.map(id => opt(id, sampleLabel(id))).join('')}</optgroup>` : '';
+    }).join('');
+  }
   function soundName(tr, id) {
     const o = soundOptions(tr).find(x => x[0] === id);
     return o ? o[1] : id;
@@ -2952,11 +3020,13 @@
       if (mode === 'select') {
         const s = document.createElement('select');
         s.className = 'select rec-sound';
-        s.innerHTML = `<option value="">As played</option>` + soundOptions(tr).map(([id, label]) => `<option value="${id}">${esc(label)}</option>`).join('');
+        s.innerHTML = `<option value="">As played</option>` + soundMenu(tr);
+        s.dataset.engine = engineOf(tr);
         s.setAttribute('aria-label', `Track ${i + 1} sound`);
         s.addEventListener('change', () => {
           const t = P.tracks[i];
           t.sound = s.value || null;
+          if (engineOf(t) === 'notes') wantSound(t.sound);   // a recorded instrument starts coming in now
           if (i === R.armed && t.sound && window.StudioLink) StudioLink.setSound(t.kind, t.sound);
           s.blur();
           if (window.StudioLink) StudioLink.focus();   // hand the computer keyboard back to the instrument
@@ -2997,9 +3067,9 @@
     if (popFor === i && !soundPop.hidden) { closePop(); return; }
     const tr = P.tracks[i];
     popFor = i;
-    const opts = soundOptions(tr).map(([id, label]) => `<option value="${id}"${tr.sound === id ? ' selected' : ''}>${esc(label)}</option>`).join('');
+    const opts = soundMenu(tr, tr.sound);
     soundPop.innerHTML = `<div class="menu-head">Track ${i + 1} · ${esc(trackName(tr))}</div>
-      <label class="menu-field"><span>Sound</span><select class="select" data-act="sound"><option value=""${tr.sound ? '' : ' selected'}>As written</option>${opts}</select></label>
+      <label class="menu-field"><span>Sound</span><select class="select" data-act="sound" data-engine="${engineOf(tr)}"><option value=""${tr.sound ? '' : ' selected'}>As written</option>${opts}</select></label>
       <p class="menu-note">From ${esc(FROM_NAME[(tr.from || {}).app] || 'another app')}: the notes stay as they came; only the sound changes.</p>`;
     soundPop.hidden = false;
     const r = anchor.getBoundingClientRect();
@@ -3013,8 +3083,9 @@
     const tr = P.tracks[popFor];
     pushUndo('the sound of track ' + (popFor + 1));
     tr.sound = t.value || null;
+    if (engineOf(tr) === 'notes') wantSound(tr.sound);   // a recorded instrument starts coming in now
     save();
-    toast(tr.sound ? `Track ${popFor + 1} now plays as ${t.options[t.selectedIndex].text}.` : `Track ${popFor + 1} plays as it was written.`);
+    toast(tr.sound ? `Track ${popFor + 1} now plays as ${Audio.PRESETS[tr.sound] ? Audio.PRESETS[tr.sound].name : t.options[t.selectedIndex].text}.` : `Track ${popFor + 1} plays as it was written.`);   // (the menu's name can say "40%" while it loads)
   });
   document.addEventListener('pointerdown', (e) => { if (!soundPop.hidden && !soundPop.contains(e.target) && !e.target.closest('.tname')) closePop(); });
 
@@ -4144,6 +4215,8 @@
     try {
       saveStatus.textContent = 'Mixing the tracks…';
       await StudioVoice.load(clipIds(P.tracks.filter(tr => audible(tr))));
+      await loadSounds(() => { saveStatus.textContent = 'Loading the recorded instruments…'; });
+      saveStatus.textContent = 'Mixing the tracks…';
       await pause();
       const buffer = await Voices.render(song);
       const blob = kind === 'mp3'

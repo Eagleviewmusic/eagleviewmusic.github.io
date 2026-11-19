@@ -31,6 +31,15 @@
    scale-driven board, the Z X C V B functions and the voicings live
    there (Digital Accordion's alone since 2026-10-29: 1.0's voicings,
    generateChordForKey, were a Sound choice until then).
+
+   RECORDED INSTRUMENTS (2026-11-18): the Virtual Keyboard's real
+   instruments (Grand Piano, Violins, Flute…) are sounds like any other —
+   lib/audio.js and lib/samples.js are the keyboard's, and the notes are
+   its own MP3s in ../virtual-keyboard/samples/. An instrument's notes
+   download the first time it is used (a note, a menu pick, Play); until
+   they are in, its stand-in synth sound plays, so nothing is ever silent.
+   Play and the sound wave wait for them, so a song never starts on the
+   stand-in. Their menu names say "Violins 40%" while they load.
    ========================================================================== */
 (function () {
   'use strict';
@@ -84,6 +93,56 @@
       preset: m.sound && E.PRESETS[m.sound] ? m.sound : mix().melody,
       gain: typeof m.volume === 'number' && m.volume >= 0 && m.volume <= 100 ? m.volume / 100 : 1
     };
+  }
+
+  /* ---- the recorded instruments (lib/samples.js, window.Samples) ---- */
+  const R = window.Samples || null;
+  const sampled = id => !!(R && R.isSampled(id));
+  // a sound about to be heard: a recorded one starts loading (its stand-in plays meanwhile)
+  function use(preset) { if (sampled(preset)) R.want(preset); return preset; }
+  // still to come in: some of these recorded sounds
+  function loading(ids) {
+    return [].concat(ids || []).some(id => sampled(id) && ['idle', 'loading'].includes(R.status(id).state));
+  }
+  // resolves once every recorded sound in `ids` is in (or has given up)
+  function ready(ids) { return R ? R.ready([].concat(ids || []).filter(sampled)) : Promise.resolve(); }
+  // every sound the song can make now: the melody's, the chords', each part's
+  function soundsInUse() {
+    const m = mix(), out = [m.melody, m.chords];
+    if (SW.parts) for (let i = 0; i < SW.parts.count(); i++) out.push(partMix(SW.parts.meta(i)).preset);
+    return Array.from(new Set(out));
+  }
+  function soundLabel(id) {
+    const name = E.PRESETS[id] ? E.PRESETS[id].name : id;
+    if (!sampled(id)) return name;
+    const st = R.status(id);
+    if (st.state === 'loading') return name + ' ' + Math.round(100 * st.got / st.total) + '%';
+    return st.state === 'failed' ? name + ' (did not load)' : name;
+  }
+  /* A sound picked in a menu is heard at once — a recorded one as soon as
+     its notes are in (it says so), rather than its stand-in. */
+  function picked(id, preview) {
+    if (!sampled(id) || R.status(id).state === 'ready') { preview(); return; }
+    const name = E.PRESETS[id].name, at = performance.now();
+    use(id);
+    SW.ui.toast('Loading ' + name + '…', 4000);
+    ready(id).then(() => {
+      if (performance.now() - at > 15000 || !soundsInUse().includes(id)) return;
+      if (R.status(id).state === 'ready') { SW.ui.toast(name + ' is ready'); preview(); }
+    });
+  }
+  if (R) {
+    R.onChange((id, st) => {
+      const label = soundLabel(id);
+      document.querySelectorAll('select.sound-select option[value="' + id + '"]').forEach(o => { if (o.textContent !== label) o.textContent = label; });
+      if (st.state === 'failed' && soundsInUse().includes(id)) {
+        SW.ui.toast(location.protocol === 'file:'
+          ? 'Recorded instruments need the page opened from a web address, not a file'
+          : E.PRESETS[id].name + ' did not load — its stand-in sound plays instead', 4000);
+      }
+    });
+    // the song's own recorded sounds start coming in at once (not in a frame: the studio's Bring in, the Library's Preview)
+    window.addEventListener('load', () => { if (!window.EVM_STUDIO_EMBED) soundsInUse().forEach(use); });
   }
 
   /* A scheduled voice, stoppable the way an oscillator was (the player
@@ -140,7 +199,7 @@
     }
     const ac = audioCtx();
     const pm = partMix(meta);
-    E.schedule('melody', [frequency], pm.preset, ac.currentTime, TAP_HOLD, pm.gain);
+    E.schedule('melody', [frequency], use(pm.preset), ac.currentTime, TAP_HOLD, pm.gain);
   }
 
   /* ---- a chord (the panel, the lane): the chords sound ----
@@ -153,7 +212,7 @@
     if (!list.length) return [];
     const ac = audioCtx();
     const when = at === undefined ? ac.currentTime : Math.max(at, ac.currentTime);
-    return [handle(E.schedule('chords', list, mix().chords, when, seconds || CHORD_HOLD, CHORD_LEVEL))];
+    return [handle(E.schedule('chords', list, use(mix().chords), when, seconds || CHORD_HOLD, CHORD_LEVEL))];
   }
 
   /* ---- a chord held down (the panel's blocks, their keys) ----
@@ -168,7 +227,7 @@
     const list = (frequencies || []).filter(valid);
     if (!list.length) return null;
     const t0 = audioCtx().currentTime;
-    const id = E.schedule('chords', list, mix().chords, t0, HELD_MAX, CHORD_LEVEL);
+    const id = E.schedule('chords', list, use(mix().chords), t0, HELD_MAX, CHORD_LEVEL);
     let done = false;
     return {
       release() {
@@ -213,7 +272,7 @@
     if (!valid(frequency)) return null;
     const ac = audioCtx();
     const pm = partMix(meta);
-    const id = E.schedule('melody', [frequency], pm.preset, Math.max(at, ac.currentTime), Math.max(0.08, seconds), pm.gain * (level || PLAYER_PEAK) / PLAYER_PEAK);
+    const id = E.schedule('melody', [frequency], use(pm.preset), Math.max(at, ac.currentTime), Math.max(0.08, seconds), pm.gain * (level || PLAYER_PEAK) / PLAYER_PEAK);
     return handle(id);
   }
 
@@ -223,11 +282,13 @@
      speakers use, faster than real time. notes: [{ freqs, at, hold,
      level }] in seconds (level as tone() takes it: the player's
      loudness — the chords' is CHORD_LEVEL). A low rate is plenty for a
-     picture. → Promise<AudioBuffer> */
-  function renderSide(side, notes, seconds, rate, meta) {
+     picture. A recorded sound is drawn once its notes are in.
+     → Promise<AudioBuffer> */
+  async function renderSide(side, notes, seconds, rate, meta) {
     const m = mix();
     const melody = side === 'melody';
     const pm = partMix(meta);                 // the melody of the part on the page, as it sounds (PARTS)
+    await ready(melody ? pm.preset : m.chords);
     return E.render({
       seconds, rate: rate || 22050, room: m.room,
       parts: [{
@@ -240,7 +301,7 @@
   /* ---- the keyboard dock: a key held down rings until it is let go ---- */
   function noteOn(midi, meta) {
     audioCtx();
-    return E.play('melody', [M.midiToFreq(midi)], partMix(meta).preset);
+    return E.play('melody', [M.midiToFreq(midi)], use(partMix(meta).preset));
   }
   function noteOff(id) { if (id) E.stop(id); }
 
@@ -271,14 +332,14 @@
   function previewMelody() {
     const ac = audioCtx();
     const doMidi = M.noteMidi('do', 'natural');
-    if (doMidi !== null) E.schedule('melody', [M.midiToFreq(doMidi)], mix().melody, ac.currentTime, 0.45);
+    if (doMidi !== null) E.schedule('melody', [M.midiToFreq(doMidi)], use(mix().melody), ac.currentTime, 0.45);
   }
   /* a part's sound and volume, as its notes will have them (the Options popover, parts-ui.js) */
   function previewPart(meta) {
     const ac = audioCtx();
     const pm = partMix(meta);
     const doMidi = M.noteMidi('do', 'natural');
-    if (doMidi !== null) E.schedule('melody', [M.midiToFreq(doMidi)], pm.preset, ac.currentTime, 0.45, pm.gain);
+    if (doMidi !== null) E.schedule('melody', [M.midiToFreq(doMidi)], use(pm.preset), ac.currentTime, 0.45, pm.gain);
   }
   function previewChords() {
     const home = SW.chords && SW.chords.entry('f');
@@ -289,6 +350,7 @@
   /* The sounds, grouped for the menus as the Virtual Keyboard groups them;
      anything Key Blocks adds later lands in "More sounds". */
   const SOUND_GROUPS = [
+    { label: 'Recorded instruments', ids: R ? R.ids : [] },   // the Virtual Keyboard's real instruments (2026-11-18)
     { label: 'Keyboards', ids: ['piano', 'epiano', 'organ'] },
     { label: 'Mallets & plucks', ids: ['marimba', 'bell', 'pluck'] },
     { label: 'Long tones', ids: ['pad', 'strings', 'voice'] },
@@ -299,7 +361,7 @@
     const extra = E.PRESET_ORDER.filter(id => !grouped.has(id));
     const groups = SOUND_GROUPS.map(g => ({ label: g.label, ids: g.ids.filter(id => E.PRESETS[id]) }));
     if (extra.length) groups.push({ label: 'More sounds', ids: extra });
-    return groups.map(g => ({ label: g.label, sounds: g.ids.map(id => ({ id, name: E.PRESETS[id].name })) }));
+    return groups.filter(g => g.ids.length).map(g => ({ label: g.label, sounds: g.ids.map(id => ({ id, name: soundLabel(id) })) }));
   }
 
   SW.audio = {
@@ -311,6 +373,8 @@
     playMidi(midi) { playNote(M.midiToFreq(midi)); },
     applyMix, previewMelody, previewPart, previewChords, soundGroups, partMix, CHORD_PLAY_HOLD,
     mix, PLAYER_PEAK, CHORD_LEVEL,      // read by js/studio-bridge.js (the Recording Studio)
-    hasSound: id => !!E.PRESETS[id]
+    hasSound: id => !!E.PRESETS[id],
+    // the recorded instruments: pick one in a menu, what the song uses, wait for them
+    picked, soundsInUse, loading, ready
   };
 })();

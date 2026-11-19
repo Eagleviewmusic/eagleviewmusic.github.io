@@ -1473,8 +1473,11 @@
 <!-- lib/keyblocks-layers.js and lib/theory.js are copies of Digital Accordion's (the chord engine) — change them there, then copy -->
 <script src="lib/keyblocks-layers.js"></script>
 <script src="lib/theory.js"></script>
-<!-- lib/audio.js is a copy of Digital Accordion/audio.js (the sounds of Digital Accordion and the Virtual Keyboard) — change it there, then copy -->
+<!-- lib/audio.js and lib/samples.js are copies of the Virtual Keyboard's (virtual-keyboard/audio.js, samples.js) — change them there, then copy.
+     The recorded instruments' notes are the keyboard's own: its manifest here, its MP3s fetched from the folder on the tag (2026-11-18) -->
 <script src="lib/audio.js"></script>
+<script src="../virtual-keyboard/samples/manifest.js"></script>
+<script src="lib/samples.js" data-base="../virtual-keyboard/samples/"></script>
 <script src="lib/notation/glyphs-leland.js"></script>
 <script src="songs.js"></script>
 <script src="lib/evm-library.js"></script>

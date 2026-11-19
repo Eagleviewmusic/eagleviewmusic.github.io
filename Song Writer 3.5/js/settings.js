@@ -683,7 +683,7 @@
     if (!$('melody-sound')) return;
     const pick = (id, key, preview) => $(id).addEventListener('change', e => {
       setMix({ [key]: e.target.value });
-      preview();
+      SW.audio.picked(e.target.value, preview);   // a recorded instrument: heard once its notes are in
       e.target.blur();              // hand the keys back to the song
     });
     pick('melody-sound', 'melodySound', SW.audio.previewMelody);

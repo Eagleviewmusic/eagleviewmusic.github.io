@@ -398,11 +398,15 @@
   </defs>
 </svg>
 
-<!-- The engines. audio.js is a copy of Digital Accordion/audio.js (authoritative there) with ONE thing added: restart(rate),
-     so the clock can run at the microphone's or the takes' own rate;
+<!-- The engines. audio.js is a copy of virtual-keyboard/audio.js (authoritative there; since 2026-11-18 — Digital Accordion's
+     before) with ONE thing added: restart(rate), so the clock can run at the microphone's or the takes' own rate;
+     lib/samples.js is a copy of virtual-keyboard/samples.js — the keyboard's recorded instruments, their notes fetched from
+     its folder (manifest below, MP3s from the data-base on the tag), never copied here;
      lib/evm-count-in.* copies of EVM Library/'s (check-copies.sh); lib/instruments/js/virtual-instruments.js
      a copy of Virtual Instrument Assets/js/ (authoritative there); vendor/lame.min.js is lamejs (LAME-NOTICE.txt). -->
 <script src="audio.js"></script>
+<script src="../virtual-keyboard/samples/manifest.js"></script>
+<script src="lib/samples.js" data-base="../virtual-keyboard/samples/"></script>
 <script src="theory.js"></script><!-- a copy of Digital Accordion/theory.js: keep them the same -->
 <script src="lib/evm-count-in.js"></script>
 <script src="lib/instruments/js/virtual-instruments.js"></script>
