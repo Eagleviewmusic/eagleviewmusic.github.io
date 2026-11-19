@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Virtual Orchestra</title>
+  <meta name="theme-color" content="#1b0c0a">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Cormorant+Garamond:ital,wght@1,500;1,600&display=swap" rel="stylesheet">
+  <!--
+    THE ORCHESTRA PIT: the landing page of The Virtual Orchestra.
+    Each seat below opens one instrument, which lives in its own folder beside this page
+    (flute/, clarinet/, trumpet/, recorder/). Those folders are copies made by _tools/sync.mjs
+    from the stand-alone apps: edit the instruments there, then run the script again.
+    To add a seat: add the folder to _tools/sync.mjs and one <a class="seat"> below.
+  -->
+  <style>
+    :root {
+      --cw: clamp(34px, 9vw, 160px);          /* width of a side curtain */
+      --valance: clamp(36px, 8vh, 76px);      /* height of the swags along the top */
+      --gold-1: #fbe9b0; --gold-2: #e3b95a; --gold-3: #a8772a; --gold-ink: #3a2408;
+      --velvet-1: #b81c2a; --velvet-2: #8f121d; --velvet-3: #4a0810;
+      --serif: 'Cinzel', 'Trajan Pro', Georgia, 'Times New Roman', serif;
+      --script: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: #0b0506; }
+    body { color: #f4e7c5; font-family: var(--serif); -webkit-font-smoothing: antialiased; }
+
+    /* ---------- The hall: back wall, stage floor ---------- */
+    .hall {
+      position: relative; height: 100vh; height: 100dvh; min-height: 430px; overflow: hidden;
+      display: flex; flex-direction: column; align-items: center;
+      background:
+        radial-gradient(ellipse 70% 62% at 50% 44%, rgba(255, 205, 130, .30) 0%, rgba(120, 60, 30, .16) 46%, transparent 74%),
+        repeating-linear-gradient(90deg, rgba(255, 220, 150, .04) 0 1px, transparent 1px clamp(40px, 6vw, 84px)),
+        linear-gradient(180deg, #170a0b 0%, #2b1410 46%, #1c0d0a 100%);
+    }
+    .floor {
+      position: absolute; left: 0; right: 0; bottom: 0; height: 37%; overflow: hidden;
+      background: linear-gradient(180deg, #2c170c 0%, #5d3820 26%, #432512 62%, #1d0e07 100%);
+      border-top: 1px solid rgba(255, 220, 150, .28);
+      box-shadow: 0 -18px 40px rgba(0, 0, 0, .45);
+    }
+    .floor::before {                         /* floorboards running away from the audience */
+      content: ""; position: absolute; top: 0; left: -60%; right: -60%; height: 260%;
+      background: repeating-linear-gradient(90deg, rgba(0, 0, 0, .42) 0 2px, rgba(255, 230, 180, .05) 2px 4px, transparent 4px 5.2vw);
+      transform: perspective(46vh) rotateX(62deg); transform-origin: 50% 0;
+    }
+    .floor::after {                          /* the warm wash of the stage lights */
+      content: ""; position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 90% at 50% 0%, rgba(255, 214, 140, .30), transparent 70%);
+    }
+
+    /* ---------- Curtains ---------- */
+    .valance {
+      position: absolute; top: 0; left: 0; right: 0; height: var(--valance); z-index: 6; pointer-events: none;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='80' viewBox='0 0 160 80'%3E%3Cdefs%3E%3ClinearGradient id='r' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%234a0810'/%3E%3Cstop offset='.5' stop-color='%23b81c2a'/%3E%3Cstop offset='1' stop-color='%234a0810'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,0H160V30Q80,96 0,30Z' fill='url(%23r)'/%3E%3Cpath d='M12,0Q42,48 80,60M148,0Q118,48 80,60M44,0Q62,38 80,54M116,0Q98,38 80,54' fill='none' stroke='%233a060c' stroke-opacity='.5' stroke-width='2'/%3E%3Cpath d='M0,30Q80,96 160,30' fill='none' stroke='%23e9c46a' stroke-width='6'/%3E%3Cpath d='M0,30Q80,96 160,30' fill='none' stroke='%238a5f16' stroke-width='6' stroke-dasharray='1.5 3'/%3E%3C/svg%3E") center top / auto 100% repeat-x;
+      filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .6));
+    }
+    .valance::before {                       /* the gilded rail the curtains hang from */
+      content: ""; position: absolute; top: 0; left: 0; right: 0; height: clamp(5px, 1.1vh, 9px);
+      background: linear-gradient(180deg, var(--gold-1), var(--gold-2) 45%, var(--gold-3));
+      box-shadow: 0 1px 0 rgba(0, 0, 0, .5);
+    }
+    .curtain { position: absolute; top: 0; bottom: 0; width: var(--cw); z-index: 5; pointer-events: none; filter: drop-shadow(0 0 16px rgba(0, 0, 0, .75)); }
+    .curtain svg { display: block; width: 100%; height: 100%; }
+    .curtain.left { left: 0; }
+    .curtain.right { right: 0; transform: scaleX(-1); }
+
+    /* The curtain that opens once, the first time the Pit is visited in a sitting */
+    .drape { display: none; position: absolute; top: 0; bottom: 0; width: 50.5%; z-index: 4; pointer-events: none;
+      background:
+        linear-gradient(180deg, rgba(0, 0, 0, .45), transparent 22%, transparent 70%, rgba(0, 0, 0, .55)),
+        repeating-linear-gradient(90deg, var(--velvet-3) 0, var(--velvet-2) 16px, var(--velvet-1) 26px, var(--velvet-2) 38px, var(--velvet-3) 52px); }
+    .drape.left { left: 0; } .drape.right { right: 0; }
+    @media (prefers-reduced-motion: no-preference) {
+      .first .drape { display: block; }
+      .first .drape.left { animation: open-left 1.5s cubic-bezier(.65, 0, .25, 1) .35s both; }
+      .first .drape.right { animation: open-right 1.5s cubic-bezier(.65, 0, .25, 1) .35s both; }
+      .first .bill, .first .seats { animation: rise .9s ease-out 1.05s both; }
+      .first .seats { animation-delay: 1.3s; }
+    }
+    @keyframes open-left { to { transform: translateX(-102%); } }
+    @keyframes open-right { to { transform: translateX(102%); } }
+    @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+
+    /* ---------- The bill: the name over the stage ---------- */
+    .pit {
+      position: relative; z-index: 2; flex: 1; min-height: 0; display: flex; flex-direction: column;
+      width: min(1120px, calc(100% - 2 * var(--cw) - 20px));
+      padding-top: calc(var(--valance) + clamp(2px, 1.2vh, 14px));
+    }
+    .bill { text-align: center; flex: none; }
+    .bill h1 {
+      margin: 0; font-weight: 700; letter-spacing: .06em; line-height: 1.08;
+      font-size: clamp(24px, min(5.3vw, 8.4vh), 66px);
+      background: linear-gradient(180deg, #fff6d6 0%, var(--gold-1) 22%, var(--gold-2) 50%, var(--gold-3) 64%, #f1d48a 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .55)) drop-shadow(0 0 22px rgba(255, 200, 110, .28));
+    }
+    .pit-name {
+      margin: clamp(0px, .6vh, 8px) 0 0; display: flex; align-items: center; justify-content: center; gap: clamp(8px, 1.6vw, 20px);
+      font-family: var(--script); font-style: italic; font-weight: 600; color: #f7e6b4;
+      font-size: clamp(17px, min(2.9vw, 4.6vh), 34px); line-height: 1.1;
+    }
+    .pit-name::before, .pit-name::after { content: ""; height: 1px; width: clamp(24px, 9vw, 130px); }
+    .pit-name::before { background: linear-gradient(90deg, transparent, var(--gold-2)); }
+    .pit-name::after { background: linear-gradient(270deg, transparent, var(--gold-2)); }
+    .ask {
+      margin: clamp(2px, .8vh, 10px) 0 0; font-weight: 500; letter-spacing: .26em; text-transform: uppercase;
+      font-size: clamp(11px, min(1.25vw, 2.1vh), 15px); color: rgba(244, 231, 197, .82);
+    }
+
+    /* ---------- The seats ---------- */
+    .seats {
+      flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: clamp(6px, 1.6vw, 26px); margin-top: clamp(4px, 1.6vh, 18px); padding-bottom: clamp(8px, 2.6vh, 26px);
+    }
+    .seat {
+      position: relative; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+      text-decoration: none; color: inherit; outline: none; -webkit-tap-highlight-color: transparent;
+    }
+    .seat:nth-child(2), .seat:nth-child(3) { transform: translateY(clamp(0px, 2vh, 18px)); }   /* the middle chairs sit nearer the rail */
+    .art { position: relative; flex: 1; min-height: 0; width: 100%; --beam: 100vh; transition: filter .35s ease; }
+    .beam {                                  /* the spotlight's beam: cut to a cone, then softened */
+      position: absolute; left: 50%; bottom: 2%; width: 122%; height: var(--beam); transform: translateX(-50%);
+      filter: blur(7px); opacity: .6; transition: opacity .35s ease; pointer-events: none;
+    }
+    .beam::before {
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(255, 240, 190, 0) 0%, rgba(255, 238, 180, .15) 45%, rgba(255, 236, 170, .34) calc(100% - 46px), rgba(255, 236, 170, 0) 100%);
+      clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%);
+    }
+    .art::after {                            /* the pool of light it leaves on the boards */
+      content: ""; position: absolute; left: 50%; bottom: -6%; width: 132%; height: 20%; transform: translateX(-50%);
+      background: radial-gradient(ellipse at center, rgba(255, 238, 180, .62) 0%, rgba(255, 226, 150, .22) 46%, transparent 72%);
+      opacity: .7; transition: opacity .35s ease; pointer-events: none;
+    }
+    .art svg {
+      position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; overflow: visible;
+      filter: drop-shadow(0 12px 10px rgba(0, 0, 0, .5));
+      transition: transform .35s cubic-bezier(.2, .8, .3, 1); transform-origin: 50% 100%;
+    }
+    .plaque {                                /* an engraved brass plate */
+      position: relative; z-index: 2; flex: none; margin-top: clamp(4px, 1.4vh, 14px);
+      min-width: min(100%, 9.5em); padding: .42em 1.5em .46em; border-radius: 7px; text-align: center;
+      font-size: clamp(14px, min(2vw, 3.3vh), 24px); color: var(--gold-ink);
+      background:
+        radial-gradient(circle at .62em 50%, #7a5416 0 .14em, #f8e6ab .15em .2em, transparent .22em),
+        radial-gradient(circle at calc(100% - .62em) 50%, #7a5416 0 .14em, #f8e6ab .15em .2em, transparent .22em),
+        linear-gradient(180deg, #f8e6ab 0%, #dcb157 46%, #bd8d33 54%, #e8ca7c 100%);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65), inset 0 -1px 0 rgba(90, 60, 10, .6), 0 2px 0 #6b4a12, 0 10px 20px rgba(0, 0, 0, .55);
+      transition: filter .25s ease, transform .25s ease;
+    }
+    .plaque .name { display: block; font-weight: 700; letter-spacing: .09em; line-height: 1.15; text-shadow: 0 1px 0 rgba(255, 245, 205, .7); }
+    .plaque .sub { display: block; margin-top: .1em; font-family: var(--script); font-style: italic; font-weight: 600; font-size: max(.74em, 13px); line-height: 1.1; color: #553609; white-space: nowrap; }
+    .plaque .flat { font-style: normal; margin: 0 .04em 0 -.1em; }   /* the flat sign comes from another font: pull it in against its letter */
+
+    @media (hover: hover) {
+      .seats:hover .seat:not(:hover) .art { filter: brightness(.66); }
+      .seat:hover .beam { opacity: 1; }
+      .seat:hover .art::after { opacity: 1; }
+      .seat:hover .art svg { transform: translateY(-1.2vh) scale(1.05); }
+      .seat:hover .plaque { filter: brightness(1.1); transform: translateY(-2px); }
+    }
+    .seat:focus-visible .beam, .seat:focus-visible .art::after { opacity: 1; }
+    .seat:focus-visible .art svg { transform: translateY(-1.2vh) scale(1.05); }
+    .seat:focus-visible .plaque { outline: 3px solid #fff3c4; outline-offset: 3px; }
+    .seat:active .plaque { transform: translateY(1px); filter: brightness(.95); }
+
+    /* ---------- The rail and its footlights ---------- */
+    .footlights {
+      position: relative; z-index: 3; flex: none; width: 100%; height: clamp(20px, 5.4vh, 46px);
+      background:
+        radial-gradient(circle at 50% 34%, #fffbe6 0 2.5px, #ffd97a 3.5px, rgba(255, 200, 90, .34) 7px, transparent 15px) center / clamp(40px, 5.6vw, 70px) 100% repeat-x,
+        linear-gradient(180deg, #2c180d, #090403);
+      border-top: 2px solid #b98a30; box-shadow: 0 -12px 34px rgba(255, 200, 100, .2);
+    }
+
+    /* ---------- Narrow screens: two rows of two, and the page may scroll ---------- */
+    @media (max-width: 700px), (max-aspect-ratio: 4 / 5) {
+      .hall { height: auto; min-height: 100vh; min-height: 100dvh; }
+      .seats { grid-template-columns: repeat(2, 1fr); row-gap: clamp(18px, 4vh, 34px); flex: none; }
+      .seat:nth-child(2), .seat:nth-child(3) { transform: none; }
+      .art { flex: none; height: min(54vw, 38vh, 330px); min-height: 150px; --beam: 135%; }
+      .floor { height: 100%; top: clamp(150px, 32vh, 260px); bottom: 0; }
+    }
+
+    /* The Eagle View Music back button, as on every app (hidden when the page is framed) */
+    .back-home-btn{position:fixed;top:12px;left:12px;z-index:10000;display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:9999px;background:rgba(30,41,59,.88);color:#f1f5f9;border:1px solid rgba(255,255,255,.22);font:600 13px/1 Montserrat,system-ui,-apple-system,sans-serif;text-decoration:none;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25);backdrop-filter:blur(6px);transition:background .2s,color .2s}
+    .back-home-btn:hover{background:#334155;color:#74B9FF}
+    @media (max-width:640px){.back-home-btn .back-label{display:none}}
+    .in-iframe .back-home-btn{display:none!important}
+  </style>
+  <script>try{if(window.self!==window.top)document.documentElement.classList.add('in-iframe')}catch(e){document.documentElement.classList.add('in-iframe')}</script>
+  <script>
+    // The curtain opens the first time the Pit is visited in a sitting, not on every trip back from an instrument.
+    try { if (!sessionStorage.getItem('virtual-orchestra-curtain')) { document.documentElement.classList.add('first'); sessionStorage.setItem('virtual-orchestra-curtain', '1'); } } catch (e) {}
+  </script>
+  <!-- EVM visit counter: one anonymous count each time an app is opened. What is sent, and what never is: /what-we-count.html -->
+  <script>
+    (function () {
+      var off = false;
+      try { off = localStorage.getItem('skipgc') === 't'; } catch (e) {}
+      if (location.hash === '#toggle-goatcounter') {   // the teacher's own browsers opt out here (and back in)
+        try { off ? localStorage.removeItem('skipgc') : localStorage.setItem('skipgc', 't'); } catch (e) {}
+        alert(off ? 'Visits from this browser will be counted again.' : 'Visits from this browser will no longer be counted.');
+        return;
+      }
+      if (off || navigator.webdriver) return;
+      if (navigator.globalPrivacyControl || navigator.doNotTrack === '1' || window.doNotTrack === '1') return;   // the visitor asked not to be counted
+      if (!/(^|\.)eagleviewmusic\.com$/.test(location.hostname)) return;   // testing, or a copy on another site
+      try { if (window.top !== window && parent.location.host) return; } catch (e) {}   // framed by another of our apps (the Music Stand), which counts itself
+      try {
+        var p = decodeURIComponent(location.pathname).replace(/index\.html$/, '');
+        var r = document.referrer.split(/[?#]/)[0];   // where the visit came from, never the rest of a link
+        var u = 'https://eagleviewmusic.goatcounter.com/count?p=' + encodeURIComponent(p) +
+          (r ? '&r=' + encodeURIComponent(r) : '') + '&s=' + screen.width + '&rnd=' + Math.random().toString(36).slice(2, 7);
+        if (!(navigator.sendBeacon && navigator.sendBeacon(u))) new Image().src = u;
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+<a href="../index.html" class="back-home-btn" title="Back to Eagle View Music" aria-label="Back to Eagle View Music"><span class="back-arrow">←</span><span class="back-label">Eagle View Music</span></a>
+
+<!-- Paints shared by every drawing on the page -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="gSilver" x1="0" x2="1"><stop offset="0" stop-color="#626b76"/><stop offset=".3" stop-color="#dfe5ea"/><stop offset=".45" stop-color="#ffffff"/><stop offset=".72" stop-color="#a3adb7"/><stop offset="1" stop-color="#555e68"/></linearGradient>
+    <linearGradient id="gSilverV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#626b76"/><stop offset=".3" stop-color="#dfe5ea"/><stop offset=".45" stop-color="#ffffff"/><stop offset=".72" stop-color="#a3adb7"/><stop offset="1" stop-color="#555e68"/></linearGradient>
+    <radialGradient id="gKey" cx=".38" cy=".34" r=".75"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#c3ccd4"/><stop offset="1" stop-color="#6c7680"/></radialGradient>
+    <linearGradient id="gBrass" x1="0" x2="1"><stop offset="0" stop-color="#7a5210"/><stop offset=".3" stop-color="#e8b944"/><stop offset=".45" stop-color="#fff1b8"/><stop offset=".72" stop-color="#c99526"/><stop offset="1" stop-color="#6f4a0c"/></linearGradient>
+    <linearGradient id="gBrassV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a5e14"/><stop offset=".28" stop-color="#e8b944"/><stop offset=".42" stop-color="#fff1b8"/><stop offset=".7" stop-color="#c99526"/><stop offset="1" stop-color="#6f4a0c"/></linearGradient>
+    <linearGradient id="gEbony" x1="0" x2="1"><stop offset="0" stop-color="#050506"/><stop offset=".3" stop-color="#3b3b42"/><stop offset=".44" stop-color="#6a6a74"/><stop offset=".7" stop-color="#1b1b1f"/><stop offset="1" stop-color="#000000"/></linearGradient>
+    <linearGradient id="gWood" x1="0" x2="1"><stop offset="0" stop-color="#2e1a0e"/><stop offset=".3" stop-color="#8a5429"/><stop offset=".45" stop-color="#c08a52"/><stop offset=".72" stop-color="#6a3f20"/><stop offset="1" stop-color="#26150a"/></linearGradient>
+    <linearGradient id="gIvory" x1="0" x2="1"><stop offset="0" stop-color="#a8956c"/><stop offset=".3" stop-color="#f5ead0"/><stop offset=".45" stop-color="#fffaf0"/><stop offset=".72" stop-color="#dccba3"/><stop offset="1" stop-color="#96825a"/></linearGradient>
+    <linearGradient id="gVelvet" x1="0" x2=".24" spreadMethod="reflect"><stop offset="0" stop-color="#4a0810"/><stop offset=".5" stop-color="#9a1420"/><stop offset=".8" stop-color="#c22231"/><stop offset="1" stop-color="#8f121d"/></linearGradient>
+    <linearGradient id="gVelvetShade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity=".5"/><stop offset=".2" stop-color="#000" stop-opacity="0"/><stop offset=".6" stop-color="#000" stop-opacity=".12"/><stop offset=".7" stop-color="#000" stop-opacity=".42"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></linearGradient>
+    <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbe9b0"/><stop offset=".5" stop-color="#e3b95a"/><stop offset="1" stop-color="#a8772a"/></linearGradient>
+    <!-- one side curtain, tied back; the right-hand one is this drawing mirrored -->
+    <symbol id="curtainArt" viewBox="0 0 100 600" preserveAspectRatio="none">
+      <path d="M0,0 H100 C100,210 96,330 56,398 C60,470 80,540 74,600 H0 Z" fill="url(#gVelvet)"/>
+      <path d="M0,0 H100 C100,210 96,330 56,398 C60,470 80,540 74,600 H0 Z" fill="url(#gVelvetShade)"/>
+      <path d="M0,386 C26,398 46,400 58,392 L60,406 C48,416 26,414 0,402 Z" fill="url(#gGold)" stroke="#6b4a12" stroke-width="1"/>
+      <path d="M57,404 C60,420 56,440 60,458 M53,406 C52,424 50,440 52,456 M61,402 C66,420 64,438 68,452" fill="none" stroke="#e3b95a" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="hall">
+  <div class="floor"></div>
+  <div class="curtain left" aria-hidden="true"><svg preserveAspectRatio="none"><use href="#curtainArt" width="100%" height="100%"/></svg></div>
+  <div class="curtain right" aria-hidden="true"><svg preserveAspectRatio="none"><use href="#curtainArt" width="100%" height="100%"/></svg></div>
+  <div class="drape left" aria-hidden="true"></div>
+  <div class="drape right" aria-hidden="true"></div>
+  <div class="valance" aria-hidden="true"></div>
+
+  <main class="pit">
+    <header class="bill">
+      <h1>The Virtual Orchestra</h1>
+      <p class="pit-name"><span>The Orchestra Pit</span></p>
+      <p class="ask">Choose your instrument</p>
+    </header>
+
+    <nav class="seats" aria-label="Instruments">
+
+      <!-- FLUTE -->
+      <a class="seat" href="flute/index.html">
+        <span class="art"><i class="beam"></i><svg viewBox="0 0 200 300" preserveAspectRatio="xMidYMax meet" aria-hidden="true" focusable="false">
+          <g transform="translate(100 152) rotate(-55) translate(-148 -22)">
+            <rect x="2" y="15.5" width="7" height="13" rx="2" fill="url(#gSilverV)"/>
+            <rect x="8" y="16" width="286" height="12" rx="1.5" fill="url(#gSilverV)"/>
+            <rect x="86" y="14.8" width="14" height="14.4" rx="1.5" fill="url(#gSilverV)"/>
+            <rect x="237" y="14.8" width="5" height="14.4" rx="1.5" fill="url(#gSilverV)"/>
+            <rect x="290.5" y="15.2" width="4" height="13.6" rx="1.5" fill="url(#gSilverV)"/>
+            <ellipse cx="50" cy="19" rx="13" ry="7.6" fill="#eef2f6" stroke="#6f7884" stroke-width=".9"/>
+            <ellipse cx="50" cy="18" rx="4.8" ry="2.9" fill="#23272d"/>
+            <rect x="106" y="27.4" width="130" height="2.4" rx="1.2" fill="#8d97a3"/>
+            <g fill="#a7b0ba"><rect x="118" y="25.6" width="3" height="5.4" rx="1"/><rect x="178" y="25.6" width="3" height="5.4" rx="1"/><rect x="223" y="25.6" width="3" height="5.4" rx="1"/></g>
+            <g fill="url(#gKey)" stroke="#4d565f" stroke-width=".8">
+              <circle cx="112" cy="20.5" r="4.7"/><circle cx="126" cy="20.5" r="6.8"/><circle cx="141" cy="20.5" r="6.8"/><circle cx="156" cy="20.5" r="6.8"/><circle cx="171" cy="20.5" r="6.8"/>
+              <circle cx="188" cy="20.5" r="6.8"/><circle cx="203" cy="20.5" r="6.8"/><circle cx="218" cy="20.5" r="6.8"/><circle cx="230.5" cy="20.5" r="4.7"/>
+              <circle cx="252" cy="20.5" r="6.4"/><circle cx="266" cy="20.5" r="6.4"/><circle cx="280" cy="20.5" r="6.4"/>
+              <ellipse cx="163.5" cy="32" rx="6.2" ry="2.5"/><ellipse cx="246" cy="32.4" rx="5.4" ry="2.5"/>
+            </g>
+            <g fill="none" stroke="#7d8792" stroke-width=".7">
+              <circle cx="126" cy="20.5" r="3.6"/><circle cx="141" cy="20.5" r="3.6"/><circle cx="156" cy="20.5" r="3.6"/><circle cx="171" cy="20.5" r="3.6"/>
+              <circle cx="188" cy="20.5" r="3.6"/><circle cx="203" cy="20.5" r="3.6"/><circle cx="218" cy="20.5" r="3.6"/>
+            </g>
+          </g>
+        </svg></span>
+        <span class="plaque"><span class="name">Flute</span><span class="sub">Woodwinds</span></span>
+      </a>
+
+      <!-- CLARINETS: E♭, B♭ and bass share one seat, as they share one app -->
+      <a class="seat" href="clarinet/index.html">
+        <span class="art"><i class="beam"></i><svg viewBox="0 0 220 300" preserveAspectRatio="xMidYMax meet" aria-hidden="true" focusable="false">
+          <defs>
+            <g id="clarArt">
+              <path d="M-2.6,0 L3.2,0 L6.6,30 L-6.6,30 Z" fill="url(#gEbony)"/>
+              <rect x="-7.3" y="12" width="14.6" height="11" rx="2" fill="url(#gSilver)"/>
+              <rect x="-8" y="30" width="16" height="22" rx="3" fill="url(#gEbony)"/>
+              <rect x="-7" y="52" width="14" height="80" fill="url(#gEbony)"/>
+              <rect x="-7.2" y="134" width="14.4" height="82" fill="url(#gEbony)"/>
+              <path d="M-7.4,218 C-8,240 -14,252 -21,260 L21,260 C14,252 8,240 7.4,218 Z" fill="url(#gEbony)"/>
+              <g fill="url(#gSilver)">
+                <rect x="-8.5" y="28.6" width="17" height="3.2" rx="1.2"/><rect x="-8.5" y="50" width="17" height="3.2" rx="1.2"/>
+                <rect x="-8.4" y="130.6" width="16.8" height="4.2" rx="1.4"/><rect x="-8.5" y="215" width="17" height="4" rx="1.4"/>
+                <rect x="-21.6" y="257.4" width="43.2" height="3.8" rx="1.9"/>
+              </g>
+              <path d="M8.8,60 V126 M8.8,142 V208" fill="none" stroke="#c9d1d9" stroke-width="1.7" stroke-linecap="round"/>
+              <g fill="#0b0b0d" stroke="#e4e9ee" stroke-width="1.7">
+                <circle cx="0" cy="74" r="4.2"/><circle cx="0" cy="90" r="4.2"/><circle cx="0" cy="106" r="4.2"/>
+                <circle cx="0" cy="152" r="4.2"/><circle cx="0" cy="168" r="4.2"/><circle cx="0" cy="184" r="4.2"/>
+              </g>
+              <g fill="url(#gKey)" stroke="#4d565f" stroke-width=".6">
+                <ellipse cx="9.6" cy="64" rx="2.5" ry="5.2"/><ellipse cx="-9.6" cy="118" rx="2.7" ry="6"/><ellipse cx="-4.6" cy="122" rx="2.3" ry="3.3"/>
+                <ellipse cx="-10.2" cy="197" rx="3.2" ry="6.6"/><ellipse cx="10.6" cy="201" rx="3" ry="6"/><ellipse cx="0" cy="203" rx="3.6" ry="3.6"/>
+              </g>
+            </g>
+          </defs>
+          <!-- E♭: the little one -->
+          <use href="#clarArt" transform="translate(44 286) rotate(-8) scale(.72) translate(0 -260)"/>
+          <!-- B♭ -->
+          <use href="#clarArt" transform="translate(96 286) rotate(-3) scale(.9) translate(0 -260)"/>
+          <!-- Bass: silver neck and upturned silver bell, standing on its peg -->
+          <g transform="translate(166 0)">
+            <path d="M13,266 V289" stroke="#9aa3ad" stroke-width="2.6" stroke-linecap="round"/>
+            <rect x="10.4" y="287" width="5.2" height="4.4" rx="1.6" fill="#1c1c20"/>
+            <g fill="none" stroke-linecap="round">
+              <path d="M0,50 V32 C0,19 -9,14 -20,20" stroke="#59626c" stroke-width="12"/>
+              <path d="M0,50 V32 C0,19 -9,14 -20,20" stroke="#cdd5dc" stroke-width="9.6"/>
+              <path d="M0,50 V32 C0,19 -9,14 -20,20" stroke="#ffffff" stroke-width="2.6" transform="translate(-1.4 -1.2)"/>
+              <path d="M0,230 V246 C0,268 26,270 26,250" stroke="#59626c" stroke-width="15"/>
+              <path d="M0,230 V246 C0,268 26,270 26,250" stroke="#cdd5dc" stroke-width="12.6"/>
+              <path d="M0,230 V246 C0,268 26,270 26,250" stroke="#ffffff" stroke-width="3" transform="translate(-2 0)"/>
+            </g>
+            <path d="M19,252 C18,240 13,231 7,223 L45,223 C39,231 34,240 33,252 Z" fill="url(#gSilver)" stroke="#59626c" stroke-width=".8"/>
+            <rect x="5.6" y="220" width="40.8" height="4.4" rx="2.2" fill="url(#gSilver)" stroke="#59626c" stroke-width=".6"/>
+            <g transform="translate(-19.5 19.6) rotate(-55)">
+              <path d="M-5.6,2 L5.6,2 L2.6,-30 L-2.8,-30 Z" fill="url(#gEbony)"/>
+              <rect x="-6.2" y="-20" width="12.4" height="10" rx="2" fill="url(#gSilver)"/>
+            </g>
+            <rect x="-9" y="48" width="18" height="184" fill="url(#gEbony)"/>
+            <g fill="url(#gSilver)"><rect x="-10.2" y="46" width="20.4" height="4.4" rx="1.6"/><rect x="-10.2" y="138" width="20.4" height="4.4" rx="1.6"/><rect x="-10.2" y="228" width="20.4" height="4.6" rx="1.6"/></g>
+            <path d="M11,58 V132 M11,148 V222" fill="none" stroke="#c9d1d9" stroke-width="1.8" stroke-linecap="round"/>
+            <g fill="url(#gKey)" stroke="#4d565f" stroke-width=".7">
+              <circle cx="0" cy="70" r="5.2"/><circle cx="0" cy="88" r="5.2"/><circle cx="0" cy="106" r="5.2"/>
+              <circle cx="0" cy="160" r="5.4"/><circle cx="0" cy="178" r="5.4"/><circle cx="0" cy="196" r="5.4"/><circle cx="0" cy="213" r="5.4"/>
+              <ellipse cx="-11.4" cy="122" rx="2.8" ry="6.4"/><ellipse cx="-11.8" cy="206" rx="3.2" ry="7"/><ellipse cx="12" cy="64" rx="2.6" ry="5"/>
+            </g>
+          </g>
+        </svg></span>
+        <span class="plaque"><span class="name">Clarinets</span><span class="sub">E<span class="flat">♭</span> · B<span class="flat">♭</span> · Bass</span></span>
+      </a>
+
+      <!-- TRUMPET -->
+      <a class="seat" href="trumpet/index.html">
+        <span class="art"><i class="beam"></i><svg viewBox="0 0 270 300" preserveAspectRatio="xMidYMax meet" aria-hidden="true" focusable="false">
+          <defs>
+            <path id="tptTubes" d="M34,62 H212 M76,62 C46,62 46,104 76,104 H122 M204,62 C234,62 234,104 204,104 H178 M122,80 H102 C92,80 92,93 102,93 H122 M178,80 H190 C199,80 199,93 190,93 H178 M124,87 H176"/>
+          </defs>
+          <g transform="translate(133 152) rotate(-34) scale(.86) translate(-150 -72)">
+            <g fill="none" stroke-linecap="round">
+              <use href="#tptTubes" stroke="#6b470c" stroke-width="10.4"/>
+              <use href="#tptTubes" stroke="#d9a93c" stroke-width="8"/>
+              <use href="#tptTubes" stroke="#fff0b3" stroke-width="2.2" transform="translate(0 -1.7)"/>
+              <path d="M197,57 C197,45 209,45 209,54" stroke="#6b470c" stroke-width="3.6"/>
+              <path d="M197,57 C197,45 209,45 209,54" stroke="#e8b944" stroke-width="2"/>
+              <circle cx="188" cy="70.5" r="4.6" stroke="#6b470c" stroke-width="3.4"/>
+              <circle cx="188" cy="70.5" r="4.6" stroke="#e8b944" stroke-width="1.8"/>
+            </g>
+            <!-- bell -->
+            <path d="M204,57 C240,56 266,46 287,18 L291,18 L291,106 L287,106 C266,78 240,68 204,67 Z" fill="url(#gBrassV)" stroke="#6b470c" stroke-width="1"/>
+            <ellipse cx="290" cy="62" rx="3.6" ry="44.6" fill="#c99526" stroke="#6b470c" stroke-width=".9"/>
+            <ellipse cx="289.4" cy="50" rx="1.1" ry="24" fill="#fff1b8" opacity=".8"/>
+            <!-- mouthpiece -->
+            <rect x="33" y="57.2" width="13" height="9.6" rx="2" fill="url(#gBrassV)" stroke="#6b470c" stroke-width=".8"/>
+            <path d="M7,53 C11,53 14,56 19,58.4 L35,60.2 V63.8 L19,65.6 C14,68 11,71 7,71 Z" fill="url(#gSilverV)" stroke="#59626c" stroke-width=".7"/>
+            <rect x="4.4" y="51.6" width="3.8" height="20.8" rx="1.9" fill="url(#gSilverV)" stroke="#59626c" stroke-width=".7"/>
+            <!-- three valves -->
+            <g id="tptValve">
+              <rect x="126.3" y="27" width="3.4" height="14" fill="url(#gSilver)"/>
+              <rect x="121" y="21.4" width="14" height="5.6" rx="2.6" fill="url(#gBrass)" stroke="#6b470c" stroke-width=".7"/>
+              <ellipse cx="128" cy="21.6" rx="5.8" ry="2.1" fill="#fdfbf3"/>
+              <rect x="119.5" y="45" width="17" height="75" fill="url(#gBrass)" stroke="#6b470c" stroke-width=".8"/>
+              <rect x="118.4" y="40" width="19.2" height="6.4" rx="1.6" fill="url(#gBrass)" stroke="#6b470c" stroke-width=".8"/>
+              <rect x="118.4" y="118" width="19.2" height="6.8" rx="1.6" fill="url(#gBrass)" stroke="#6b470c" stroke-width=".8"/>
+              <rect x="123.5" y="124.6" width="9" height="3.4" rx="1.4" fill="#c99526" stroke="#6b470c" stroke-width=".7"/>
+            </g>
+            <use href="#tptValve" x="22"/>
+            <use href="#tptValve" x="44"/>
+          </g>
+        </svg></span>
+        <span class="plaque"><span class="name">Trumpet</span><span class="sub">Brass</span></span>
+      </a>
+
+      <!-- RECORDER -->
+      <a class="seat" href="recorder/index.html">
+        <span class="art"><i class="beam"></i><svg viewBox="0 0 200 300" preserveAspectRatio="xMidYMax meet" aria-hidden="true" focusable="false">
+          <g transform="rotate(7 100 150)">
+            <path d="M94,16 Q100,11 106,16 L114,58 L114,86 L86,86 L86,58 Z" fill="url(#gWood)"/>
+            <rect x="95.4" y="43" width="9.2" height="7.4" rx="1.2" fill="#150b06"/>
+            <path d="M95.4,50.4 L104.6,50.4 L106.8,65 L93.2,65 Z" fill="#000" opacity=".3"/>
+            <path d="M87.6,94 L112.4,94 L110.4,232 L89.6,232 Z" fill="url(#gWood)"/>
+            <path d="M89,239 L111,239 C112,262 116,276 119.5,286 L80.5,286 C84,276 88,262 89,239 Z" fill="url(#gWood)"/>
+            <g fill="url(#gIvory)" stroke="#7d6a45" stroke-width=".6">
+              <rect x="84" y="84" width="32" height="10.5" rx="3"/>
+              <rect x="86.4" y="230" width="27.2" height="9.6" rx="3"/>
+              <rect x="79.4" y="282.6" width="41.2" height="5.4" rx="2.7"/>
+            </g>
+            <g fill="#150b06" stroke="#d9a877" stroke-opacity=".35" stroke-width=".8">
+              <circle cx="100" cy="114" r="4.2"/><circle cx="100" cy="133" r="4.2"/><circle cx="100" cy="152" r="4.2"/>
+              <circle cx="100" cy="176" r="4.2"/><circle cx="100" cy="195" r="4.2"/>
+              <circle cx="97" cy="214" r="2.5"/><circle cx="103.6" cy="214" r="3.1"/>
+              <circle cx="103.4" cy="254" r="2.4"/><circle cx="109" cy="255" r="2.9"/>
+            </g>
+          </g>
+        </svg></span>
+        <span class="plaque"><span class="name">Recorder</span><span class="sub">Woodwinds</span></span>
+      </a>
+
+    </nav>
+  </main>
+
+  <div class="footlights" aria-hidden="true"></div>
+</div>
+</body>
+</html>

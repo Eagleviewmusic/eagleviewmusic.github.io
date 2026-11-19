@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="g" cx=".5" cy=".55" r=".6"><stop offset="0" stop-color="#6b3a1c"/><stop offset="1" stop-color="#1b0c0a"/></radialGradient>
+    <linearGradient id="au" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbe9b0"/><stop offset="1" stop-color="#c8963a"/></linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#g)"/>
+  <path d="M5,9 H25 C25,27 21,37 11,45 C14,51 15,55 14,59 H5 Z" fill="#a3141f"/>
+  <path d="M59,9 H39 C39,27 43,37 53,45 C50,51 49,55 50,59 H59 Z" fill="#a3141f"/>
+  <path d="M5,9 H13 C13,27 11,37 8,45 L5,45 Z M59,9 H51 C51,27 53,37 56,45 L59,45 Z" fill="#5d0a12" opacity=".6"/>
+  <rect x="5" y="5" width="54" height="7" rx="2.5" fill="url(#au)"/>
+  <g fill="url(#au)">
+    <ellipse cx="27" cy="47" rx="5.2" ry="3.9" transform="rotate(-20 27 47)"/>
+    <ellipse cx="42" cy="43.5" rx="5.2" ry="3.9" transform="rotate(-20 42 43.5)"/>
+    <rect x="29.6" y="24" width="2.6" height="23"/>
+    <rect x="44.6" y="20.5" width="2.6" height="23"/>
+    <path d="M29.6,24 L47.2,20 V26.6 L29.6,30.6 Z"/>
+  </g>
+</svg>
