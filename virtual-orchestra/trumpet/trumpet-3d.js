@@ -8,6 +8,8 @@
 //   import { createTrumpet } from './trumpet-3d.js';
 //   const t = createTrumpet(container, { labels: 'off', view: 'side' });
 //   t.setValves([true, false, true], '#e11d48');
+//   t.setSlides({ third: 0.55 });   // (after setValves: an out slide takes the note's colour, or pass color: '#…')
+//   A pressed valve's pearl, button rim and brass casing take the colour; the nickel caps stay silver.
 //
 // Axes (mm): +x = toward the bell, +y = up (valve buttons), +z = the player's
 // right (the leadpipe side, the side every product photo is taken from).
@@ -30,7 +32,7 @@ const FILM = (() => {
   THREE.ShaderChunk.tonemapping_pars_fragment = ch.replace(key, 'vec3 CustomToneMapping( vec3 color ) { /* vtFilm */ color *= toneMappingExposure; return min( color, 0.72 ) + 0.28 * ( 1.0 - exp( - max( color - 0.72, 0.0 ) / 0.28 ) ); }');
   return true;
 })();
-const BRASS = 0xf9cf7a, NICKEL = 0xe2e3e2;              // base colours of the two polished metals
+const BRASS = 0xf9cf7a, NICKEL = 0xe2e3e2, KNURL = 0xe9eae9;   // base colours of the two polished metals (and the knurled nickel)
 
 /* ------------------------------------------------------------------ *
  *  Measurements (mm). Taken from a true side photo of a YTR-2330,
@@ -498,15 +500,26 @@ function buildTrumpet() {
   M.brassIn = new THREE.MeshPhysicalMaterial({ color: BRASS, metalness: 1, roughness: 0.05, clearcoat: 1, clearcoatRoughness: 0.03, vertexColors: true });   // inside the bell
   M.nickel = new THREE.MeshPhysicalMaterial({ color: NICKEL, metalness: 1, roughness: 0.04, vertexColors: true });
   M.satin = new THREE.MeshPhysicalMaterial({ color: 0xdcdddd, metalness: 1, roughness: 0.27, vertexColors: true });   // the stems: satin, a step duller than the polished caps
-  M.knurl = new THREE.MeshPhysicalMaterial({ color: 0xe9eae9, metalness: 1, roughness: 0.24, vertexColors: true });   // the knurled bands: bright ridges, dark valleys
-  M.knurl.defines.USE_UV = '';
-  M.knurl.customProgramCacheKey = () => 'vt-knurl';
-  M.knurl.onBeforeCompile = sh => {
-    sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-      { float kt = vUv.x, kw = fwidth(kt);
-        float ridge = smoothstep(0.05, 0.55, abs(fract(kt) - 0.5) * 2.0);
-        diffuseColor.rgb *= mix(0.46, 1.0, mix(ridge, 0.6, smoothstep(0.3, 1.1, kw))); }`);
+  const knurl = () => {
+    const m = new THREE.MeshPhysicalMaterial({ color: KNURL, metalness: 1, roughness: 0.24, vertexColors: true });   // the knurled bands: bright ridges, dark valleys
+    m.defines.USE_UV = '';
+    m.customProgramCacheKey = () => 'vt-knurl';
+    m.onBeforeCompile = sh => {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        { float kt = vUv.x, kw = fwidth(kt);
+          float ridge = smoothstep(0.05, 0.55, abs(fract(kt) - 0.5) * 2.0);
+          diffuseColor.rgb *= mix(0.46, 1.0, mix(ridge, 0.6, smoothstep(0.3, 1.1, kw))); }`);
+    };
+    return m;
   };
+  M.knurl = knurl();
+  // each valve button's own rim (the nickel round the pearl and its knurled edge), so a pressed valve's rim can take
+  // a darker shade of the note's colour: the pearl alone was easy to miss
+  for (const n of [1, 2, 3]) { M['rim' + n] = M.nickel.clone(); M['rim' + n].userData.like = 'nickel'; M['rimKnurl' + n] = knurl(); }
+  // and each valve's brass casing, and the moving part of the 3rd valve slide, so they can turn a metallic version of the
+  // note's colour while that valve is down or the slide is out (the nickel stays silver). `like` = the material they shade as
+  for (const n of [1, 2, 3]) { M['case' + n] = M.brassV.clone(); M['case' + n].userData.like = 'brassV'; }
+  M.slide3B = M.brass.clone(); M.slide3B.userData.like = 'brass';
   M.silver = new THREE.MeshPhysicalMaterial({ color: 0xf3f3f1, metalness: 1, roughness: 0.03, vertexColors: true });
   M.felt = new THREE.MeshStandardMaterial({ color: 0x141414, metalness: 0, roughness: 1, vertexColors: true });
   M.cork = new THREE.MeshStandardMaterial({ color: 0xc58f62, metalness: 0, roughness: 0.9, vertexColors: true });
@@ -616,7 +629,7 @@ function buildTrumpet() {
     const R = D.casingR, Ru = R + 0.35, Rl = R - 0.5, at = V3(x, 0, 0);
     // brass casing: the upper barrel is wider than the lower; they meet at a step with a fine bead
     const body = [[D.casingBot, Rl], [-27.4, Rl], [-26.7, Ru - 0.05], ...arc2(-25.9, Ru, 0.7, 180, 0, 8).map(q => [q[0], Ru + (q[1] - Ru) * 0.4]), [D.casingTop, Ru]];
-    add(cn, M.brassV, place(lathe(fine(body), { segs: 72 }), at));
+    add(cn, M['case' + (i + 1)], place(lathe(fine(body), { segs: 72 }), at));
     capsules.push({ a: V3(x, D.capBot, 0), b: V3(x, D.capTop, 0), r: R, id: cn });
     rc(V3(x, D.casingBot, 0), V3(x, -26.5, 0), Rl, { flat: true }); rc(V3(x, -26.5, 0), V3(x, D.casingTop, 0), Ru, { flat: true });
     rc(V3(x, D.casingTop, 0), V3(x, D.casingTop + 6.2, 0), 11.3, { flat: true, kind: 1 }); rc(V3(x, D.casingBot - 8, 0), V3(x, D.casingBot, 0), 10.2, { flat: true, kind: 1 });
@@ -638,9 +651,9 @@ function buildTrumpet() {
     G(vn); G(mv, vn);
     const u = D.buttonUnder, ub = u - 0.9;
     add(mv, M.satin, place(lathe([[-14, 2.5], [u + 0.3, 2.5]], { segs: 28 }), at));
-    add(mv, M.nickel, place(lathe([[ub, 2.4], [ub, 6.5], ...arc2(ub + 0.9, 7.25, 0.9, 180, 90, 6)], { segs: 56, crease: 50 }), at));
-    add(mv, M.knurl, place(knurlBand(ub + 0.9, u + 2.6, 8.15, 80), at));
-    add(mv, M.nickel, place(lathe([...arc2(u + 2.6, 7.15, 1.0, 90, 0, 8), [u + 3.6, 6.62], [u + 3.45, 6.58]], { segs: 64, crease: 60 }), at));
+    add(mv, M['rim' + (i + 1)], place(lathe([[ub, 2.4], [ub, 6.5], ...arc2(ub + 0.9, 7.25, 0.9, 180, 90, 6)], { segs: 56, crease: 50 }), at));
+    add(mv, M['rimKnurl' + (i + 1)], place(knurlBand(ub + 0.9, u + 2.6, 8.15, 80), at));
+    add(mv, M['rim' + (i + 1)], place(lathe([...arc2(u + 2.6, 7.15, 1.0, 90, 0, 8), [u + 3.6, 6.62], [u + 3.45, 6.58]], { segs: 64, crease: 60 }), at));
     const dome = []; for (let k = 0; k <= 8; k++) { const r = 6.6 * (1 - k / 8); dome.push([u + 3.5 + 1.0 * (1 - (r / 6.6) ** 2), r]); }
     add(mv, M['pearl' + (i + 1)], place(lathe(dome, { segs: 48 }), at));
     capsules.push({ a: V3(x, u, 0), b: V3(x, u + 3.5, 0), r: 8, id: mv });
@@ -755,12 +768,12 @@ function buildTrumpet() {
       tube('slide3', M.brass, [V3(V + 4, y, 0), V3(S.x0, y, 0)], 6.0, { segs: 36 });                  // stub on the casing
       ring('slide3', M.brass, V3(V + 11.6, y, 0), AX, 6.05, 1.5, 0.5);
       tube('slide3', M.nickel, [V3(S.x0 - 1, y, 0), V3(S.x0 + 62, y, 0)], 5.7, { segs: 32, noAO: true });   // inner leg (nickel silver), seen when the slide is out
-      tube('slide3.moving', M.brass, [V3(S.x0, y, 0), V3(S.x1 - 2.6, y, 0)], 6.3, { segs: 40, capA: true });
-      ring('slide3.moving', M.brass, V3(S.x0 + 0.9, y, 0), AX, 6.4, 1.8, 0.75);
-      sleeve('slide3.moving', M.brass, V3(S.x1 - 3.2, y, 0), AX, 4.2, 6.6, { segs: 40 });
+      tube('slide3.moving', M.slide3B, [V3(S.x0, y, 0), V3(S.x1 - 2.6, y, 0)], 6.3, { segs: 40, capA: true });
+      ring('slide3.moving', M.slide3B, V3(S.x0 + 0.9, y, 0), AX, 6.4, 1.8, 0.75);
+      sleeve('slide3.moving', M.slide3B, V3(S.x1 - 3.2, y, 0), AX, 4.2, 6.6, { segs: 40 });
     }
     const rb = (S.yU - S.yL) / 2;
-    tube('slide3.moving', M.brass, roundedPath([V3(S.x1 - 1, S.yU, 0), V3(S.x1 + rb, S.yU, 0), V3(S.x1 + rb, S.yL, 0), V3(S.x1 - 1, S.yL, 0)], rb, 0.07), 6.1, { segs: 40 });
+    tube('slide3.moving', M.slide3B, roundedPath([V3(S.x1 - 1, S.yU, 0), V3(S.x1 + rb, S.yU, 0), V3(S.x1 + rb, S.yL, 0), V3(S.x1 - 1, S.yL, 0)], rb, 0.07), 6.1, { segs: 40 });
     for (const y of [S.yU, S.yL]) { rc(V3(V + 6, y, 0), V3(S.x0, y, 0), 6.0); rc(V3(S.x0, y, 0), V3(S.x1, y, 0), 6.3, { mov: 'slide3.moving' }); }
     rcPath(roundedPath([V3(S.x1, S.yU, 0), V3(S.x1 + rb, S.yU, 0), V3(S.x1 + rb, S.yL, 0), V3(S.x1, S.yL, 0)], rb, 0.07), 6.1, 4, { mov: 'slide3.moving' });
     // finger ring on its bar, the clamp that holds the bar, the thumb screw, the rubber tip
@@ -768,7 +781,7 @@ function buildTrumpet() {
     const band = [[-3.2, 10.3], ...arc2(-2.7, 11.4, 0.5, 180, 90, 4), ...arc2(2.7, 11.4, 0.5, 90, 0, 4), [3.2, 10.3], ...arc2(2.7, 10.3, 0.5, 0, -90, 4), ...arc2(-2.7, 10.3, 0.5, -90, -180, 4)];
     add('slide3.moving', M.nickel, place(lathe(band, { segs: 72, crease: 60 }), V3(73.3, yT + 3.3 + 11.8, 0), AZ));
     const bar = roundedBox(52, 2.3, 5.4, 0.7); bar.translate(73.3 + 2 + 26, yT + 2.5, 0); add('slide3.moving', M.nickel, bar);
-    const blk = roundedBox(9.4, 9.2, 9.2, 1.1); blk.translate(109, yT + 3.6, 0); add('slide3.moving', M.brass, blk);
+    const blk = roundedBox(9.4, 9.2, 9.2, 1.1); blk.translate(109, yT + 3.6, 0); add('slide3.moving', M.slide3B, blk);
     add('slide3.moving', M.nickel, place(lathe([[0, 1.3], [3.2, 1.3], [3.2, 3.0]], { segs: 20 }), V3(109, yT + 8.1, 0)));
     add('slide3.moving', M.knurl, place(knurlBand(3.2, 5.2, 3.3, 22), V3(109, yT + 8.1, 0)));
     add('slide3.moving', M.nickel, place(lathe([[5.2, 3.3], [5.5, 2.9], [5.5, 0]], { segs: 24 }), V3(109, yT + 8.1, 0)));
@@ -860,9 +873,9 @@ function buildTrumpet() {
 
   /* ---------- water keys (main tuning slide, 3rd slide) ---------- */
   {
-    const key = (group, z, base, n, lever, pivot, postFrom) => {
+    const key = (group, z, base, n, lever, pivot, postFrom, brass = M.brass) => {
       const N = V3(n[0], n[1], 0).normalize(), b = V3(base[0], base[1], z);
-      add(group, M.brass, place(lathe([[-3, 3.0], [2.4, 3.0], [2.4, 2.2]], { segs: 20 }), b, N));                                         // nipple
+      add(group, brass, place(lathe([[-3, 3.0], [2.4, 3.0], [2.4, 2.2]], { segs: 20 }), b, N));                                         // nipple
       add(group, M.cork, place(lathe([[2.4, 0], [2.4, 4.0], [4.4, 4.0], [4.4, 0]], { segs: 24, crease: 40 }), b, N));                      // cork
       add(group, M.nickel, place(lathe([[4.0, 4.5], [4.6, 4.7], ...arc2(5.0, 3.5, 1.2, 90, 0, 6), [6.2, 0]], { segs: 28 }), b, N));        // cup that holds the cork
       const Lp = spline(lever.map(p => V3(p[0], p[1], z)), 60);
@@ -872,7 +885,7 @@ function buildTrumpet() {
       // the lever: a strip arm from the cup, deep where the pivot screw goes through, then a broad paddle that follows the bow
       add(group, M.nickel, sweep(Lp, (s, L) => (1.05 + 1.25 * Math.exp(-(((s / L - tp) / 0.1) ** 2))) * Math.sqrt(smooth(0, 1.5, s) * smooth(0, 1.5, L - s)) + 0.02, { segs: 16, up: AZ, scaleN: 2.5, scaleB: 1, sq: 3.5 }));
       add(group, M.nickel, sweep(Lp.slice(Math.min(Lp.length - 8, ip + 5)), (s, L) => 0.85 * Math.sqrt(smooth(0, 3, s) * smooth(0, 2.2, L - s)) + 0.02, { segs: 16, up: AZ, scaleN: 5.0, scaleB: 1, sq: 2.5 }));
-      for (const dz of [-3.6, 3.6]) add(group, M.brass, sweep([pf.clone().setZ(z + dz), pv.clone().lerp(pf, -0.18).setZ(z + dz)], 1.5, { segs: 12, capB: true }));   // the two posts
+      for (const dz of [-3.6, 3.6]) add(group, brass, sweep([pf.clone().setZ(z + dz), pv.clone().lerp(pf, -0.18).setZ(z + dz)], 1.5, { segs: 12, capB: true }));   // the two posts
       add(group, M.nickel, place(lathe([[-5.3, 0], [-5.3, 1.7], [-5.0, 2.0], [-4.7, 2.0], [-4.7, 1.0], [4.7, 1.0], [4.7, 2.0], [5.0, 2.0], [5.3, 1.7], [5.3, 0]], { segs: 20, crease: 40 }), pv, AZ));  // pivot screw and its heads
       const coil = new THREE.TorusGeometry(1.9, 0.34, 6, 18);                                                                              // the spring, coiled round the screw between the posts
       for (let dz = -2.1; dz <= 2.11; dz += 0.7) { const c = coil.clone(); c.translate(pv.x, pv.y, z + dz); add(group, M.steel, c); }
@@ -883,7 +896,7 @@ function buildTrumpet() {
     // 3rd slide bow
     G('slide3.moving');
     const k3 = 'slide3.moving';
-    key(k3, 0, [155.7, -77.9], [0.5, -0.866], [[156.6, -82.6], [162.2, -83.4], [167.6, -77.5], [170.6, -68.5], [171.2, -59], [170.2, -51.5], [168.8, -47]], [170.4, -68.0], [165.2, -66.6]);
+    key(k3, 0, [155.7, -77.9], [0.5, -0.866], [[156.6, -82.6], [162.2, -83.4], [167.6, -77.5], [170.6, -68.5], [171.2, -59], [170.2, -51.5], [168.8, -47]], [170.4, -68.0], [165.2, -66.6], M.slide3B);
   }
 
   /* ---------- soft shading where tubes sit close together (baked into vertex colours) ---------- */
@@ -1038,7 +1051,9 @@ export function createTrumpet(container, options = {}) {
     tex.minFilter = tex.magFilter = THREE.NearestFilter; tex.generateMipmaps = false;
     const lin = hex => { const c = new THREE.Color(hex); return V3(c.r, c.g, c.b); };
     const U = { vtPix: { value: 0.001 }, vtRot: { value: new THREE.Matrix3() }, vtBell: { value: V3(D.bell.rimX, D.zB, D.bell.rimR) }, vtCaps: { value: tex }, vtAo: { value: 0.5 }, vtTint: { value: [lin(BRASS), lin(NICKEL).multiplyScalar(0.9), V3(0.03, 0.03, 0.03)] } };
-    const mats = [T.M.brass, T.M.brassV, T.M.brassBell, T.M.brassIn, T.M.nickel, T.M.silver];
+    const mats = [T.M.brass, T.M.brassV, T.M.brassBell, T.M.brassIn, T.M.nickel, T.M.silver, T.M.rim1, T.M.rim2, T.M.rim3, T.M.case1, T.M.case2, T.M.case3, T.M.slide3B];
+    const like = m => (m.userData.like && T.M[m.userData.like]) || m;      // the colourable copies shade exactly as the metal they copy
+    const nk = m => m === T.M.nickel || m === T.M.silver;
     const write = () => {
       for (let i = 0; i < N; i++) {
         const k = list[i], o = k.mov ? T.obj(k.mov).position : null, ox = o ? o.x : 0, oy = o ? o.y : 0, oz = o ? o.z : 0;
@@ -1064,7 +1079,8 @@ export function createTrumpet(container, options = {}) {
           m.defines.VT_N = N; m.defines.VT_TRACE = q === 'high' ? 1 : 0; m.defines.VT_SOFT = (opt.soften || 90).toFixed(1); if (m === T.M.brassIn) m.defines.VT_INSIDE = 1;
           m.customProgramCacheKey = () => 'vt-studio';
           m.onBeforeCompile = sh => {
-            Object.assign(sh.uniforms, U, { vtUpright: { value: m === T.M.brassBell ? -1 : m === T.M.brassIn ? 0 : 1 }, vtEdge: { value: m === T.M.brassBell ? 0.4 : 1 }, vtTube: { value: m === T.M.brass || m === T.M.brassBell ? 1 : 0 }, vtFront: { value: m === T.M.nickel || m === T.M.silver ? 0.6 : 1 }, vtDeep: { value: m === T.M.brassBell ? 0.92 : 1 }, vtCool: { value: m === T.M.nickel || m === T.M.silver ? 0.25 : 0 }, vtBlob: { value: m === T.M.brassBell ? 0.62 : 0 }, vtWave: { value: opt.wave === false ? 0 : m === T.M.brassBell ? 0.006 : m === T.M.brass ? 0.0045 : 0 }, vtSkip: { value: m === T.M.brassBell ? new THREE.Vector2(list.skipBell[0], list.skipBell[1]) : new THREE.Vector2(-1, -1) } });
+            const b = like(m);
+            Object.assign(sh.uniforms, U, { vtUpright: { value: b === T.M.brassBell ? -1 : b === T.M.brassIn ? 0 : 1 }, vtEdge: { value: b === T.M.brassBell ? 0.4 : 1 }, vtTube: { value: b === T.M.brass || b === T.M.brassBell ? 1 : 0 }, vtFront: { value: nk(b) ? 0.6 : 1 }, vtDeep: { value: b === T.M.brassBell ? 0.92 : 1 }, vtCool: { value: nk(b) ? 0.25 : 0 }, vtBlob: { value: b === T.M.brassBell ? 0.62 : 0 }, vtWave: { value: opt.wave === false ? 0 : b === T.M.brassBell ? 0.006 : b === T.M.brass ? 0.0045 : 0 }, vtSkip: { value: b === T.M.brassBell ? new THREE.Vector2(list.skipBell[0], list.skipBell[1]) : new THREE.Vector2(-1, -1) } });
             sh.fragmentShader = sh.fragmentShader
               .replace('#include <envmap_physical_pars_fragment>', TRACE_GLSL + '\n' + chunk.replace(target, 'return vtRadiance( reflectVec, normal ) * envMapIntensity;'))
               .replace('#include <color_fragment>', '#if defined( USE_COLOR ) && ! defined( VT_INSIDE )\n\tdiffuseColor.rgb *= mix( vec3( 1.0 ), vColor, vtAo );\n#endif');
@@ -1212,9 +1228,15 @@ export function createTrumpet(container, options = {}) {
   }
 
   /* ---- valves, slides ---- */
-  const valves = [0, 1, 2].map(i => ({ obj: T.obj('valve' + (i + 1) + '.moving'), mat: T.M['pearl' + (i + 1)], x: 0, v: 0, to: 0, col: new THREE.Color(0xe7e2d8), colTo: new THREE.Color(0xe7e2d8), mix: 0, mixTo: 0 }));
-  const PEARL = new THREE.Color(0xe7e2d8);
-  const slides = { third: { obj: T.obj('slide3.moving'), x: 0, to: 0, len: D.s3.out, dir: 1 }, first: { obj: T.obj('slide1.moving'), x: 0, to: 0, len: D.s1.out, dir: -1 } };
+  const valves = [0, 1, 2].map(i => ({ obj: T.obj('valve' + (i + 1) + '.moving'), mat: T.M['pearl' + (i + 1)], rim: T.M['rim' + (i + 1)], knurl: T.M['rimKnurl' + (i + 1)], dark: new THREE.Color(), body: T.M['case' + (i + 1)], metal: new THREE.Color(), x: 0, v: 0, to: 0, col: new THREE.Color(0xe7e2d8), colTo: new THREE.Color(0xe7e2d8), mix: 0, mixTo: 0 }));
+  const PEARL = new THREE.Color(0xe7e2d8), NICK = new THREE.Color(NICKEL), KNURLC = new THREE.Color(KNURL), hsl = {};
+  // the rim's shade: the same hue, a little richer and a good deal darker, so it frames the lit pearl
+  const BRASSC = new THREE.Color(BRASS);
+  let lastColor = null;                                                   // the last note's colour, for a slide pushed out with it
+  // the brass's shade: the note's colour as polished metal (a touch paler, as brass is, so its highlights still sparkle)
+  const metalOf = (c, out) => { c.getHSL(hsl, THREE.SRGBColorSpace); return out.setHSL(hsl.h, Math.min(1, hsl.s * 1.05), clamp(0.18 + hsl.l * 0.78, 0.45, 0.66), THREE.SRGBColorSpace); };
+  const darkOf = (c, out) => { c.getHSL(hsl, THREE.SRGBColorSpace); return out.setHSL(hsl.h, Math.min(1, hsl.s * 1.1 + 0.05), clamp(hsl.l * 0.6, 0.16, 0.36), THREE.SRGBColorSpace); };
+  const slides = { third: { obj: T.obj('slide3.moving'), x: 0, to: 0, len: D.s3.out, dir: 1, mat: T.M.slide3B, metal: new THREE.Color(), mix: 0, mixTo: 0 }, first: { obj: T.obj('slide1.moving'), x: 0, to: 0, len: D.s1.out, dir: -1 } };
   // the saddle rides on the 1st slide
   {
     const hooks = T.obj('hooks'), sad = hooks.children.find(m => m.name === 'hooks:nickel');
@@ -1237,10 +1259,19 @@ export function createTrumpet(container, options = {}) {
       v.mat.emissive.copy(v.colTo).multiplyScalar(0.55 * v.mix);                 // lit from inside a little, so it reads across a room
       v.mat.envMapIntensity = 0.62 * (1 - 0.72 * v.mix); v.mat.clearcoat = 0.7 * (1 - 0.55 * v.mix);
       v.mat.iridescence = 0.55 * (1 - v.mix); v.mat.sheen = 0.4 * (1 - v.mix);
+      v.rim.color.copy(NICK).lerp(v.dark, v.mix); v.knurl.color.copy(KNURLC).lerp(v.dark, v.mix);
+      v.rim.emissive.copy(v.dark).multiplyScalar(0.35 * v.mix); v.knurl.emissive.copy(v.dark).multiplyScalar(0.35 * v.mix);
+      v.body.color.copy(BRASSC).lerp(v.metal, v.mix);
     }
-    for (const s of Object.values(slides)) if (Math.abs(s.to - s.x) > 1e-4) {
-      s.x += (s.to - s.x) * Math.min(1, dt * 13); if (Math.abs(s.to - s.x) < 0.002) s.x = s.to;
-      s.obj.position.x = s.dir * s.len * s.x; busy = true; movedParts = true;
+    for (const s of Object.values(slides)) {
+      if (Math.abs(s.to - s.x) > 1e-4) {
+        s.x += (s.to - s.x) * Math.min(1, dt * 13); if (Math.abs(s.to - s.x) < 0.002) s.x = s.to;
+        s.obj.position.x = s.dir * s.len * s.x; busy = true; movedParts = true;
+      }
+      if (s.mat) {
+        if (Math.abs(s.mixTo - s.mix) > 1e-3) { s.mix += (s.mixTo - s.mix) * Math.min(1, dt * 22); if (Math.abs(s.mixTo - s.mix) < 0.004) s.mix = s.mixTo; busy = true; }
+        s.mat.color.copy(BRASSC).lerp(s.metal, s.mix);
+      }
     }
     if (camAnim) {
       const k = clamp((now - camAnim.t0) / camAnim.ms, 0, 1), e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
@@ -1437,15 +1468,20 @@ export function createTrumpet(container, options = {}) {
   const api = {
     setValves(pressed, color) {
       const c = color ? new THREE.Color(color) : null;
+      lastColor = c;
       valves.forEach((v, i) => {
         const on = !!(pressed && pressed[i]);
         v.to = on ? 1 : 0;
-        if (on && c) { v.colTo.copy(c); v.mixTo = 1; } else v.mixTo = 0;
+        if (on && c) { v.colTo.copy(c); darkOf(c, v.dark); metalOf(c, v.metal); v.mixTo = 1; } else v.mixTo = 0;
       });
       invalidate();
     },
     setSlides(s = {}) {
-      if (s.third != null) slides.third.to = clamp(+s.third || 0, 0, 1);
+      if (s.third != null) {
+        const t3 = slides.third, c = s.color ? new THREE.Color(s.color) : lastColor;   // a slide that goes out takes the note's colour (the one given, or the valves')
+        t3.to = clamp(+s.third || 0, 0, 1);
+        if (t3.to > 0 && c) { metalOf(c, t3.metal); t3.mixTo = 1; } else t3.mixTo = 0;
+      }
       if (s.first != null) slides.first.to = clamp(+s.first || 0, 0, 1);
       invalidate();
     },
