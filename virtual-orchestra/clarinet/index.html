@@ -58,6 +58,61 @@
     #chart { width: 390px; height: 330px; display: block; }
     .centre-col { position: relative; min-width: 0; }
     #clarinet { width: 570px; height: 800px; display: block; overflow: hidden; }   /* the close view crops the instrument at its own edges */
+    /* The B♭ clarinet in 3D (clarinet-3d.js) takes the drawing's place; the 3D button in the top bar swaps them
+       (also Settings → Clarinet picture). The drawing keeps its room, so nothing else moves. */
+    #clarinet3d { position: absolute; inset: 0; display: none; touch-action: none; user-select: none; -webkit-user-select: none; }
+    .centre-col.d3 #clarinet3d { display: block; }
+    .centre-col.d3 #clarinet { visibility: hidden; }
+    .centre-col:not(.d3) .view-bar, .centre-col:not(.d3) .c-hint, .centre-col:not(.d3) .c-note { display: none; }
+    .c-note { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; color: #6b7280; pointer-events: none; }
+    .c-hint { position: absolute; top: 4px; left: 0; right: 0; text-align: center; font-size: 12px; color: #7b8794; pointer-events: none; transition: opacity 0.6s; }
+    .c-hint.used { opacity: 0; }
+    .view-bar {
+      position: absolute;
+      left: 50%;
+      bottom: 4px;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 3px 6px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+    }
+    .view-bar button {
+      height: 24px;
+      padding: 0 9px;
+      border: 0;
+      border-radius: 9999px;
+      background: transparent;
+      font: 600 12px/1 system-ui, -apple-system, sans-serif;
+      color: #4b5563;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .view-bar button:hover { background: rgba(106, 76, 147, 0.12); }
+    .view-bar button[aria-pressed="true"] { background: #6a4c93; color: #ffffff; }
+    .view-bar .sep { width: 1px; margin: 3px 2px; background: #d1d5db; }
+    .view-bar .vrow { display: flex; gap: 3px; }
+    /* Up and down the clarinet (3D only): press for a step, hold to glide */
+    .pan-bar {
+      position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+      display: flex; flex-direction: column; gap: 6px; padding: 4px;
+      border-radius: 9999px; background: rgba(255, 255, 255, 0.82); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+      touch-action: none; user-select: none; -webkit-user-select: none;
+    }
+    .pan-bar button {
+      width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%;
+      background: transparent; color: #6a4c93; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pan-bar button:hover { background: rgba(106, 76, 147, 0.12); }
+    .pan-bar button:active, .pan-bar button.held { background: #6a4c93; color: #ffffff; }
+    .pan-bar button:disabled { opacity: 0.3; cursor: default; background: transparent; color: #6a4c93; }
+    .pan-bar svg { width: 16px; height: 16px; }
+    .centre-col:not(.d3) .pan-bar { display: none; }
     .right-col { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
     /* The notes, laid out like a piano standing on its end: low E at the bottom,
        the sharps and flats in their own column between the letters they sit between */
@@ -314,6 +369,27 @@
     @media (max-width: 719px) { .chart-btn { display: none; } .title-group { right: 216px; } }
     @media (max-width: 640px) { .title-group { left: 54px; } }
     @media (max-width: 460px) { .title-group { right: 166px; left: 50px; } }
+    /* 3D on/off: lit = the turnable 3D clarinet, dark = the flat drawing (also in Settings → Clarinet picture).
+       It sits left of Chart; narrower, where the dial needs the middle, it moves over beside the back button. */
+    .d3-btn { right: 286px; min-width: 52px; padding: 0 12px; }
+    .d3-btn[aria-pressed="true"] { background: #74B9FF; border-color: #74B9FF; color: #0f172a; }
+    .d3-btn[aria-pressed="true"]:hover { background: #9ccbff; color: #0f172a; }
+    .d3-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .title-group { right: 346px; }
+    @media (max-width: 959px) { .d3-btn { right: auto; left: 172px; } .title-group { left: 232px; right: 286px; } }
+    @media (max-width: 719px) { .title-group { right: 216px; } }
+    @media (max-width: 640px) { .d3-btn { left: 56px; } .title-group { left: 114px; } }
+    @media (max-width: 460px) {
+      .d3-btn { left: 50px; min-width: 42px; padding: 0 8px; }
+      .title-group { left: 96px; right: 166px; }
+      .model-dial { width: 118px; --item: 116px; }
+      .dial-item { font-size: 17px; }
+      /* a phone, 3D on: the views are under the clarinet, so Whole / Close makes room for the dial */
+      body.d3-on .view-btn { display: none; }
+      body.d3-on .title-group { right: 110px; }
+      body.d3-on .model-dial { width: 152px; --item: 150px; }
+      body.d3-on .dial-item { font-size: 21px; }
+    }
 
     /* ----- the whole fingering chart, the page a band book prints ----- */
     .chart-sheet {
@@ -524,6 +600,7 @@
         <button type="button" class="dial-arrow next" id="dialNext" tabindex="-1" aria-hidden="true">›</button>
       </div>
     </div>
+    <button type="button" class="labels-btn d3-btn" id="d3Btn" aria-pressed="true" aria-label="3D clarinet" title="3D on: the clarinet you can turn round. Off: the flat drawing">3D</button>
     <button type="button" class="labels-btn chart-btn" id="chartBtn" title="The whole fingering chart">Chart</button>
     <button type="button" class="labels-btn view-btn" id="viewBtn" aria-label="Clarinet view: Whole">Whole</button>
     <button type="button" class="labels-btn" id="labelsBtn" aria-label="Clarinet labels: Keys">Keys</button>
@@ -540,8 +617,32 @@
           <svg id="chart" viewBox="0 0 390 330" role="img" aria-label="Fingering chart"></svg>
           <div class="tip-area" id="tipArea" aria-live="polite"></div>
         </div>
-        <div class="centre-col">
+        <div class="centre-col" id="clarinetBox">
           <svg id="clarinet" viewBox="-112 -3 224 684" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Clarinet"></svg>
+          <div id="clarinet3d" role="img" aria-label="A clarinet you can turn around"></div>
+          <div class="c-note" id="clarinetNote">Loading the clarinet…</div>
+          <div class="c-hint" id="clarinetHint">Drag to turn the clarinet · scroll or pinch to zoom in where you point · ▲ ▼ or two fingers to move up and down · tap a key to see its name · double-click to put it back</div>
+          <div class="pan-bar" id="panBar" role="group" aria-label="Move up and down the clarinet">
+            <button type="button" id="panUp" title="Move up the clarinet, toward the mouthpiece (hold to keep going · Shift + ↑)" aria-label="Move up the clarinet, toward the mouthpiece"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5 13.5 11h-11z" fill="currentColor"/></svg></button>
+            <button type="button" id="panDown" title="Move down the clarinet, toward the bell (hold to keep going · Shift + ↓)" aria-label="Move down the clarinet, toward the bell"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 12.5 2.5 5h11z" fill="currentColor"/></svg></button>
+          </div>
+          <div class="view-bar" id="viewBar" role="group" aria-label="Look at the clarinet from">
+           <div class="vrow">
+            <button type="button" data-look="front" aria-pressed="true">Front</button>
+            <button type="button" data-look="left" aria-pressed="false" title="From the player's left">Left</button>
+            <button type="button" data-look="back" aria-pressed="false" title="The thumbs' side">Back</button>
+            <button type="button" data-look="right" aria-pressed="false" title="From the player's right">Right</button>
+            <span class="sep" aria-hidden="true"></span>
+            <button type="button" id="spinBtn" aria-pressed="false" title="Turn slowly by itself">⟳ Spin</button>
+            <button type="button" id="apartBtn" aria-pressed="false" title="Take the clarinet apart: mouthpiece, barrel, upper joint, lower joint, bell">⇕ Apart</button>
+           </div>
+           <div class="vrow">
+            <button type="button" data-look="mouth" aria-pressed="false" title="Close-up: the mouthpiece, reed and ligature">Mouthpiece</button>
+            <button type="button" data-look="lh" aria-pressed="false" title="Close-up: the left hand's keys">Left hand</button>
+            <button type="button" data-look="rh" aria-pressed="false" title="Close-up: the right hand's keys">Right hand</button>
+            <button type="button" data-look="bell" aria-pressed="false" title="Close-up: the low keys and the bell">Bell</button>
+           </div>
+          </div>
         </div>
         <div class="right-col"><div class="note-pad" id="notePad"></div></div>
       </div>
@@ -558,6 +659,18 @@
         <button type="button" role="radio" data-view="first"><b>First notes</b><small>Low G to throat B♭, below the break, keys 1 to 0</small></button>
         <button type="button" role="radio" data-view="chromatic"><b>Every note</b><small id="everyNoteHint">Low E to high G, with every sharp and flat</small></button>
       </div>
+    </div>
+    <div class="sp-section" id="pictureSection">
+      <h3>Clarinet picture</h3>
+      <div class="seg" role="radiogroup" aria-label="Clarinet picture" id="pictureSeg">
+        <button type="button" role="radio" data-picture="3d">3D: turn it round</button>
+        <button type="button" role="radio" data-picture="drawing">Flat drawing</button>
+      </div>
+      <div class="seg" role="radiogroup" aria-label="3D detail" id="detailSeg" style="margin-top: 8px">
+        <button type="button" role="radio" data-detail="high">Mirror reflections</button>
+        <button type="button" role="radio" data-detail="low">Simple (faster)</button>
+      </div>
+      <div class="sp-hint" id="pictureHint">The 3D clarinet is the B♭. The E♭ and the bass are shown as flat drawings.</div>
     </div>
     <div class="sp-section">
       <h3>Fingering chart</h3>
@@ -758,7 +871,7 @@
       try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; }
     }
     function saveSettings() {
-      try { localStorage.setItem(STORE_KEY, JSON.stringify({ version: 1, model: model.id, view, labels: labelView, zoom: zoomView, sound: soundSettings })); } catch (e) { /* private window */ }
+      try { localStorage.setItem(STORE_KEY, JSON.stringify({ version: 1, model: model.id, view, labels: labelView, zoom: zoomView, picture, detail, sound: soundSettings })); } catch (e) { /* private window */ }
     }
     const saved = loadSettings();
     let model = MODELS[saved.model] || MODELS.bb;
@@ -768,6 +881,8 @@
     let view = saved.view === 'first' ? 'first' : 'chromatic';
     let labelView = ['fingers', 'names'].includes(saved.labels) ? saved.labels : 'keys';   // what the clarinet's keys say
     let zoomView = saved.zoom === 'close' ? 'close' : 'whole';   // the whole instrument, or close on the keys
+    let picture = saved.picture === 'drawing' ? 'drawing' : '3d';   // the 3D clarinet (B♭ only), or the flat drawing
+    let detail = saved.detail === 'low' ? 'low' : 'high';            // 3D: the clarinet mirrored in itself, or the studio only (slow computers)
     let keyMap = {};   // e.code -> pitch, for the view on screen
 
     // Which fingering each note shows, when it has more than one (kept while the page is open, for this clarinet)
@@ -894,12 +1009,15 @@
 
     // ----- the clarinet (clarinet-art.js) -----
     const art = ClarinetArt.create(document.getElementById('clarinet'), model.id);
+    let clarinet3d = null, clarinet3dFailed = false, lastDrawn = { note: null, keys: null };   // (the 3D clarinet starts further down)
     function drawClarinet(note, keys) {
       let paint = null;
       if (note) {
         paint = { color: note.color, upperColor: note.upperColor, edge: darken(noteMid(note), 0.62) };
       }
       art.setKeys(keys || new Set(), paint);
+      lastDrawn = { note, keys };
+      if (clarinet3d) clarinet3d.setKeys(keys || new Set(), note ? note.color : null, note ? note.upperColor || null : null);
       document.getElementById('clarinet').setAttribute('aria-label', note ? `${model.name}: fingering for ${note.name}` : model.name);
     }
 
@@ -1298,11 +1416,12 @@
     document.body.addEventListener('pointerdown', e => {
       if (e.target.closest('.settings-panel, #app-header, .chart-sheet')) return;
       if (!e.target.closest('.note-btn')) closeSettings();
-      if (!e.target.closest('.note-btn, .alt-btn')) showNote(null);
+      if (!e.target.closest('.note-btn, .alt-btn, #clarinet3d, .view-bar, .pan-bar')) showNote(null);   // (turning the 3D clarinet keeps the note)
     });
 
     // ----- the Keys / Fingers / Names button -----
     const LABEL_VIEWS = { keys: 'Keys', fingers: 'Fingers', names: 'Names' };
+    const LABEL_MODES = { keys: 'off', fingers: 'fingers', names: 'names' };   // what the 3D clarinet calls them
     const labelsBtn = document.getElementById('labelsBtn');
     function showLabelButton() {
       labelsBtn.textContent = LABEL_VIEWS[labelView];
@@ -1314,6 +1433,7 @@
       showLabelButton();
       saveSettings();
       art.setLabels(labelView);
+      if (clarinet3d) clarinet3d.setLabels(LABEL_MODES[labelView]);
     });
     showLabelButton();
     art.setLabels(labelView);
@@ -1330,6 +1450,8 @@
       showViewButton();
       saveSettings();
       art.setView(zoomView);
+      // in 3D: the whole clarinet, or close on the keys, from the front
+      if (clarinet3d && in3d()) { clarinet3d.setView(zoomView === 'close' ? 'keys' : 'front'); markLook(zoomView === 'close' ? null : 'front'); }
     });
     showViewButton();
     art.setTall(tallWindow.matches);
@@ -1614,6 +1736,7 @@
       chosenFingering = {};
       saveSettings();
       art.setModel(model.id);
+      showPicture();
       if (synth) { synth.set('size', synthValue('size')); synth.set('timbre', synthValue('timbre', soundSettings.timbre)); }
       buildNotePad();
       showNote(was && notesByPitch[was] && buttonFor(was) ? notesByPitch[was] : null);
@@ -1676,6 +1799,144 @@
     if (document.fonts) document.fonts.ready.then(() => placeDial());
 
     // Responsive scaling: shrink (or grow) the whole app proportionally to fit the window
+    // ----- the 3D clarinet (clarinet-3d.js): the B♭ only; the E♭ and the bass keep the flat drawing -----
+    const clarinetBox = document.getElementById('clarinetBox');
+    const viewBar = document.getElementById('viewBar');
+    const spinBtn = document.getElementById('spinBtn');
+    const d3Btn = document.getElementById('d3Btn');
+    let spinning = false, loading3d = null;
+    const has3d = () => model.id === 'bb' && !clarinet3dFailed;
+    const in3d = () => picture === '3d' && has3d();
+    function markLook(name) {
+      viewBar.querySelectorAll('[data-look]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.look === name)));
+    }
+    // Two ways in. On a web address the page loads clarinet-3d.js itself (an ES module). A page opened by double-click
+    // (file://) is not allowed to load modules, so there, and anywhere the module fails, it loads clarinet-3d.bundle.js:
+    // the same code and three.js as ONE ordinary script. Rebuild it after every edit of clarinet-3d.js
+    // (sh _tools/build-bundle.sh).
+    function loadBundle() {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'clarinet-3d.bundle.js';
+        s.onload = () => (window.Clarinet3D && window.Clarinet3D.createClarinet)
+          ? resolve(window.Clarinet3D) : reject(new Error('clarinet-3d.bundle.js loaded without createClarinet'));
+        s.onerror = () => reject(new Error('clarinet-3d.bundle.js could not be loaded'));
+        document.head.appendChild(s);
+      });
+    }
+    function start3d() {
+      if (clarinet3d || clarinet3dFailed || loading3d) return;
+      loading3d = (location.protocol === 'file:' ? loadBundle() : import('./clarinet-3d.js').catch(loadBundle)).then(m => {
+        clarinet3d = m.createClarinet(document.getElementById('clarinet3d'), { labels: LABEL_MODES[labelView], view: zoomView === 'close' ? 'keys' : 'front', reflections: detail });
+        document.getElementById('clarinetNote').remove();
+        clarinet3d.onViewChange(() => {
+          markLook(null);
+          document.getElementById('clarinetHint').classList.add('used');
+          clearTimeout(clarinetBox._pe); clarinetBox._pe = setTimeout(() => panEnds(), 450);   // (the ▲ ▼ buttons' ends)
+        });
+        if (zoomView === 'close') markLook(null);
+        window.clarinet3d = clarinet3d;
+        clarinet3d.setKeys(lastDrawn.keys || new Set(), lastDrawn.note ? lastDrawn.note.color : null, lastDrawn.note ? lastDrawn.note.upperColor || null : null);
+        showPicture();
+      }).catch(err => {
+        console.warn('[Virtual Clarinet] the 3D clarinet could not start:', err);
+        clarinet3dFailed = true;
+        showPicture();
+      });
+    }
+    // which picture is on the page, and what the buttons say about it
+    function showPicture() {
+      const on = in3d();
+      clarinetBox.classList.toggle('d3', on);
+      document.body.classList.toggle('d3-on', on);
+      d3Btn.setAttribute('aria-pressed', String(on));
+      d3Btn.disabled = !has3d();
+      d3Btn.title = clarinet3dFailed ? 'The 3D clarinet cannot start on this computer, so the flat drawing is shown'
+        : model.id !== 'bb' ? 'The 3D clarinet is the B♭: this clarinet is shown as the flat drawing'
+        : on ? '3D is on: click for the flat drawing' : '3D is off: click for the clarinet you can turn round';
+      settingsPanel.querySelectorAll('[data-picture]').forEach(b => {
+        b.setAttribute('aria-checked', String(b.dataset.picture === (on ? '3d' : 'drawing')));
+        if (b.dataset.picture === '3d') b.disabled = !has3d();
+      });
+      settingsPanel.querySelectorAll('[data-detail]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.detail === detail)));
+      document.getElementById('detailSeg').hidden = !on;
+      document.getElementById('pictureHint').hidden = model.id === 'bb' && !clarinet3dFailed;
+      if (on) start3d();
+      if (clarinet3d) { clarinet3d.setAutoRotate(on && spinning); if (on) clarinet3d.resize(); }
+    }
+    function setPicture(p) {
+      picture = p === 'drawing' ? 'drawing' : '3d';
+      showPicture();
+      saveSettings();
+    }
+    d3Btn.addEventListener('click', () => setPicture(in3d() ? 'drawing' : '3d'));
+    settingsPanel.querySelectorAll('[data-picture]').forEach(b => b.addEventListener('click', () => setPicture(b.dataset.picture)));
+    // 3D detail: the slower computers can turn the mirror reflections off (the 3D clarinet also does so by itself if it gets slow)
+    settingsPanel.querySelectorAll('[data-detail]').forEach(b => b.addEventListener('click', () => {
+      detail = b.dataset.detail === 'low' ? 'low' : 'high';
+      if (clarinet3d) clarinet3d.setQuality(detail);
+      showPicture();
+      saveSettings();
+    }));
+    viewBar.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b || !clarinet3d) return;
+      if (b.id === 'apartBtn') {
+        const on = b.getAttribute('aria-pressed') !== 'true';
+        b.setAttribute('aria-pressed', String(on));
+        clarinet3d.setApart(on);
+        return;
+      }
+      if (b === spinBtn) {
+        spinning = !spinning;
+        spinBtn.setAttribute('aria-pressed', String(spinning));
+        clarinet3d.setAutoRotate(spinning);
+        if (spinning) markLook(null);
+        return;
+      }
+      clarinet3d.setView(b.dataset.look);
+      markLook(b.dataset.look);
+    });
+    // Up and down the clarinet: a press moves a step, holding glides until let go; Enter / Space (no pointer) steps.
+    // Each button greys out at its end of the instrument.
+    const panUp = document.getElementById('panUp'), panDown = document.getElementById('panDown');
+    let panHold = 0, panDir = 0, panWatch = 0;
+    function panEnds() {
+      if (!clarinet3d) return;
+      const a = clarinet3d.along;
+      panUp.disabled = a > 0.995; panDown.disabled = a < 0.005;
+    }
+    function watchEnds() { if (!panWatch) panWatch = setInterval(() => { panEnds(); if (!panDir) { clearInterval(panWatch); panWatch = 0; } }, 120); }
+    function panStop() {
+      clearTimeout(panHold); panHold = 0;
+      if (panDir && clarinet3d) clarinet3d.glide(0);
+      panDir = 0; panUp.classList.remove('held'); panDown.classList.remove('held');
+      setTimeout(panEnds, 350);
+    }
+    for (const [btn, dir] of [[panUp, 1], [panDown, -1]]) {
+      btn.addEventListener('pointerdown', e => {
+        if (!clarinet3d || btn.disabled || e.button > 0) return;
+        e.preventDefault(); try { btn.setPointerCapture(e.pointerId); } catch (er) { /* (a synthetic or already-ended pointer) */ }
+        panDir = dir; btn.classList.add('held');
+        clarinet3d.moveAlong(dir);
+        panHold = setTimeout(() => { if (panDir === dir) clarinet3d.glide(dir); }, 320);
+        watchEnds();
+      });
+      btn.addEventListener('pointerup', panStop);
+      btn.addEventListener('pointercancel', panStop);
+      btn.addEventListener('lostpointercapture', panStop);
+      btn.addEventListener('pointerleave', e => { if (!btn.hasPointerCapture || !btn.hasPointerCapture(e.pointerId)) panStop(); });
+      btn.addEventListener('click', e => { if (e.detail === 0 && clarinet3d) { clarinet3d.moveAlong(dir); setTimeout(panEnds, 350); } });
+    }
+    // the clarinet itself can move too (a drag, a zoom, a view button): keep the buttons' ends right
+    clarinetBox.addEventListener('pointerup', () => setTimeout(panEnds, 400));
+    clarinetBox.addEventListener('wheel', () => { clearTimeout(clarinetBox._pe); clarinetBox._pe = setTimeout(panEnds, 300); }, { passive: true });
+    viewBar.addEventListener('click', () => setTimeout(panEnds, 800));
+    // Double-click on the clarinet puts it back to the front view (clarinet-3d.js does the move)
+    clarinetBox.addEventListener('dblclick', e => { if (!e.target.closest('.view-bar') && in3d()) markLook('front'); });
+    clarinetBox.addEventListener('keydown', e => { if (e.key === 'Home' && e.target.closest('#clarinet3d')) markLook('front'); });
+    showPicture();
+
     function updateScale() {
       const outer = document.getElementById('scaling-outer');
       const wrapper = document.getElementById('scaling-wrapper');
@@ -1692,6 +1953,7 @@
       const scale = Math.min(availableHeight / designHeight, availableWidth / designWidth);
       outer.style.transform = `scale(${Math.max(0.1, scale)})`;
       if (typeof art !== 'undefined') art.fitLighting();
+      if (typeof clarinet3d !== 'undefined' && clarinet3d) clarinet3d.resize();
     }
     window.addEventListener('resize', updateScale);
     window.addEventListener('load', updateScale);
