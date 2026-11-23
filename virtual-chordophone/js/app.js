@@ -97,6 +97,9 @@
   const keyNow = () => (SKELETON ? skeletonKey : S.key);
   const shown = () => (SKELETON ? SKELETON.places.slice() : C.placesOf(S.set));
   const namesNow = () => (SKELETON ? SKELETON.names : S.names);
+  /* the computer key that plays a box: in the skeleton 1 2 3 4 5 (the user, the same night: "I as 1 and IV/IV as 5"),
+     else Digital Accordion's letters (F S D A · G R · E W Q) */
+  const keyLabel = p => (SKELETON ? String(SKELETON.places.indexOf(p) + 1) : C.KEY_OF(p));
   if (SKELETON) document.body.classList.add('skeleton');
 
   /* ================= A BOX ================= */
@@ -157,14 +160,14 @@
     const rd = R.describe(rhythmOf(p), meter());
     const tones = S.showNotes ? '<div class="box-tones">' + d.tones.map(t => '<span style="--tc:' + t.color + '">' + esc(t.name) + '</span>').join('') + '</div>' : '';
     return '<div class="box' + (P.isSounding(p) ? ' on' : '') + (d.own ? ' own' : '') + '" data-place="' + p + '" style="--c:' + d.color + '">' +
-      '<div class="box-main" data-part="main" role="button" aria-label="Strike ' + esc(d.roman) + '" title="Strike (' + C.KEY_OF(p) + ')">' +
-        '<span class="box-key" aria-hidden="true">' + C.KEY_OF(p) + '</span>' +
+      '<div class="box-main" data-part="main" role="button" aria-label="Strike ' + esc(d.roman) + '" title="Strike (' + keyLabel(p) + ')">' +
+        '<span class="box-key" aria-hidden="true">' + keyLabel(p) + '</span>' +
         '<div class="box-face"><div class="box-name" style="--s:' + C.nameScale(big) + '">' + C.labelHTML(big) + '</div>' +
         '<div class="box-sub">' + C.labelHTML(small) + '</div>' + tones + '</div>' +
         '<div class="box-foot">' + stripHtml(p) + '<div class="box-rhythm">' + esc(rd.title) + '</div></div>' +
       '</div>' +
       '<button class="box-gear" data-part="gear" type="button" aria-label="Settings for ' + esc(d.roman) + '" title="This chord’s settings">' + GEAR + '</button>' +
-      '<div class="box-hold" data-part="hold" role="button" aria-label="Hold ' + esc(d.roman) + ': its rhythm" title="Hold: the chord’s rhythm (Shift+' + C.KEY_OF(p) + ', or Caps Lock)">' + HOLD + '<span>Hold</span></div>' +
+      '<div class="box-hold" data-part="hold" role="button" aria-label="Hold ' + esc(d.roman) + ': its rhythm" title="Hold: the chord’s rhythm (Shift+' + keyLabel(p) + ', or Caps Lock)">' + HOLD + '<span>Hold</span></div>' +
     '</div>';
   }
   function renderBoxes() {
@@ -240,8 +243,12 @@
   });
   boxesEl.addEventListener('contextmenu', e => e.preventDefault());
 
-  /* the computer's keys: F S D A · G R · E W Q strike; with Shift held or Caps Lock on they Hold (the rhythm); Space = Play */
-  const CODE_PLACE = { KeyF: 'f', KeyS: 's', KeyD: 'd', KeyA: 'a', KeyG: 'g', KeyR: 'r', KeyE: 'e', KeyW: 'w', KeyQ: 'q' };
+  /* the computer's keys: F S D A · G R · E W Q strike (in the skeleton 1 2 3 4 5); with Shift held or Caps Lock on they Hold (the rhythm); Space = Play */
+  const LETTER_PLACE = { KeyF: 'f', KeyS: 's', KeyD: 'd', KeyA: 'a', KeyG: 'g', KeyR: 'r', KeyE: 'e', KeyW: 'w', KeyQ: 'q' };
+  // the skeleton's 1 2 3 4 5 — the number row or the number pad (by key position, so Shift+1 is still 1)
+  const NUMBER_PLACE = {};
+  if (SKELETON) SKELETON.places.forEach((p, i) => { NUMBER_PLACE['Digit' + (i + 1)] = p; NUMBER_PLACE['Numpad' + (i + 1)] = p; });
+  const CODE_PLACE = SKELETON ? NUMBER_PLACE : LETTER_PLACE;
   const keysDown = new Map();
   const typing = el => !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
   document.addEventListener('keydown', e => {
@@ -502,7 +509,7 @@
         '<div class="opt"><span>Colours</span><div class="seg small" id="set-theme"><button type="button" data-v="auto"' + (theme === 'auto' ? ' class="on"' : '') + '>Device</button><button type="button" data-v="dark"' + (theme === 'dark' ? ' class="on"' : '') + '>Dark</button><button type="button" data-v="light"' + (theme === 'light' ? ' class="on"' : '') + '>Light</button></div></div>' +
       '</section>' +
       '<section class="sheet-section"><h3>Keys</h3><p class="note keys-note">' + (SKELETON
-        ? shown().map(p => '<kbd>' + C.KEY_OF(p) + '</kbd>').join(' ') + ' = ' + shown().map(p => esc(nameParts(p).d.letter)).join(' ') + '.'
+        ? shown().map(p => '<kbd>' + keyLabel(p) + '</kbd>').join(' ') + ' = ' + shown().map(p => esc(nameParts(p).d.letter)).join(' ') + '.'
         : '<kbd>F</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>A</kbd> = I IV V vi · <kbd>G</kbd> <kbd>R</kbd> = ii iii · <kbd>E</kbd> <kbd>W</kbd> <kbd>Q</kbd> = V/V IV/IV V/vi.') + ' A key strikes the chord (it rings while you hold the key). With <kbd>Shift</kbd> held, or <kbd>Caps Lock</kbd> on, a key is <b>Hold</b>: the chord’s rhythm, round and round. <kbd>Space</kbd> plays and stops the beat.</p></section>' +
       '<section class="sheet-section"><h3>Start again</h3><div class="sheet-actions left"><button class="btn ghost" id="set-reset" type="button">Put every chord back as it was</button></div></section>';
     const sel = $('set-sound');
@@ -582,7 +589,7 @@
     const { d, big, small } = nameParts(p);
     $('bs-head').style.setProperty('--c', d.color);
     document.querySelector('#box-sheet .sheet').style.setProperty('--c', d.color);
-    $('bs-title').innerHTML = '<span class="bs-big">' + C.labelHTML(big) + '</span><span class="bs-small">' + C.labelHTML(small) + '</span><span class="bs-q">' + esc(d.own ? 'its own notes' : d.mods.length ? '' : d.quality.toLowerCase()) + '</span><kbd>' + C.KEY_OF(p) + '</kbd>';
+    $('bs-title').innerHTML = '<span class="bs-big">' + C.labelHTML(big) + '</span><span class="bs-small">' + C.labelHTML(small) + '</span><span class="bs-q">' + esc(d.own ? 'its own notes' : d.mods.length ? '' : d.quality.toLowerCase()) + '</span><kbd>' + keyLabel(p) + '</kbd>';
     $('bs-tabs').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.tab === S.tab));
     $('bs-tabs').querySelector('[data-tab="notes"]').innerHTML = 'Chord &amp; notes' + (NOTES_EDITING ? '' : ' <span class="tab-soon">soon</span>');
     const body = $('bs-body');
