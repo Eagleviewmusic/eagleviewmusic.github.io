@@ -61,7 +61,15 @@
   const clone = x => JSON.parse(JSON.stringify(x));
   const LETTERS = 'CDEFGAB';
 
-  let F = null;          // { origin, spot, spotEnd, hooks, isNew, ed, root, tab, say }
+  let F = null;          // { origin, spot, spotEnd, hooks, isNew, ed, root, tab, say, key }
+  const M = SW.music;
+  /* A CHORD OF THE SONG IS IN ITS BAR'S KEY (KEY CHANGES, js/keys.js): its notes (a voice is kept above the
+     tonic), the staff's key signature, the keyboard and ▶ — as "In the song" plays it (2026-11-22, bug report
+     M17: they followed the key of the selected note, so a chord after a key change, opened with a note before
+     it selected, showed and sounded in the old key). A card from the chart, or a new chord: the key where the
+     selection is, as before. Everything here that reads a chord's notes runs inside inKey. */
+  const inKey = fn => (F && F.key ? M.withKey(F.key, fn) : fn());
+  const keyAt = tick => (SW.keys && tick !== null && tick !== undefined ? SW.keys.atTick(tick) : null);
 
   /* ---------------- going in ---------------- */
   const cardsNow = () => (T.isChartShape() ? T.chart() : T.chartFrom().chart);
@@ -71,10 +79,13 @@
     return N.rootOf(nv && !nv.unnamed ? nv.id : chord);
   }
   function begin(o) {
-    const notes = C.cleanVoice(o.notes) || C.voiceOf(o.chord) || [[0, 0], [4, 7]];
     F = { origin: o.origin, spot: o.spot === undefined ? null : o.spot, spotEnd: o.spotEnd, hooks: o.hooks || null, isNew: !!o.isNew,
-      root: rootFor(o.chord, notes), tab: 'notes', say: '' };
-    F.ed = N.create({ cols: [{ k: o.k || null, chord: o.chord, place: o.place, notes, main: true }], onChange: changed });
+      tab: 'notes', say: '', key: keyAt(o.spot) };
+    inKey(() => {
+      const notes = C.cleanVoice(o.notes) || C.voiceOf(o.chord) || [[0, 0], [4, 7]];
+      F.root = rootFor(o.chord, notes);
+      F.ed = N.create({ cols: [{ k: o.k || null, chord: o.chord, place: o.place, notes, main: true }], onChange: changed });
+    });
   }
   function openCard(k) {
     const e = cardsNow().find(x => x.id === k);
@@ -88,7 +99,7 @@
     if (!ev) return false;
     let k = ev.k || null;
     if (!T.isChartShape()) { const pc = T.chartFrom().pieces.find(p => p.at === ev.at); k = pc ? pc.k : null; }
-    begin({ origin, k, chord: ev.id, place: ev.place || undefined, spot: ev.at, spotEnd: ev.end, notes: ev.voice || C.voiceOf(ev.id) });
+    begin({ origin, k, chord: ev.id, place: ev.place || undefined, spot: ev.at, spotEnd: ev.end, notes: ev.voice || null });   // none: the engine's, in its key (begin)
     return true;
   }
   function openNew() { begin({ origin: 'chart', chord: 'I', notes: C.voiceOf('I'), isNew: true }); }
@@ -98,7 +109,7 @@
     if (!pc || !C.isKnown(pc.chord)) return false;
     const card = pc.k ? cardsNow().find(x => x.id === pc.k) : null;
     begin({ origin: 'song', k: card ? pc.k : null, chord: pc.chord, place: pc.place || undefined, spot: pc.at, spotEnd: pc.end,
-      notes: (card ? card.voice : pc.voice) || C.voiceOf(pc.chord), hooks });
+      notes: (card ? card.voice : pc.voice) || null, hooks });
     return true;
   }
   const col = () => F.ed.col();
@@ -275,7 +286,7 @@
 
   /* ---------------- sound ---------------- */
   let held = null;
-  function holdOn() { holdOff(); held = SW.audio.holdChord(F.ed.freqs(col())); }
+  function holdOn() { holdOff(); held = SW.audio.holdChord(inKey(() => F.ed.freqs(col()))); }
   function holdOff() { if (held) { held.release(); held = null; } }
   function inSong() {
     if (F.spot === null) return;
@@ -316,7 +327,8 @@
         modsHtml() +
       '</div>' + F.ed.keysHtml() + '</div>';
   }
-  function render(body, foot, slot) {
+  function render(body, foot, slot) { inKey(() => draw(body, foot, slot)); }
+  function draw(body, foot, slot) {
     if (!F) { body.innerHTML = '<p class="fx-none">No chord here</p>'; foot.innerHTML = ''; if (slot) slot.innerHTML = ''; return; }
     if (F.ed.sel() !== null && F.ed.sel() >= col().notes.length) F.ed.deselect();
     if (compact()) {
@@ -375,13 +387,13 @@
   }
   function save(then) {
     const o = F.origin, c = col();
-    const k = F.isNew ? saveNewMain(c) : saveMain(c);
+    const k = inKey(() => (F.isNew ? saveNewMain(c) : saveMain(c)));
     if (SW.chordChart && k) SW.chordChart.select(k);
     (then || (() => goBack(o)))();
   }
   function saveNew(then) {
     const o = F.origin;
-    const k = saveNewMain(col());
+    const k = inKey(() => saveNewMain(col()));
     if (SW.chordChart && k) SW.chordChart.select(k);
     (then || (() => goBack(o)))();
   }
@@ -393,7 +405,7 @@
     const done = () => { F = null; if (SW.chordRhythm) SW.chordRhythm.spotDone(); go(); };
     const after = fn => () => { fn(done); };
     const c = col();
-    const was = C.nameOf(C.describeVoiced(c.chord, JSON.parse(c.orig)));
+    const was = inKey(() => C.nameOf(C.describeVoiced(c.chord, JSON.parse(c.orig))));
     SW.chordChart.ask(F.isNew ? {
       title: 'Put this chord on the chart?',
       buttons: [{ label: 'Put it on the chart', primary: true, act: after(saveNew) }, { label: 'Don’t', act: done }]
@@ -411,6 +423,9 @@
   const active = () => !!F && SW.progWin && SW.progWin.isOpen() && SW.progWin.tab() === 'focus';
   function onClick(e) {
     if (!active()) return;
+    inKey(() => clickHere(e));
+  }
+  function clickHere(e) {
     const t = e.target;
     const tb = t.closest('[data-fxtab]');
     if (tb) { setTabHere(tb.dataset.fxtab); return; }
@@ -449,7 +464,8 @@
   });
 
   /* ---------------- keys (the window hands them over while the editor is open) ---------------- */
-  function keyDown(e) {
+  function keyDown(e) { return inKey(() => keyHere(e)); }
+  function keyHere(e) {
     if (!F) return true;
     if (e.metaKey || e.ctrlKey) return false;
     const k = e.key || '';
@@ -465,9 +481,10 @@
   SW.chordFocus = {
     openCard, atSpot, atDraft, openNew, render, keyDown, dirty, leave, closed, escape, compact,
     origin: () => (F ? F.origin : null), tab: () => (F ? F.tab : null),
-    undo: () => { if (F) { F.ed.undo(); redraw(); } }, redo: () => { if (F) { F.ed.redo(); redraw(); } },
+    undo: () => { if (F) { inKey(() => F.ed.undo()); redraw(); } }, redo: () => { if (F) { inKey(() => F.ed.redo()); redraw(); } },
     canUndo: () => !!F && F.ed.canUndo(), canRedo: () => !!F && F.ed.canRedo(), isOpen: () => !!F,
     // for tests: the chord's buttons
-    press: id => { if (F) { press(id); redraw(); } }, lit: () => (F ? [...shapeOf(col().notes).lit] : []), notes: () => (F ? clone(col().notes) : null)
+    press: id => { if (F) { inKey(() => press(id)); redraw(); } }, lit: () => (F ? inKey(() => [...shapeOf(col().notes).lit]) : []), notes: () => (F ? clone(col().notes) : null),
+    key: () => (F ? F.key : null)
   };
 })();

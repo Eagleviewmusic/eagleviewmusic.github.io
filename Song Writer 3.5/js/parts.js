@@ -374,10 +374,42 @@
     redraw(model, i, 'part');
     return i;
   }
+  /* REMOVING PART 1 (2026-11-22, bug report M24). The song's key changes live
+     on Part 1's columns, and an old song's lane chords on its syllables, so
+     they went with it, and later bars sounded in the opening key. The part
+     that becomes Part 1 takes them over, line by line: a key change on its
+     first column in the same bar (none starting there: the next column after
+     it — in this line, or the next line with any — and the key changes at
+     that one's bar); a lane chord on its syllable that starts at the same
+     tick, or the next one after. `from`, `to`: the two parts' whole lines
+     (linesOf); `to`'s columns and syllables are written into. */
+  function handOver(from, to) {
+    const read = ls => SW.timing.songOf(ls, { pitches: false }).lines;
+    const a = read(from), b = read(to);
+    const firstFrom = k => { for (let j = k; j < b.length; j++) if (b[j].events.length && b[j].events[0].spec) return b[j].events[0]; return null; };
+    a.forEach((le, k) => {
+      const into = b[k];
+      if (!into) return;
+      le.events.forEach(ev => {
+        const key = ev.spec && ev.spec.key;
+        if (key) {
+          const at = into.events.find(x => x.spec && x.bar === ev.bar) || into.events.find(x => x.spec && x.bar > ev.bar) || firstFrom(k + 1);
+          if (at) at.spec.key = key;
+        }
+        const syl = ev.sylFirst && from[k] && (from[k].syllables || [])[ev.sylIndex];
+        if (syl && syl.chord) {
+          const at = into.events.find(x => x.sylFirst && x.start >= ev.start);
+          const target = at && to[k] && (to[k].syllables || [])[at.sylIndex];
+          if (target) target.chord = syl.chord;
+        }
+      });
+    });
+  }
   function remove(i) {
     if (!ok(i) || parts.length < 2) return false;
     const model = SW.score.read();
     const all = parts.map((p, k) => Object.assign(compactMeta(p), { lines: linesOf(model, k) }));
+    if (i === 0) handOver(all[0].lines, all[1].lines);
     all.splice(i, 1);
     hidden = new Set(Array.from(hidden).filter(k => k !== i).map(k => (k > i ? k - 1 : k)));
     delete model.parts;

@@ -209,6 +209,8 @@ in the head (2026-09-28 to 2026-10-01) is still read: a quarter on every line.
 
 `[X1]` note shorthand, `,` next column, `+` harmony, `:q` a value, `~` a rest,
 `_` at a column's end a tie to the next (`D1:q_,D1:e`),
+`@` and a key after the value a key change starting at that column (`D1:q@G` —
+Create Key Change, `cols[].key`; 2026-11-22, the text used to drop them),
 `#`/`b` after the letter an accidental, `{…}` a chord before the syllable.
 A 1.0 song is this text with no values, chords, time or tempo.
 
@@ -317,8 +319,24 @@ outside them starts at the nearest); `locked` leaves the BPM as plain text
 at each exercise's own tempo.
 
 The lesson open in a tab is also kept in **sessionStorage**
-(`song_writer_35_open_lesson_v1`: `{ title, songIds, id, policy, current }`), so a
-reload does not end it. It never leaves the device.
+(`song_writer_35_open_lesson_v1`: `{ title, songIds, id, policy, current, layout, marked }`), so a
+reload does not end it. It never leaves the device. Since 2026-11-22: `layout` is the
+lesson's layout, held on screen only (it is no longer written over the teacher's own
+Layout settings), and `marked: true` says the tab's address was turned to `…/#in-lesson`
+once the lesson opened — only that address (a reload) opens it again, so typing the
+plain app address in the same tab ends the lesson. An entry with no `marked` (saved
+before) still reopens on a reload.
+
+Returned student work is filed as `work_<tag>_<letters>-<hash>` (2026-11-22): the
+letters a slug of the student's name keeps, then a short hash of the name exactly as
+typed, so 王小明 and 李华, or Alex and alex, are never filed over each other. Work filed
+before under `work_<tag>_<slug>` is still replaced by the same student's next hand-in.
+
+**Two tabs (2026-11-22, library.js ANOTHER TAB):** each tab remembers the stored copy of
+its song as it last read or wrote it, and never writes over a newer one written by another
+tab. With nothing new of its own it catches up (the newer copy, or the sandbox when the
+song was deleted there) and says so; with changes in both, its own are saved as
+“Title (copy)”.
 
 ## 6a. Student version — `#lesson=` with `kind: "student-version"` (2026-11-15)
 

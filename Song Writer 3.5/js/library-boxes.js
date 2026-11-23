@@ -810,8 +810,9 @@
       if (!kept(lib, id)) actions.appendChild(smallBtn('Rename', 'Give this version a new name', () => L.showNewSongModal('rename', id)));
       if (n > 1) actions.appendChild(smallBtn('Move out', 'Take this version out of the box, into a box of its own', () => moveOut(b.id, id)));
       if (L.canDelete(id, lib[id])) actions.appendChild(smallBtn('&times;', 'Delete this version', () => {
-        if (!confirm('Delete “' + rec.title + '”' + (n > 1 ? ', this version of “' + b.title + '”' : '') + '? This cannot be undone.')) return;
-        L.deleteSongById(id);
+        // the app's own question (core.js ASK: the browser's can be refused without a word — bug report L28)
+        ui.ask({ title: 'Delete “' + rec.title + '”?', text: (n > 1 ? 'It is a version of “' + b.title + '”. ' : '') + 'This cannot be undone.', yes: 'Delete', danger: true })
+          .then(ok => { if (ok) L.deleteSongById(id); });
       }, 'delete-btn-item'));
       row.appendChild(star);
       row.appendChild(badge);
@@ -1014,7 +1015,11 @@
     const api = frameApi();
     if (!api) return;
     let ok = false;
-    try { ok = api.open(id); } catch (e) { console.error('Preview:', e); }
+    /* the record goes too: a song from a link in a page embedded in another
+       site lives only in this page's memory (library.js `visiting`), and the
+       frame reads the stored library — so it said "could not be opened" (L25) */
+    const rec = L.getStoredLibrary()[id];
+    try { ok = api.open(id, rec ? JSON.stringify(rec) : undefined); } catch (e) { console.error('Preview:', e); }
     $('sp-loading').hidden = ok;
     if (!ok) $('sp-loading').textContent = 'This song could not be opened here.';
   }

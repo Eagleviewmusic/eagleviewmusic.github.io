@@ -211,7 +211,9 @@
       e.stopPropagation();
       if (!editable()) return;
       const f = P.focused();
-      if (confirm('Remove ' + P.label(f) + ' and everything written on it?')) P.remove(f);
+      // the app's own window (core.js ui.ask): the browser's confirm() can be refused without a word (bug report L28)
+      SW.ui.ask({ title: 'Remove ' + P.label(f) + '?', text: 'Everything written on it goes too.', yes: 'Remove', danger: true })
+        .then(yes => { if (yes && P.focused() === f) P.remove(f); });
       return;
     }
     if (e.target.closest('[data-chords]')) {

@@ -285,14 +285,20 @@
     return out;
   }
   /* the written values: [{ a (cell), id, rest, tie (to the next), bar (a whole-bar rest) }] */
-  function rhythmPieces(cells, pb, bar, comp) {
+  /* cuts: cells where a run of rests must break — where the drawing begins
+     (a lead, a pick-up's start: rhythm()). The silence before them is
+     dropped from the drawing, and one rest spelled across both was dropped
+     with it (a half-note pick-up whose first beat is a rest showed only its
+     quarter note: bug report M6, 2026-11-22) */
+  function rhythmPieces(cells, pb, bar, comp, cuts) {
     const n = cells.length;
     const pieces = [];
     const put = (a, ids, rest) => { ids.forEach(id => { pieces.push({ a, id, rest }); a += cellsOf(id); }); return a; };
+    const cut = new Set((cuts || []).filter(c => c > 0));
     for (let i = 0; i < n;) {
       const rest = cells[i] === 'R';
       let j = i + 1;
-      while (j < n && (rest ? cells[j] === 'R' : cells[j] === 'O')) j++;
+      while (j < n && (rest ? cells[j] === 'R' : cells[j] === 'O') && !(rest && cut.has(j))) j++;
       const first = pieces.length;
       let a = i;
       while (a < j) {
@@ -333,7 +339,7 @@
     const str = 'R'.repeat(lead) + String(cells || '');
     const pb = o.perBeat || 4, bar = o.barCells || pb * 4, comp = !!o.compound;
     const SS = o.ss || 7, k = SS / UNITS;
-    let pieces = rhythmPieces(str, pb, bar, comp);
+    let pieces = rhythmPieces(str, pb, bar, comp, [lead, o.from || 0]);
     if (lead) pieces = pieces.filter(p => p.a >= lead);
     if (o.from) pieces = pieces.filter(p => p.a >= o.from);          // the Rhythm page: cells before a line's pick-up are not silence, they are before the line
     if (o.to !== undefined) pieces = pieces.filter(p => p.a < o.to);  // and nothing after a chord's end

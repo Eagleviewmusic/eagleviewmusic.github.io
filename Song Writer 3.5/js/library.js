@@ -131,7 +131,14 @@
   let openedBook = '';
   // …or it is one of the songs that come with the app, kept the same way (2026-11-11)
   let openedBuiltin = false;
-  const readOnly = () => openedReceived || openedBuiltin;
+  /* …or it is a lesson's exercise (lesson_…) opened from the ordinary Library,
+     outside its lesson (2026-11-22, bug report M22): there the lesson's locks
+     are not on, so it is kept as the lesson left it — what is done to it
+     here would go back into the lesson and be handed in. The lesson's link
+     opens it to work on; Save my copy keeps a copy of one's own. */
+  let openedLessonWork = false;
+  const isLessonWork = id => String(id).indexOf('lesson_') === 0;
+  const readOnly = () => openedReceived || openedBuiltin || openedLessonWork;
 
   /* ---------------- records ---------------- */
   function normalizeSong(raw, idHint) {
@@ -254,8 +261,24 @@
      changed and saved is theirs and stays as it is. The old texts are
      kept here only to recognise them. 2026-11-08: rewritten again, from the
      user's 3.5 copy with its Chord Chart and chord track (songs.js
-     PRELOADED_SCORES), so 2026-10-26's text is retired too. */
+     PRELOADED_SCORES), so 2026-10-26's text is retired too. 2026-11-22
+     (bug report L30): Twinkle and Mary given their rhythm in songs.js, so
+     their block texts — 1.0's, and every 3.5 library's until then — are
+     retired here too (they are also what tells a 1.0 copy is untouched,
+     migrateFromV1). */
   const RETIRED_DEFAULTS = {
+    twinkle: [`[Key of C]
+[A]
+Twin[D1] kle,[D1] twin[S1] kle,[S1] lit[L1] tle[L1] star[S1] How[F1] I[F1] won[M1] der[M1] what[R1] you[R1] are[D1]
+[B]
+Up[S1] a-[S1] bove[F1] the[F1] world[M1] so[M1] high,[R1] Like[S1] a[S1] dia-[F1] mond[F1] in[M1] the[M1] sky.[R1]
+[A]
+Twin[D1] kle,[D1] twin[S1] kle,[S1] lit[L1] tle[L1] star,[S1] How[F1] I[F1] won[M1] der[M1] what[R1] you[R1] are.[D1]`],
+    mary: [`[Key of C]
+[A]
+Ma[M1] ry[R1] had[D1] a[R1] lit[M1] tle[M1] lamb,[M1] lit[R1] tle[R1] lamb,[R1] lit[M1] tle[S1] lamb.[S1]
+[B]
+Ma[M1] ry[R1] had[D1] a[R1] lit[M1] tle[M1] lamb,[M1] its[M1] fleece[R1] was[R1] white[M1] as[R1] snow.[D1]`],
     starspangledbanner: [`[Key of Ab]
 [A1]
 Oh[S1] -[M1] say[D1] can[M1] you[S1] see[D2] By[M2] the[R2] dawn's[D2] ear-[M1] -ly[F#1] light?[S1]
@@ -357,8 +380,15 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
       const song = legacy[id];
       if (!song || typeof song !== 'object' || typeof song.content !== 'string') return;
       if (isDefaultId(id)) {
+        /* Untouched: 1.0's own text. That is songs.js's text, or — for a
+           built-in rewritten since (the Star Spangled Banner is a whole score
+           now, with no text in songs.js) — one of the texts it had before
+           (RETIRED_DEFAULTS: 1.0's is the first). Until 2026-11-22 a device
+           that had only run 1.0 got a "Star Spangled Banner (from 1.0)"
+           nobody wrote (bug report L27). */
         const stock = (typeof PRELOADED_SONGS !== 'undefined' && PRELOADED_SONGS[id]) || '';
-        if (song.content.trim() === stock.trim()) return;
+        const was = [stock].concat(RETIRED_DEFAULTS[id] || []);
+        if (was.some(text => song.content.trim() === String(text).trim())) return;
         const rec = normalizeSong({ title: (song.title || DEFAULT_TITLES[id]) + ' (from 1.0)', content: song.content, isCustom: true, createdAt: Date.now() + i }, 'v1_' + id);
         library[rec.id] = rec;
       } else {
@@ -507,10 +537,149 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     if (!hasUnsavedChanges()) return true;
     const title = currentSongTitle || 'this song';
     return confirm('Leave “' + title + '” without saving your changes?\n\n'
-      + 'Auto-save is off' + (openedReceived ? ' (it is a shared song)' : openedBuiltin ? ' (it is a song that comes with Song Writer)' : '') + ', so the changes you have made since opening it are not saved. '
+      + 'Auto-save is off' + (openedReceived ? ' (it is a shared song)' : openedBuiltin ? ' (it is a song that comes with Song Writer)' : openedLessonWork ? ' (it is a lesson’s exercise)' : '') + ', so the changes you have made since opening it are not saved. '
       + 'OK ' + (where || 'goes on') + ' and leaves them behind. Cancel stays here — then Save as… (or turn auto-save on) to keep them.');
   }
 
+  /* ------------------------------------------------------------------
+     ANOTHER TAB (2026-11-22, bug report H11)
+
+     The same song can be open in two tabs — a student clicks the same
+     Schoology link twice. Every save writes the song on screen, and save()
+     also runs on the way out of a tab, so the tab left behind used to write
+     its older copy over the newer one when it was closed or switched away
+     from, without a word: the other tab's work gone, a song deleted there
+     back again, Start over undone, an old name back after a rename.
+
+     Now a tab remembers the stored copy of the song on screen as it last
+     read or wrote it (the BASE). Before it writes, save() looks: if the
+     stored copy has changed since — another tab saved, renamed or deleted
+     it —
+     • with nothing new on screen here, nothing is written, and the tab
+       catches up: it shows the newer copy (or, if the song was deleted
+       there, the sandbox), and says so;
+     • with changes here too, both are kept: this tab's work is saved as a
+       copy, “Title (copy)”, and the song keeps the other tab's version;
+     • deleted there but changed here: written again — there is nothing
+       newer to keep.
+     A tab hears of the other's saves at once (the `storage` event) and
+     catches up then, or when it is next looked at (a hidden tab waits). A
+     tab with changes of its own not yet saved (auto-save off, a word being
+     typed) is never caught up: its changes stay on the page, and it says
+     why once. Never in a frame that is only a guest here (js/embed.js), nor
+     in a preview or a student's work held for a look (nothing is saved).
+     Only the song's music, settings and name count: its dates or header
+     moving alone is not a change.
+     ------------------------------------------------------------------ */
+  let baseRaw;              // the stored record as this tab last read or wrote it (JSON; null: none stored; undefined: not known yet)
+  let toldRaw;              // the stored copy this tab has said it is keeping its own changes over (said once)
+  function noteBase(rec) { baseRaw = rec ? JSON.stringify(rec) : null; toldRaw = undefined; }
+  const storedKey = rec => rawSongKey(rec) + '|' + pieceLayoutKey(rec) + '|' + (rec.title || '');
+  function changedElsewhere(rec) {
+    if (baseRaw === undefined || window.EVM_STUDIO_EMBED) return false;
+    const raw = rec ? JSON.stringify(rec) : null;
+    if (raw === baseRaw) return false;
+    if (raw === null || baseRaw === null) return true;
+    if (storedKey(rec) !== storedKey(JSON.parse(baseRaw))) return true;
+    baseRaw = raw;            // only its dates or its header moved: the same piece
+    return false;
+  }
+  const hasOwnChanges = () => SW.score.isTyping() || fingerprint() !== savedFingerprint;
+  /* The library as stored, without getStoredLibrary's first-run writing:
+     null while there is none (another tab's Start over, between its writes). */
+  function peekLibrary() {
+    let library = null;
+    try { library = JSON.parse(heldLibrary || localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) { return null; }
+    if (!library || typeof library !== 'object' || !Object.keys(library).length) return null;
+    Object.keys(visiting).forEach(id => { library[id] = JSON.parse(visiting[id]); });
+    return library;
+  }
+  function refreshOpenList() {
+    const sheet = $('library-sheet');
+    if (sheet && sheet.classList.contains('show')) renderLibrarySongList();
+  }
+  const nameOnScreen = () => isSandboxId(currentSongId) ? 'Your sandbox' : '“' + (currentSongTitle || 'This song') + '”';
+
+  /* Another tab changed the song on screen: show its version (see above). */
+  function catchUp() {
+    if (!booted || !currentSongId || window.EVM_STUDIO_EMBED) return;
+    if (SW.lessons && SW.lessons.isPreviewing()) return;
+    if (document.hidden) return;                      // a hidden tab catches up when it is next looked at (visibilitychange)
+    const library = peekLibrary();
+    if (!library) return;
+    const rec = library[currentSongId] || null;
+    if (!changedElsewhere(rec)) return;
+    const name = nameOnScreen();
+    if (hasOwnChanges()) {
+      const raw = rec ? JSON.stringify(rec) : null;
+      if (toldRaw !== raw) {
+        toldRaw = raw;
+        ui.toast(name + (rec ? ' was changed' : ' was deleted') + ' in another tab. This tab has changes of its own, so they stay here' +
+          (rec ? ' — saving them makes a copy, so nothing is lost.' : ' — saving them keeps the song.'), 9000);
+      }
+      return;
+    }
+    if (!rec) {
+      loadSongById(ensureSandbox());
+      refreshOpenList();
+      ui.toast(name + ' was deleted in another tab, so this tab has gone to your sandbox.', 7000);
+      return;
+    }
+    const screen = { title: currentSongTitle || '', score: SW.score.read() };
+    if (!(SW.lessons && SW.lessons.meta())) screen.layout = SW.settings.layoutSnapshot();
+    if (rawSongKey(rec) === rawSongKey(screen) && (!rec.layout || pieceLayoutKey(rec) === pieceLayoutKey(screen))) {
+      // the same music: at most a new name
+      noteBase(rec);
+      const title = normalizeSong(rec, currentSongId).title;
+      if (!isSandboxId(currentSongId) && title !== currentSongTitle) {
+        currentSongTitle = title;
+        updateSongChip();
+        ui.toast('Renamed “' + title + '” in another tab');
+      }
+      refreshOpenList();
+      return;
+    }
+    loadSongById(currentSongId, { autoSave });
+    refreshOpenList();
+    ui.toast(name + ' was changed in another tab, so this tab now shows the newest version.', 7000);
+  }
+
+  /* Changed here and in another tab: this tab's work becomes a copy, and
+     the tab carries on in it (nothing is drawn again — save() can be in the
+     middle of an edit). In a lesson the copy is one more of its exercises. */
+  function keepBoth(library) {
+    const from = currentSongId;
+    const lesson = SW.lessons && SW.lessons.meta();
+    const was = currentSongTitle || (library[from] && library[from].title) || 'Untitled Song';
+    const sandbox = isSandboxId(from);
+    const title = sandbox ? 'Sandbox (copy)' : was.slice(0, 53) + ' (copy)';
+    const id = lesson ? from + '_' + Date.now().toString(36) : EVM.newId('song');      // (lesson_…: out of a link's way, fileOpts)
+    const now = Date.now();
+    const record = { id, title, score: SW.score.read(), isCustom: true, createdAt: now, updatedAt: now };
+    if (!lesson) record.layout = SW.settings.layoutSnapshot();
+    if (!lesson && !sandbox) record.derivedFrom = from;
+    library[id] = record;
+    saveStoredLibrary(library);
+    if (SW.boxes && !lesson && !sandbox) SW.boxes.placeNew(id, from, true);
+    if (lesson && SW.lessons.addExercise) SW.lessons.addExercise(id);
+    currentSongId = id;
+    currentSongTitle = title;
+    openedReceived = false;
+    openedBook = '';
+    openedBuiltin = false;
+    openedLessonWork = false;
+    autoSave = true;
+    persistActiveId();
+    noteBase(record);
+    markSaved();
+    updateSongChip();
+    refreshOpenList();
+    ui.toast(sandbox
+      ? 'Your sandbox was changed in another tab too. So nothing is lost, your changes here are saved in your library as “' + title + '”.'
+      : '“' + was + '” was changed in another tab too. So nothing is lost, your changes here are saved as “' + title + '”, and “' + was + '” keeps the other tab’s.', 10000);
+  }
+
+  /* Returns 'copied' when the work on screen went into a copy (ANOTHER TAB). */
   function save(force) {
     if (!currentSongId) return;
     /* Preview as a student works on the teacher's own songs: nothing a
@@ -523,6 +692,13 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
        student always go back to it. Their changes become theirs only
        through Save my copy (Save as…). A lesson always keeps itself. */
     if ((existing.received || isBuiltin(currentSongId, existing)) && !(SW.lessons && SW.lessons.meta())) return;
+    if (openedLessonWork) return;                     // a lesson's exercise, outside its lesson (M22)
+    /* ANOTHER TAB: never an older copy over a newer one */
+    if (changedElsewhere(library[currentSongId] || null)) {
+      if (!hasOwnChanges()) { setTimeout(catchUp, 0); return; }     // nothing new here: the other tab's copy stands
+      if (library[currentSongId]) { keepBoth(library); return 'copied'; }
+      ui.toast(nameOnScreen() + ' was deleted in another tab, but this tab had changes to it, so it is kept.', 8000);
+    }
     const record = {
       id: currentSongId,
       title: currentSongTitle || existing.title || 'Untitled Song',
@@ -541,6 +717,7 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     EVM.stamp(record, existing.id ? existing : null, key);
     library[currentSongId] = record;
     saveStoredLibrary(library);
+    noteBase(record);
     markSaved();
   }
 
@@ -563,6 +740,8 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
       ? 'A shared song stays exactly as it was sent, so you can always go back to it. Press to save your own copy and keep your changes.'
       : openedBuiltin
       ? 'This song comes with Song Writer and stays as it is, so you can always go back to it. Press to save your own version and keep your changes.'
+      : openedLessonWork
+      ? 'This is a lesson’s exercise, kept as the lesson left it — open the lesson’s link to work on it. Press to save your own copy and keep your changes.'
       : on
       ? 'Auto-save is on: every change is saved to this song. Press to stop saving.'
       : 'Auto-save is off: your changes are not being saved. Press to save them and start saving again.';
@@ -580,8 +759,8 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
         + 'Cancel leaves auto-save off, and “' + title + '” stays as it was saved.');
       if (!ok) { updateAutoSaveToggle(); return; }
       autoSave = true;
-      save(true);
-      ui.toast('Saved — auto-save on');
+      // (changed in another tab meanwhile: they went into a copy, and save() said so — ANOTHER TAB)
+      if (save(true) !== 'copied') ui.toast('Saved — auto-save on');
     } else {
       autoSave = !!on;
       if (autoSave) markSaved();
@@ -595,7 +774,7 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     const sandbox = isSandboxId(currentSongId);
     const lesson = SW.lessons && SW.lessons.meta();
     const title = sandbox ? SANDBOX_TITLE : (currentSongTitle || 'Untitled');
-    const where = sandbox ? 'Sandbox' : (lesson ? 'Lesson' : (openedReceived ? (openedBook || 'Shared') : openedBuiltin ? 'Built-in' : 'Library'));
+    const where = sandbox ? 'Sandbox' : (lesson ? 'Lesson' : (openedReceived ? (openedBook || 'Shared') : openedBuiltin ? 'Built-in' : openedLessonWork ? 'Lesson work' : 'Library'));
     const chip = $('song-chip');
     chip.classList.toggle('is-sandbox', sandbox);
     chip.title = sandbox ? 'Library — your sandbox is open: scratch work, not in your library' : `Library — ${where}: ${title}`;
@@ -615,6 +794,8 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
       ? 'Shared with you. It stays exactly as it was sent, so you can always come back to it — use Save as… to keep your own copy with your changes.'
       : openedBuiltin
       ? 'Comes with Song Writer. It stays as it is, so you can always come back to it — use Save my copy to keep your own version, in the same box.'
+      : openedLessonWork
+      ? 'A lesson’s exercise. It is kept as the lesson left it — open the lesson’s link to carry on with it, or use Save my copy to keep a copy of your own.'
       : '';
     note.hidden = !note.textContent;
     document.title = (sandbox ? 'Sandbox' : title) + ' — Song Writer 3.5';
@@ -653,7 +834,9 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     openedReceived = !!rec.received && !(SW.lessons && SW.lessons.meta());
     openedBook = openedReceived && rec.book ? String(rec.book) : '';
     openedBuiltin = !openedReceived && isBuiltin(songId, song) && !(SW.lessons && SW.lessons.meta());
+    openedLessonWork = !openedReceived && isLessonWork(songId) && !(SW.lessons && SW.lessons.meta());
     autoSave = !!(options && options.autoSave) && !readOnly();
+    noteBase(library[songId]);                       // ANOTHER TAB: the stored copy, as this tab opened it
     markSaved();
     updateSongChip();
     SW.bus.emit('song:opened', { id: songId, title: rec.title });
@@ -679,6 +862,23 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     library[SANDBOX_ID] = freshSandbox();
     saveStoredLibrary(library);
     if (isSandboxId(currentSongId)) loadSongById(SANDBOX_ID);
+  }
+  /* Nothing in it but New's "Start Here" — its blocks as they are, or written
+     as the beat, as Notation writes them as soon as it shows them (M19) */
+  function onlyStartHere(rec) {
+    const asBeats = score => {
+      const s = JSON.parse(JSON.stringify(score));
+      const beat = SW.meters.byId(s.meter || SW.meters.DEFAULT).beatValue;
+      if (s.parts) return null;
+      (s.lines || []).forEach(l => (l.syllables || []).forEach(sy => (sy.cols || []).forEach(c => { if (!c.v) c.v = beat; })));
+      return EVM.stableStringify(s);
+    };
+    const mine = asBeats(normalizeSong(rec, SANDBOX_ID).score);
+    return mine !== null && mine === asBeats(normalizeSong({ content: NEW_SONG_TEXT }, SANDBOX_ID).score);
+  }
+  // Clear's question, in the app's own window (core.js ASK — the browser's could be refused: L28)
+  function askClearSandbox() {
+    return ui.ask({ title: 'Clear the sandbox?', text: 'It starts again with a blank page. This cannot be undone.', yes: 'Clear', danger: true });
   }
 
   /* ---------------- new / save as ---------------- */
@@ -709,6 +909,8 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
       heading.textContent = 'Save my copy';
       sub.textContent = (openedBuiltin
         ? 'The song that comes with Song Writer stays as it is, so you can always go back to it.'
+        : openedLessonWork
+        ? 'The lesson’s exercise stays as the lesson left it.'
         : 'The shared song stays as it was sent, so you can always go back to it.') + ' Your copy is yours to change, and you carry on in it.';
       confirmNewSongBtn.textContent = 'Save my copy';
       newSongTitleInput.value = `${currentSongTitle || 'Untitled'} (my copy)`;
@@ -760,15 +962,18 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
   function renameSong(id, title) {
     const trimmed = (title && title.trim()) ? title.trim().slice(0, 60) : '';
     if (!trimmed) { rejectEmptyTitle(); return; }
+    // the song on screen is saved first, and the library read after it (read before, it put the old score back)
+    if (id === currentSongId) save();
     const lib = getStoredLibrary();
     if (!lib[id]) { hideNewSongModal(); return; }
-    if (id === currentSongId) save();
     // a song that is kept as it came keeps its name (its box can be renamed: js/library-boxes.js)
     if (isProtectedKind(kindOf(id, lib[id]))) { hideNewSongModal(); return; }
+    const inStep = id === currentSongId && !changedElsewhere(lib[id]);      // ANOTHER TAB
     const was = lib[id].title;
     lib[id].title = trimmed;
     lib[id].updatedAt = Date.now();
     saveStoredLibrary(lib);
+    if (inStep) noteBase(lib[id]);
     if (SW.boxes) SW.boxes.recordRenamed(id, was, trimmed);
     if (id === currentSongId) { currentSongTitle = trimmed; updateSongChip(); }
     hideNewSongModal();
@@ -786,9 +991,12 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     if (!trimmed || !lib[id] || isProtectedKind(kindOf(id, lib[id]))) return false;
     if (id === currentSongId) save();
     const fresh = getStoredLibrary();
+    if (!fresh[id]) return false;
+    const inStep = id === currentSongId && !changedElsewhere(fresh[id]);    // ANOTHER TAB
     fresh[id].title = trimmed;
     fresh[id].updatedAt = Date.now();
     saveStoredLibrary(fresh);
+    if (inStep) noteBase(fresh[id]);
     if (id === currentSongId) { currentSongTitle = trimmed; updateSongChip(); }
     return true;
   }
@@ -802,12 +1010,24 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     save();
     /* A blank name: a fresh page in the sandbox (the family's rule). */
     if (!trimmed) {
-      clearSandbox();
-      if (!isSandboxId(currentSongId)) loadSongById(SANDBOX_ID);
-      hideNewSongModal();
-      ui.closeSheet('library-sheet');
-      if (SW.editBox) SW.editBox.setOpen(true);
-      ui.toast('A blank page in your sandbox');
+      const blankPage = () => {
+        clearSandbox();
+        if (!isSandboxId(currentSongId)) loadSongById(SANDBOX_ID);
+        hideNewSongModal();
+        ui.closeSheet('library-sheet');
+        if (SW.editBox) SW.editBox.setOpen(true);
+        ui.toast('A blank page in your sandbox');
+      };
+      /* That clears the sandbox, which Undo cannot bring back — so, as the
+         sandbox's own Clear does, it asks first when there is anything in it
+         (2026-11-22, bug report M19: it used to clear it without a word). */
+      const sandbox = getStoredLibrary()[SANDBOX_ID];
+      if (!sandbox || onlyStartHere(sandbox)) { blankPage(); return; }
+      ui.ask({
+        title: 'Clear your sandbox?',
+        text: 'A new song with no name is a blank page in your sandbox, so what is in your sandbox now goes. This cannot be undone. To keep it, press Cancel and give the new song a name — or use Save as… first.',
+        yes: 'Clear the sandbox', danger: true
+      }).then(ok => { if (ok) blankPage(); });
       return;
     }
     const id = EVM.newId('song');
@@ -915,10 +1135,12 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
       actions.appendChild(actionBtn('load-btn', 'Open', 'Open the sandbox', () => openFromLibrary(ensureSandbox())));
     }
     actions.appendChild(actionBtn('', 'Clear', 'Start the sandbox over with a blank page', () => {
-      if (!confirm('Clear the sandbox and start with a blank page? This cannot be undone.')) return;
-      clearSandbox();
-      renderLibrarySongList();
-      ui.toast('Sandbox cleared');
+      askClearSandbox().then(ok => {
+        if (!ok) return;
+        clearSandbox();
+        renderLibrarySongList();
+        ui.toast('Sandbox cleared');
+      });
     }));
     row.appendChild(badge);
     row.appendChild(text);
@@ -952,10 +1174,14 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
 
     if (isCurrent && !autoSaveOn()) {
       actions.appendChild(actionBtn('load-btn', 'Reopen', 'Open the saved version again, losing the changes on screen', () => {
-        if (hasUnsavedChanges() && !confirm('Reopen “' + rec.title + '” as it was saved?\n\nThe changes you have made since opening it are lost.')) return;
-        loadSongById(id);
-        ui.closeSheet('library-sheet');
-        ui.toast('Reopened as saved');
+        const reopen = () => {
+          loadSongById(id);
+          ui.closeSheet('library-sheet');
+          ui.toast('Reopened as saved');
+        };
+        if (!hasUnsavedChanges()) { reopen(); return; }
+        ui.ask({ title: 'Reopen “' + rec.title + '” as it was saved?', text: 'The changes you have made since opening it are lost.', yes: 'Reopen', danger: true })
+          .then(ok => { if (ok && id === currentSongId) reopen(); });
       }));
     } else if (isCurrent) {
       const b = actionBtn('is-active', 'Open now');
@@ -968,8 +1194,9 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     const lesson = SW.lessons && SW.lessons.meta();
     if (lesson) {
       actions.appendChild(actionBtn('', 'Start again', 'Put this exercise back the way your teacher sent it', () => {
-        if (!confirm('Put “' + rec.title + '” back the way your teacher sent it?')) return;
-        if (SW.lessons.restoreSong(id)) { renderLibrarySongList(); ui.toast('Back to the original'); }
+        ui.ask({ title: 'Put “' + rec.title + '” back the way your teacher sent it?', text: 'Your work on it goes. This cannot be undone.', yes: 'Start again', danger: true }).then(ok => {
+          if (ok && SW.lessons.restoreSong(id)) { renderLibrarySongList(); ui.toast('Back to the original'); }
+        });
       }));
     } else {
       const kind = kindOf(id, song);
@@ -979,8 +1206,8 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
          own it would only come back at the next visit while the book is out.
          A built-in stays (2026-11-11, the song boxes). */
       if (canDelete(id, song)) actions.appendChild(actionBtn('delete-btn-item', '&times;', 'Delete “' + rec.title + '”', () => {
-        if (!confirm('Delete “' + rec.title + '”?')) return;
-        deleteSongById(id);
+        ui.ask({ title: 'Delete “' + rec.title + '”?', text: 'This cannot be undone.', yes: 'Delete', danger: true })
+          .then(ok => { if (ok) deleteSongById(id); });
       }));
     }
     row.appendChild(badge);
@@ -1186,9 +1413,11 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
      is then just the app). Embedded — a Google Site — it stays: the page
      around it can bring the frame back at the address it had last (Back,
      a reload), and without its link it would open the last song open. */
-  function clearLinkFromAddress() {
+  /* hash: what the address keeps instead ('#in-lesson': a lesson open in
+     this tab, lessons.js — a reload then keeps it, the plain address does not) */
+  function clearLinkFromAddress(hash) {
     if (window.self !== window.top) return;
-    try { window.history.replaceState(null, document.title, window.location.pathname); } catch (e) {}
+    try { window.history.replaceState(null, document.title, window.location.pathname + (hash || '')); } catch (e) {}
   }
 
   /* A song from a link or a file, ready for EVM.file: the score
@@ -1355,6 +1584,9 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
         if (counts.kept) parts.push(`kept your newer copy of ${counts.kept}`);
         if (counts.blank) parts.push(`skipped ${counts.blank} blank`);
         saveStoredLibrary(library);
+        /* the file held a newer copy of the song on screen: show it (or the
+           next save would put the older one back — ANOTHER TAB) */
+        if (currentSongId && !hasOwnChanges() && changedElsewhere(library[currentSongId] || null)) loadSongById(currentSongId, { autoSave });
         // the boxes the file kept its songs in (a backup made since 2026-11-11)
         if (SW.boxes && Array.isArray(json.boxes)) SW.boxes.importFrom(json.boxes, where);
         renderExportSongList();
@@ -1373,7 +1605,13 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
   }
 
   function handleResetAllUserData() {
-    if (!confirm('Delete every song you have made and put Song Writer back to how it started? This cannot be undone.')) return;
+    ui.ask({
+      title: 'Start over?',
+      text: 'This deletes every song you have made and puts Song Writer back to how it started. This cannot be undone.',
+      yes: 'Delete everything', danger: true
+    }).then(ok => { if (ok) resetAllUserData(); });
+  }
+  function resetAllUserData() {
     try {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(ACTIVE_ID_KEY);
@@ -1523,14 +1761,41 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
      library is the lesson. boot() runs it once a song is on screen. A
      Librarian envelope's data holds `score` (2.0) or only `content` (1.0
      text); normalizeSong takes either. */
+  /* THE SHELF WRITES ONLY ITS OWN (2026-11-22, a lead in the bug report): a
+     sync reads the library, waits on the network for the books' songs, then
+     wrote back the whole library it had read — so a rename, a delete or an
+     auto-save made in those seconds, here or in another tab, went back (and,
+     with ANOTHER TAB above, would have looked like another tab's change).
+     It is handed the library as it is when it writes, with only what the
+     shelf did to the books' songs put on it: the ones it filed or changed,
+     and the ones it took away. */
+  const shelfReads = new WeakMap();        // a library the shelf read → { id: its record then, as JSON }
+  function shelfLoad() {
+    const lib = getStoredLibrary();
+    const then = new Map();
+    Object.keys(lib).forEach(id => then.set(id, JSON.stringify(lib[id])));
+    shelfReads.set(lib, then);
+    return lib;
+  }
+  function shelfSave(lib) {
+    const then = shelfReads.get(lib);
+    if (!then) { saveStoredLibrary(lib); return; }      // (not one it read here: as before)
+    const now = getStoredLibrary();
+    then.forEach((raw, id) => { if (!lib[id] && now[id] && isShelfSong(now[id])) delete now[id]; });
+    Object.keys(lib).forEach(id => {
+      if (isShelfSong(lib[id]) && JSON.stringify(lib[id]) !== then.get(id)) now[id] = lib[id];
+    });
+    saveStoredLibrary(now);
+  }
+
   function startShelf() {
     if (!window.EVMShelf) return;
     EVMShelf.init({
       app: 'song-writer',
       // not in a lesson, nor in the Recording Studio's frame (js/embed.js), which must not file songs
       disabled: !!window.EVM_STUDIO_EMBED || !!(SW.lessons && SW.lessons.meta()),
-      load: getStoredLibrary,
-      save: saveStoredLibrary,
+      load: shelfLoad,
+      save: shelfSave,
       incoming: rec => normalizeSong({ ...rec }, rec.id),
       key: songKey,
       changed: shelfChanged,
@@ -1549,9 +1814,11 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     if (autoSaveToggle) autoSaveToggle.addEventListener('click', () => setAutoSave(!autoSaveOn()));
     $('sandbox-clear-btn').addEventListener('click', () => {
       if (!isSandboxId(currentSongId)) return;
-      if (!confirm('Clear the sandbox and start with a blank page? This cannot be undone.')) return;
-      clearSandbox();
-      ui.toast('Sandbox cleared');
+      askClearSandbox().then(ok => {
+        if (!ok || !isSandboxId(currentSongId)) return;
+        clearSandbox();
+        ui.toast('Sandbox cleared');
+      });
     });
     $('newSongBtn').addEventListener('click', () => showNewSongModal('new'));
     $('saveAsBtn').addEventListener('click', () => showNewSongModal('saveAs'));
@@ -1602,7 +1869,16 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
       save();
       if (!window.EVM_STUDIO_EMBED && hasUnsavedChanges()) { e.preventDefault(); e.returnValue = ''; }
     });
-    document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+    // looked at again: catch up with another tab (ANOTHER TAB)
+    document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else catchUp(); });
+    /* Another tab wrote the library (ANOTHER TAB). Not the removal half of
+       its Start over — the new library is written straight after it. */
+    if (!window.EVM_STUDIO_EMBED && !window.EVM_STORAGE_MEMORY) {
+      window.addEventListener('storage', e => {
+        if (e.key !== null && (e.key !== STORAGE_KEY || e.newValue === null)) return;
+        catchUp();
+      });
+    }
   }
 
   SW.library = {
@@ -1612,6 +1888,8 @@ And[D2:e] the[R2:e] home[M2:q.] of[F2:e] the[R2:q] brave?[D2:h]
     showManageLibraryModal, offerLink, shareLinkFor, shortLinkFor, clearLinkFromAddress, hasUnsavedChanges, okToLeave,
     currentId: () => currentSongId,
     currentTitle: () => currentSongTitle,
+    // the auto-save choice for the song on screen, to open it again the same way (loadSongById's autoSave)
+    autoSaveChoice: () => autoSave,
     isSandboxId, isDefaultId, SANDBOX_ID, STORAGE_KEY, holdVisiting, dropVisiting,
     // for the song boxes (js/library-boxes.js)
     kindOf, isProtectedKind, canDelete, deleteSongById, openFromLibrary, buildSandboxRow, subline, paintBadge, setSongTitle,

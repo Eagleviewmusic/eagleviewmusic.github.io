@@ -177,6 +177,21 @@
     if (currentNoteIndex >= 0 && currentNoteIndex < notes.length) return notes[currentNoteIndex];
     return null;
   }
+  /* THE SELECTION BY ELEMENT (bug report H1, 2026-11-22): the selected
+     syllable is remembered as a place in the song (currentSyllableIndex),
+     and moving a line (▲ ▼) or typing a hyphenated word before it moved the
+     syllable away from that place — × or Delete then removed another word
+     (a, when d was selected). Before the place is used it is read again from
+     the note that is selected (or the highlighted syllable). */
+  function syncSelection() {
+    const syls = Array.from(getAllSyllables());
+    const note = notationContainer.querySelector('.note.selected-note');
+    const syl = note ? note.closest('.syllable') : notationContainer.querySelector('.syllable.highlighted');
+    if (syl && syls.indexOf(syl) !== -1) {
+      currentSyllableIndex = syls.indexOf(syl);
+      if (note) currentNoteIndex = Array.from(getAllNotes()).indexOf(note);
+    } else if (currentSyllableIndex >= syls.length) currentSyllableIndex = -1;
+  }
 
   /* 1.0 scrolled the window so a syllable on a new visual row sat just
      under the middle of the screen. The score now scrolls inside the
@@ -670,6 +685,7 @@
     updateLineBackgrounds();
     updateAllLineHeights();
     updateSectionActionButtonsState();
+    syncSelection();                                   // the selected syllable has a new place in the song (H1)
     changed('section');
     const active = getActiveNote();
     if (active) emitSelection(false);
@@ -746,9 +762,13 @@
       const runsOn = own.length && own[own.length - 1].dataset.hy;
       const before = lineElement.previousElementSibling;
       if (!runsOn && before && before.classList.contains('notation-line')) endWordAt(before);
+      // the selected note in another line stays selected (bug report M12: by its old place, the
+      // selection — and its sound — jumped on by the deleted line's note count)
+      const kept = notationContainer.querySelector('.note.selected-note');
       lineElement.remove();
       const remaining = getAllNotes();
-      if (remaining.length > 0) {
+      if (kept && document.contains(kept)) setNoteAsActive(kept, false);
+      else if (remaining.length > 0) {
         if (currentNoteIndex >= remaining.length) currentNoteIndex = remaining.length - 1;
         setNoteAsActive(remaining[Math.max(0, currentNoteIndex)], true);
       } else {
@@ -873,7 +893,7 @@
       can: !!syl && can('structure'),
       on: !!line,
       value: line ? line.dataset.pickup : null,
-      first: !!line && !previousLine(line),
+      first: !!line && (!previousLine(line) || !!previousLine(line).dataset.bars),   // (nothing to join above an Intro, M10)
       values: pickupValues()
     };
   }
@@ -916,13 +936,16 @@
     line = line || pickupAt(selectedSyllable());
     if (!line || !S.editing || !can('structure') || !line.dataset.pickup) return false;
     delete line.dataset.pickup;
-    if (previousLine(line)) {
+    // (under an instrumental line, an Intro, there is nothing to join: it starts on the downbeat after it —
+    // until 2026-11-22 the toast said it had joined, and nothing was saved: bug report M10)
+    const above = previousLine(line);
+    if (above && !above.dataset.bars) {
       joinLineWithPrevious(line);
       SW.ui.toast('Pick-up taken away — the line joined the one above');
     } else {
       line.querySelectorAll(':scope > .row-break').forEach(b => b.remove());
       updateLineHeight(line);
-      SW.ui.toast('Pick-up taken away — the song starts on the downbeat');
+      SW.ui.toast('Pick-up taken away — ' + (above ? 'the line' : 'the song') + ' starts on the downbeat');
       changed('line');
     }
     return true;
@@ -931,13 +954,16 @@
   /* The × on a pick-up's bar line (staff.js syncCut). */
   function cutPickupBar(line) { return removePickup(line); }
 
-  /* Layout settings → Pick-up: the first line's. */
+  /* Layout settings → Pick-up: the first line's — the first with words: an
+     instrumental line (an Intro) takes no pick-up, so the switch wrote onto
+     it and never turned on (bug report M10) */
+  const firstSung = () => notationContainer.querySelector('.notation-line:not([data-bars])');
   function firstPickup() {
-    const first = notationContainer.querySelector('.notation-line');
+    const first = firstSung();
     return first && SW.timing.linePickup(first) ? first.dataset.pickup : null;
   }
   function setFirstPickup(on) {
-    const first = notationContainer.querySelector('.notation-line');
+    const first = firstSung();
     if (!first || !!firstPickup() === !!on) return;
     if (on) first.dataset.pickup = pickupValueFor(first.querySelector(':scope > .syllable'));
     else delete first.dataset.pickup;
@@ -950,7 +976,8 @@
   function joinState() {
     const syl = selectedSyllable();
     const line = syl && syl.closest('.notation-line');
-    return { can: !!line && !!previousLine(line) && can('structure') && line.querySelector(':scope > .syllable') === syl };
+    const above = line && previousLine(line);
+    return { can: !!above && !above.dataset.bars && can('structure') && line.querySelector(':scope > .syllable') === syl };
   }
   function joinUp() {
     if (!joinState().can) return false;
@@ -1140,7 +1167,8 @@
       applyStackValue(st, id);
       n++;
     });
-    if (n) { emitSelection(false); changed('value'); }
+    // written as part of what is on screen, not as an edit of its own (history.js 'blocks', bug report H6)
+    if (n) { emitSelection(false); changed('blocks'); }
     return n;
   }
   function clearAllValues() {
@@ -1260,13 +1288,52 @@
       text.parentNode.insertBefore(notesContainer, text);
     }
     const currentStack = activeNote.closest('.harmony-stack');
+    /* + ON A TIED NOTE (bug report H5, 2026-11-22): the notes a tie holds
+       together are one sound, so the new note comes after the whole tie —
+       put in after its first column, the tie went on to the new note (not
+       struck) and the held part sounded as a fresh note. */
+    let afterStack = currentStack;
+    if (afterStack && afterStack.dataset.tie) {
+      const line = afterStack.closest('.notation-line');
+      const all = line ? Array.from(line.querySelectorAll('.harmony-stack')) : [];
+      let i = all.indexOf(afterStack);
+      while (i >= 0 && all[i].dataset.tie && all[i + 1]) i++;
+      if (i >= 0) afterStack = all[i];
+    }
+    const hostSyllable = afterStack ? afterStack.closest('.syllable') : parentSyllable;
+    const hostStacks = hostSyllable ? Array.from(hostSyllable.querySelectorAll('.harmony-stack')) : [];
+    /* A NEW BAR, A NEW "-" (2026-11-22, the user's "wordless notes break the
+       lines"): on Notation, a note added after a word's last note that would
+       start in a later bar than the word began goes on a "-" syllable of its
+       own, so the word's notes stop at the bar line and the staff can begin a
+       new row there (a row can only begin before a syllable — staff.js). */
+    if (afterStack && onNotation() && can('structure') && !isJoined(hostSyllable) &&
+        hostStacks[hostStacks.length - 1] === afterStack) {
+      const line = afterStack.closest('.notation-line');
+      const le = line && SW.timing ? SW.timing.lineEvents(line, { pitches: false }) : null;
+      const evOf = st => le && le.events.find(e => e.stack === st);
+      const last = evOf(afterStack), first = evOf(hostStacks[0]);
+      if (last && first && Math.floor((last.end + le.shift) / le.meter.barTicks) > first.bar) {
+        const own = createNewSyllable('-', [{
+          v: currentStack ? currentStack.dataset.v : undefined,
+          notes: [{ n: M.noteClassOf(activeNote) || 'do', acc: getAccidentalFromNote(activeNote) }]
+        }]);
+        if (hostSyllable.dataset.hy) own.dataset.hy = '1';          // the word goes on after it, as before
+        hostSyllable.insertAdjacentElement('afterend', own);
+        updateLineHeight(line);
+        setNoteAsActive(own.querySelector('.note'), true);
+        changed('syllable');
+        return;
+      }
+    }
     const newStack = document.createElement('div');
     newStack.className = 'harmony-stack';
     // always a note, on a rest too: the pitch the rest kept (until 2026-11-04 a rest copied itself)
     const newNote = createNoteElement(M.noteClassOf(activeNote) || 'do', getAccidentalFromNote(activeNote), false, memoryOf(activeNote));
     newStack.appendChild(newNote);
     applyStackValue(newStack, currentStack ? currentStack.dataset.v : null);
-    if (currentStack && currentStack.parentNode === notesContainer) currentStack.insertAdjacentElement('afterend', newStack);
+    const hostBox = afterStack ? afterStack.parentNode : null;
+    if (afterStack && hostBox && hostBox.classList.contains('notes-container')) afterStack.insertAdjacentElement('afterend', newStack);
     else notesContainer.appendChild(newStack);
     updateLineHeight(parentSyllable.closest('.notation-line'));
     setNoteAsActive(newNote, true);
@@ -1534,6 +1601,7 @@
      opts.fresh (typing on past the song's end): a word of its own. */
   function addSyllableAfterCurrent(opts) {
     if (!S.editing || !can('structure')) return;
+    syncSelection();
     const syllables = getAllSyllables();
     let targetSyllable, targetLine;
     if (currentSyllableIndex >= 0 && currentSyllableIndex < syllables.length) {
@@ -1565,6 +1633,7 @@
   }
 
   function deleteSyllable() {
+    syncSelection();
     if (!S.editing || currentSyllableIndex < 0 || !can('structure')) return;
     const syllables = getAllSyllables();
     if (currentSyllableIndex >= syllables.length) return;
@@ -1577,7 +1646,19 @@
     if (before && before.dataset.hy && !doomed.dataset.hy) delete before.dataset.hy;
     doomed.remove();
     if (parentLine && parentLine.querySelectorAll('.syllable').length === 0) {
-      parentLine.remove();
+      /* the line's last note gone: the line goes, in every part (bug report
+         H9, 2026-11-22 — removed here alone, every later line of the other
+         parts sat under the wrong line). The song's only line stays, with a
+         new note, while other parts have notes of their own on it. */
+      const allLines = Array.from(notationContainer.querySelectorAll('.notation-line'));
+      const at = allLines.indexOf(parentLine);
+      if (allLines.length <= 1 && SW.parts.count() > 1) {
+        parentLine.appendChild(createNewSyllable());
+        updateLineHeight(parentLine);
+      } else {
+        if (at >= 0) SW.parts.mirror({ kind: 'delete', at });   // every part (PARTS), as Delete this line does
+        parentLine.remove();
+      }
       updateLineBackgrounds();
       updateSectionActionButtonsState();
     } else if (parentLine) {
@@ -1602,6 +1683,7 @@
   /* Removing the focused input blurs it; its blur must not close the word
      a second time (that threw, and made Esc keep what was typed). */
   let droppingInput = false;
+  let typedAhead = '', typedAheadAt = 0;     // letters typed while no word's box was open (init: TYPED AHEAD)
   function dropInput(input) {
     droppingInput = true;
     try { input.remove(); } finally { droppingInput = false; }
@@ -1617,11 +1699,26 @@
     input.type = 'text';
     input.className = 'text-input';
     // a whole word on the Pitch page is typed with its hyphens (wa-ter-mel-on): they say where its syllables go
-    input.value = isJoined(syllable) ? piecesOf(syllable).map(p => shown(p.text)).join('-') : textElement.textContent;
+    if (isJoined(syllable)) {
+      /* wordless notes at the word's start or end (bug report 1c) are not
+         typed: wa + "-" opened as "wa-", and Enter took the hyphen as the
+         word running on into the next. They are left out of the box and
+         put back round what is typed (applyTyped) */
+      const ps = piecesOf(syllable).map(p => shown(p.text));
+      let a = 0, b = ps.length;
+      while (a < b && !ps[a]) a++;
+      while (b > a && !ps[b - 1]) b--;
+      input.value = ps.slice(a, b).join('-');
+      if (a < b) { input.dataset.lead = a; input.dataset.trail = ps.length - b; }
+    } else input.value = textElement.textContent;
+    input.dataset.was = input.value;
     textElement.style.display = 'none';
     textElement.parentNode.insertBefore(input, textElement);
     input.focus();
     input.select();
+    // (only just typed: a gap that opened no box leaves nothing for a later one)
+    if (typedAhead && performance.now() - typedAheadAt < 400) { input.value = typedAhead; input.setSelectionRange(input.value.length, input.value.length); }
+    typedAhead = '';
     SW.bus.emit('words:typing', { on: true });      // the Edit box greys its word tools
     input.addEventListener('blur', () => { if (!isAdvancingToNext && !droppingInput) finishTextEdit(); });
     input.addEventListener('keydown', e => {
@@ -1825,9 +1922,12 @@
     let last = syllable;
     if (input) {
       const value = input.value;
+      const edges = { lead: Number(input.dataset.lead) || 0, trail: Number(input.dataset.trail) || 0 };
+      // a joined word with nothing typed: nothing changes (opened and closed again, it was re-split)
+      const same = isJoined(syllable) && input.dataset.was !== undefined && value === input.dataset.was;
       dropInput(input);
       currentlyEditingText.style.display = '';
-      last = applyTyped(syllable, value);
+      if (!same) last = applyTyped(syllable, value, edges);
     }
     settleFresh(syllable);
     return document.contains(last) ? last : syllable;
@@ -1904,7 +2004,10 @@
       SW.bus.emit('words:typing', { on: false });
       return;
     }
-    if (input && input.value.trim() === '-' && can('structure')) {
+    // (a "-" emptied by the first Backspace — it opens selected — is still that "-": the second
+    // went back without deleting it, an unconfirmed lead in the 2026-11-22 bug report)
+    const wordless = input && (input.value.trim() === '-' || (input.value.trim() === '' && (input.dataset.was || '').trim() === '-'));
+    if (wordless && can('structure')) {
       syllable.classList.remove('editing');
       currentlyEditingText = null;
       currentEditingIndex = -1;
@@ -2138,7 +2241,7 @@
      connected notes first, new ones like its last after them);  -ter  the
      word before goes on into this one;  wa-  this one goes on into the
      next. Returns the last syllable the word now spans. */
-  function applyTyped(syl, raw) {
+  function applyTyped(syl, raw, edges) {
     const textEl = syl.querySelector('.text');
     let v = String(raw || '').trim();
     if (v === '--') { syl.dataset.hy = '1'; v = '-'; }
@@ -2151,7 +2254,9 @@
       syl.dataset.hy = '1';
       v = v.replace(/\s*-+$/, '');
     }
-    const pieces = /[^-]/.test(v) ? v.split('-').map(p => p.trim() || '-') : ['-'];
+    let pieces = /[^-]/.test(v) ? v.split('-').map(p => p.trim() || '-') : ['-'];
+    // a joined word's wordless notes at its edges, left out of the box (startTextEdit), go back round it
+    if (edges && (edges.lead || edges.trail)) pieces = new Array(edges.lead).fill('-').concat(pieces, new Array(edges.trail).fill('-'));
     if (pieces.length === 1) {
       if (isJoined(syl)) unjoin(syl);
       textEl.textContent = pieces[0];
@@ -2543,6 +2648,7 @@
 
   /* Delete / Backspace: two presses (1.0). */
   function handleDeleteClick() {
+    syncSelection();
     if (!S.editing || currentSyllableIndex < 0 || !can('structure')) return;
     if (!deleteConfirmationState) {
       deleteConfirmationState = true;
@@ -2581,6 +2687,7 @@
     return newLine;
   }
   function currentSyllable() {
+    syncSelection();
     return currentSyllableIndex >= 0 ? getAllSyllables()[currentSyllableIndex] || null : null;
   }
   function newLineState() {
@@ -2800,6 +2907,7 @@
     setMeter(score.meter, true);
     setTempo(score.bpm, true);
     setSwing(score.swing, true);
+    splitAtBarLines(score);                                                    // (needs the song's meter, just set)
     finishTextEdit();
     notationContainer.innerHTML = '';
     currentNoteIndex = -1;
@@ -2829,6 +2937,61 @@
     if (first) setNoteAsActive(first, false);
     else emitSelection(false);
     if (stageEl) stageEl.scrollTop = 0;
+  }
+
+  /* WORDS SPLIT AT THEIR BAR LINES (2026-11-22, the user: "Yes, split
+     them"). The staff can begin a row only before a syllable, so a word
+     whose connected notes run on into later bars kept those bars on one row
+     — on a phone wider than the row, which then had to break inside a bar.
+     Since the same day + gives a note that starts in a later bar a "-" of
+     its own (duplicateCurrentNote); a song written before is brought in line
+     when it is drawn: a syllable's notes that start in a later bar than its
+     first go on to a "-" syllable, one a bar. Nothing heard or seen changes
+     — the "-" is not printed, the word's extender line runs on over them —
+     but the words gain those "-" (Lyrics shows them: star - -). A word that
+     goes on (hy) keeps going on through them (wa--ter). Only written
+     notes (a Pitch song's blocks stay as they are, unless it is drawn on
+     Notation, which writes them as beats), every part, and never in a
+     lesson, a preview or work being viewed: an exercise keeps the syllables
+     its teacher gave it. A note held over a bar line is one column and
+     stays whole (the staff draws it tied). Returns how many were split. */
+  function splitAtBarLines(score) {
+    const L = SW.lessons;
+    if (L && (L.policy() || L.isPreviewing() || L.isViewing())) return 0;
+    if (!SW.timing || !SW.timing.songOf || !SW.parts) return 0;
+    const blocksToo = onNotation();
+    let n = 0;
+    for (let i = 0; i < SW.parts.countOf(score); i++) {
+      const lines = SW.parts.linesOf(score, i);
+      const sg = SW.timing.songOf(lines, { pitches: false });
+      let changedPart = false;
+      const out = lines.map((l, k) => {
+        const le = sg.lines[k];
+        if (l.bars || !le || !Array.isArray(l.syllables)) return l;
+        const syls = [];
+        let changedLine = false;
+        l.syllables.forEach((sy, si) => {
+          const cols = Array.isArray(sy.cols) ? sy.cols : [];
+          const evs = le.events.filter(e => e.sylIndex === si);
+          if (cols.length < 2 || evs.length !== cols.length || !(blocksToo || cols.every(c => c.v))) { syls.push(sy); return; }
+          let piece = null, bar = null;
+          cols.forEach((c, j) => {
+            if (!piece || evs[j].bar > bar) {
+              if (piece) { changedLine = true; n++; }
+              piece = j === 0 ? Object.assign({}, sy, { cols: [] }) : (sy.hy ? { text: '-', cols: [], hy: true } : { text: '-', cols: [] });
+              syls.push(piece);
+              bar = evs[j].bar;
+            }
+            piece.cols.push(c);
+          });
+        });
+        if (!changedLine) return l;
+        changedPart = true;
+        return Object.assign({}, l, { syllables: syls });
+      });
+      if (changedPart) SW.parts.setLines(score, i, out);
+    }
+    return n;
   }
 
   /* Anything read from storage, a file or a link comes through here, so
@@ -2987,7 +3150,8 @@
       if (line.bars) { body += `[Bars ${line.bars}]\n`; return; }          // an instrumental line
       if (line.pickup) body += `[Pickup ${line.pickup}]\n`;
       body += line.syllables.map(s => {
-        const cols = s.cols.map(c => c.notes.map(noteToken).join('+') + (c.v ? ':' + c.v : '') + (c.tie ? '_' : '')).join(',');
+        // a key change (Create Key Change, js/keys.js) starts at its column: D1:q@G (bug report H10 — the text dropped it)
+        const cols = s.cols.map(c => c.notes.map(noteToken).join('+') + (c.v ? ':' + c.v : '') + (c.key ? '@' + c.key : '') + (c.tie ? '_' : '')).join(',');
         return (s.chord ? `{${s.chord}}` : '') + `${s.text}${s.hy ? '-' : ''}[${cols}]`;
       }).join(' ') + '\n';
     });
@@ -3085,6 +3249,8 @@
             colStrings.forEach(cs => {
               const col = { notes: [] };
               if (cs.endsWith('_')) { col.tie = true; cs = cs.slice(0, -1); }   // tied to the next column
+              const km = cs.match(/@([A-G][#b]?)$/);                            // a key change starts here (scoreToText)
+              if (km) { if (M.KEYS.indexOf(km[1]) !== -1) col.key = km[1]; cs = cs.slice(0, -km[0].length); }
               cs.split('+').map(s => s.trim()).filter(Boolean).forEach(sh => {
                 const p = parseNoteShorthand(sh);
                 const spec = { n: p.noteClass };
@@ -3141,13 +3307,35 @@
      same and is not a break. An old song's Wa -ter -me -lon is shown as
      the one word it meant (Set to the notes stores it that way). */
   const NB_HYPHEN = '‑';
+  /* A space inside one syllable's own text (ice cream typed on one note) is
+     written as a non-breaking space, as its hyphen is: a plain one is a
+     break between words, and the next Set to the notes gave "cream" a new
+     note of its own (bug report 1d, 2026-11-22). */
+  const NB_SPACE = ' ';
   function scoreToWords(model, part) {
     return SW.parts.linesOf(normalizeScore(model || readScore()), partOnPage(part)).filter(l => !l.bars).map(l => {
-      return wordsOfLine(l.syllables).map(w => w.map(sy => {
-        const t = legacyBare(sy.text);
-        if (t === '-') return w.length > 1 ? '' : '-';
-        return t.replace(/-/g, NB_HYPHEN);
-      }).join('-') + (w.open ? '-' : '')).join(' ');
+      return wordsOfLine(l.syllables).map(w => {
+        const texts = w.map(sy => {
+          const t = legacyBare(sy.text);
+          return t === '-' ? '' : t.replace(/-/g, NB_HYPHEN).replace(/\s+/g, NB_SPACE);
+        });
+        /* WORDLESS NOTES AT A WORD'S EDGES (bug report 1c, 2026-11-22): a
+           "-" between two syllables of a word is the empty piece of wa--ter,
+           but one at the word's start or end was lost — wa- + "-" read back
+           as wa joined to the next word (its note deleted, a chord on it
+           with it), "-" + ter as -ter joined to the word before. Those are
+           written as lone "-" tokens: wa- - next, prev - ter. */
+        let a = 0, b = texts.length;
+        while (a < b && !texts[a]) a++;
+        while (b > a && !texts[b - 1]) b--;
+        if (a === b) return texts.map(() => '-').join(' ');
+        const out = [];
+        for (let i = 0; i < a; i++) out.push('-');
+        const trailing = texts.length - b;
+        out.push(texts.slice(a, b).join('-') + (trailing || w.open ? '-' : ''));
+        for (let i = 0; i < trailing; i++) out.push('-');
+        return out.join(' ');
+      }).join(' ');
     }).join('\n\n');
   }
   /* The words view's song lines: paragraphs (an empty line between), each
@@ -3185,13 +3373,14 @@
   function parseWordsLine(row) {
     const words = [];
     let open = false;
-    row.split(/\s+/).filter(Boolean).forEach(tok => {
+    // (a non-breaking space is part of a syllable — NB_SPACE)
+    row.split(/[^\S ]+/).filter(Boolean).forEach(tok => {
       let t = tok, joinPrev = false, joinNext = false;
       if (/[^-]/.test(t)) {
         if (t[0] === '-') { joinPrev = true; t = t.replace(/^-+/, ''); }
         if (/-$/.test(t)) { joinNext = true; t = t.replace(/-+$/, ''); }
       }
-      const pieces = /[^-]/.test(t) ? t.split('-').map(p => (p || '-').replace(/‑/g, '-')) : ['-'];
+      const pieces = /[^-]/.test(t) ? t.split('-').map(p => (p || '-').replace(/‑/g, '-').replace(/ /g, ' ')) : ['-'];
       if ((joinPrev || open) && words.length) words[words.length - 1].push(...pieces);
       else words.push(pieces);
       open = joinNext;
@@ -3241,14 +3430,54 @@
      (typing a lone "-" among the words says you are counting them: then
      the ones you left out go, as words do). A "-" holding only a rest is
      passed by, so words land on notes. */
+  /* WHICH PARAGRAPH IS WHICH LINE (bug report H3, 2026-11-22). Paragraphs
+     were matched to the song's lines by place, so deleting verse 2 put verse
+     3's words on verse 2's notes (and its label) and dropped verse 3's notes.
+     With as many paragraphs as lines they still go by place (each one's words
+     edited where it stands); with a paragraph more or fewer, they are lined
+     up by their words, as a diff lines up text — a paragraph like no line is
+     a new line, a line like no paragraph is the one deleted. Returns, for
+     each paragraph, its line's index in `sung` (or -1: a new line). */
+  function matchParagraphs(rows, sung) {
+    if (rows.length === sung.length) return rows.map((r, i) => i);
+    const norm = t => String(t || '').toLowerCase().replace(/[‑-]/g, ' ').replace(/[^\p{L}\p{N}\s]/gu, '').split(/\s+/).filter(Boolean);
+    const lineWords = l => norm(wordsOfLine(l.syllables).map(w => w.map(sy => legacyBare(sy.text)).filter(t => t !== '-').join('')).join(' '));
+    const a = rows.map(r => norm(r.replace(/(\S)-(?=\S)/g, '$1')));   // wa-ter → water, as the line's words are read
+    const b = sung.map(lineWords);
+    // how alike two lists of words are: shared words over all (Dice), 0…1
+    const like = (x, y) => {
+      if (!x.length && !y.length) return 1;
+      const left = x.slice();
+      let shared = 0;
+      y.forEach(w => { const k = left.indexOf(w); if (k !== -1) { shared++; left.splice(k, 1); } });
+      return (2 * shared) / (x.length + y.length);
+    };
+    const n = a.length, m = b.length;
+    const best = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+    for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) {
+      const s = like(a[i - 1], b[j - 1]);
+      best[i][j] = Math.max(best[i - 1][j], best[i][j - 1], s >= 0.5 ? best[i - 1][j - 1] + s : -Infinity);
+    }
+    const out = new Array(n).fill(-1);
+    for (let i = n, j = m; i > 0 && j > 0;) {
+      const s = like(a[i - 1], b[j - 1]);
+      if (s >= 0.5 && best[i][j] === best[i - 1][j - 1] + s) { out[i - 1] = j - 1; i--; j--; }
+      else if (best[i][j] === best[i - 1][j]) i--;
+      else j--;
+    }
+    // nothing alike at all (every word rewritten): by place, as before
+    return out.every(v => v === -1) ? rows.map((r, i) => (i < sung.length ? i : -1)) : out;
+  }
   function wordsToScore(text, model, part) {
     const score = normalizeScore(model || readScore());
     const rows = wordParagraphs(text);
     const which = partOnPage(part);                                       // the words of one part (PARTS)
     const was = SW.parts.linesOf(score, which);
     const sung = was.filter(l => !l.bars);                               // the paragraphs are the lines with words
+    // (lined up by their words for the song's own lines, Part 1; another part's paragraphs go by place, as before)
+    const pair = which === 0 ? matchParagraphs(rows, sung) : rows.map((r, i) => (i < sung.length ? i : -1));
     const lines = rows.map((row, i) => {
-      const old = sung[i] || { label: '', syllables: [] };
+      const old = pair[i] >= 0 ? sung[pair[i]] : { label: '', syllables: [] };
       const parsed = parseWordsLine(row);
       const neu = parsed.words;
       const oldWords = wordsOfLine(old.syllables).map(w => w.slice());
@@ -3296,11 +3525,23 @@
     });
     // instrumental lines keep their places among them (the ones after the last paragraph stay at the end)
     const out = [];
+    const srcOf = [];                                                    // each line's place in `was` (-1: a new line)
+    const sungAt = was.map((l, i) => i).filter(i => !was[i].bars);
     let k = 0;
-    was.forEach(l => { if (l.bars) out.push(l); else if (k < lines.length) out.push(lines[k++]); });
-    while (k < lines.length) out.push(lines[k++]);
+    const take = () => { srcOf.push(pair[k] >= 0 ? sungAt[pair[k]] : -1); out.push(lines[k++]); };
+    was.forEach((l, i) => { if (l.bars) { out.push(l); srcOf.push(i); } else if (k < lines.length) take(); });
+    while (k < lines.length) take();
     // the song keeps its key, scale, panel and time (2.0 dropped meter and tempo here) — and its other parts
-    return normalizeScore(SW.parts.setLines(Object.assign({}, score), which, out));
+    const next = Object.assign({}, score);
+    // … each other part's lines go with the song's: a line deleted (or put in) here is deleted
+    // (or put in, as rests) there too, so no part ends up under another line (bug report H3)
+    if (which === 0 && SW.parts.countOf(score) > 1 && (srcOf.length !== was.length || srcOf.some((v, i) => v !== i))) {
+      for (let p = 1; p < SW.parts.countOf(score); p++) {
+        const theirs = SW.parts.linesOf(score, p);
+        SW.parts.setLines(next, p, srcOf.map((src, i) => (src >= 0 && theirs[src] ? theirs[src] : { bars: out[i].bars, syllables: [] })));
+      }
+    }
+    return normalizeScore(SW.parts.setLines(next, which, out));
   }
 
   /* Your words (the Write button). Two views: the words alone, fitted
@@ -3344,14 +3585,32 @@
       next = Object.assign(readScore(), { key: parsed.key, scale: parsed.scale, meter: parsed.meter, bpm: parsed.bpm });
       if (parsed.swing) next.swing = parsed.swing; else delete next.swing;
       SW.parts.setLines(next, part, parsed.lines);
-    } else next = wordsToScore(text, null, part);
-    renderScore(next, { part });
+    } else {
+      // an emptied box is not a song with no lines: it was every sung line deleted, with no warning (bug report H3)
+      if (!text.trim()) { SW.ui.toast('The box is empty, so the song was left as it was'); return; }
+      next = wordsToScore(text, null, part);
+    }
+    // one Undo step, as any edit (bug report H2): drawn as a load, it emptied the whole Undo history
+    SW.history.hold(() => renderScore(next, { part }));
     changed('text-editor');
     hideTextEditorPopup();
   }
 
   /* ================= WIRING ================= */
   function init() {
+    /* TYPED AHEAD (bug report M11, 2026-11-22): between one word's box
+       closing (Space, Backspace) and the next one's opening, 50 ms later, no
+       box has the keyboard — a letter typed fast went to the shortcuts (the
+       h of "go home" re-pitched the note and sounded it), a second Space
+       played the song. In that gap a letter is kept for the next box, and
+       Space or Backspace does nothing. */
+    document.addEventListener('keydown', e => {
+      if (!isAdvancingToNext || currentlyEditingText || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.length === 1 && e.key !== ' ') { typedAhead += e.key; typedAheadAt = performance.now(); }
+      else if (e.key !== ' ' && e.key !== 'Backspace' && e.key !== 'Delete') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }, true);
     notationContainer.addEventListener('click', onScoreClick);
     // a tap on the manuscript itself — a line's background, the space under
     // the last line — takes the chord's notes off the keyboard (a note, a

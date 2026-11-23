@@ -418,6 +418,9 @@
       if (sheet) { ui.closeSheet(sheet.id); event.preventDefault(); return; }
       if (ui.isPopoverOpen()) { ui.closeAllPopovers(); return; }
       if (S.present) { setPresent(false); return; }
+      // a chord being dragged on the music goes back where it was; else the chord cursor goes (chord-track.js;
+      // 2026-11-22, bug report M18: Esc never reached it, so the drag still dropped and chord keys still wrote)
+      if (SW.ctrack && SW.ctrack.keyDown(event)) { event.preventDefault(); return; }
       if (S.playing) SW.player.stop();
       return;
     }

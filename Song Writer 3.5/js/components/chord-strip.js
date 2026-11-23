@@ -433,6 +433,14 @@
     carry = null;
     if (SW.ctrack) SW.ctrack.dropCancel();
   });
+  // Esc while a chord is carried off the panel: it goes nowhere (2026-11-22, bug report M18) — and the key goes no further
+  window.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || !carry || !carry.out) return;
+    carry = null;
+    if (SW.ctrack) SW.ctrack.dropCancel();
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
 
   /* A held chord let go (its key up, its finger lifted). */
   function release(holder) {

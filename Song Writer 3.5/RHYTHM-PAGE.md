@@ -59,12 +59,19 @@ line (DOM)  --readLine-->  lineModel  --F.cellsOf-->  cells[]   (one per sixteen
   the last note, or a yellow one inside it, starts a note; tapped again it goes
   (at a beat's start to silence, off the beat back into the note before). A
   wordless note goes when its own time has gone or when it only repeats the pitch
-  before it, so a circle tapped twice gives the line back; a note with a word, or
-  its own pitch elsewhere in the line, waits at the end, and takes its time back
-  when a tap makes room (THE WAITING NOTES). × on a bar takes its wordless notes
-  with it. Silence runs together (two rests that each began are one), and the
-  silence after the last note inside its bar is never written (whole empty bars
-  from + stay). A lesson that locks the melody or the words keeps the rule of
+  before it; a note with a word, or its own pitch elsewhere in the line, waits at
+  the end, and takes its time back when a tap makes room (THE WAITING NOTES).
+  **A circle tapped twice gives the line back** (2026-11-22, bug report 1e —
+  `flow.js` A CIRCLE TAPPED TWICE): the page remembers the line as it was before
+  the last gesture, for as long as nothing else has changed it, and a gesture
+  that brings the circles back to just what they showed then brings that line
+  back, pitches and words too (a wordless last note tapped off and on had come
+  back as the pitch before it: do re mi fa → do re mi mi). × on a bar takes its
+  wordless notes with it; × never leaves a line empty (its only bar, or its only
+  note, says to delete the line in Edit). Silence runs together (two rests that
+  each began are one), and the silence after the last note inside its bar is never
+  written (whole empty bars from + stay, and so does a rest the line already had
+  there — a Rest put in at the line's end). A lesson that locks the melody or the words keeps the rule of
   10-26: an onset the melody cannot fill is silence, a yellow circle inside the
   last note ends it, a grey one right after it lengthens it, and any other says
   every note is placed. History: a hollow **ghost** note (10-01), a tie from the
@@ -73,7 +80,10 @@ line (DOM)  --readLine-->  lineModel  --F.cellsOf-->  cells[]   (one per sixteen
 * **A word's own rest** (a word rested in Edit) is a grey circle with a ring,
   its word under it, and reads `R` in the notation box; a tap on that circle
   makes the word sound again (`score.unrestColumn`, one Undo step). Its later
-  cells are plain silence (grey).
+  cells are plain silence (grey). It is ONE onset, from where it begins: once a
+  tap, a value or a bar line has cut into it, what is left of it is plain
+  silence (2026-11-22, bug report H7 — as an onset of its own it took the next
+  word, and every later word slid).
 * **⛓ between two beats** of one bar = `F.toggleJoin`: the sound goes on over
   the beat line (a half note is two joined beats). Offered wherever the beat
   before ends in a sound, simple and compound time alike.
@@ -84,20 +94,44 @@ line (DOM)  --readLine-->  lineModel  --F.cellsOf-->  cells[]   (one per sixteen
 * **Bar lines**: `+` inserts an empty bar (a bar of rests) after that bar,
   `×` removes the bar. The melody pours into what is left (Rhythm Poetry's
   words re-flow): a removed bar's notes wait at the line's end as blocks (R1 —
-  no word is ever deleted).
+  no word is ever deleted). `×` on a **pick-up's bar** takes the pick-up away
+  too, as the staff's × does (`flow.applyCells` opts.unpick): the line starts on
+  the downbeat and its beats stay on the beat (2026-11-22, bug report H8 — the
+  pick-up stayed marked and every note moved onto the "and"). The beats shown
+  in sixteenths move with the bars a `+` or `×` moves. The end-of-song double
+  bar closes only the song's last bar (M1: it closed every line).
+* **A line before a pick-up line** runs on, in silence, into the bar that
+  pick-up finishes (timing.js PADDING): that bar is drawn, numbered, up to where
+  the pick-up begins — its beats after that are left out, its circles there
+  `off` — as the pick-up's own bar is drawn only from where it begins. The same
+  for the song's last line when line 1 has a pick-up (the song goes round).
+  (2026-11-22, bug report M2: the length was rounded to whole bars — a bar of
+  grey circles in the next line's time, which threw when tapped, or one bar too
+  few, and the numbers jumped.)
+* **Sixteenths** show in a beat when `+` asked for them or a note (or rest)
+  starts on one — in the page's part, or in another part shown with it (its
+  pills take these widths, bug report M7), and in a pick-up's open beat too (a
+  sixteenth or dotted-eighth pick-up had no circle on its note, M3). The other
+  parts' words take room in the layout as the page's own do (M7: they overlapped).
 * The **notation box** under each bar is `SW.engrave.rhythm` (the single-line
   rhythm engraver already used for Pre-built chord rhythms) placed on the
   circles' measured centres (`opts.xAt`, new), one SVG per bar; noteheads keep
   their pitch's colour, block beats are drawn faint. The **words** sit under
-  their start slot, as on Rhythm Poetry's Poetry side.
+  their start slot, as on Rhythm Poetry's Poetry side. A syllable typed with its
+  dash in the old way ("ear-" "-ly") is drawn as `hy` is: one hyphen, centred
+  (bug report L14); with parts, each part's hyphens look to that part's own next
+  word (L15). A chord's strike dots sit on their circles, or at their time
+  between two (a chord from a sixteenth lost its first dot).
 * **Typing a word** (2026-10-26): a double-click (double tap) on a note, or in
   the words' row under it, opens its word in a box under the note — Enter or a
   click elsewhere keeps it, Esc lets it go, Space at its end keeps it and opens
   the next word. The word goes into the song through `score.setWordAt(stack,
   text)` (one Undo step); on a connected note it makes that note a syllable of
   its own, as on the Notation page. The box lives through redraws (`typing`
-  remembers the column). Live whenever the words may change (`can('words')`),
-  hat or not, like the circles.
+  remembers the column). Live in Edit while the words may change
+  (`S.editing && can('words')`), as on the Notation page — the lock with the box
+  shut, and Present, end Edit (2026-11-22, bug report M9: the word was saved
+  past both; until then it was "hat or not").
 * **The Edit box's rhythm tools work this page's way** (2026-10-26, the user: a
   half note from the Edit box moved bar 2's eighths, the same half note from the
   circles did not): the value circles, Dotted, Tie, Rest and Fill bar are cell
@@ -106,9 +140,10 @@ line (DOM)  --readLine-->  lineModel  --F.cellsOf-->  cells[]   (one per sixteen
   is absorbed, what it cuts into starts anew where it ends), and the melody
   pours. Tie = the note goes on an eighth, written as a tie; Tie again = the
   held part goes quiet (as ⛓ apart); Rest = a rest cut out of the beats after
-  the note; Tap in lays its take on the cells the same way (the beats after the
-  take stay). So whichever page a rhythm is made on, the other two show the
-  same thing, and nothing ever slides onto the off-beat.
+  the note. So whichever page a rhythm is made on, the other two show the
+  same thing, and nothing ever slides onto the off-beat. (Tap in, which laid
+  its take on the cells the same way, lost its button on 2026-10-26; its
+  engine was taken out of flow.js on 2026-11-22, bug report L17.)
 * **Ties hold only the same pitches**: a tie mark onto a note of another pitch
   is dropped when a song is read (`score.normalizeScore`), as timing.js never
   tied it anyway — so the flow never takes two different notes for one sound.

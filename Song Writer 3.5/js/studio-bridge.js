@@ -58,8 +58,11 @@
 
   function quiet() { if (SW.player) SW.player.stop(); }
 
-  function chordName(id) {
-    try { return SW.chords.nameOf(SW.chords.describe(id)) || id; } catch (e) { return id; }
+  // a chord is named, and voiced, in the key of its bar (KEY CHANGES, js/keys.js — as js/player.js voices it;
+  // without the key it was the key of the selected note, 2026-11-22)
+  const inKeyAt = (at, fn) => SW.music.withKey(SW.keys ? SW.keys.atTick(at) : null, fn);
+  function chordName(id, at) {
+    try { return inKeyAt(at, () => SW.chords.nameOf(SW.chords.describe(id))) || id; } catch (e) { return id; }
   }
 
   /* The song on screen in this frame, planned whole from tick 0. */
@@ -100,9 +103,9 @@
     const chords = [];
     events.forEach(ce => {
       if (ce.end <= from || ce.at >= total) return;
-      const list = ce.id && SW.chords.isKnown(ce.id) ? SW.chords.midis(ce.id, { voice: ce.voice }) : [];   // its own notes, when it has them
+      const list = ce.id && SW.chords.isKnown(ce.id) ? inKeyAt(ce.at, () => SW.chords.midis(ce.id, { voice: ce.voice })) : [];   // its own notes, when it has them
       if (!list.length) return;
-      const name = chordName(ce.id);
+      const name = chordName(ce.id, ce.at);
       ce.strikes.forEach(st => {
         const sEnd = Math.min(st.at + SW.track.strikeHold(st), total);          // an arpeggio's note rings on (track.js)
         if (sEnd <= from || st.at >= total) return;

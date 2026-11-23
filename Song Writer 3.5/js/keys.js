@@ -449,13 +449,23 @@
   }
 
   /* a chord re-written so it sounds where it did: its root as a numeral of
-     the new key (spelled as the scale spells it), its own notes moved */
+     the new key (spelled as the scale spells it), its notes kept — it leaves
+     its card (k: null; track.js applyLoose finds it a card with its chord and
+     notes, or makes one) and the panel key it was picked from (place: null:
+     a new scale does not re-chord it). Its notes are the ones it sounded in
+     the old key (its card's, its own, or the engine's), written as its own
+     in the new key — unless the new numeral, voiced by the engine, sounds
+     exactly those: the engine voices from the key's tonic, so a root that
+     wraps round (C → A♭: vi to ♭ii) would sound an octave away (2026-11-22,
+     bug report H14 + L33). */
   function keepChords(t0, t1, fromKey, toKey) {
     if (!SW.track || !SW.track.hasChords() || typeof Theory === 'undefined') return 0;
     const T = Theory;
-    const shift = T.tonicMidi(M.KEY_SIGNATURES_CHROMATIC_INDEX[fromKey]) - T.tonicMidi(M.KEY_SIGNATURES_CHROMATIC_INDEX[toKey]);
+    const tonicTo = T.tonicMidi(M.KEY_SIGNATURES_CHROMATIC_INDEX[toKey]);
+    const shift = T.tonicMidi(M.KEY_SIGNATURES_CHROMATIC_INDEX[fromKey]) - tonicTo;
     const sc = M.scaleOf();
     const list = SW.track.flat().filter(pc => pc.at >= t0 && pc.at < t1 && pc.chord);
+    const sorted = a => a.slice().sort((x, y) => x - y).join();
     let n = 0;
     SW.track.batch(() => list.forEach(pc => {
       const spec = SW.chords.parse(pc.chord);
@@ -464,9 +474,13 @@
       const id = SW.chords.toId({ root: T.semisToDegree(semis, sc ? sc.degrees : []), q: spec.q, mods: spec.mods });
       if (!id) return;
       const card = pc.k ? SW.track.chartEntry(pc.k) : null;
-      const v = (card && card.voice) || pc.voice;
+      const v = (card && card.voice) || pc.voice || null;
+      const was = M.withKey(fromKey, () => SW.chords.midis(pc.chord, { voice: v }));
       const patch = { chord: id, place: null, k: null };
-      if (v) patch.voice = SW.chords.cleanVoice(v.map(nn => [Math.round((nn[1] + shift) * 7 / 12), nn[1] + shift])) || null;
+      if (v || sorted(was) !== sorted(M.withKey(toKey, () => SW.chords.midis(id)))) {
+        // the same pitches above the new tonic, spelled as the new chord spells them
+        patch.voice = was.length ? M.withKey(toKey, () => SW.chords.voiceOf(id, { voice: was.map(m => [0, m - tonicTo]) })) : null;
+      }
       SW.track.setChord(pc.at, patch);
       n++;
     }));
@@ -535,6 +549,9 @@
   /* CREATE KEY CHANGE: the selected note is the trigger; the key changes from its bar's first beat */
   function createChange(k) {
     if (!lead()) { SW.ui.toast('Key changes are made on ' + SW.parts.label(0) + ' — they are the whole song\u2019s'); return; }
+    // it writes on the notes (its trigger; Remain unchanged re-spells them): only where the notes may change —
+    // never with the score locked, nor in Present (2026-11-22). Transpose moves the key alone, as the tempo moves
+    if (!S.editing) { SW.ui.toast('The notes are locked — open the Edit box to make a key change'); return; }
     const sel = selectedStack();
     if (!sel) { SW.ui.toast('Select a note — the new key starts at the start of its bar'); return; }
     const from = barStart(sel);

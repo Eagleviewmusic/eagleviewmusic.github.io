@@ -96,6 +96,8 @@
     if (!el) return;
     e.stopPropagation();
     open(el);
+    // … and any word the double click still selected (the menu's own text, under the pointer: bug report L31)
+    setTimeout(() => { const sel = window.getSelection && window.getSelection(); if (sel && !sel.isCollapsed) sel.removeAllRanges(); }, 0);
   }, true);
   /* A press on a clef stops there. It still shuts an open popover, which its
      click would have done on the way up (core.js) — but not the one a double

@@ -326,7 +326,7 @@
         gapsIn(a, z, ctx.evs).forEach(([s0, z0]) => {
           const x1 = left(r, s0), x2 = right(r, z0);
           if (x2 - x1 < 8) return;
-          html += '<button type="button" class="cbar-add" data-a="' + s0 + '" data-z="' + z0 + '" style="left:' + x1.toFixed(1) + 'px;top:' + r.y + 'px;width:' + (x2 - x1).toFixed(1) + 'px;height:' + r.h + 'px" title="No chord here — tap a beat, then a chord (or drag one here from the panel); double-click to choose">' + (x2 - x1 >= 18 ? '+' : '') + '</button>';
+          html += '<button type="button" class="cbar-add" data-a="' + s0 + '" data-z="' + z0 + '" style="left:' + x1.toFixed(1) + 'px;top:' + r.y + 'px;width:' + (x2 - x1).toFixed(1) + 'px;height:' + r.h + 'px" title="No chord here — tap the + (its first beat) or a beat, then a chord (or drag one here from the panel); double-click to choose">' + (x2 - x1 >= 18 ? PLUS : '') + '</button>';
         });
       }
       // its beats: faint marks along the band's foot (a bar line is the gap between bars)
@@ -339,6 +339,12 @@
     });
     layer.innerHTML = html;
   }
+
+  /* EMPTY TIME'S +: at its start, and a tap on it is its first beat (2026-11-22, bug report M13: drawn in the
+     middle of an empty bar, a tap on it put the chord on beat 2 or 3 — the beat under the finger); a tap
+     anywhere else in the dashed box is still the beat under it. Placed here, not in style.css: the box's own
+     rule there centres its text. */
+  const PLUS = '<span class="cbar-plus" style="position:absolute;left:0;top:0;bottom:0;width:22px;max-width:100%;display:flex;align-items:center;justify-content:center">+</span>';
 
   /* dots at least a few px apart, inside the bar (in px) */
   function spread(dots, width) {
@@ -422,7 +428,7 @@
       });
     });
     if (ctx.edit) gapsIn(a, lim, ctx.evs).forEach(([s0, z0]) => {
-      html += '<button type="button" class="cbar-add in-chart" data-a="' + s0 + '" data-z="' + z0 + '" style="left:' + pct(s0).toFixed(2) + '%;width:' + Math.max(3, pct(z0) - pct(s0) - 1.2).toFixed(2) + '%" title="No chord here — tap a beat, then a chord">' + (z0 - s0 >= g.B / 2 ? '+' : '') + '</button>';
+      html += '<button type="button" class="cbar-add in-chart" data-a="' + s0 + '" data-z="' + z0 + '" style="left:' + pct(s0).toFixed(2) + '%;width:' + Math.max(3, pct(z0) - pct(s0) - 1.2).toFixed(2) + '%" title="No chord here — tap the + (its first beat) or a beat, then a chord">' + (z0 - s0 >= g.B / 2 ? PLUS : '') + '</button>';
     });
     return html + '</div></div>';
   }
@@ -604,7 +610,8 @@
     press = {
       id: e.pointerId, x: e.clientX, y: e.clientY, btn, at, end: isBar ? Number(btn.dataset.end) : null, chord: ev ? ev.id : null,
       kind: !edit || !ev ? 'tap' : grip ? grip.dataset.grip : 'move',
-      t: tickAtPoint(e.clientX, e.clientY), moved: false, target: null, pointerType: e.pointerType
+      t: tickAtPoint(e.clientX, e.clientY), moved: false, target: null, pointerType: e.pointerType,
+      plus: !isBar && !!e.target.closest('.cbar-plus')                    // empty time's +: its first beat
     };
     if (press.kind !== 'tap') e.preventDefault();          // no text selection, no scrolling under a finger
   }
@@ -663,7 +670,7 @@
     const g = T.grid();
     const a0 = Number(btn.dataset.at !== undefined ? btn.dataset.at : btn.dataset.a);
     const t = p.t !== null ? p.t : a0;
-    const beat = Math.max(a0, beatFloor(t, g));            // the beat under the tap (inside what was tapped)
+    const beat = p.plus ? a0 : Math.max(a0, beatFloor(t, g));   // the beat under the tap (inside what was tapped); the +, its first
     if (isDouble(btn, e)) { openHere(beat); return; }
     const ev = btn.classList.contains('cbar') ? T.events().find(x => x.at === a0 && x.id) : null;
     if (canEdit()) setCursor(beat);
@@ -692,7 +699,7 @@
       const g = T.grid();
       const a0 = Number(btn.dataset.at !== undefined ? btn.dataset.at : btn.dataset.a);
       const t = tickAtPoint(e.clientX, e.clientY);
-      openHere(Math.max(a0, beatFloor(t !== null ? t : a0, g)));
+      openHere(e.target.closest('.cbar-plus') ? a0 : Math.max(a0, beatFloor(t !== null ? t : a0, g)));
     }, true);
   }
   // the window follows a press wherever it goes (it is caught first, before the score stops it)

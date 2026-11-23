@@ -63,10 +63,11 @@
     const nBars = Math.max(1, Math.round((cs.end + cs.shift) / mt.barTicks));
     // the word that starts on a cell (a syllable's first column), and the pitch colour of each onset
     const wordAt = new Map();
+    let prev = null;
     cs.ons.forEach(o => {
       if (!o.item) return;
       const sy = model.syllables[o.item.si];
-      if (sy && sy.cols[0] === o.item.cols[0] && sy.text && sy.text !== '-') wordAt.set(o.start / CELL, { text: sy.text, hy: !!sy.hy });
+      if (sy && sy.cols[0] === o.item.cols[0] && sy.text && sy.text !== '-') wordAt.set(o.start / CELL, prev = spelled(sy.text, sy.hy, prev));
     });
     // the key each column is in (KEY CHANGES, js/keys.js — from the first beat of a trigger's bar):
     // the model's columns are the line's, in order
@@ -75,7 +76,11 @@
     const cols = [];
     model.syllables.forEach(sy => sy.cols.forEach(c => cols.push(c)));
     if (SW.keys && cols.length === els.length) cols.forEach((c, i) => keyOfCol.set(c, SW.keys.at(els[i])));
-    return { line, model, cs, cells: cs.cells, mt, shiftC, BAR, nBars, wordAt, keyOfCol };
+    // where the line's time ends (the song's length for it — timing.js SHARED LENGTHS, PADDING): before a
+    // pick-up line, part of the way into a bar (render)
+    const padded = SW.timing.lineEvents(line, { pitches: false }).padded;
+    const endC = padded > 0 ? padded / CELL : Infinity;
+    return { line, model, cs, cells: cs.cells, mt, shiftC, BAR, nBars, wordAt, keyOfCol, endC };
   }
   function colourOf(cell, keyOfCol) {
     const item = cell && cell.item;
@@ -109,7 +114,13 @@
     sg.lines.forEach((le, li) => {
       if (le.bars) { html += restHtml(le, li, g, chordEvs); return; }
       const d = lineData(le.line);
-      d.nBars = Math.max(d.nBars, Math.round((le.padded + d.cs.shift) / mt.barTicks));   // the song's length for this line (PARTS: timing.js SHARED LENGTHS)
+      // the song's length for this line (PARTS: timing.js SHARED LENGTHS). Before a pick-up line it runs on
+      // into the bar that pick-up finishes (timing.js PADDING): that bar is drawn up to where the pick-up
+      // begins, as the pick-up's own bar is drawn from where it begins — not rounded to a whole bar more
+      // (grey circles in the next line's time, which threw when tapped) or less (the numbers jumped), M2
+      d.nBars = Math.max(d.nBars, Math.ceil((le.padded + d.cs.shift) / mt.barTicks));
+      d.lastLine = li === sg.lines.length - 1;
+      d.six = (c0, c1) => sixteenthsIn(d, le, li, c0, c1, others);
       const label = d.model.label;
       const bg = le.line.style.backgroundColor;
       html += '<div class="rp-line" data-line="' + li + '"' + (bg ? ' style="--line-bg:' + bg + '"' : '') + '>';
@@ -122,6 +133,7 @@
         for (let b = 0; b < mt.beats; b++) {
           const c0 = barC0 + b * PB, c1 = c0 + PB;
           if (c1 <= 0) continue;                           // wholly before the line starts (a short pick-up)
+          if (c0 >= d.endC) continue;                      // wholly in the next line's pick-up
           beats += beatHtml(d, li, c0, c1, b, n, liveNow);
           words += wordsHtml(d, li, c0, c1, n);
           n++;
@@ -140,12 +152,13 @@
         const numbered = chordsHere ? '' : number;
         above.forEach((p, j) => { html += partBarHtml(p, le, d, li, k, mt, PB, j === 0 ? numbered : ''); });
         html +=
-          '<div class="rp-bar"><div class="rp-measure' + (pickup ? ' rp-pickup' : '') + '" data-line="' + li + '" data-bar="' + k + '" data-c0="' + barC0 + '" style="--beats:' + n + '">' +
+          '<div class="rp-bar"><div class="rp-measure' + (pickup ? ' rp-pickup' : '') + '" data-line="' + li + '" data-bar="' + k + '" data-c0="' + barC0 + '" data-c1="' + Math.min(barC0 + d.BAR, d.endC) + '" style="--beats:' + n + '">' +
           (above.length ? '' : numbered) +
           beats + '<div class="rp-notes" data-line="' + li + '" data-bar="' + k + '"></div>' + words +
         '</div>';
-        // the bar line after it: + a bar after, × this bar
-        const last = k === d.nBars - 1;
+        // the bar line after it: + a bar after, × this bar — the end-of-song double bar only after the
+        // song's last bar (it closed every line, bug report M1)
+        const last = k === d.nBars - 1 && d.lastLine;
         html += '<div class="rp-divider' + (last ? ' final' : '') + '">' +
           (liveNow ? '<button type="button" class="rp-bar-btn rp-add" data-line="' + li + '" data-bar="' + k + '" title="Add an empty bar after this one" aria-label="Add a bar">+</button>' +
                      '<button type="button" class="rp-bar-btn rp-del" data-line="' + li + '" data-bar="' + k + '" title="Take this bar out" aria-label="Take this bar out">×</button>' : '') +
@@ -186,12 +199,17 @@
     for (let i = 0; i < SW.parts.count(); i++) {
       if (i === SW.parts.focused() || !SW.parts.isShown(i)) continue;
       const cell = new Map();                       // absolute tick → { t: 'on' | 'hold' | 'reston' | 'rest', word, at, colour }
-      SW.parts.song(i).lines.forEach(le => le.events.forEach(ev => {
-        const colour = ev.pitches && ev.pitches.length ? ev.pitches[0].color : null;
-        for (let c = 0; c * CELL < ev.ticks; c++) {
-          cell.set(ev.at + c * CELL, { t: ev.rest ? (c ? 'rest' : 'reston') : (c ? 'hold' : 'on'), word: c ? null : ev.word, at: ev.at, colour });
-        }
-      }));
+      SW.parts.song(i).lines.forEach(le => {
+        let prev = null;                              // the word before, in this line (THE OLD HYPHENS)
+        le.events.forEach(ev => {
+          const colour = ev.pitches && ev.pitches.length ? ev.pitches[0].color : null;
+          const word = ev.word ? spelled(ev.word.text, ev.word.hy, prev) : null;
+          if (word) prev = word;
+          for (let c = 0; c * CELL < ev.ticks; c++) {
+            cell.set(ev.at + c * CELL, { t: ev.rest ? (c ? 'rest' : 'reston') : (c ? 'hold' : 'on'), word: c ? null : word, at: ev.at, colour });
+          }
+        });
+      });
       out.push({ part: i, label: SW.parts.label(i), cell });
     }
     return out;
@@ -203,10 +221,9 @@
       let beats = '', words = '', n = 0;
       for (let b = 0; b < mt.beats; b++) {
         const c0 = barC0 + b * PB, c1 = c0 + PB;
-        if (c1 <= 0) continue;
+        if (c1 <= 0 || c0 >= d.endC) continue;
         // the same slots as the pill above (so the same width)
-        const key = li + ':' + c0;
-        const sixteenths = c0 >= 0 && (fine.has(key) || F.needsSixteenths(d.cells, c0, Math.min(c1, d.cells.length)));
+        const sixteenths = d.six(c0, c1);
         const slots = sixteenths ? PB : PB / 2, span = PB / slots;
         // no circles on a part off the page (the user): its rhythm is engraved on the slots' centres (engraveParts); the words sit under
         words += '<div class="rp-words" data-b="' + n + '" style="--slots:' + slots + ';grid-column:' + (n + 1) + '">';
@@ -216,7 +233,7 @@
           const T = le.at + c * CELL;
           let cell = null;
           for (let j = 0; j < span && !cell; j++) { const x = p.cell.get(T + j * CELL); if (x && (x.t === 'on' || x.t === 'reston') && x.word) cell = x; }
-          if (cell) words += '<span class="rp-word"' + (cell.word.hy ? ' data-hy="1"' : '') + ' style="grid-column:' + (i + 1) + '">' + esc(cell.word.text) + '</span>';
+          if (cell) words += '<span class="rp-word" data-col="' + (i + 1) + '"' + (cell.word.hy ? ' data-hy="1"' : '') + ' style="grid-column:' + (i + 1) + '">' + esc(cell.word.text) + '</span>';
         }
         words += '</div>';
         n++;
@@ -226,9 +243,35 @@
         '<div class="rp-measure rp-part-measure" data-line="' + li + '" data-bar="' + k + '" data-part="' + p.part + '" data-t0="' + t0 + '" style="--beats:' + n + '">' +
         (number || '') + (k === 0 ? '<span class="rp-part-tag">' + esc(p.label) + '</span>' : '') +
         '<div class="rp-notes rp-part-notes" data-line="' + li + '" data-bar="' + k + '"></div>' + words +
-        '</div><div class="rp-divider' + (k === d.nBars - 1 ? ' final' : '') + '"></div></div>';
+        '</div><div class="rp-divider' + (k === d.nBars - 1 && d.lastLine ? ' final' : '') + '"></div></div>';
     }
     return h;
+  }
+  /* SIXTEENTHS in a beat: + asked for them, or a note (or a rest) starts on one —
+     in this page's part, or in another part shown with it, whose pills take these
+     pills' widths (bug report M7: its sixteenths under eighths here fell two on one
+     slot, and a word was lost); in a pick-up's open beat too (M3: a short pick-up's
+     first note sits on a sixteenth, and had no circle) */
+  function sixteenthsIn(d, le, li, c0, c1, others) {
+    if (fine.has(li + ':' + c0) || F.needsSixteenths(d.cells, c0, Math.min(c1, d.cells.length))) return true;
+    return others.some(p => {
+      for (let o = c0 + 1; o < c1; o += 2) {
+        const x = o >= 0 && p.cell.get(le.at + o * CELL);
+        if (x && (x.t === 'on' || x.t === 'reston')) return true;
+      }
+      return false;
+    });
+  }
+  /* THE OLD HYPHENS (bug report L14): a syllable typed with its dash — "ear-" "-ly",
+     "proud- -ly", as the built-in Star-Spangled Banner has them — is drawn as the
+     newer `hy` is: the word without the dash, and one hyphen centred between the two
+     (hyphens, below). `prev` is the word before it in the line (a dash in front gives
+     it the hyphen). */
+  function spelled(text, hy, prev) {
+    let t = String(text).trim();
+    if (/[^-]-+$/.test(t)) { t = t.replace(/-+$/, ''); hy = true; }
+    if (prev && /^-+[^-]/.test(t)) { t = t.replace(/^-+/, ''); prev.hy = true; }
+    return { text: t, hy: !!hy };
   }
   /* the pills of a part take the widths of the pills above them */
   function sizeParts() {
@@ -273,7 +316,8 @@
       });
       const cellAt = a => (a >= 0 ? p.cell.get(t0 + (a - barC0) * CELL) : null);
       let str = '';
-      for (let a = barC0; a < barC0 + BAR; a++) {
+      const stop = Math.min(barC0 + BAR, Number(twin.dataset.c1));     // a line's last bar, cut where the next line's pick-up begins
+      for (let a = barC0; a < stop; a++) {
         const cell = cellAt(a);
         const t = cell ? cell.t : 'fill';
         str += t === 'on' ? 'X' : t === 'hold' ? 'O' : 'R';
@@ -347,34 +391,39 @@
   function hyphens() {
     el.querySelectorAll('.rp-hyphen').forEach(h => h.remove());
     el.querySelectorAll('.rp-line').forEach(line => {
-      const words = Array.from(line.querySelectorAll('.rp-word'));
-      if (!words.some(w => w.dataset.hy)) return;
-      const lr = line.getBoundingClientRect();
-      words.forEach((a, i) => {
-        if (!a.dataset.hy || a.hidden || !a.offsetWidth) return;
-        const b = words[i + 1];
-        if (b && (b.hidden || !b.offsetWidth)) return;
-        const ar = a.getBoundingClientRect();
-        const cs = getComputedStyle(a);
-        const pad = parseFloat(cs.paddingRight) || 0;
-        const br = b ? b.getBoundingClientRect() : null;
-        const sameRow = br && Math.abs(br.top - ar.top) < ar.height / 2 && br.left >= ar.right - 2 * pad;
-        const x = sameRow ? (ar.right + br.left) / 2 : ar.right - pad + parseFloat(cs.fontSize) * 0.45;
-        const h = document.createElement('span');
-        h.className = 'rp-hyphen';
-        h.setAttribute('aria-hidden', 'true');
-        h.textContent = '-';
-        h.style.cssText = 'left:' + (x - lr.left).toFixed(1) + 'px;top:' + (ar.top - lr.top).toFixed(1) + 'px;height:' + ar.height.toFixed(1) + 'px';
-        line.appendChild(h);
+      // each part's words on their own (PARTS): the word after one at a bar's end is that part's next
+      // word, not the first word of the part under it (bug report L15)
+      const groups = [Array.from(line.querySelectorAll('.rp-measure:not(.rp-part-measure) .rp-word'))];
+      const parts = new Set(Array.from(line.querySelectorAll('.rp-part-measure')).map(pm => pm.dataset.part));
+      parts.forEach(p => groups.push(Array.from(line.querySelectorAll('.rp-part-measure[data-part="' + p + '"] .rp-word'))));
+      groups.forEach(words => {
+        if (!words.some(w => w.dataset.hy)) return;
+        const lr = line.getBoundingClientRect();
+        words.forEach((a, i) => {
+          if (!a.dataset.hy || a.hidden || !a.offsetWidth) return;
+          const b = words[i + 1];
+          if (b && (b.hidden || !b.offsetWidth)) return;
+          const ar = a.getBoundingClientRect();
+          const cs = getComputedStyle(a);
+          const pad = parseFloat(cs.paddingRight) || 0;
+          const br = b ? b.getBoundingClientRect() : null;
+          const sameRow = br && Math.abs(br.top - ar.top) < ar.height / 2 && br.left >= ar.right - 2 * pad;
+          const x = sameRow ? (ar.right + br.left) / 2 : ar.right - pad + parseFloat(cs.fontSize) * 0.45;
+          const h = document.createElement('span');
+          h.className = 'rp-hyphen';
+          h.setAttribute('aria-hidden', 'true');
+          h.textContent = '-';
+          h.style.cssText = 'left:' + (x - lr.left).toFixed(1) + 'px;top:' + (ar.top - lr.top).toFixed(1) + 'px;height:' + ar.height.toFixed(1) + 'px';
+          line.appendChild(h);
+        });
       });
     });
   }
 
   function beatHtml(d, li, c0, c1, b, n, liveNow) {
     const cells = d.cells, PB = perBeat();
-    const key = li + ':' + c0;
     const before = c0 < 0;
-    const sixteenths = !before && (fine.has(key) || F.needsSixteenths(cells, c0, Math.min(c1, cells.length)));
+    const sixteenths = d.six(c0, c1);
     const slots = sixteenths ? PB : PB / 2;
     const span = PB / slots;
     const first = c0 >= 0 ? cells[c0] : null;
@@ -392,7 +441,8 @@
     }
     for (let i = 0; i < slots; i++) {
       const c = c0 + i * span;
-      if (c < 0) { h += '<span class="rp-circle off" aria-hidden="true"></span>'; continue; }
+      // before the line (the pick-up's open part), or after it (the next line's pick-up)
+      if (c < 0 || c >= d.endC) { h += '<span class="rp-circle off" aria-hidden="true"></span>'; continue; }
       const cell = cells[c] || { t: 'fill' };
       let cls = 'rp-circle', title;
       switch (cell.t) {
@@ -410,8 +460,7 @@
 
   function wordsHtml(d, li, c0, c1, n) {
     const PB = perBeat();
-    const key = li + ':' + c0;
-    const sixteenths = c0 >= 0 && (fine.has(key) || F.needsSixteenths(d.cells, c0, Math.min(c1, d.cells.length)));
+    const sixteenths = d.six(c0, c1);
     const slots = sixteenths ? PB : PB / 2;
     const span = PB / slots;
     let h = '<div class="rp-words" data-b="' + n + '" style="--slots:' + slots + ';grid-column:' + (n + 1) + '">';
@@ -462,11 +511,20 @@
         const slots = Number(getComputedStyle(c).getPropertyValue('--slots')) || 2;
         return { c, w, slots, u: uMin(slots), gap: 0 };
       });
-      const words = [];
-      pills.forEach((p, b) => {
-        if (p.w) p.w.querySelectorAll('.rp-word').forEach(x => words.push({ b, j: Number(x.dataset.col) - 1, w: x.offsetWidth, hy: !!x.dataset.hy }));
+      // the words' rows: this bar's own, and (PARTS) each other part's same bar under or over it —
+      // its pills take these widths (sizeParts), so its words need their room here too (bug report M7)
+      const rowOf = w => {
+        const out = [];
+        pills.forEach((p, b) => {
+          const ws = w(p, b);
+          if (ws) ws.querySelectorAll('.rp-word').forEach(x => out.push({ b, j: Number(x.dataset.col) - 1, w: x.offsetWidth, hy: !!x.dataset.hy }));
+        });
+        return out.sort((a, z) => a.b - z.b || a.j - z.j);
+      };
+      const rows = [rowOf(p => p.w)];
+      el.querySelectorAll('.rp-part-measure[data-line="' + m.dataset.line + '"][data-bar="' + m.dataset.bar + '"]').forEach(pm => {
+        rows.push(rowOf(p => pm.querySelector('.rp-words[data-b="' + p.c.dataset.b + '"]')));
       });
-      words.sort((a, z) => a.b - z.b || a.j - z.j);
       const outer = p => ML + 2 * BW + GL + GR + p.slots * p.u + MR + p.gap;
       const centre = (b, j) => {
         let x = 0;
@@ -475,25 +533,30 @@
       };
       const room = (a, z) => a.w / 2 + z.w / 2 + (a.hy ? HY_GAP : GAP);
       // words in the same pill: its slots widen
-      for (let i = 1; i < words.length; i++) {
-        const a = words[i - 1], z = words[i];
-        if (a.b === z.b) pills[z.b].u = Math.max(pills[z.b].u, room(a, z) / (z.j - a.j));
-      }
+      rows.forEach(words => {
+        for (let i = 1; i < words.length; i++) {
+          const a = words[i - 1], z = words[i];
+          if (a.b === z.b) pills[z.b].u = Math.max(pills[z.b].u, room(a, z) / (z.j - a.j));
+        }
+      });
       // words in different pills: the bar lines of the beats between them part
-      for (let i = 1; i < words.length; i++) {
-        const a = words[i - 1], z = words[i];
-        if (a.b === z.b) continue;
-        const short = room(a, z) - (centre(z.b, z.j) - centre(a.b, a.j));
-        if (short > 0) for (let b = a.b; b < z.b; b++) pills[b].gap += short / (z.b - a.b);
-      }
+      rows.forEach(words => {
+        for (let i = 1; i < words.length; i++) {
+          const a = words[i - 1], z = words[i];
+          if (a.b === z.b) continue;
+          const short = room(a, z) - (centre(z.b, z.j) - centre(a.b, a.j));
+          if (short > 0) for (let b = a.b; b < z.b; b++) pills[b].gap += short / (z.b - a.b);
+        }
+      });
       // the bar's ends
       let padL = 0, padR = 0;
-      if (words.length) {
+      rows.forEach(words => {
+        if (!words.length) return;
         const f = words[0], l = words[words.length - 1];
-        padL = Math.max(0, f.w / 2 - WALL - centre(f.b, f.j));
+        padL = Math.max(padL, f.w / 2 - WALL - centre(f.b, f.j));
         const width = pills.reduce((s, p) => s + outer(p), 0);
-        padR = Math.max(0, centre(l.b, l.j) + l.w / 2 + (l.hy ? HY_GAP / 2 : 0) - WALL - width);
-      }
+        padR = Math.max(padR, centre(l.b, l.j) + l.w / 2 + (l.hy ? HY_GAP / 2 : 0) - WALL - width);
+      });
       return { m, pills, padL, padR };
     });
     // 2. write them
@@ -546,7 +609,8 @@
         });
       });
       let str = '';
-      for (let a = barC0; a < barC0 + BAR; a++) {
+      const stop = Math.min(barC0 + BAR, Number(m.dataset.c1));        // a line's last bar, cut where the next line's pick-up begins
+      for (let a = barC0; a < stop; a++) {
         const cell = a >= 0 ? d.cells[a] : null;
         const t = cell ? cell.t : 'fill';
         str += (t === 'on' || t === 'bon') ? 'X' : (t === 'hold' || t === 'bhold') ? 'O' : 'R';
@@ -645,7 +709,16 @@
         }
         return pills[pills.length - 1].x1;
       };
-      const dotAt = t => { let x = slots.length ? slots[0].x : 0; slots.forEach(sl => { if (sl.t <= t) x = sl.x; }); return x; };
+      // a strike on its circle, or at its time between two circles: a chord that starts on a sixteenth
+      // in a beat of eighths has no circle of its own, and the one before it lies left of the chord's
+      // start (on the beat's last sixteenth its first dot fell outside the chord, unseen)
+      const dotAt = t => {
+        if (!slots.length) return 0;
+        let i = 0;
+        while (i + 1 < slots.length && slots[i + 1].t <= t) i++;
+        const s = slots[i], nx = slots[i + 1];
+        return !nx || t <= s.t ? s.x : s.x + (t - s.t) / (nx.t - s.t) * (nx.x - s.x);
+      };
       let html = '';
       evs.filter(e => e.end > a && e.at < z).forEach(e => {
         const st = Math.max(e.at, a), en = Math.min(e.end, z);
@@ -762,6 +835,19 @@
     const note = SW.score.getActiveNote();
     if (changedIt && note && !note.classList.contains('rest-note')) SW.score.soundNote(note);
     if (!changedIt) render();
+    return changedIt;
+  }
+  /* the beats shown in sixteenths go with their bars when a bar is put in (`by` > 0)
+     or taken out (`by` < 0) at cell `from`: the beats after it are other cells now */
+  function moveFine(li, from, by) {
+    const moved = [];
+    fine.forEach(key => {
+      const [l, c] = key.split(':').map(Number);
+      if (l !== li || c < Math.min(from, from + by)) return;
+      fine.delete(key);
+      if (c >= from) moved.push(li + ':' + (c + by));                    // a taken-out bar's own beats go
+    });
+    moved.forEach(key => fine.add(key));
   }
   /* an empty bar (a bar of rests) put in at cell `at`; a sound held into there is cut cleanly */
   function insertBar(cells, at, BAR) {
@@ -833,7 +919,9 @@
     return { row, col: Math.floor((c - Number(circ.dataset.c0)) / span) + 1 };
   }
   function openWord(e) {
-    if (!SW.settings.can('words')) return false;
+    // as on the Notation page: in Edit, with the words free — the lock with the box shut, and
+    // Present, end Edit (bug report M9: the word was saved past both)
+    if (!S.editing || !SW.settings.can('words')) return false;
     const t = document.elementFromPoint(e.clientX, e.clientY) || e.target;     // the page may have been redrawn under the pointer
     const m = t.closest('.rp-measure');
     if (!m || !t.closest('.rp-notes, .rp-words') || t.closest('.rp-word-input')) return false;
@@ -885,7 +973,7 @@
     if (!t) return;
     typing = null;
     const value = takeBox(t);
-    const syl = SW.score.setWordAt(t.stack, value);
+    const syl = S.editing && SW.settings.can('words') ? SW.score.setWordAt(t.stack, value) : null;
     if (next && syl) {
       const all = Array.from(SW.score.getAllSyllables());
       const after = all[all.indexOf(syl) + 1];
@@ -975,17 +1063,27 @@
       let next = F.tapSlot(cells, c, span, c0, c1);
       if (wasBlock && c === c0) next = F.tapSlot(next, c, span, c0, c1);     // written, then the tap itself: one tap does both
       // a lesson that locks the notes: silence past the melody's last note, with nothing to lengthen (flow.js R2)
-      if (SILENCE[cell.t] && next.every((x, i) => x.t === cells[i].t)) { SW.ui.toast(NO_NOTE_MSG); return; }
-      pour(d, next, c);
+      if (SILENCE[cell.t] && next.every((x, i) => x.t === (cells[i] || { t: 'fill' }).t)) { SW.ui.toast(NO_NOTE_MSG); return; }
+      if (!pour(d, next, c) && F.emptied()) SW.ui.toast('This is the line\'s only note — delete the line in Edit instead');
       return;
     }
     if (b.classList.contains('rp-add') || b.classList.contains('rp-del')) {
       const k = Number(b.dataset.bar);
       const at = k * d.BAR - d.shiftC;
-      if (b.classList.contains('rp-add')) pour(d, insertBar(cells, Math.max(0, at + d.BAR), d.BAR), Math.max(0, at + d.BAR));
-      else {
-        if (d.nBars <= 1 && k === 0 && !cells.some(c => c.item)) { SW.ui.toast('This is the line\'s only bar — delete the line in Edit instead'); return; }
-        pour(d, deleteBar(cells, at, d.BAR), Math.max(0, at), { dropIn: [Math.max(0, at) * CELL, (at + d.BAR) * CELL] });
+      if (b.classList.contains('rp-add')) {
+        // after a line's last bar cut short by the next line's pick-up: in where the pick-up begins (one bar more, not two)
+        const ins = Math.max(0, Math.min(at + d.BAR, d.endC));
+        if (pour(d, insertBar(cells, ins, d.BAR), ins)) moveFine(li, ins, d.BAR);
+      } else {
+        const a = Math.max(0, at), z = at + d.BAR;
+        // nothing of the line outside this bar: there would be nothing left (bug report 1f — flow.js apply
+        // will not pour a line empty; the wordless notes of its only bar all went, and its circles threw)
+        const alone = !cells.some((c, i) => (i < a || i >= z) && c.t !== 'fill');
+        // the pick-up's bar: the pick-up goes with it, as the staff's × takes it, so the line starts on
+        // the downbeat and its beats stay on the beat (bug report H8: they all moved onto the "and")
+        const unpick = k === 0 && d.cs.shift > 0;
+        if (pour(d, deleteBar(cells, at, d.BAR), a, { dropIn: [a * CELL, z * CELL], unpick })) moveFine(li, z, a - z);
+        else if (alone || F.emptied()) SW.ui.toast('This is the line\'s only bar — delete the line in Edit instead');
       }
     }
   });
@@ -995,6 +1093,7 @@
   function schedule() { clearTimeout(timer); timer = setTimeout(render, 20); }
   ['score:changed', 'score:loaded', 'view:changed', 'layout:changed', 'meter:changed', 'policy:changed', 'key:changed', 'scale:changed', 'present:changed', 'mode:changed', 'parts:shown'].forEach(evt => SW.bus.on(evt, schedule));
   SW.bus.on('score:loaded', () => fine.clear());
+  SW.bus.on('mode:changed', () => { if (typing && !S.editing) dropWord(); });     // Edit ended (the lock, Present): the word is let go (M9)
   SW.bus.on('selection', mark);
   SW.bus.on('play:changed', mark);
   window.addEventListener('resize', () => { if (!el.hidden) schedule(); });

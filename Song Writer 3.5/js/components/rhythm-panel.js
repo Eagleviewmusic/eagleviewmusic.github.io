@@ -40,8 +40,8 @@
 
    Fill bar, ⋯ All notes and Tap in sat under Dotted · Tie · Rest until
    2026-10-26 (the user: not needed any more). Their engines stay —
-   flow.js fillBar / tap, score.js notateAll and the rest — with nothing
-   in the box calling them.
+   flow.js fillBar, score.js notateAll and the rest — with nothing in the
+   box calling them (Tap in's went on 2026-11-22: flow.js, bug report L17).
 
    Colours are RP's EASY_COLOURS, one per base value, so a colour means
    one length everywhere it appears (here, the chips in Layout settings,
@@ -407,6 +407,9 @@
     render();
   });
 
+  // a song opened, or Undo / Redo (they redraw the song): an armed Dotted or Rest waited for a value
+  // on the song as it was, so it is let go (before the redraw below; bug report, unconfirmed leads)
+  SW.bus.on('score:loaded', () => { dotPending = false; restPending = false; });
   ['selection', 'score:loaded', 'score:changed', 'key:changed', 'layout:changed', 'mode:changed', 'view:changed'].forEach(evt => SW.bus.on(evt, render));
   SW.bus.on('mode:changed', () => { if (!S.editing && (dotPending || restPending)) { dotPending = false; restPending = false; render(); } });
   // Dotted or Rest waiting for a value: the box closing takes the circles away, so the wait ends with it

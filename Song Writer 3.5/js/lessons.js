@@ -243,12 +243,24 @@
     });
     if (!ids.length) return null;
     L.saveStoredLibrary(library);
+    /* A pristine copy whose exercise has left the library (deleted, or Start
+       over) can never be used again — Start again is only offered for
+       exercises that are there, and opening the lesson again writes a new
+       one. Let go, so the copies do not pile up lesson after lesson. */
+    Object.keys(sources).forEach(id => { if (!library[id]) delete sources[id]; });
     writeSources(sources);
     policy = p;
-    lessonMeta = { title, songIds: ids, id: payload.id ? String(payload.id) : '', kind: p.kind };
-    // the lesson brings the teacher's layout, locked
-    if (payload.layout) SW.settings.applyLayoutSnapshot(payload.layout, true);
-    L.clearLinkFromAddress();                     // (kept when embedded: library.js)
+    const layout = payload.layout && typeof payload.layout === 'object' ? payload.layout : null;
+    lessonMeta = { title, songIds: ids, id: payload.id ? String(payload.id) : '', kind: p.kind, layout };
+    /* The lesson brings the teacher's layout, locked — for the lesson only
+       (2026-11-22, bug report M21). It used to be stored as the person's own,
+       locked for good: Options lost Layout settings, and every song after
+       took the lesson's layout (a teacher testing their own link had it too).
+       Now it is held on screen (settings.js holdLayout: never stored), kept
+       with the lesson for this tab (rememberOpenLesson) for a reload, and the
+       person's own come back with the plain app. */
+    if (layout) SW.settings.holdLayout(layout);
+    L.clearLinkFromAddress(IN_LESSON);            // (kept when embedded: library.js)
     rememberOpenLesson(ids[0]);
     SW.settings.applyPolicyToShell();
     return ids[0];
@@ -256,23 +268,43 @@
 
   /* The link's hash is cleared once the lesson is open (so a whole song
      never sits in the address bar), which used to mean a reload ended the
-     lesson. The open lesson is kept for this tab in sessionStorage. */
+     lesson. The open lesson is kept for this tab in sessionStorage.
+
+     A WAY OUT (2026-11-22, bug report L23): the address then reads
+     …/#in-lesson, and only an address that says so opens the lesson again —
+     a reload does; the plain app's address, typed in the same tab, is the
+     whole app again (until then only closing the tab ended a lesson). An
+     entry kept before this (no `marked`) still opens on a reload, as it
+     did. Embedded, the frame keeps its #lesson= link and opens from that. */
+  const IN_LESSON = '#in-lesson';
   function rememberOpenLesson(current) {
     if (previewing || !lessonMeta) return;
     try {
-      sessionStorage.setItem(OPEN_LESSON_KEY, JSON.stringify({ title: lessonMeta.title, songIds: lessonMeta.songIds, id: lessonMeta.id, policy, current }));
+      sessionStorage.setItem(OPEN_LESSON_KEY, JSON.stringify({ title: lessonMeta.title, songIds: lessonMeta.songIds, id: lessonMeta.id, policy, current,
+        layout: lessonMeta.layout || null, marked: true }));
     } catch (e) {}
+  }
+  function navigationType() {
+    try { const nav = performance.getEntriesByType('navigation')[0]; return nav ? nav.type : ''; } catch (e) { return ''; }
   }
   function reopenFromSession() {
     let saved = null;
     try { saved = JSON.parse(sessionStorage.getItem(OPEN_LESSON_KEY) || 'null'); } catch (e) {}
     if (!saved || !Array.isArray(saved.songIds)) return null;
+    const asked = window.location.hash === IN_LESSON || (!saved.marked && navigationType() === 'reload');
+    if (!asked) {
+      try { sessionStorage.removeItem(OPEN_LESSON_KEY); } catch (e) {}      // the plain app: the lesson is over in this tab
+      return null;
+    }
     const library = SW.library.getStoredLibrary();
     const ids = saved.songIds.filter(id => library[id]);
     const p = normalizePolicy(saved.policy);
     if (!ids.length || !p) return null;
     policy = p;
-    lessonMeta = { title: saved.title || 'Lesson', songIds: ids, id: saved.id || '', kind: p.kind };
+    const layout = saved.layout && typeof saved.layout === 'object' ? saved.layout : null;
+    lessonMeta = { title: saved.title || 'Lesson', songIds: ids, id: saved.id || '', kind: p.kind, layout };
+    // the lesson's layout again, held (M21; an entry from before kept it in storage, where it still is)
+    if (layout) SW.settings.holdLayout(layout);
     SW.settings.applyPolicyToShell();
     return ids.indexOf(saved.current) !== -1 ? saved.current : ids[0];
   }
@@ -294,6 +326,15 @@
       return null;
     }
     return reopenFromSession();
+  }
+
+  /* An exercise changed in this tab and in another one at once: this tab's
+     work was kept as a copy (library.js ANOTHER TAB), which is one more of
+     the lesson's exercises from now on, in this tab. */
+  function addExercise(id) {
+    if (!lessonMeta || previewing || lessonMeta.songIds.indexOf(id) !== -1) return;
+    lessonMeta.songIds.push(id);
+    rememberOpenLesson(id);
   }
 
   function restoreSong(id) {
@@ -481,11 +522,14 @@
       del.innerHTML = '&times;';
       del.title = 'Delete this lesson';
       del.addEventListener('click', () => {
-        if (!confirm('Delete “' + (item.title || 'Untitled lesson') + '”?')) return;
-        const all = getStoredLessons();
-        delete all[id];
-        try { localStorage.setItem(LESSON_KEY, JSON.stringify(all)); } catch (e) {}
-        renderSavedLessons();
+        // (the app's own question: the browser's can be refused — core.js ASK)
+        ui.ask({ title: 'Delete “' + (item.title || 'Untitled lesson') + '”?', text: 'Links already sent keep working.', yes: 'Delete', danger: true }).then(ok => {
+          if (!ok) return;
+          const all = getStoredLessons();
+          delete all[id];
+          try { localStorage.setItem(LESSON_KEY, JSON.stringify(all)); } catch (e) {}
+          renderSavedLessons();
+        });
       });
       actions.appendChild(edit);
       actions.appendChild(del);
@@ -518,6 +562,10 @@
     const library = L.getStoredLibrary();
     const songs = draft.songIds.filter(id => library[id]).map(id => {
       const rec = L.normalizeSong(JSON.parse(JSON.stringify(library[id])), id);
+      /* the song open now goes as it is on the page, as Create a link and Make
+         a student version send it (2026-11-22, bug report M20: a library song
+         is open with auto-save off, so its saved copy can be older) */
+      if (id === L.currentId()) rec.score = SW.score.read();
       delete rec.createdAt;
       delete rec.updatedAt;
       /* normalizeSong carries the shared-library header; a lesson's
@@ -545,6 +593,8 @@
   }
   /* the preview itself — a lesson's (above) or a student version's (previewVersion) */
   function beginPreview(p, title, songIds) {
+    // the song it goes back to opens again with auto-save as it was (bug report L24: it came back off)
+    previewAutoSave = SW.library.autoSaveChoice();
     policy = p;
     lessonMeta = { title, songIds, id: '', kind: p.kind };
     previewing = true;
@@ -566,10 +616,11 @@
     $('preview-bar').hidden = true;
     ui.closeSheet('save-work-sheet');
     SW.settings.applyPolicyToShell();
-    if (back) SW.library.loadSongById(back);
+    if (back) SW.library.loadSongById(back, { autoSave: previewAutoSave });
     ui.openSheet(previewFrom);
     if (previewFrom === 'student-version-sheet') renderVersionSheet(); else renderSetupSheet();
   }
+  let previewAutoSave = false;
   let previewTarget = null;
   let previewFrom = 'lesson-setup-sheet';    // the sheet the preview goes back to
 
@@ -790,12 +841,14 @@
       del.innerHTML = '&times;';
       del.title = 'Delete this version';
       del.addEventListener('click', () => {
-        if (!confirm('Delete “' + (item.title || 'Untitled version') + '”? Links already sent keep working.')) return;
-        const all = getStoredLessons();
-        delete all[id];
-        try { localStorage.setItem(LESSON_KEY, JSON.stringify(all)); } catch (e) {}
-        if (sv && sv.id === id) sv.id = null;
-        renderSavedVersions();
+        ui.ask({ title: 'Delete “' + (item.title || 'Untitled version') + '”?', text: 'Links already sent keep working.', yes: 'Delete', danger: true }).then(ok => {
+          if (!ok) return;
+          const all = getStoredLessons();
+          delete all[id];
+          try { localStorage.setItem(LESSON_KEY, JSON.stringify(all)); } catch (e) {}
+          if (sv && sv.id === id) sv.id = null;
+          renderSavedVersions();
+        });
       });
       actions.appendChild(edit);
       actions.appendChild(del);
@@ -1052,6 +1105,45 @@
     downloadJson(workPayload(), workFileName());
     ui.toast('Saved “' + workFileName() + '” to your downloads');
   }
+  /* A FILE BRINGS NOTHING LOCKED IN (2026-11-22, a lead in the bug report):
+     a work file was taken whole, so one changed by hand — or saved before the
+     teacher fixed more of the version — could change what the version keeps
+     as it is. It must agree with the exercise as the teacher sent it (its
+     pristine copy; in a preview, the page) in what nothing else they may do
+     can move: the words (wordsLocked: none new or changed — with the rhythm
+     theirs, a bar taken out on the Rhythm page can take its words with it,
+     so fewer is allowed then); each note's length, tie and rest, and the
+     time signature (rhythmLocked; a block counts as the beat, as it sounds);
+     with the whole melody fixed, each note's pitches and key changes too
+     (pitch alone is not checked: a rhythm change may rightly turn a note
+     into a rest, or repeat it); the chords on the music, when the chords,
+     the rhythm and the key are all fixed (a new time signature or scale
+     moves them rightly); the key (key.locked); the tempo and swing (tempo
+     locked); and how many parts, unless parts are theirs to add (Pitch,
+     Rhythm and Lyrics all theirs). → what differs, in words. */
+  function lockedChanges(was, now) {
+    const t = policy.task, out = [];
+    const lines = s => [].concat(...SW.parts.everyLine(s));
+    const syls = s => [].concat(...lines(s).map(l => l.syllables || []));
+    const cols = s => [].concat(...syls(s).map(sy => sy.cols || []));
+    const isRest = c => (c.notes || []).length > 0 && c.notes.every(n => n.rest);
+    const beat = s => SW.meters.byId(s.meter || SW.meters.DEFAULT).beatValue;
+    const same = f => ui.stableStringify(f(was)) === ui.stableStringify(f(now));
+    const words = s => syls(s).map(sy => String(sy.text || '').trim()).filter(x => x && x !== '-');
+    if (t.wordsLocked) {
+      const a = words(was), b = words(now);
+      let i = 0;
+      b.forEach(w => { while (i < a.length && a[i] !== w) i++; i++; });       // b in a's order, none new
+      if (t.rhythmLocked ? a.join('\n') !== b.join('\n') : i > a.length) out.push('the words');
+    }
+    if (t.rhythmLocked && !same(s => [s.meter || '', cols(s).map(c => [c.v || beat(s), !!c.tie, isRest(c)])])) out.push('the rhythm');
+    if (t.pitchLocked && t.rhythmLocked && !same(s => cols(s).map(c => [c.key || '', isRest(c) ? [] : (c.notes || []).map(n => [n.n, n.acc && n.acc !== 'natural' ? n.acc : ''])]))) out.push('the notes');
+    if (t.chordsLocked && t.rhythmLocked && policy.key.locked && !same(s => [s.track || [], syls(s).map(sy => sy.chord || '').filter(Boolean)])) out.push('the chords');
+    if (policy.key.locked && was.key !== now.key) out.push('the key');
+    if (policy.tempo.mode === 'locked' && (was.bpm !== now.bpm || (was.swing || '') !== (now.swing || ''))) out.push('the tempo');
+    if ((t.pitchLocked || t.rhythmLocked || t.wordsLocked) && SW.parts.countOf(was) !== SW.parts.countOf(now)) out.push('the parts');
+    return out;
+  }
   /* one of their own files, back into this version (what is on the page goes) */
   function openWorkFile(json) {
     if (!json || json.kind !== 'student-work' || !json.song || !json.song.score) {
@@ -1063,10 +1155,23 @@
       ui.toast('That file was saved from a different student version — open it from the link it came with');
       return;
     }
-    if (!confirm('Open “' + (json.title || 'your saved work') + '” in place of what is on the page now?')) return;
     const L = SW.library;
     const id = L.currentId();
     const score = L.normalizeSong({ id, title: L.currentTitle(), score: json.song.score }, id).score;
+    const source = !previewing && readSources()[id];
+    const was = source && source.score ? L.normalizeSong(source, id).score : SW.score.read();
+    const locked = policy ? lockedChanges(was, score) : [];
+    if (locked.length) {
+      const list = locked.length === 1 ? locked[0] : locked.slice(0, -1).join(', ') + ' and ' + locked[locked.length - 1];
+      ui.toast('That file changes ' + list + ', which this version keeps fixed, so it can’t open here.', 9000);
+      return;
+    }
+    ui.ask({ title: 'Open “' + (json.title || 'your saved work') + '”?', text: 'It takes the place of what is on the page now.', yes: 'Open it', danger: true })
+      .then(ok => { if (ok) putWorkFile(json, id, score); });
+  }
+  function putWorkFile(json, id, score) {
+    const L = SW.library;
+    if (id !== L.currentId()) return;                  // (another song came up meanwhile)
     if (previewing) SW.score.render(score);            // a preview saves nothing
     else {
       const library = L.getStoredLibrary();
@@ -1128,6 +1233,28 @@
     return true;
   }
 
+  /* A student's part of the id their work is filed under (2026-11-22, bug
+     report M23). It was slugify(name) alone, so every name in another
+     alphabet (王小明, 李华, محمد, 김민준 — all "lesson") and Alex / alex /
+     ALEX! shared one id, and one student's work replaced another's. Now the
+     name as written, exactly, picks it: the letters a slug keeps, then a
+     short hash of the whole name. Work filed before under the old id stays
+     there and is still replaced by the same student's next hand-in — when
+     that copy is theirs (its title, “Song — Name”, ends with their name as
+     written). */
+  function hashName(s) {
+    let h = 2166136261;                               // FNV-1a, 32 bits
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0).toString(36);
+  }
+  function studentTag(name, tag, library) {
+    const n = String(name || '');
+    const plain = n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24);
+    const old = library['work_' + tag + '_' + slugify(n)];
+    if (old && typeof old.title === 'string' && old.title.endsWith(' — ' + n)) return slugify(n);
+    return (plain ? plain + '-' : '') + hashName(n);
+  }
+
   function fileReturned(data, quiet) {
     const L = SW.library;
     if (!quiet && !L.okToLeave('opens their work')) return;
@@ -1135,8 +1262,8 @@
     const r = returnedParts(data);
     // one copy a student a version: their next hand-in replaces it (two students never share one)
     const tag = alnumTag(r.work ? data.version && data.version.id : data.id) || 'x';
-    const id = r.work ? 'work_' + tag + '_' + (r.name ? slugify(r.name) : alnumTag(Date.now())) : 'version_' + tag;
     const library = L.getStoredLibrary();
+    const id = r.work ? 'work_' + tag + '_' + (r.name ? studentTag(r.name, tag, library) : alnumTag(Date.now())) : 'version_' + tag;
     const now = Date.now();
     const was = library[id];
     const rec = L.normalizeSong(Object.assign({}, r.song, { id, title: r.filedTitle, isCustom: true, received: true, receivedAt: now,
@@ -1157,7 +1284,7 @@
     const r = returnedParts(data);
     const p = data.policy ? normalizePolicy(Object.assign({}, data.policy, { kind: 'student-version' })) : null;
     if (!p) { ui.toast('That work came without its settings, so it can only open with everything'); return; }
-    viewing = { data, back: L.currentId() };
+    viewing = { data, back: L.currentId(), autoSave: L.autoSaveChoice() };      // (back with auto-save as it was: L24)
     L.holdVisiting(VIEW_ID, Object.assign({}, r.song, { title: r.songTitle, isCustom: true }));
     policy = p;
     lessonMeta = { title: r.versionTitle || r.songTitle, songIds: [VIEW_ID], id: '', kind: p.kind };
@@ -1190,7 +1317,8 @@
     if (!v) return;
     const L = SW.library;
     const library = L.getStoredLibrary();
-    L.loadSongById(v.back && v.back !== VIEW_ID && library[v.back] ? v.back : L.ensureSandbox());
+    if (v.back && v.back !== VIEW_ID && library[v.back]) L.loadSongById(v.back, { autoSave: v.autoSave });
+    else L.loadSongById(L.ensureSandbox());
     L.dropVisiting(VIEW_ID);
   }
   function viewingToEverything() {
@@ -1247,7 +1375,10 @@
     });
     $('lesson-title-input').addEventListener('input', e => { draft.title = e.target.value; });
     $('lesson-songs-all').addEventListener('click', () => {
-      draft.songIds = SW.library.getSortedSongIds();
+      /* not a student's returned work ("Song — Name", work_…): a lesson link
+         would carry it, name and all, to the whole class (bug report L26).
+         It can still be ticked by hand. */
+      draft.songIds = SW.library.getSortedSongIds().filter(id => String(id).indexOf('work_') !== 0);
       renderLessonSongs();
       renderShell();
     });
@@ -1372,7 +1503,7 @@
   SW.bus.on('song:opened', d => { if (lessonMeta && !previewing) rememberOpenLesson(d.id); });
 
   SW.lessons = {
-    init, bootFromUrl, restoreSong, afterStart,
+    init, bootFromUrl, restoreSong, afterStart, addExercise,
     policy: () => policy,
     meta: () => lessonMeta,
     isPreviewing: () => previewing,

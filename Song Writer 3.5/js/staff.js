@@ -426,9 +426,13 @@
       ev.accSet = new Set();
       if (ev.keyTo) { ks = ev.keyTo; held = {}; }           // a key change: its signature from here (KEY CHANGES)
       if (!ev.notated || ev.rest) return;
-      if (ev.bar !== bar) { bar = ev.bar; held = {}; }
+      const newBar = ev.bar !== bar;
+      if (newBar) { bar = ev.bar; held = {}; }
       ev.pitches.forEach(pt => {
         const key = pt.letter + pt.octave;
+        // a note tied over the bar line is the same sound: its accidental is not printed again (C♯⁀C♯,
+        // bug report L6) — and it carries none into the bar, so a later C♯ there shows its own
+        if (newBar && ev.tiedIn && ev.tiedIn.has(pt.midi)) return;
         const now = held[key] !== undefined ? held[key] : (ks.sig[pt.letter] || 0);
         if (pt.alter !== now) ev.accSet.add(pt);
         held[key] = pt.alter;
@@ -563,7 +567,16 @@
     if (hiP.end <= target) return { f: fMax, p: hiP };
     let lo = SP.fMin, hi = fMax;
     let loP = placeRow(cols, lo, ctx);
-    if (loP.end >= target) return { f: lo, p: loP };
+    if (loP.end >= target) {
+      // too wide even squeezed as far as a row may be: a run that can't be
+      // split (one word's notes, or bars a word runs across — planLine).
+      // It squeezes on, down to its ink alone, rather than running off the
+      // page's edge, where its notes could not be seen or tapped
+      // (.stage clips; bug report §1.7, 2026-11-22)
+      const tight = placeRow(cols, 0, ctx);
+      if (tight.end >= target) return { f: 0, p: tight };
+      hi = lo; lo = 0; loP = tight;
+    }
     for (let it = 0; it < 22; it++) {
       const mid = (lo + hi) / 2;
       const mp = placeRow(cols, mid, ctx);
@@ -622,7 +635,18 @@
     const lastReal = le.events[le.events.length - 1];
     // (the JOINT PLAN keeps the fillers apart: a line can run on for bars, rows even, past its own notes)
     const joint = jointMode() && le.padded > 0;
-    if (!joint && lastReal && lastReal.notated) SW.timing.fillPieces(le).forEach(part => lastReal.pieces.push(mkPiece(lastReal, part, true)));
+    /* THE LAST LINE ON PAPER (bug report M2, 2026-11-22): the song's last
+       line is padded so that, going round, the first line's pick-up lands on
+       its beat (timing.js) — music the paper doesn't show: a song with a
+       pick-up ends on a short bar. Drawn, it was a last bar of rests alone (a
+       half rest, in 3/4). On paper the last line only finishes its own bar. */
+    const B = le.meter.barTicks;
+    const paperLe = lastLine && !joint && le.padded > le.total
+      ? Object.assign({}, le, { padded: le.total + ((le.pickup - le.total) % B + B) % B }) : le;
+    if (!joint && lastReal && lastReal.notated) SW.timing.fillPieces(paperLe).forEach(part => lastReal.pieces.push(mkPiece(lastReal, part, true)));
+    // where the drawn line ends — after its fillers — and whether that is on a bar line
+    const drawnEnd = !joint && lastReal && lastReal.notated ? Math.max(paperLe.padded, le.total) : le.total;
+    const endsOnBar = ((drawnEnd + le.shift) % B) === 0;
 
     // the syllables, and each column's ink and space
     const syls = Array.from(line.querySelectorAll(':scope > .syllable'));
@@ -639,7 +663,9 @@
       const allBlocks = reals.every(ev => !ev.notated);
       let span = 0;
       for (let j = 1; j < reals.length; j++) span += (reals[j - 1].bw + reals[j].bw) / 2;
-      const info = { syl, si, evs, allBlocks, textW: tEl ? tEl.offsetWidth : 0, chordW: chordEl ? chordEl.offsetWidth : 0 };
+      // a wordless note's "-" is not printed (lyric-hyphens.js WORDLESS NOTES), so it takes no room
+      const wordless = !!tEl && tEl.classList.contains('text') && (tEl.textContent || '').trim() === '-';
+      const info = { syl, si, evs, allBlocks, textW: tEl && !wordless ? tEl.offsetWidth : 0, chordW: chordEl ? chordEl.offsetWidth : 0 };
       // the syllable before is of the same word (score.js WORDS IN SYLLABLES): a hyphen goes between
       const before = syls[si - 1];
       info.hyIn = !!(before && before.dataset.hy && tEl && /[^-\s]/.test(tEl.textContent || tEl.value || ''));
@@ -667,7 +693,9 @@
       const nx = cols[i + 1];
       // a line ends on a bar line — unless, with a pick-up, it stops inside
       // a bar the next line's pick-up finishes (the song's end always has one)
-      ev.endsBar = nx ? nx.bar > ev.bar : (le.endsOnBar || !le.opensNext || lastLine);
+      // (whether its drawn end — the fillers' — is on a bar line: le.endsOnBar is its notes', and a line
+      // padded for the next line's pick-up closed a bar in its middle, on beat 4: bug report M2)
+      ev.endsBar = nx ? nx.bar > ev.bar : (endsOnBar || !le.opensNext || lastLine);
       ev.final = !nx && lastLine;
     });
 
@@ -699,7 +727,14 @@
       // the bars still share a base.
       const blockTop = o.blockTop || 0;
       let top = 0;
-      cols.forEach(ev => { if (ev.notated) top = Math.min(top, inkTop(ev, gRel, s)); });
+      cols.forEach((ev, i) => {
+        if (!ev.notated) return;
+        const it = inkTop(ev, gRel, s);
+        top = Math.min(top, it);
+        // a bar's number lifted over a high note at its start (renderRow) needs its own room above
+        // it too, or it ran into the chord lane (bug report L11, 2026-11-22)
+        if (i > 0 && ev.bar > cols[i - 1].bar && !ev.rest && it - s * 0.45 < gRel.yOf(F5) - s * 0.9) top = Math.min(top, it - s * 0.45 - s * 0.7);
+      });
       const rise = Math.max(0, -top - (Math.max(staffTopPx, blockTop) + 20 * bs));
       // … and the words fit under the row's lowest ink: a block stands on
       // the bar base, so while a row has one the words stay under the
@@ -717,12 +752,19 @@
       cols.forEach((ev, i) => {
         if (ev.notated && !ev.rest && ev.beam !== null && ev.beam !== undefined && ev.dir === 'down') (downBeams[ev.beam] = downBeams[ev.beam] || []).push(i);
       });
-      // a tie under a low note bows down towards the words
+      // a tie under a low note bows down towards the words — a tie to the next
+      // column, or one inside a note drawn in pieces across a bar line (until
+      // 2026-11-22 only the first: "you," in Happy Birthday sat on its tie, L1)
       cols.forEach((ev, i) => {
-        if (!ev.tieNext || !cols[i + 1] || !ev.tiePitches) return;
+        const nx = cols[i + 1];
+        if (!nx) return;
+        const owner = ev.piece ? ev.owner : ev;
+        const inPieces = nx.piece && nx.owner === owner && !nx.filler && !owner.rest;
+        const pitches = inPieces ? owner.pitches : (ev.tieNext ? ev.tiePitches : null);
+        if (!pitches || !pitches.length) return;
         const bow = tieBow(xs[i + 1] - xs[i], s);
-        ev.tiePitches.forEach(pt => {
-          if (tieSide(ev.tiePitches, pt, ev.dir, ev.value) > 0) floor = Math.max(floor, gRel.yOf(pt.step) + s * (TIE_OFF + 0.05) + bow);
+        pitches.forEach(pt => {
+          if (tieSide(pitches, pt, ev.dir || owner.dir, ev.value) > 0) floor = Math.max(floor, gRel.yOf(pt.step) + s * (TIE_OFF + 0.05) + bow);
         });
       });
       Object.keys(downBeams).forEach(id => {
@@ -852,16 +894,31 @@
 
     // pack. A unit is a bar — the syllables that start in it stay together
     // — or, for a bar too wide for any row, each of its words.
+    // BARS A SYLLABLE RUNS ACROSS ARE ONE UNIT (2026-11-22, the user's "wordless
+    // notes break the lines"): a row can only start before a syllable, so a word
+    // whose notes go on past a bar line (connected notes, a note tied over the
+    // bar line) glues the bars it touches, as the joint plan does — else the
+    // next row began in the middle of a bar, with no bar line closing the row
+    // before, no bar number, beams cut and an accidental carried over.
     const colsOf = infos => infos.reduce((a, info) => a.concat(info.evs), []);
     const target = ctx.avail - 1;
     const endAt = (infos, f) => placeRow(colsOf(infos), f, ctx).end;
     let units = [];
-    let cur = null, curBar = null;
+    let cur = null, reach = -Infinity;
     sylInfo.forEach(info => {
       const bar = info.evs[0].bar;
-      if (!cur || bar !== curBar) { cur = []; units.push(cur); curBar = bar; }
+      if (!cur || bar > reach) { cur = []; units.push(cur); }
       cur.push(info);
+      // the last bar this syllable's columns (and their tied pieces) reach
+      info.evs.forEach(ev => { if (!ev.filler) reach = Math.max(reach, ev.bar); });
     });
+    // a pick-up goes with the bar it leads into: alone, it was a row of its own, a beat
+    // stretched edge to edge (phones: bug report L19) — when the two fit a row at all
+    // (else they would be split into words, and the row broken inside bar 1)
+    if (le.pickup && units.length > 1 && units[0][0].evs[0].bar === 0) {
+      const both = units[0].concat(units[1]);
+      if (endAt(both, 0) <= target) units.splice(0, 2, both);
+    }
     // (words joined by a beam stay together: a beam never breaks across rows)
     const byWords = u => u.reduce((a, info) => {
       const prev = a.length ? a[a.length - 1] : null;
@@ -870,7 +927,11 @@
       else a.push([info]);
       return a;
     }, []);
-    units = units.reduce((a, u) => a.concat(u.length > 1 && endAt(u, SP.fMin) > target ? byWords(u) : [u]), []);
+    // (a unit is split into its words only when even squeezed to its ink alone
+    // it can't fit a row — fitRow squeezes a lone unit that far — since a row
+    // broken inside a bar is worse to read than a tight one; until 2026-11-22
+    // a bar split at the ordinary squeeze, fMin)
+    units = units.reduce((a, u) => a.concat(u.length > 1 && endAt(u, 0) > target ? byWords(u) : [u]), []);
 
     // the fewest rows (greedy, a little squeeze allowed) …
     const n = units.length;
@@ -916,9 +977,22 @@
     // (only half again its natural spacing) when it holds little
     const lastFull = rows.length > 1 && endAt(rows[rows.length - 1], 1) >= target * 0.6;
 
+    /* The time signature is drawn on the song's first row only, but the
+       line keeps room for it on every row (--staff-prefix is the line's):
+       the first line's later rows start that much further left, into it,
+       and are justified to the width they gain (bug report L4, 2026-11-22 —
+       two staff spaces of empty staff before their first note) */
+    const timeW = lineIndex === 0 ? Math.max(0, pre.width - prefixWidth(line, s, false)) : 0;
     rows.forEach((infos, ri) => {
       const rc = colsOf(infos);
-      const { f, p } = fitRow(rc, ctx, ri === rows.length - 1 && !lastFull ? SP.fLast : SP.fInner);
+      const wide = ri > 0 && timeW > 0;
+      const rctx = wide ? Object.assign({}, ctx, { avail: ctx.avail + timeW, textAllowance: Math.max(0, ctx.textAllowance - timeW) }) : ctx;
+      const { f, p } = fitRow(rc, rctx, ri === rows.length - 1 && !lastFull ? SP.fLast : SP.fInner);
+      if (wide) {
+        p.x = p.x.map(v => v - timeW);
+        p.bars = p.bars.map(b => Object.assign({}, b, { x: b.x - timeW }));
+        p.end -= timeW;
+      }
       realiseRow(infos, rc, p, f, ri);
     });
     return { line, vars, breaks, info, rows: rows.length, avail, prefix: pre };
@@ -992,6 +1066,13 @@
   /* a part's columns for one line, from the model, as planLine builds the page's */
   function modelColumns(le, bs, s, k, font, lineKey) {
     const ks = keySignature(lineKey, S.scale);
+    /* a column with no value yet (a block, written on the Pitch page) is
+       drawn as the beat it lasts — a quarter, a dotted quarter in 6/8 — as
+       Notation writes the page's own (score.js writeBlocksHere). Drawn as it
+       was, the part's band threw, and every other part vanished from the
+       page (bug report H4, 2026-11-22). */
+    const beat = SW.values.byId(le.meter.beatValue);
+    if (beat) le.events.forEach(ev => { if (!ev.notated) { ev.notated = true; ev.value = beat; ev.ticks = beat.ticks; } });
     const groups = {};
     le.events.forEach(ev => {
       ev.bw = 32 * bs;                                  // a column's block is 32 px wide (style.css .note)
@@ -1010,7 +1091,8 @@
       const evs = reals.reduce((a, ev) => a.concat([ev], ev.pieces), []);
       const text = reals[0].word ? reals[0].word.text : '';
       const allBlocks = reals.every(ev => !ev.notated);
-      const info = { syl: null, si, evs, allBlocks, textW: text ? textWidth(text, font) : 0, chordW: 0, hyIn: prevHy && !!text, text, hy: !!reals[0].hy };
+      // (+ the 2 px a side the page's .text has, so a part measures the same off the page as on it — L9)
+      const info = { syl: null, si, evs, allBlocks, textW: text && text !== '-' ? textWidth(text, font) + 4 : 0, chordW: 0, hyIn: prevHy && !!text && text !== '-', text, hy: !!reals[0].hy };
       prevHy = info.hy;
       sylInfo.push(info);
       const span = reals.reduce((a, ev) => a + ev.bw, 0);
@@ -1071,9 +1153,12 @@
       p.byBar = new Map();
       p.cols.concat(p.fillers).forEach(c => { if (!p.byBar.has(c.bar)) p.byBar.set(c.bar, []); p.byBar.get(c.bar).push(c); });
       const lineLast = p.fillers.length ? p.fillers[p.fillers.length - 1] : p.cols[p.cols.length - 1];
+      // (the drawn end, after the fillers, on a bar line or not — as planLine, bug report M2)
+      const endT = p.fillers.length ? Math.max(p.le.padded, p.le.total) : p.le.total;
+      const onBar = ((endT + p.le.shift) % B) === 0;
       p.byBar.forEach(list => list.forEach((c, i) => {
         const last = i === list.length - 1;
-        c.endsBar = last ? (c === lineLast ? (le.endsOnBar || !le.opensNext || lastLine) : true) : false;
+        c.endsBar = last ? (c === lineLast ? (onBar || !le.opensNext || lastLine) : true) : false;
       }));
     });
     const target = ctx.avail - 1;

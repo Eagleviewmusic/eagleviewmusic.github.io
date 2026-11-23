@@ -84,7 +84,6 @@
      SW.flow.writeValue / tie / untie / insertRest   the Edit box's rhythm
                                         tools, as cell gestures (below)
      SW.flow.restAtEnd / noteOnRest     a note put in on the line's last rest
-     SW.flow.tap                        Tap it in (below)
      SW.flow.selfTest()                 the contract, on every line on screen
    ========================================================================== */
 (function () {
@@ -167,7 +166,8 @@
       st.items = st.items.filter(it => carries(it) || it.start < o.dropIn[0] || it.start >= o.dropIn[1]);
     }
     const mt = meter();
-    const shift = shiftOf(lineModel);
+    // opts.unpick: the × on the pick-up's bar — the line starts on the downbeat (H8)
+    const shift = o.unpick ? 0 : shiftOf(lineModel);
     const ok = allowed();
     const emitted = [];                       // { si, col }
     const firstCol = new Map();               // item → index of its first column in the line
@@ -308,6 +308,7 @@
       cur.cols.push(col);
     });
     const model = Object.assign({}, lineModel, { syllables: out });
+    if (o.unpick) delete model.pickup;
     return { model, firstCol, fresh, waiting, stream: st };
   }
 
@@ -343,12 +344,17 @@
      onset is as long as they are. `opts`: pour's. A focusIndex past the
      stream means the new notes, in order. */
   let lastPoured = null;
+  let emptied = false;                        // the last apply would have left its line empty, so did nothing
   function apply(line, ons, focusIndex, reason, fixed, opts) {
     const model = SW.score.readLine(line);
     const res = pour(model, ons, fixed, opts);
     lastPoured = res;
-    const before = JSON.stringify(model.syllables);
-    const after = JSON.stringify(res.model.syllables);
+    // a line is never poured empty (× on the only bar of a wordless line, bug report 1f):
+    // it would leave nothing to show or tap — deleting a line is the Edit box's
+    emptied = !res.model.syllables.length && model.syllables.length > 0;
+    if (emptied) return false;
+    const before = JSON.stringify([model.syllables, model.pickup || null]);
+    const after = JSON.stringify([res.model.syllables, res.model.pickup || null]);
     if (before === after) return false;
     SW.score.replaceLine(line, res.model);
     const items = res.stream.items;
@@ -574,293 +580,10 @@
     return setLength(sel.stack, fs.ticks, false, 'value');
   }
 
-  /* ================= TAP IT IN (P3) =================
-     Play the line with → (or Space, Enter, or the big pad on a touch
-     screen) in the rhythm in your head: from the selected note to the end
-     of its line, one press per note, to a count-in and the steady beat.
-     Key down is where the note starts, key up where it stops; a note let
-     go early leaves a rest. The taps are snapped to the grid (eighths,
-     or sixteenths with Detailed on) and laid on the line's cells, as
-     every gesture is (2026-10-26): the take replaces the time from the
-     first note to where the last tap ends, what it cuts into starts anew
-     there, and the beats after it stay where they are (until then they
-     slid along behind the take). The melody pours into the result — so
-     the staff shows it at once; Keep it, try Again, or Cancel (Undo).
-     Words and pitches are never touched: this is time only. */
-  const tap = (function () {
-    const panel = document.getElementById('tap-panel');
-    let run = null;              // the take in progress
-    let lastTake = null;         // { line, index } for Again
-    let lastRun = null;          // the finished take, for Snap to (re-snapped without tapping again)
-    const $ = sel => panel && panel.querySelector(sel);
-
-    function say(kind, text) {
-      if (!panel) return;
-      panel.dataset.state = kind;
-      const t = $('.tap-text');
-      if (t) t.textContent = text;
-    }
-    function show(on) {
-      if (!panel) return;
-      panel.hidden = !on;
-      document.body.classList.toggle('tapping', !!on);
-    }
-    function detail() {
-      return !!(SW.settings && SW.settings.view && SW.settings.view.tapDetail);
-    }
-
-    async function start(again) {
-      if (run) return;
-      if (!S.editing || !SW.settings.can('values')) return;
-      if (S.playing) SW.player.stop();
-      let line, index;
-      if (again && lastTake && lineAt(lastTake.lineIndex)) { line = lineAt(lastTake.lineIndex); index = lastTake.index; }
-      else {
-        const sel = selected();
-        if (!sel) { SW.ui.toast('Select the note to start from'); return; }
-        const at = itemAt(sel.line, sel.stack);
-        if (!at || !at.item) { SW.ui.toast('Select a note (not a rest) to start from'); return; }
-        line = sel.line;
-        index = at.index;
-      }
-      const model = SW.score.readLine(line);
-      const st = stream(model);
-      const todo = st.items.slice(index).filter(it => !it.rest);
-      if (!todo.length) { SW.ui.toast('Nothing to tap from here'); return; }
-      lastTake = { lineIndex: lineIndexOf(line), index };
-
-      const mt = meter();
-      const shift = shiftOf(model);
-      const S0 = st.items[index].start;
-      const beat0 = Math.floor((S0 + shift) / mt.beatTicks) * mt.beatTicks - shift;    // the beat the take begins on
-      const ac = SW.audio.context();
-      const secPerTick = SW.timing.tickMs() / 1000;
-      const beatSec = mt.beatTicks * secPerTick;
-      const count = mt.beats;
-      show(true);
-      say('ready', 'Get ready…');
-      if (window.EVMCountIn) EVMCountIn.open(count, mt.beats);
-      const primed = window.EVMCountIn ? await EVMCountIn.prime(ac, { warm: 0.35 }) : true;
-      if (!primed) { finish(false); SW.ui.toast('The sound would not start — try again'); return; }
-      const from = ac.currentTime + 0.12;
-      const times = [];
-      for (let i = 0; i < count; i++) {
-        SW.audio.click(from + i * beatSec, i === 0, false);
-        if (window.EVMCountIn) times.push(EVMCountIn.heardAt(ac, from + i * beatSec));
-      }
-      const t0 = from + count * beatSec;                    // where beat0 is heard
-      if (window.EVMCountIn) EVMCountIn.run(times, EVMCountIn.heardAt(ac, t0));
-      run = { line, index, model, st, todo, shift, mt, beat0, S0, t0, secPerTick, beatSec, taps: [], held: null, voice: [], clickAt: t0, timer: 0, ac };
-      // the steady beat goes on under the take (accent on each bar's 1)
-      const tick = () => {
-        if (!run) return;
-        const ahead = run.ac.currentTime + 0.25;
-        while (run.clickAt < ahead) {
-          const beatTicks = run.beat0 + Math.round((run.clickAt - run.t0) / run.beatSec) * mt.beatTicks;
-          const strong = ((beatTicks + run.shift) % mt.barTicks + mt.barTicks) % mt.barTicks === 0;
-          SW.audio.click(run.clickAt, strong, true);
-          run.clickAt += run.beatSec;
-        }
-        // a take that has gone quiet for two bars ends itself
-        const lastAt = run.taps.length ? run.taps[run.taps.length - 1].on : run.t0;
-        if (!run.held && run.ac.currentTime - lastAt > 2 * mt.beats * run.beatSec + (run.taps.length ? 0 : 2 * mt.beats * run.beatSec)) { finish(true); return; }
-        run.timer = setTimeout(tick, 60);
-      };
-      tick();
-      say('go', 'Tap → for each note (' + todo.length + ')');
-      const first = firstStackOf(line, todo[0]);
-      if (first) SW.score.setNoteAsActive(first.querySelector('.note'), false);
-    }
-
-    // the page's column for an item of the take (the line is untouched
-    // until the take ends, so the model read at the start still matches it)
-    function firstStackOf(line, item) {
-      const model = run ? run.model : SW.score.readLine(line);
-      const n = flatIndex(model, item.cols[0]);
-      return n >= 0 ? stacksOf(line)[n] || null : null;
-    }
-
-    function down() {
-      if (!run || run.held) return;
-      const now = run.ac.currentTime;
-      if (now < run.t0 - run.beatSec / 2) return;            // still counting in
-      const n = run.taps.length;
-      if (n >= run.todo.length) return;
-      const it = run.todo[n];
-      run.held = { on: now, off: null };
-      run.taps.push(run.held);
-      // sound it, as long as it is held
-      const stack = firstStackOf(run.line, it);
-      if (stack) {
-        SW.score.setNoteAsActive(stack.querySelector('.note'), false);
-        run.voice = Array.from(stack.querySelectorAll('.note')).filter(x => !x.classList.contains('rest-note'))
-          .map(x => SW.audio.noteOn(SW.music.noteMidi(SW.music.noteClassOf(x) || 'do', SW.score.getAccidentalFromNote(x))));
-      }
-      say('go', (n + 1) + ' of ' + run.todo.length);
-    }
-    function up() {
-      if (!run || !run.held) return;
-      run.held.off = run.ac.currentTime;
-      run.held = null;
-      run.voice.forEach(id => SW.audio.noteOff(id));
-      run.voice = [];
-      if (run.taps.length >= run.todo.length) finish(true);
-    }
-
-    /* The taps → onsets for the whole line, through the cells. Before
-       the take: as it was. The take: snapped to the grid; a note let go
-       early by half its gap (and at least one grid step) leaves a rest;
-       a rest with a word keeps its place in the stream. After the take:
-       as it was — what the take cut into starts anew where it ends. */
-    function onsetsFromTake(r) {
-      const g = detail() ? 6 : 12;
-      const cs = cellsOf(r.model);
-      const cells = cs.cells.slice();
-      // a swung song is tapped swung (timing.js SWING): the taps are read back straight, from the beat the take began on
-      const sw = SW.timing.swing(0, r.mt);
-      const toTick = sec => r.beat0 + Math.round(sw.back((sec - r.t0) / r.secPerTick) / g) * g;
-      const taps = r.taps.filter(t => t.off !== null || t === r.taps[r.taps.length - 1]);
-      const q = [];
-      taps.forEach((t, i) => {
-        let at = Math.max(r.S0, toTick(t.on));
-        if (i && at <= q[i - 1].at) at = q[i - 1].at + g;
-        const off = t.off === null ? at + g * 2 : Math.max(at + g, toTick(t.off));
-        // how early it was let go before the next press, in ticks, from the real times
-        // (a detached note is not a rest: only a clear silence counts)
-        const nx = taps[i + 1];
-        const early = nx && t.off !== null ? (nx.on - t.off) / r.secPerTick : 0;
-        q.push({ at, off, early });
-      });
-      // cells [from, to) ticks become one span: a sound, a silence, or a word's own rest
-      const put = (from, to, kind, item) => {
-        const a = from / CELL, b = to / CELL;
-        while (cells.length < b) cells.push({ t: 'fill' });
-        const on = item ? cs.ons.find(o => o.item === item) || null : null;
-        for (let c = a; c < b; c++) {
-          const first = c === a;
-          cells[c] = { t: kind === 'sound' ? (first ? 'on' : 'hold') : (first ? 'reston' : 'rest'), on, item: item || null, silent: kind === 'silent' };
-        }
-      };
-      let cursor = r.S0;
-      let qi = 0;
-      // the take's items, in the order the stream holds them (cs reads the same model as r.st)
-      r.st.items.slice(r.index).forEach((it, k) => {
-        if (qi >= q.length) return;
-        const item = cs.st.items[r.index + k];
-        if (it.rest) { put(cursor, cursor + g, 'silent', item); cursor += g; return; }
-        const t = q[qi], nx = q[qi + 1];
-        put(cursor, t.at, 'rest');
-        const nextAt = nx ? nx.at : null;
-        let len;
-        if (nextAt === null) len = t.off - t.at;
-        else {
-          const gap = nextAt - t.at;
-          len = (t.early >= Math.max(g, gap / 2) && t.off < nextAt) ? t.off - t.at : gap;
-        }
-        len = Math.max(g, len);
-        put(t.at, t.at + len, 'sound', item);
-        cursor = t.at + len;
-        if (nextAt !== null) { put(cursor, nextAt, 'rest'); cursor = Math.max(cursor, nextAt); }
-        qi++;
-      });
-      // where the take ends, what it cut into starts anew; the beats after it stay where they are
-      const e = cursor / CELL;
-      if (e < cells.length) {
-        const t = cells[e].t;
-        if (t === 'hold') setT(cells, e, 'on');
-        else if (t === 'bhold') setT(cells, e, 'bon');
-        else if (t === 'rest') setT(cells, e, 'reston');
-      }
-      return onsetsFromCells(cells, { bar: cs.mt.barTicks, shift: cs.shift });
-    }
-
-    function finish(keep) {
-      if (!run) { show(false); return; }
-      const r = run;
-      run = null;
-      clearTimeout(r.timer);
-      r.voice.forEach(id => SW.audio.noteOff(id));
-      if (window.EVMCountIn) EVMCountIn.close();
-      if (!keep || !r.taps.length) { show(false); if (keep) SW.ui.toast('No taps — nothing changed'); return; }
-      const ons = onsetsFromTake(r);
-      lastRun = Object.assign(r, { lineIndex: lineIndexOf(r.line) });
-      const changedIt = apply(r.line, ons, r.index, 'rhythm');
-      say('done', changedIt ? 'Here it is — keep it?' : 'The same rhythm as before');
-      show(true);
-    }
-
-    function keep() { if (run) finish(true); show(false); }
-    function cancel() {
-      if (run) { finish(false); return; }
-      show(false);
-      if (panel && panel.dataset.state === 'done' && SW.history && SW.history.canUndo()) SW.history.undo();
-    }
-    function againNow() {
-      if (run) finish(false);
-      if (panel && panel.dataset.state === 'done' && SW.history && SW.history.canUndo()) SW.history.undo();
-      start(true);
-    }
-
-    // keys: → Space Enter tap; Esc cancels. Taken before the page's own keys.
-    const TAP_KEYS = { ArrowRight: 1, ' ': 1, Enter: 1 };
-    window.addEventListener('keydown', e => {
-      if (!run) return;
-      if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); cancel(); return; }
-      if (TAP_KEYS[e.key]) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) down(); }
-      else if (!e.metaKey && !e.ctrlKey) { e.stopImmediatePropagation(); }
-    }, true);
-    window.addEventListener('keyup', e => {
-      if (!run) return;
-      if (TAP_KEYS[e.key]) { e.preventDefault(); e.stopImmediatePropagation(); up(); }
-    }, true);
-    if (panel) {
-      const pad = $('.tap-pad');
-      if (pad) {
-        pad.addEventListener('pointerdown', e => { e.preventDefault(); try { pad.setPointerCapture(e.pointerId); } catch (err) {} down(); });
-        pad.addEventListener('pointerup', e => { e.preventDefault(); up(); });
-        pad.addEventListener('pointercancel', () => up());
-      }
-      panel.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
-      const on = (sel, fn) => { const b = $(sel); if (b) b.addEventListener('click', e => { e.stopPropagation(); fn(); }); };
-      on('.tap-keep', keep);
-      on('.tap-again', againNow);
-      on('.tap-cancel', cancel);
-      on('.tap-stop', () => finish(true));
-    }
-    /* Snap to: eighths or sixteenths. After a take, the same taps are
-       snapped again (the take is undone and poured anew). */
-    function syncSnap() {
-      if (!panel) return;
-      panel.querySelectorAll('[data-snap]').forEach(b => b.classList.toggle('active', (b.dataset.snap === 's') === detail()));
-    }
-    function setSnap(sixteenths) {
-      if (sixteenths === detail()) return;
-      SW.settings.setView({ tapDetail: sixteenths }, { quiet: true });
-      syncSnap();
-      if (!run && lastRun && panel && panel.dataset.state === 'done' && lineAt(lastRun.lineIndex)) {
-        if (SW.history && SW.history.canUndo()) SW.history.undo();
-        // the line is as it was before the take (Undo drew it anew): read it again for the pour
-        const line = lineAt(lastRun.lineIndex);
-        const r = Object.assign({}, lastRun, { line, model: SW.score.readLine(line) });
-        r.st = stream(r.model);
-        const changedIt = apply(r.line, onsetsFromTake(r), r.index, 'rhythm');
-        say('done', changedIt ? 'Snapped to ' + (sixteenths ? 'sixteenths' : 'eighths') + ' — keep it?' : 'The same rhythm as before');
-      }
-    }
-    if (panel) panel.querySelectorAll('[data-snap]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); setSnap(b.dataset.snap === 's'); }));
-    syncSnap();
-    SW.bus.on('mode:changed', () => { if (!S.editing) { if (run) finish(false); show(false); } });
-    // a song opened ends a take (Undo's redraw is not a song opened)
-    SW.bus.on('score:loaded', () => {
-      if (SW.history && SW.history.isRestoring()) return;
-      if (run) finish(false);
-      show(false);
-      lastTake = null;
-      lastRun = null;
-    });
-
-    return { start, keep, cancel, again: againNow, active: () => !!run, onsetsFromTake, finish };
-  })();
+  /* TAP IT IN (P3, 2026-10-01) — Play the line in the rhythm in your head, one
+     press per note — lost its button on 2026-10-26 and nothing called it
+     after; its engine (flow.tap, onsetsFromTake) was taken out on 2026-11-22
+     (bug report L17: dead, and every note landed one tap late). */
 
   /* ================= CELLS (the beat strip, P4) =================
      A line's time in sixteenths (6 ticks): each cell is one of
@@ -905,40 +628,56 @@
      `opts` { bar, shift } (ticks), the silence after the line's last
      sound inside that sound's bar is not written — the line ends with
      its last note (R2) and the staff finishes the bar; whole bars of
-     silence after it stay (an empty bar put in with +). */
+     silence after it stay (an empty bar put in with +), and so does a
+     rest the line already had there, as it was (a Rest put in at the
+     line's end — the next tap used to drop it).
+     A WORD'S OWN REST is one onset, from where it begins (bug report H7):
+     once a note, a value or a bar line has cut into it, what is left of
+     it is plain silence — as a second onset of its own it took the next
+     word, and every later word slid. */
   function onsetsFromCells(cells, opts) {
     let last = cells.length - 1;
     while (last >= 0 && cells[last].t === 'fill') last--;
     const out = [];
     let cur = null;
-    const RESTY = { rest: 1, reston: 1, fill: 1 };
+    const seen = new Set();                    // the words' rests that have their onset
     for (let i = 0; i <= last; i++) {
       const c = cells[i];
       const t = c.t;
-      const kind = (t === 'on' || t === 'hold') ? 'sound' : (t === 'bon' || t === 'bhold') ? 'block' : (c.silent && t !== 'fill') ? 'silent' : 'rest';
-      const starts = START[t] && !(kind === 'rest' && cur && cur.kind === 'rest');
+      let kind = (t === 'on' || t === 'hold') ? 'sound' : (t === 'bon' || t === 'bhold') ? 'block' : (c.silent && t !== 'fill') ? 'silent' : 'rest';
+      const sameRest = kind === 'silent' && !!cur && cur.kind === 'silent' && cur.item === c.item;
+      if (kind === 'silent' && seen.has(c.item) && !(sameRest && !START[t])) kind = 'rest';
+      const starts = (START[t] || (kind === 'silent' && !sameRest)) && !(kind === 'rest' && cur && cur.kind === 'rest');
       const fits = cur && !starts && cur.kind === kind && !(kind === 'block' && cur.ticks >= blockTicks());
       if (fits) { cur.ticks += CELL; continue; }
       cur = { start: i * CELL, ticks: CELL, rest: kind === 'rest', block: kind === 'block', kind };
-      if (kind === 'silent') { cur.silent = true; cur.blockItem = !!(c.on && c.on.block); }
+      if (kind === 'silent') { cur.silent = true; cur.item = c.item; seen.add(c.item); cur.blockItem = !!(c.on && c.on.block); }
       out.push(cur);
     }
     out.forEach(o => {
       // a block is a beat: a cut one is written as what is left of it
       if (o.block && o.ticks !== blockTicks()) o.block = false;
       if (o.silent && o.blockItem && o.ticks === blockTicks()) o.block = true;
-      delete o.kind; delete o.blockItem;
+      delete o.kind; delete o.blockItem; delete o.item;
     });
     if (opts && opts.bar) {
       let L = -1;
       out.forEach((o, i) => { if (!o.rest) L = i; });
+      // a rest made only of the line's own rest columns, each whole (cellsOf's gaps): kept
+      const own = o => {
+        for (let t = o.start; t < o.start + o.ticks; t += CELL) {
+          const c = cells[t / CELL];
+          if (!(c && c.on && c.on.rest && c.on.start >= o.start && c.on.start + c.on.ticks <= o.start + o.ticks)) return false;
+        }
+        return true;
+      };
       if (L >= 0) {
         const end = out[L].start + out[L].ticks;
         const shift = opts.shift || 0;
         const barEnd = Math.ceil((end + shift) / opts.bar) * opts.bar - shift;
         for (let i = out.length - 1; i > L; i--) {
           const o = out[i];
-          if (o.start >= barEnd) continue;
+          if (o.start >= barEnd || own(o)) continue;
           if (o.start + o.ticks <= barEnd) out.splice(i, 1);
           else { o.ticks -= barEnd - o.start; o.start = barEnd; }
         }
@@ -965,6 +704,9 @@
   /* A dot tapped: cells [i, i+span) are the slot, inside the beat [b0, b1). */
   function tapSlot(cells, i, span, b0, b1) {
     cells = cells.slice();
+    // a slot past the line's own bars (a bar the song's other parts make it run on to, or an
+    // empty line) is the silence after its end: it threw here (bug report M2, 1f)
+    while (cells.length < Math.max(i + 1, b1)) cells.push({ t: 'fill' });
     const wasBlock = cells[i].t === 'bon' || cells[i].t === 'bhold';
     writeBlockAt(cells, i);
     if (wasBlock && i === b0) return cells;                      // the block is written as it was: a quarter
@@ -1033,6 +775,7 @@
     cells = cells.slice();
     for (let o = b0 + 1; o < b1; o += 2) {
       const e = o - 1;
+      if (!cells[o] || !cells[e]) continue;                  // past the line's cells (or before a pick-up)
       const t = cells[o].t;
       if (t !== 'on' && t !== 'reston') continue;
       if (START[cells[e].t]) setT(cells, o, SOUND[cells[e].t] || cells[e].t === 'bon' ? 'hold' : 'rest');
@@ -1076,17 +819,60 @@
   let waiting = null;                         // { line, n, key }
   function waitKey(model, n) {
     const tail = new Set();
-    stream(model).items.slice(-n).forEach(it => it.cols.forEach(c => tail.add(c)));
+    if (n > 0) stream(model).items.slice(-n).forEach(it => it.cols.forEach(c => tail.add(c)));
     return JSON.stringify(model.syllables.map(sy => [sy.text, sy.chord, sy.hy, sy.cols.map(c => tail.has(c) ? c.notes : c)]));
+  }
+  /* A CIRCLE TAPPED TWICE GIVES THE LINE BACK (bug report 1e). The pour is
+     not always its own way back: a wordless last note tapped off goes (R2),
+     and tapped on again the new note took the pitch before it — do re mi fa
+     → do re mi mi, the fa lost. So the page remembers the line as it was
+     before each gesture, for as long as nothing else has changed it: a
+     gesture that brings the circles back to just what they showed before the
+     last one brings that line back, pitches, words and all (and the one
+     before that, gesture by gesture). The circles are compared as the page
+     shows them — orange, yellow, grey, a word's rest's ring, up to the last
+     that is not the bar's filler after the line — so a block written in
+     between, or a rest that began anew, still counts as the same, and a bar
+     put in with + does not. */
+  let back = [];                              // the way back for one line: [{ line, model, before, after, n, key, waiting }]
+  function shownKey(cells) {
+    let end = cells.length;
+    while (end > 0 && cells[end - 1].t === 'fill') end--;
+    return cells.slice(0, end).map((c, i) => (c.t === 'on' || c.t === 'bon') ? 'O' : (c.t === 'hold' || c.t === 'bhold') ? 'y'
+      : (c.silent && c.item && c.on && c.on.start === i * CELL) ? 's' : '.').join('');
+  }
+  function tapBack(line, model0, cells, focus) {
+    const top = back[back.length - 1];
+    // another line, or this one changed some other way since: the way back is gone
+    if (top && (top.line !== line || top.key !== waitKey(model0, top.n) || top.after !== shownKey(cellsOf(model0).cells))) back = [];
+    const b = back[back.length - 1];
+    if (!b || b.before !== shownKey(cells)) return false;
+    back.pop();
+    SW.score.replaceLine(line, clone(b.model));
+    // the selection on the note at the tapped cell (or the one sounding there)
+    const items = stream(b.model).items.filter(it => it.start <= (focus || 0) * CELL);
+    const it = items[items.length - 1] || stream(b.model).items[0];
+    const n = it ? flatIndex(b.model, it.cols[0]) : 0;
+    const stack = stacksOf(line)[n] || stacksOf(line)[0];
+    const note = stack && stack.querySelector('.note');
+    if (note) SW.score.setNoteAsActive(note, false);
+    waiting = b.waiting;
+    SW.score.changed('rhythm');
+    return true;
   }
   /* Pour cells into a line on the page; the selection goes to the note
      that now starts at cell `focus` (or the one sounding there). A tapped
      rhythm makes the notes it shows and takes them away again (R2);
      opts.dropIn [from, to) (ticks, the × on a bar): the wordless notes
-     that stood there go with it, and nothing new is made. */
+     that stood there go with it, and nothing new is made; opts.unpick
+     (the × on a pick-up's bar, bug report H8): the line's pick-up goes
+     too, so it starts on the downbeat and its beats stay on the beat. */
   function applyCells(line, cells, focus, opts) {
     const model0 = SW.score.readLine(line);
-    const ons = onsetsFromCells(cells, { bar: meter().barTicks, shift: shiftOf(model0) });
+    const unpick = !!(opts && opts.unpick);
+    if (!unpick && tapBack(line, model0, cells, focus)) return true;
+    const waiting0 = waiting;
+    const ons = onsetsFromCells(cells, { bar: meter().barTicks, shift: unpick ? 0 : shiftOf(model0) });
     let k = 0;
     for (const o of ons) {
       if (o.start >= (focus || 0) * CELL) break;
@@ -1102,10 +888,19 @@
     const owed = grow && !dropIn && (focus || 0) * CELL <= lastStart ? held : 0;
     // (taken back, the note the tap made is an old one: the stream has room for it)
     const did = apply(line, ons, grow && !dropIn && !owed ? k : Math.min(k, st.items.length - 1), 'rhythm', null,
-      { grow: grow && !dropIn, shed: grow, dropIn: grow ? dropIn : null, owed });
+      { grow: grow && !dropIn, shed: grow, dropIn: grow ? dropIn : null, owed, unpick });
     if (did) {
       const n = grow && !dropIn ? lastPoured.waiting + (held - owed) : 0;
-      waiting = n > 0 ? { line, n, key: waitKey(SW.score.readLine(line), n) } : null;
+      const now = SW.score.readLine(line);
+      waiting = n > 0 ? { line, n, key: waitKey(now, n) } : null;
+      // the way back (above); the notes left waiting as blocks are written when the page draws them
+      const blocks = Math.max(0, lastPoured.waiting - owed);
+      if (unpick) back = [];
+      else {
+        back.push({ line, model: model0, before: shownKey(cellsOf(model0).cells), after: shownKey(cellsOf(now).cells),
+          n: blocks, key: waitKey(now, blocks), waiting: waiting0 });
+        if (back.length > 32) back.shift();
+      }
     }
     return did;
   }
@@ -1284,9 +1079,10 @@
   }
 
   SW.flow = {
-    stream, onsets, pour, apply, itemAt, fillState, fillBar, tap, selfTest, shiftOf,
+    stream, onsets, pour, apply, itemAt, fillState, fillBar, selfTest, shiftOf,
     setLength, writeValue, tie, untie, insertRest, restAtEnd, noteOnRest, canGrow,
     CELL, cellsOf, onsetsFromCells, noteLeft, tapSlot, joined, canJoin, toggleJoin, coarsen, needsSixteenths, writePattern, applyCells, stackAt,
+    emptied: () => emptied,
     piecesOf, realize, stepPiece, pendingPiece: () => pending
   };
 })();

@@ -113,6 +113,8 @@
   let run = null;             // the run in progress (see play)
   let soundingSyl = null;
   let soundingStack = null;   // the column itself (View → Light up → Note)
+  let livePlan = null;        // the plan playing, or getting ready to (a part's volume reaches it: revolume)
+  let announced = null;       // the chord the run last put on the keyboard (chordOff takes it off)
 
   const ctx = () => SW.audio.context();
   const latency = () => { const ac = ctx(); return ac.outputLatency || ac.baseLatency || 0; };
@@ -161,6 +163,8 @@
     silence();
     cues = [];
     run = null;
+    livePlan = null;
+    announced = null;
     markSounding(null);
     if (S.playing) setPlaying(false);
   }
@@ -242,7 +246,9 @@
       }
       return Object.assign(base, { first: [startTick, span[1]], loop: span, mode });
     }
-    return Object.assign(base, { first: [startTick, total], loop: mode === 'round' ? [startTick, total] : null, mode });
+    // Go round: from where Play began — a replan (below) starts again where the music is, and says where that was
+    const roundFrom = typeof o.roundFrom === 'number' && o.roundFrom >= 0 && o.roundFrom < total ? o.roundFrom : startTick;
+    return Object.assign(base, { first: [startTick, total], loop: mode === 'round' ? [roundFrom, total] : null, mode });
   }
 
   /* Lay one pass down on the clock: [fromTick, toTick) starting at audio
@@ -291,6 +297,7 @@
     // THE CHORD TRACK (js/track.js): each strike in its rhythm. A pass that
     // starts inside a ringing strike sounds it at once for what is left
     // (unless it is a re-timing: then it is still ringing)
+    const chordStarts = new Set(plan.chords.filter(ce => ce.id && SW.chords.isKnown(ce.id)).map(ce => ce.at));
     plan.chords.forEach(ce => {
       if (ce.end <= fromTick || ce.at >= toTick) return;
       // Focus, unsaved: a chord from card k (or the one at tick `at`) sounds with that voice — several at once when it compares chords
@@ -302,6 +309,8 @@
       const list = ce.id && SW.chords.isKnown(ce.id) ? M.withKey(SW.keys.atTick(ce.at), () => SW.chords.midis(ce.id, { voice: pv || ce.voice })) : [];
       newCues.push({ t: anchor + secs(Math.max(ce.at, fromTick)), chord: list.length ? { id: ce.id, list } : null, track: ce });
       if (!list.length) return;
+      // where it ends with no chord after it (silence, or the track's end): it leaves the keyboard (2026-11-22, bug report L34)
+      if (ce.end > fromTick && ce.end < toTick && !chordStarts.has(ce.end)) newCues.push({ t: anchor + secs(ce.end), chordOff: true });
       ce.strikes.forEach(st => {
         const freqs = SW.track.strikeNotes(list, st).map(M.midiToFreq);        // an arpeggio: its notes one by one, each ringing on (track.js)
         const sEnd = Math.min(st.at + SW.track.strikeHold(st), toTick);
@@ -364,6 +373,7 @@
     const wait = Math.max(0, (passEnd - HANDOVER - ctx().currentTime) * 1000);
     passTimer = setTimeout(() => {
       if (!run || !plan.loop) return;
+      run.looped = true;                          // a later pass is on the clock now: before its anchor is not a count-in (retime)
       run.passFrom = plan.loop[0];
       run.passTo = plan.loop[1];
       run.anchor = passEnd;
@@ -401,6 +411,7 @@
     stop();
     const plan = makePlan(fromTick, opts);
     if (!plan) { SW.ui.toast('Nothing to play yet'); return; }
+    livePlan = plan;
     const hasChords = plan.chords.some(c => c.strikes.length && c.id && SW.chords.isKnown(c.id));
     if (!plan.melody && !hasChords && !plan.beat) {
       SW.ui.toast('The melody is off in Sound, and there are no chords to hear');
@@ -459,7 +470,9 @@
         markSounding(ev.syllable, ev.stack);
       }
       // the keyboard's chord wash and the corner go with the chord panel; without it the chords are only heard
-      if (cue.chord && SW.settings.panelOut()) SW.chords.announce(cue.chord.id, cue.chord.list, 'track');
+      if (cue.chord && SW.settings.panelOut()) { SW.chords.announce(cue.chord.id, cue.chord.list, 'track'); announced = S.soundingChord; }
+      // … and leave it where the chords fall silent — unless another chord was put there since (a tap on the panel)
+      if (cue.chordOff && announced && S.soundingChord === announced) { SW.chords.clearSounding(); announced = null; }
       if (cue.track) SW.bus.emit('track:sounding', { at: cue.track.at, event: cue.track });
       if (cue.melodyEnd) markSounding(null);
       if (cue.pev) SW.bus.emit('part:sounding', { part: cue.part, at: cue.pev.at, rest: !!cue.pev.rest });
@@ -493,14 +506,18 @@
   function retime(why) {
     if (!S.playing || !run) return;
     const now = ctx().currentTime;
-    const counting = now < run.anchor;
+    // before the pass's anchor: still counting in — or a loop's next pass already laid down in the last
+    // moments of this one (HANDOVER), which starts again at its anchor at the new tempo (2026-11-22, bug
+    // report L32: a tempo change then was taken for one during the count-in, and lost for the whole run)
+    const ahead = now < run.anchor;
+    const counting = ahead && !run.looped;
     if (counting && why !== 'swing') return;      // still counting in: this run keeps its tempo
     const plan = run.plan;
-    const from = counting ? run.anchor : now;
+    const from = ahead ? run.anchor : now;
     // where the music is: the time on the bent clock (the same under any swing — the beats never move),
     // and the tick there, read with the bend it was laid down with
     const clock = run.c0 + (now - run.anchor) / run.tickSec;
-    const tickAt = counting ? run.passFrom : tickAfter(now - run.anchor);
+    const tickAt = ahead ? run.passFrom : tickAfter(now - run.anchor);
     voices = voices.filter(v => {
       if (v.start > now && v.start >= from) { try { v.o.stop(); } catch (e) {} return false; }
       return true;
@@ -508,14 +525,14 @@
     pending = [];                                 // what was still to come is planned again at the new tempo
     pendingIndex = 0;
     clearTimeout(passTimer);
-    cues = cues.filter(c => c.t <= now);
+    cues = cues.filter(c => c.t <= now || c.t < from);     // the pass still ending keeps its lights
     cueIndex = Math.min(cueIndex, cues.length);
     run.tickSec = SW.timing.tickMs() / 1000;
     run.sw = swingOf(plan);
     run.passFrom = tickAt;
     run.anchor = from;
-    // from the count-in's beat, or from this point of the clock (a note the new swing puts just before it sounds at once)
-    planNextPass(plan, schedulePass(plan, tickAt, run.passTo, from, run.tickSec, !counting, counting ? undefined : clock));
+    // from the count-in's beat (or the next pass's start), or from this point of the clock (a note the new swing puts just before it sounds at once)
+    planNextPass(plan, schedulePass(plan, tickAt, run.passTo, from, run.tickSec, !ahead, ahead ? undefined : clock));
   }
 
   function toggle() { if (S.playing) stop(); else play(); }
@@ -525,7 +542,24 @@
   function replan() {
     if (!S.playing || !run) return;
     const at = position();
-    play(at === null ? run.passFrom : Math.floor(at), Object.assign({}, run.opts || {}, { countIn: false }));
+    // Go round keeps going round from where Play began, not from here (2026-11-22, bug report M15)
+    const keep = run.plan.mode === 'round' && run.plan.loop ? { roundFrom: run.plan.loop[0] } : {};
+    play(at === null ? run.passFrom : Math.floor(at), Object.assign({}, run.opts || {}, keep, { countIn: false }));
+  }
+
+  /* A part's volume changed while it plays (Options → Parts, its slider): the
+     sounds not yet on the clock take the new level — within LOOKAHEAD — and
+     nothing starts again (2026-11-22, bug report M16: each step of a dragged
+     slider replanned the run, so the music stuttered, and a step that came
+     while the run was getting ready was lost, leaving an in-between level).
+     A part's notes read their level from the plan's meta when they are laid
+     on the clock (schedulePass layPart → SW.audio.tone), so it is changed
+     there, in place. */
+  function revolume() {
+    const plan = livePlan;
+    if (!S.playing || !plan) return;
+    Object.assign(plan.meta, SW.parts.meta(SW.parts.focused()));
+    plan.others.forEach(p => Object.assign(p.meta, SW.parts.meta(p.part)));
   }
 
   /* Where the music is now, in ticks from the song's top (null when not
@@ -542,7 +576,8 @@
   // matches); a change of tempo or swing re-times it instead
   SW.bus.on('score:changed', d => {
     if (d && (d.reason === 'tempo' || d.reason === 'swing')) retime(d.reason);
-    else if (d && (d.reason === 'chart' || d.reason === 'part-sound' || d.reason === 'part-volume' || d.reason === 'part-clef')) replan();   // the Chord Chart, a part's sound or clef: the music goes on
+    else if (d && d.reason === 'part-volume') revolume();          // a part's volume: the music goes on, louder or softer
+    else if (d && (d.reason === 'chart' || d.reason === 'part-sound' || d.reason === 'part-clef')) replan();   // the Chord Chart, a part's sound or clef: the music goes on
     else stop();
   });
   ['score:loaded', 'key:changed'].forEach(evt => SW.bus.on(evt, stop));

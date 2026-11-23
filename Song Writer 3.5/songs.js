@@ -2,18 +2,22 @@ const PRELOADED_SONGS = {
     'new-song': `[Key of C]
 [A]
 Start[D1] Here[D1]`,
+    /* 2026-11-22 (bug report L30): with their rhythm — as blocks, Notation
+       made every note a quarter, so "star" and "are" were not held and
+       "How" ended Twinkle's first row. Their old texts are kept in
+       library.js RETIRED_DEFAULTS, so an untouched old copy is given these. */
     'twinkle': `[Key of C]
 [A]
-Twin[D1] kle,[D1] twin[S1] kle,[S1] lit[L1] tle[L1] star[S1] How[F1] I[F1] won[M1] der[M1] what[R1] you[R1] are[D1]
+Twin[D1:q] kle,[D1:q] twin[S1:q] kle,[S1:q] lit[L1:q] tle[L1:q] star[S1:h] How[F1:q] I[F1:q] won[M1:q] der[M1:q] what[R1:q] you[R1:q] are[D1:h]
 [B]
-Up[S1] a-[S1] bove[F1] the[F1] world[M1] so[M1] high,[R1] Like[S1] a[S1] dia-[F1] mond[F1] in[M1] the[M1] sky.[R1]
+Up[S1:q] a-[S1:q] bove[F1:q] the[F1:q] world[M1:q] so[M1:q] high,[R1:h] Like[S1:q] a[S1:q] dia-[F1:q] mond[F1:q] in[M1:q] the[M1:q] sky.[R1:h]
 [A]
-Twin[D1] kle,[D1] twin[S1] kle,[S1] lit[L1] tle[L1] star,[S1] How[F1] I[F1] won[M1] der[M1] what[R1] you[R1] are.[D1]`,
+Twin[D1:q] kle,[D1:q] twin[S1:q] kle,[S1:q] lit[L1:q] tle[L1:q] star,[S1:h] How[F1:q] I[F1:q] won[M1:q] der[M1:q] what[R1:q] you[R1:q] are.[D1:h]`,
     'mary': `[Key of C]
 [A]
-Ma[M1] ry[R1] had[D1] a[R1] lit[M1] tle[M1] lamb,[M1] lit[R1] tle[R1] lamb,[R1] lit[M1] tle[S1] lamb.[S1]
+Ma[M1:q] ry[R1:q] had[D1:q] a[R1:q] lit[M1:q] tle[M1:q] lamb,[M1:h] lit[R1:q] tle[R1:q] lamb,[R1:h] lit[M1:q] tle[S1:q] lamb.[S1:h]
 [B]
-Ma[M1] ry[R1] had[D1] a[R1] lit[M1] tle[M1] lamb,[M1] its[M1] fleece[R1] was[R1] white[M1] as[R1] snow.[D1]`
+Ma[M1:q] ry[R1:q] had[D1:q] a[R1:q] lit[M1:q] tle[M1:q] lamb,[M1:q] its[M1:q] fleece[R1:q] was[R1:q] white[M1:q] as[R1:q] snow.[D1:w]`
 };
 
 /* A built-in with more than the text format can hold (a Chord Chart and a

@@ -789,6 +789,59 @@
     return !!document.querySelector('.sheet-backdrop.show');
   };
 
+  /* ASK (2026-11-22, bug report L28): the app's own yes-or-no window, for the
+     questions that throw work away (Clear, Delete, Start over). The
+     browser's confirm() can be refused without a word — in the app's
+     browser pane, in a page embedded where pop-up dialogs are blocked — and
+     then Clear simply did nothing. Built here from the sheets' own classes
+     (no new CSS, nothing in index.html), on top of any sheet already open.
+     o: { title, text, yes, no, danger }. A promise: true for the yes
+     button; false for Cancel, ×, a tap outside or Esc. One at a time — a
+     second question answers the first one "no". */
+  let askDone = null;
+  ui.ask = function (o) {
+    const opts = o || {};
+    if (askDone) askDone(false);
+    let el = document.getElementById('ask-sheet');
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'sheet-backdrop';
+      el.id = 'ask-sheet';
+      el.innerHTML = '<div class="sheet sheet-sm" role="alertdialog" aria-modal="true" aria-labelledby="ask-sheet-title">' +
+        '<div class="sheet-head"><h2 id="ask-sheet-title"></h2>' +
+        '<button class="sheet-close" type="button" title="Close" aria-label="Close">&times;</button></div>' +
+        '<p class="sheet-sub"></p>' +
+        '<div class="sheet-foot"><button class="btn" type="button" data-ask="no"></button>' +
+        '<button class="btn" type="button" data-ask="yes"></button></div></div>';
+      document.body.appendChild(el);
+      // a tap outside closes it, as every sheet's does (press and release both on the backdrop)
+      let down = false;
+      el.addEventListener('pointerdown', e => { down = e.target === el; });
+      el.addEventListener('pointerup', e => { if (e.target === el && down) ui.closeSheet('ask-sheet'); down = false; });
+      el.querySelector('.sheet-close').addEventListener('click', () => ui.closeSheet('ask-sheet'));
+      el.querySelector('[data-ask="no"]').addEventListener('click', () => ui.closeSheet('ask-sheet'));
+      el.querySelector('[data-ask="yes"]').addEventListener('click', () => { const d = askDone; askDone = null; ui.closeSheet('ask-sheet'); if (d) d(true); });
+      // every other way out (Esc closes the top sheet: app.js) is a no
+      SW.bus.on('sheet:closed', d => { if (d && d.id === 'ask-sheet' && askDone) { const f = askDone; askDone = null; f(false); } });
+    }
+    el.querySelector('#ask-sheet-title').textContent = opts.title || 'Are you sure?';
+    const sub = el.querySelector('.sheet-sub');
+    sub.textContent = opts.text || '';
+    sub.hidden = !opts.text;
+    const yes = el.querySelector('[data-ask="yes"]');
+    yes.textContent = opts.yes || 'OK';
+    yes.className = 'btn ' + (opts.danger ? 'btn-danger-solid' : 'btn-primary');
+    el.querySelector('[data-ask="no"]').textContent = opts.no || 'Cancel';
+    document.body.appendChild(el);                   // last in the page: the top sheet, over any other open one
+    return new Promise(resolve => {
+      askDone = resolve;
+      ui.openSheet('ask-sheet');
+      // a question that throws work away waits on Cancel, so a stray Enter keeps it
+      const first = opts.danger ? el.querySelector('[data-ask="no"]') : yes;
+      setTimeout(() => { if (el.classList.contains('show')) first.focus(); }, 60);
+    });
+  };
+
   /* Popovers: each is paired with the button that opens it. Registered by
      whichever module owns the popover. opts.guard() may refuse the open
      (and say why in a toast) — the key when a lesson fixes it, say. */

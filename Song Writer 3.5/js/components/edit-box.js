@@ -392,6 +392,15 @@
     syncUndo();
     if (opened) SW.bus.emit('editbox:changed', { open });
     if (open) schedule();
+    // on a screen held upright the box opens under the music (style.css, bug report M25): the
+    // selected note is brought back into view once the music has its new, shorter room
+    if (opened && open && window.matchMedia && window.matchMedia('(orientation: portrait)').matches) {
+      setTimeout(() => {
+        const sel = document.querySelector('#score .note.selected-note');
+        const syl = sel && sel.closest('.syllable');
+        if (syl && syl.scrollIntoView) syl.scrollIntoView({ block: 'nearest' });
+      }, 350);
+    }
   }
   function setOpen(on) {
     if (!railOn() || !!view().editOpen === !!on) { sync(); return; }

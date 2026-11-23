@@ -262,6 +262,16 @@ body.show-dock .preview-bar { bottom: calc(var(--toolbar-real) + var(--dock-h) +
 /* (the viewing bar — a student's work opened as they had it — is a preview bar with two buttons) */
 .viewing-bar { gap: 8px; }
 .viewing-bar span { margin-right: 4px; overflow: hidden; text-overflow: ellipsis; }
+/* never wider than the screen: below about 520 px the viewing bar's name and Close went off
+   both edges (bug report L20, 2026-11-22). On a narrow screen a bar wraps when it must; the
+   viewing bar puts its words on a row of their own, over its two buttons. */
+.preview-bar { width: max-content; max-width: calc(100vw - 20px); }   /* max-content: centred from 50%, it would shrink to half the screen */
+.preview-bar span { min-width: 0; }
+@media (max-width: 600px) {
+  .preview-bar { flex-wrap: wrap; justify-content: center; row-gap: 7px; padding: 9px 12px; border-radius: var(--r-lg); white-space: normal; text-align: center; }
+  .preview-bar span { margin-right: 0; line-height: 1.3; }
+  .viewing-bar span { flex-basis: 100%; }
+}
 
 /* ============================================================
    STUDENT VERSIONS (2026-11-15, js/lessons.js) — Save my work in the
@@ -735,6 +745,12 @@ body.show-staff .harmony-stack.notated .letter-name, body.show-staff .harmony-st
 }
 body.show-ctrack .chord-slot { display: flex; }               /* chord-track.js: View → Chord track on, and chords to show */
 body.show-ctrack .notation-line { padding-top: 34px; }
+/* a little air between the chord lane and the staff on a phone or tablet: the bar numbers,
+   which sit over the staff, touched the chord boxes above them (bug report L11, 2026-11-22;
+   a number lifted over a high note can still reach them: staff.js's to fix) */
+@media (max-width: 900px) {
+  body.show-ctrack .notation-line.has-staff .syllable { row-gap: 5px; }
+}
 body.editing:not(.chords-locked) .chord-slot { cursor: pointer; }
 
 /* ============================================================
@@ -887,6 +903,11 @@ body.pane-chords .eb-chords .chord-strip { display: flex; }   /* the pane brings
   transform: scale(.86);
 }
 .eb-harm-add:hover { color: var(--edit); }
+/* five or six notes: the circles shrank to share one row — about 14 px, 10 on a phone (bug
+   report L22, 2026-11-22). They keep their size now and go on to a second row; only a big
+   chord makes the box taller. */
+.eb-harm-notes { flex-wrap: wrap; align-content: center; height: auto; min-height: var(--eb-btn-h); padding: 5px 7px; gap: 6px 7px; }
+.eb-harm-note, .eb-harm-add { flex: none; width: calc(var(--eb-btn-h) - 14px); }
 /* the pick-up's values (edit-box.js PICK-UP): a row of small chips under
    Pick-up, the lit one what the selected pick-up is worth */
 .eb-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: -2px; }
@@ -971,12 +992,18 @@ body.editing .add-line-row { display: flex; justify-content: center; padding: 2p
   transition: background .13s, color .13s;
 }
 .set-btn:hover { background: var(--chord); color: #fff; }
+/* The rows share the panel's height. A row stops growing at about a quarter
+   of the screen's height (118 px at least), and the tower has no cap of its
+   own: with a fixed 118 px row and a 640 px tower, a tall screen left a
+   gap above the buttons — about 440 px on a smartboard, 110 px at
+   1280×800 (bug report M26, 2026-11-22). A set of one or two rows still
+   sits down by the keyboard, under a gap. */
 .strip-tower {
-  flex: 1 1 auto; min-height: 0; max-height: 640px;
+  flex: 1 1 auto; min-height: 0;
   display: flex; flex-direction: column-reverse; gap: 5px;
   margin-top: auto;
 }
-.crow { display: flex; gap: 5px; flex: 1 1 0; min-height: 0; max-height: 118px; }
+.crow { display: flex; gap: 5px; flex: 1 1 0; min-height: 0; max-height: max(118px, 24vh); }
 /* the Chord Chart's and Everything's: top down, every block the same size (a short row filled out with gaps) */
 .strip-tower.down { flex-direction: column; justify-content: flex-end; }   /* down by the keyboard, as the places sit */
 .cblock-pad { flex: 1 1 0; min-width: 0; }
@@ -1048,6 +1075,20 @@ body.hide-keycaps .cb-key, body.hide-keycaps .cmod-key { display: none; }
 .figs { display: inline-flex; flex-direction: column; vertical-align: -.12em; margin-left: .07em; font-size: .48em; line-height: .92; font-weight: 700; }
 .figs i { font-style: normal; }
 .fig { font-size: .55em; vertical-align: super; line-height: 0; font-weight: 700; }
+/* NUMERALS THAT READ (bug report L2, 2026-11-22). Fredoka's kerning pulls V into I and
+   into a slash: "IV" read as "N" and "V/V" as "V/\/". Letter-spacing cannot undo it (even
+   .1em still touched); turning the kerning off does, and leaves C♯m7 or B♭ as they were.
+   So every chord name drawn in Fredoka — the panel, the chord track, the Time Line and its
+   tray, the Chord Chart, Focus, Compare, the corner, the Rhythm page — sets its letters
+   unkerned. */
+.cblock, .head-btn, .cmod-name, .cn-name, .cp-name, .root-chip span,
+.cc-card, .cc-lchord, .cc-cb, .cc-cnames .seg-btn, .cr-chip,
+.fx-big, .fx-small, .fx-dchip, .cx-cname,
+.tl-c, .cbar, .ct-ghost, .rp-rest-bar > i { font-kerning: none; }
+/* Save picture: html2canvas writes a whole name at once with the canvas's own kerning, so
+   the picture still said "N". A hair of letter-spacing makes it place each letter where
+   the page has it (unkerned); it is far below a pixel. */
+body.capturing .cb-name, body.capturing .ct-ghost, body.capturing .rp-rest-bar > i { letter-spacing: .01em; }
 
 /* Z X C V B: hold a tab (or its key) while you play */
 .strip-mods { display: flex; gap: 4px; }
@@ -1742,6 +1783,21 @@ body:not(.editing) #textEditorBtn { display: none; }
 .sl-tabs .seg-btn.active { background: var(--accent); color: #fff; box-shadow: none; }
 .sl-pane[hidden] { display: none; }
 .sl-pane > .popover-title:first-child { margin-top: 10px; }
+/* Look was about 800 px tall in one column: at 1280×800 Display Note Names sat below the fold
+   and the popover grew up over the top bar (bug report L21, 2026-11-22). On a screen up to
+   1000 px tall, both panes take two columns — Look: the sizes | Music Page; Sound: what you
+   hear | how it sounds — so they come out about half as tall. */
+@media (min-width: 721px) and (max-height: 1000px) {
+  #soundlook-popover { width: 620px; }
+  #soundlook-popover .sl-pane { columns: 2; column-gap: 22px; }
+  #soundlook-popover .sl-pane > * { break-inside: avoid; }
+  #look-page-title, #sound-switches + .popover-title { break-before: column; margin-top: 10px; }
+}
+/* and a toolbar's popover never covers the top bar (core.js positionPopover lets it reach 12 px
+   from the top): the room between the two bars, less a little air */
+#setup-popover:not(.pinned), #soundlook-popover:not(.pinned), #options-popover:not(.pinned) {
+  max-height: calc(100dvh - var(--topbar-h) - var(--toolbar-real) - 16px) !important;
+}
 
 /* the key: thirteen keys in their tonic colours (Setup; its own popover until 2026-10-31) */
 .key-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
@@ -2420,6 +2476,48 @@ body.capturing:not(.capture-colour) .line-label { background: #f2f2f2; }
   .edit-box .eb-btn.eb-view { height: 32px; font-size: 12.5px; }
   .eb-title { font-size: 18px; }
   .vd-caption { font-size: 14px; }
+}
+/* ---- a screen held upright: the Edit box UNDER the music (2026-11-22,
+   bug report M25 + L18). Beside the music, the rail and the box left a
+   phone's song about 150 px — one clef and key wide, the notes and the
+   line tools cut off — and a tablet's one bar a row. Upright, height is
+   what a screen has to spare, so the box moves under the stage (and under
+   the keyboard, when that is out): the music keeps the whole width and its
+   size. The box keeps a fixed height, so the music never jumps as the
+   selection moves; it scrolls inside itself, and on a tablet its sections
+   sit side by side. The rail stays at the left edge. ---- */
+@media (max-width: 900px) and (orientation: portrait) {
+  :root { --eb-h: min(42vh, 360px); }
+  body.show-dock { --eb-h: min(30vh, 300px); }          /* the keyboard out too: the box gives the music some back */
+  body.box-open .workspace,
+  body.box-open.show-strip .workspace { grid-template-columns: 0 minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 0 var(--eb-h); }
+  body.box-open.show-dock .workspace { grid-template-rows: minmax(0, 1fr) auto var(--eb-h); }
+  .edit-box { grid-column: 2; grid-row: 3; border-right: none; border-top: 1.5px solid rgba(240,138,0,.32); }
+  body.box-open .eb-rail { background: var(--surface); }          /* no title beside its top cell now */
+  .eb-fold[aria-expanded="true"] svg { transform: rotate(90deg); }  /* ⌄: the box goes away downwards */
+  body:not(.pane-chords) .eb-body { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; column-gap: 18px; }
+  .eb-body > .eb-lyrics, .eb-body > .eb-empty, .eb-body > .eb-chords { grid-column: 1 / -1; }
+  /* the preview / viewing bar floats over the music, not over the box */
+  body.box-open .preview-bar { bottom: calc(var(--toolbar-real) + var(--eb-h) + 14px); }
+  body.box-open.show-dock .preview-bar { bottom: calc(var(--toolbar-real) + var(--dock-h) + var(--eb-h) + 28px); }
+}
+/* a phone: one column the box's width, so the value circles go in one row (rhythm-panel.js
+   places a short last row inline; one row needs no placing) and Dotted · Tie · Rest come up */
+@media (max-width: 599px) and (orientation: portrait) {
+  .eb-values .vd-row { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .eb-values .vd-row > .value-choice { grid-column: auto !important; }
+}
+/* a tablet held upright: three columns — Rhythm | Lyrics over Note | Lines — so every tool is in sight */
+@media (min-width: 600px) and (max-width: 900px) and (orientation: portrait) {
+  body:not(.pane-chords) .eb-body { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto 1fr; padding-top: 10px; }
+  .eb-body > #rhythm-panel { grid-column: 1; grid-row: 1 / span 2; }
+  .eb-body > .eb-lyrics { grid-column: 2; grid-row: 1; }
+  .eb-body > #eb-note { grid-column: 2; grid-row: 2; }
+  .eb-body > #eb-words { grid-column: 3; grid-row: 1 / span 2; }
+  .eb-body > #rhythm-panel, .eb-body > #eb-words { margin-top: 0; padding-top: 0; border-top: none; }
+  /* the Pitch page has no Rhythm section: Lyrics | Note | Lines */
+  .eb-body:has(> #rhythm-panel[hidden]) > .eb-lyrics { grid-column: 1; }
+  .eb-body:has(> #rhythm-panel[hidden]) > #eb-note { grid-row: 1 / span 2; margin-top: 0; padding-top: 0; border-top: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3448,6 +3546,14 @@ body.present-mode .prog-btn { display: none; }          /* Present: the music, n
   .pw-foot { padding: 10px 12px; gap: 6px; flex-wrap: nowrap; }
   .pw-foot .btn { padding: 0 11px; height: 40px; font-size: 13px; }
 }
+/* a phone held upright: one row was about 445 px (▶ · In the song · Save as New · Save to Chord
+   Chart), so Save to Chord Chart went off the edge (bug report M27, 2026-11-22). The foot takes
+   two rows, as the smaller window's does: ▶ and the playing buttons, then the saves side by side */
+@media (max-width: 520px) {
+  .pw-foot { flex-wrap: wrap; row-gap: 8px; }
+  .pw-foot .pw-gap { flex-basis: 100%; height: 0; }
+  .pw-foot .pw-gap ~ .btn { flex: 1; justify-content: center; }
+}
 
 /* ============================================================
    THE CHORDS WINDOW — its tabs (Chord Chart · Time Line)
@@ -3488,6 +3594,14 @@ body.show-ctrack .notation-line.chords-above .chord-slot { height: 0; overflow: 
 }
 .cbar.held { border-left-color: transparent; border-top-left-radius: 2px; border-bottom-left-radius: 2px; }
 .cbar.held .cb-name { color: var(--ink-3); font-size: calc(14px * var(--text-scale)); }
+/* A chord that starts on a row's last short note gets a box only that note wide, and its
+   name was cut to a sliver ("V/" for V/V at 220% text on Pitch; bug report L3, 2026-11-22).
+   Below about 64 px the name shrinks with its box (a container query on the bar) — never
+   under 10 px — so it is whole, if small. The box itself is the chord track's to size. */
+.cbar { container-type: inline-size; }
+@container (max-width: 64px) {
+  .cbar .cb-name, .cbar.held .cb-name { font-size: max(10px, min(calc(17px * var(--text-scale)), 38cqw)); }
+}
 .cbar.end { border-right: 3px solid rgba(43,29,56,.3); }
 .cbar.nochord { background: transparent; border: 1.5px solid #D8CAE0; }
 .cbar.nochord .cb-name { color: var(--ink-3); }
@@ -3631,10 +3745,12 @@ body.capturing #score { position: static; height: auto; overflow: visible; visib
 body.capturing .rhythm-page { display: none; }
 .rp-empty { font-size: 14px; font-weight: 700; color: var(--ink-3); text-align: center; padding: 30px 0; }
 
-/* one song line: its bars in a row (wrapping), its section colour behind */
+/* one song line: its bars in a row (wrapping), its section colour behind. The rows start at
+   one left edge, as on Notation (centred, each row sat at its own place on a wide screen:
+   bug report L13, 2026-11-22) */
 .rp-line {
   position: relative;
-  display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center;
+  display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: flex-start;
   row-gap: 14px;
   padding: 28px 14px 12px;
   margin-top: 8px;
@@ -3645,6 +3761,9 @@ body.capturing .rhythm-page { display: none; }
   position: absolute; left: 14px; top: 7px;
   font-family: var(--font-round); font-size: 13px; font-weight: 700; color: var(--ink-3);
 }
+/* rows from the left edge: a line whose first bar has a number (no pick-up) would have it
+   under the line's name ("A" over "1"), so that line's name gets a band of its own */
+.rp-line:has(> .rp-label + .rp-bar .rp-measure-number) { padding-top: 46px; }
 
 /* a bar and the bar line after it wrap as one */
 .rp-bar { display: flex; align-items: stretch; flex: none; max-width: 100%; }
@@ -3841,6 +3960,21 @@ body.rhythm-fixed .rhythm-page .rp-notes { margin-top: 0; }
   .rhythm-page { --rp-dot: calc(20px * var(--bs)); --rp-word: calc(16px * var(--bs)); --gutter-l: 16px; --gutter-r: 5px; padding: 0 8px 16px; }
   .rp-line { padding: 26px 6px 10px; }
   .rp-divider { margin: 0 5px; }
+}
+/* A PHONE'S RHYTHM PAGE (bug report L16, 2026-11-22). The circles were 10 px (20 px × a
+   phone's 0.5): never under 13 px now (a 3/4 bar of sixteenths still fits a 375 px phone),
+   each with a taller invisible collar inside its pill. The ⛓ is a size smaller, so it no
+   longer covers the next beat's +. And a bar too wide for the screen (4/4 in sixteenths)
+   was cut off with no way to reach it: its line grows to the bar, and the page scrolls
+   sideways to it. */
+@media (max-width: 640px) {
+  .rhythm-page { --rp-dot: max(13px, calc(20px * var(--bs))); }
+  button.rp-circle { position: relative; }
+  button.rp-circle::after { content: ''; position: absolute; left: -1px; right: -1px; top: -8px; bottom: -8px; }
+  .rp-link { width: 20px; height: 20px; top: -11px; right: calc(-13.5px - var(--gap, 0px) / 2); }
+  .rp-link svg { width: 12px; height: 12px; }
+  body.page-rhythm .stage { overflow-x: auto; }
+  .rp-line { width: fit-content; min-width: 100%; }
 }
 
 /* ==========================================================================

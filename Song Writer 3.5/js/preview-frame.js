@@ -39,13 +39,24 @@
     if (SW.app && !S.present) SW.app.setPresent(true);
   }
 
-  function open(id) {
+  /* recJson (2026-11-22, bug report L25): the window's own copy of the
+     record, as JSON. A song that is in this frame's library opens from there;
+     one that is not — a song from a link in a page embedded in another site
+     is kept in that page's memory only, never stored — is held here for the
+     look (library.js holdVisiting: shared, so nothing could save it). */
+  function open(id, recJson) {
     if (id === undefined || id === null) return false;
     quiet();
     // the live library: what this frame read earlier may be old by now
     try { EMBED.forget(L.STORAGE_KEY); } catch (e) {}
     let ok = false;
     try { ok = L.loadSongById(String(id)); } catch (e) { console.error('SongWriterPreview.open:', e); }
+    if (!ok && typeof recJson === 'string') {
+      try {
+        L.holdVisiting(String(id), JSON.parse(recJson));
+        ok = L.loadSongById(String(id));
+      } catch (e) { console.error('SongWriterPreview.open:', e); }
+    }
     if (!ok) return false;
     settle();
     const stage = document.getElementById('stage');

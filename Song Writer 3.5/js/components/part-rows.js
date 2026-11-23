@@ -345,6 +345,7 @@
     const bits = [];
     evs.forEach(c => {
       let ink = '';
+      if (!c.notated) { bits.push({ c, ink }); return; }      // (staff.js modelColumns writes blocks as the beat; never a value-less note)
       if (c.rest) {
         // a whole rest sits in the middle of its bar
         if (c.value.base === 'w') { const sp = jr.bars.find(b => b.b === c.bar); if (sp) c.x = cx((sp.x0 + sp.x1) / 2); }
@@ -357,7 +358,7 @@
     // ties: a note drawn in pieces to its pieces, and a tied note to the next
     evs.forEach((c, i) => {
       const nx = evs[i + 1];
-      if (!nx || c.rest || nx.rest) return;
+      if (!nx || c.rest || nx.rest || !c.notated || !nx.notated) return;
       const owner = c.piece ? c.owner : c;
       if (nx.piece && nx.owner === owner) { out.push(K.drawTies(Object.assign({}, c, { tiePitches: owner.pitches }), nx, g)); return; }
       const lastOf = !c.piece ? !(owner.pieces && owner.pieces.length) : c === owner.pieces[owner.pieces.length - 1];
@@ -366,7 +367,7 @@
     bits.forEach(b => {
       const c = b.c;
       let ink = b.ink;
-      if (!c.rest) ink += K.drawHeads(c, g, noNames);
+      if (!c.rest && c.notated) ink += K.drawHeads(c, g, noNames);
       if (c.word) ink += K.text(c.x, wordY, Math.max(12, 20 * bs), esc(c.word.text) + (c.hy ? '-' : ''), wordAttr);
       const at = c.piece ? c.owner.at : c.at;
       out.push('<g class="pr-ev' + (c.standalone ? ' pr-filler' : '') + '" data-part="' + part + '" data-at="' + (at === undefined ? '' : at) + '">' + ink + '</g>');

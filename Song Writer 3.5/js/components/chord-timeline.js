@@ -163,14 +163,21 @@
     const song = SW.timing.song();
     const mt = song.meter, B = mt.barTicks;
     const rows = [];
+    // a line as long as its longest part needs it (timing.js SHARED LENGTHS: `padded` is the song's, `own`
+    // this part's — whole bars apart, or all of it when this part's line is empty): the bars the other parts
+    // add are part of its time, wherever it goes (2026-11-22, bug report M14: drawn from this part's notes
+    // alone, a line another part ran on in came out short, and everything after it early)
+    const length = le => (le.own === undefined ? le.total : le.own ? le.total + le.padded - le.own : le.padded);
     items.forEach(it => {
       if (it.kind === 'gap') rows.push({ it, bars: it.bars, P: 0 });
-      else it.src.forEach(i => { const le = song.lines[i]; if (le && !le.bars) rows.push({ it, le, P: le.pickup, t: le.total }); });
+      else it.src.forEach(i => { const le = song.lines[i]; if (le && !le.bars) rows.push({ it, le, P: le.pickup, t: length(le) }); });
     });
     let at = 0;
     rows.forEach((r, i) => {
+      // padded until the next line's pick-up lands on the bar line — after the last line, the first's (the song
+      // goes round, timing.js lineSource: a one-line song with a pick-up was a little short here)
       const nx = rows[i + 1] || rows[0];
-      const Pn = nx === r ? 0 : nx.P;
+      const Pn = nx.P;
       r.padded = r.le ? (r.t === 0 ? 0 : r.t + mod(r.P - Pn - r.t, B)) : r.bars * B - Pn;
       r.at = at;
       at += r.padded;

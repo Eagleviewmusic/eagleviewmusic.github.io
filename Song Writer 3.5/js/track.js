@@ -516,14 +516,28 @@
     let list = [];
     (Array.isArray(raw.track) ? raw.track : []).forEach(r => {
       if (!r || typeof r !== 'object') return;
-      const from = Math.round(Number(r.from));
-      if (!isFinite(from) || from < minBar || from > MAX_BAR) return;
+      let from = Math.round(Number(r.from));
+      if (!isFinite(from) || from > MAX_BAR) return;
       let to;
       if (r.to === 'melody') to = 'melody';
       else {
         to = Math.round(Number(r.to));
         if (!isFinite(to) || to < from) return;
         to = Math.min(to, MAX_BAR);
+      }
+      /* A stretch from before the first bar there is — bar 0 once the first
+         line's pick-up was taken away (2026-11-22: it used to be dropped,
+         and every chord with it). It starts on that bar instead: it is laid
+         from tick 0 either way (expand: max(0, T(from))), so its chords
+         stay with the melody, which kept its ticks too (score.js PICK-UPS:
+         the bar lines move, the notes do not). Its loose chords then reach
+         up to a bar further than its last bar did (the pick-up's length):
+         it grows to hold them (below). */
+      const early = from < minBar;
+      if (early) {
+        if (to !== 'melody' && to < minBar && !Array.isArray(r.chords)) return;
+        from = minBar;
+        if (to !== 'melody') to = Math.max(to, from);
       }
       const st = { from, to };
       if (typeof r.prog === 'string' && byId[r.prog]) {
@@ -562,14 +576,20 @@
       } else if (Array.isArray(r.chords)) {
         st.chords = r.chords.map(c => cleanStep(c, mt, mt.beats)).filter(Boolean);
         if (!st.chords.length) return;
+        if (early && to !== 'melody' && minBar === 1) {           // laid from bar 1's line: as many bars as its chords fill
+          const len = st.chords.reduce((t, c) => t + toTicks(c.beats || mt.beats, mt.beatTicks), 0);
+          const need = Math.min(Math.round(Number(r.to)) + 1, Math.ceil(len / mt.barTicks));
+          if (need > to) { st.grew = to; st.to = Math.min(need, MAX_BAR); }
+        }
       } else return;
       list.push(st);
     });
     list.sort((a, b) => a.from - b.from);
-    // never overlapping: a later stretch loses the bars an earlier one has
+    // never overlapping: a later stretch loses the bars an earlier one has (one grown above only grows up to it)
     const clean = [];
     list.forEach(r => {
       const prev = clean[clean.length - 1];
+      if (prev && prev.grew !== undefined && r.from <= prev.to) prev.to = Math.max(prev.grew, r.from - 1);
       if (prev && prev.to !== 'melody' && r.from <= prev.to) {
         if (r.to !== 'melody' && r.to <= prev.to) return;
         shiftStart(r, prev.to + 1 - r.from, mt, byId);
@@ -651,7 +671,12 @@
      on a grid → events. `chart` (optional): the cards a chord's `k` finds
      its voice on. */
   // how many notes a chord sounds (an arpeggio's ranks)
-  const notesIn = (id, voice) => (SW.chords && SW.chords.isKnown(id) ? SW.chords.midis(id, { voice }).length : 3);
+  // … in the key of its bar, as the player sounds it (2026-11-22: past a key change it counted in the key of the selection)
+  function notesIn(id, voice, at) {
+    if (!SW.chords || !SW.chords.isKnown(id)) return 3;
+    const count = () => SW.chords.midis(id, { voice }).length;
+    return SW.keys && at !== undefined ? SW.music.withKey(SW.keys.atTick(at), count) : count();
+  }
   function expand(progs, track, g, chart) {
     const byId = {};
     progs.forEach(p => { byId[p.id] = p; });
@@ -730,7 +755,7 @@
           place: pc.place || null, rhythm: ownSpan(pc),
           k: pc.id && pc.k ? pc.k : null, sv: pc.id && pc.sv ? pc.sv : null, voice: pc.id ? voiceOf(pc) : null,
           arp: pc.id && pc.arp ? pc.arp : null, ownRhythm: !!(pc.id && pc.or),
-          strikes: pc.id ? (pc.arp ? arpStrikes(strikesOf(pc, pattern, origin), pc, g, notesIn(pc.id, voiceOf(pc))) : strikesOf(pc, pattern, origin)) : []
+          strikes: pc.id ? (pc.arp ? arpStrikes(strikesOf(pc, pattern, origin), pc, g, notesIn(pc.id, voiceOf(pc), pc.at)) : strikesOf(pc, pattern, origin)) : []
         });
       });
     });
@@ -798,6 +823,15 @@
     SW.score.changed(why === 'chart' ? 'chart' : 'track');        // 'chart': the Chord Chart — the player keeps playing (replan)
     SW.bus.emit('track:changed', { why: why || 'edit' });
   }
+  /* THE FIRST LINE'S PICK-UP TAKEN AWAY (2026-11-22): a stretch left on bar
+     0 goes over to bar 1 at once (normalizeInto, above), not at the next
+     reload — in the same Undo step, as this file is loaded before
+     history.js records the change. */
+  SW.bus.on('score:changed', d => {
+    if ((d && d.reason === 'history') || !S.track.some(r => r.from < 1)) return;
+    if (SW.timing.pickupTicks(SW.parts ? SW.parts.firstPickup() : '', meterOf()) > 0) return;
+    S.track = normalizeInto({ chart: S.chart, progressions: S.progressions, track: S.track }, { meter: S.meter, lines: [] }).track || [];
+  });
   function batch(fn) {
     batching++;
     try { fn(); } finally {
@@ -1077,7 +1111,8 @@
     const pcs = next.map(pc => {
       const o = Object.assign({}, pc);
       if (!o.k || !chartEntry(o.k)) {
-        const mine = S.chart.filter(x => !x.hidden && x.chord === o.chord);
+        // a chord with notes of its own goes to a card with those notes, or to a new one: it sounds as it did (2026-11-22)
+        const mine = S.chart.filter(x => !x.hidden && x.chord === o.chord && (!o.voice || sameVoice(x.voice, o.voice)));
         let e = mine.find(x => (x.place || '') === (o.place || '')) || mine[0];
         let made = false;
         if (!e) {
@@ -1382,13 +1417,21 @@
     writeFlat(step.chord ? layFlat(list, pc) : cutFlat(list, pc.at, pc.end), 'put');
     return step.chord ? pc : null;
   }
-  /* DRAG a chord to start at `to` (its length kept); `copy` leaves it where it was too */
+  /* DRAG a chord to start at `to` (its length kept); `copy` leaves it where it was too. A chord playing its
+     card's rhythm plays it in step with its new bar (2026-11-22: it carried its old strikes along, out of
+     step with the bar when moved by part of one); one with a rhythm of its own (ownRhythm) keeps it as it is */
   function moveChord(at, to, copy) {
-    const list = flat();
+    const g = grid();
+    const list = flat(g);
     const e = list.find(pc => pc.at === at);
     to = Math.max(0, to);
     if (!e || to === at) return null;
     const pc = Object.assign({}, e, { at: to, end: to + (e.end - e.at) });
+    const card = !e.ownRhythm && e.k ? chartEntry(e.k) : null;
+    if (card && card.rhythm && card.rhythm !== HELD) {
+      delete pc.rhythm; delete pc.arp;
+      Object.assign(pc, cardSpot(card, pc.at, pc.end, g));
+    }
     writeFlat(layFlat(copy ? list : cutFlat(list, e.at, e.end), pc), copy ? 'copy' : 'move');
     return pc;
   }
@@ -1411,15 +1454,19 @@
     const e = list.find(pc => pc.at === at);
     return e ? writeFlat(cutFlat(list, e.at, e.end), 'remove') : false;
   }
-  /* change a chord where it is: { chord, place, rhythm } — rhythm 'held',
-     cells over its span, or null (back to its progression's) */
+  /* change a chord where it is: { chord, place, rhythm, k, voice } — rhythm
+     'held', cells over its span, or null (back to its progression's); k null:
+     it leaves its card (applyLoose finds it one for its chord and notes);
+     voice its own notes, null none (2026-11-22: k and voice were passed by,
+     so a chord kept for a key change kept its old card and sounded with its
+     notes, bug report H14) */
   function setChord(at, patch) {
     const list = flat();
     const e = list.find(pc => pc.at === at);
     if (!e) return null;
     if ('chord' in patch && !patch.chord) { removeChord(at); return null; }
     const pc = Object.assign({}, e);
-    ['chord', 'place', 'rhythm'].forEach(k => {
+    ['chord', 'place', 'rhythm', 'k', 'voice'].forEach(k => {
       if (!(k in patch)) return;
       if (patch[k]) pc[k] = patch[k]; else delete pc[k];
     });
@@ -1520,7 +1567,18 @@
      stays one bar); a rhythm goes over beat by beat — between simple and
      compound time each beat to its twin (♩ ↔ ♩., ♫ ↔ ♪♪♪, ♬ ↔ ♩♪, anything
      else stretched to fit); and a bar's rhythm loses its last beats (4/4 →
-     3/4) or gains copies of its last beat (3/4 → 4/4). */
+     3/4) or gains copies of its last beat (3/4 → 4/4).
+     LOOSE CHORDS (the Chord Chart's shape) are RE-BARRED (2026-11-22): every
+     chord keeps its bar and its beat in the bar — bar 3 beat 2 stays bar 3
+     beat 2; one that ran to a bar line still does (3/4 → 4/4: the bar's last
+     chord takes the new beat), one on a beat the shorter bar has not got
+     goes (4/4 → 3/4: beat 4); the pick-up's chords keep their length. Each
+     chord's own rhythm goes over bar by bar, as a card's bar does. (Until
+     then only chords filling whole bars were re-barred, so a pick-up chord
+     or a part-bar ending left every chord on the old beat count, each
+     length rounded on its own, and a rhythm kept its old number of beats.)
+     `pick` (the self-test): { a, b } the pick-up's ticks before and after;
+     otherwise the song's. */
   const TWIN = { XOOO: 'XOOOOO', XOXO: 'XOXOXO', XXXX: 'XOOOXO', OOOO: 'OOOOOO', RRRR: 'RRRRRR' };
   const TWIN_BACK = {};
   Object.keys(TWIN).forEach(k => { TWIN_BACK[TWIN[k]] = k; });
@@ -1536,10 +1594,13 @@
     }
     return out;
   }
-  function followMeter(fromId, toId) {
+  function followMeter(fromId, toId, pick) {
     const A = meterOf(fromId), B = meterOf(toId);
     if (A.id === B.id) return;
     const pa = A.beatTicks / CELL, pb = B.beatTicks / CELL;
+    // the first line's pick-up in each meter (a value a bar long or more is none: timing.js pickupTicks)
+    const pA = pick ? pick.a || 0 : (SW.timing.song().pickup || 0);
+    const pB = pick ? pick.b || 0 : (SW.parts && SW.timing.pickupTicks ? SW.timing.pickupTicks(SW.parts.firstPickup(), B) : pA);
     const beat = chunk => {
       if (pa === pb) return chunk;
       if (chunk.length !== pa) return rescale(chunk, Math.max(1, Math.round(chunk.length * pb / pa)));
@@ -1585,13 +1646,63 @@
       chords.forEach((c, i) => { c.beats = Math.round(want[i] / pb * 1e4) / 1e4; });
       return Math.round(bars) * B.beats;
     };
+    /* LOOSE CHORDS RE-BARRED: a tick of the old grid → the same bar and beat of the new one */
+    const BA = A.barTicks, BB = B.barTicks;
+    const moveTick = t => {
+      if (pA && t <= pA) return pB ? t : 0;            // in the pick-up: where it was (no pick-up now: its chords go)
+      const k = Math.floor((t - pA) / BA);
+      const o = Math.min((t - pA - k * BA) / A.beatTicks, B.beats);   // beats into its bar; past the shorter bar's end, its bar line
+      return pB + k * BB + Math.round(o * B.beatTicks / CELL) * CELL;
+    };
+    // a chord's own rhythm over its new span [x, y): each bar beat by beat, its last beats lost or copied (as barRhythm)
+    const ownOver = (c, at, x, y) => {
+      const charAt = tk => { const i = (tk - at) / CELL; return i >= 0 && i < c.length ? c[i] : 'R'; };
+      let out = '';
+      for (let u = x; u < y;) {
+        if (pA && pB && u < pB) { out += charAt(u); u += CELL; continue; }
+        const k = Math.floor((u - pB) / BB), b0 = pB + k * BB, a0 = pA + k * BA;
+        const beats = [];
+        for (let i = 0; i < A.beats; i++) {
+          let ch = '';
+          for (let j = 0; j < pa; j++) ch += charAt(a0 + (i * pa + j) * CELL);
+          beats.push(beat(ch));
+        }
+        while (beats.length > B.beats) beats.pop();
+        while (beats.length < B.beats) beats.push(beats[beats.length - 1]);
+        const bar = beats.join(''), stop = Math.min(y, b0 + BB);
+        out += bar.slice((u - b0) / CELL, (stop - b0) / CELL);
+        u = stop;
+      }
+      return tidyCells(out);
+    };
+    const gB = { b: B.beatTicks, B: BB };                // what stepsOf needs of the new grid
+    const rebar = r => {
+      const T0 = r.from >= 1 ? pA + (r.from - 1) * BA : 0;    // laid from its first bar line (bar 0: the song's start)
+      let t = Math.max(0, T0);
+      const pcs = [];
+      r.chords.forEach(st => {
+        const len = toTicks(st.beats || A.beats, A.beatTicks);
+        const x = moveTick(t), y = moveTick(t + len);
+        if (st.chord !== null && y > x) {
+          const pc = { at: x, end: y, chord: st.chord };
+          ['place', 'k', 'voice', 'arp'].forEach(f => { if (st[f]) pc[f] = st[f]; });
+          if (st.ownRhythm) pc.ownRhythm = true;
+          if (st.rhythm === HELD) pc.rhythm = HELD;
+          else if (st.rhythm) { const c = ownCells(st, len); if (c) pc.rhythm = ownOver(c, t, x, y); }
+          pcs.push(pc);
+        }
+        t += len;
+      });
+      const a = r.from >= 1 ? pB + (r.from - 1) * BB : 0;
+      r.chords = stepsOf(pcs, Math.max(0, a), Infinity, gB, false);          // none left (all on lost beats): normalize lets it go
+    };
     S.track.forEach(r => {
       (r.here || []).forEach(h => {
         if (h.beat !== 1) return;
         const nb = wholeBars(h.chords, h.beats);
         if (nb) h.beats = nb;
       });
-      if (r.chords) wholeBars(r.chords, r.chords.reduce((t, c) => t + (c.beats || 0), 0));
+      if (r.chords && !r.prog) rebar(r);
     });
     S.chart.forEach(e => { if (e.rhythm && e.rhythm !== HELD) e.rhythm = barRhythm(e.rhythm, 1); });   // a card's bar (2026-10-30)
     S.progressions.forEach(p => {
@@ -1599,11 +1710,11 @@
       p.chords.forEach(step);
     });
     S.track.forEach(r => {
-      (r.here || []).forEach(h => h.chords.forEach(step));
-      (r.chords || []).forEach(step);
+      (r.here || []).forEach(h => h.chords.forEach(step));     // loose chords' rhythms went over with them (rebar)
     });
-    // back through normalize in the new meter (a "just here" on beat 4 has no place in 3/4)
-    const picked = (SW.timing.song().pickup || 0) > 0;
+    // back through normalize in the new meter (a "just here" on beat 4 has no place in 3/4), with
+    // the new meter's pick-up (one a bar long or more is none there)
+    const picked = pB > 0;
     const norm = normalizeInto({ chart: S.chart, progressions: S.progressions, track: S.track }, { meter: B.id, lines: picked ? [{ pickup: true }] : [] });
     S.chart = norm.chart || [];
     S.progressions = norm.progressions || [];
@@ -1797,6 +1908,33 @@
     eq('a bar just here stays a bar', JSON.stringify(S.track[0].here.map(h => [h.bar, h.beats, h.chords.map(c => c.beats)])), '[[2,3,[1.5,1.5]],[3,3,[3]]]');
     followMeter('3/4', '4/4');
     eq('and back', JSON.stringify(S.track[0].here.map(h => [h.bar, h.beats, h.chords.map(c => c.beats)])), '[[2,4,[2,2]],[3,4,[4]]]');
+    // loose chords re-barred (2026-11-22): every chord keeps its bar and beat — a pick-up chord, a chord on every beat, a chord's own rhythm
+    const looseOf = () => S.track.map(r => [r.from, r.chords.map(c => c.chord + ':' + c.beats + (c.rhythm ? '/' + c.rhythm : '')).join(' ')]);
+    S.progressions = [];
+    S.track = [{ from: 0, to: 4, chords: [{ chord: 'V', beats: 1 }, { chord: 'I', beats: 4 }, { chord: 'IV', beats: 4 }, { chord: 'V', beats: 4 }, { chord: 'I', beats: 4 }] }];
+    followMeter('4/4', '3/4', { a: 24, b: 24 });
+    eq('4/4 → 3/4 with a pick-up chord: a bar each still', looseOf(), [[0, 'V:1 I:3 IV:3 V:3 I:3']]);
+    S.track = [{ from: 1, to: 2, chords: [{ chord: 'I', beats: 1 }, { chord: 'IV', beats: 1 }, { chord: 'V', beats: 1 }, { chord: 'I', beats: 1 }, { chord: 'IV', beats: 1 }, { chord: 'V', beats: 1 }] }];
+    followMeter('3/4', '4/4', { a: 0, b: 0 });
+    eq('3/4 → 4/4 a chord a beat: on their beats, the last takes the new one', looseOf(), [[1, 'I:1 IV:1 V:2 I:1 IV:1 V:2']]);
+    S.track = [{ from: 1, to: 2, chords: [{ chord: 'I', beats: 4 }, { chord: 'IV', beats: 2 }, { chord: 'V', beats: 2 }] }];
+    followMeter('4/4', '3/4', { a: 0, b: 0 });
+    eq('4/4 → 3/4 half bars: on their beats', looseOf(), [[1, 'I:3 IV:2 V:1']]);
+    followMeter('3/4', '4/4', { a: 0, b: 0 });
+    eq('and back', looseOf(), [[1, 'I:4 IV:2 V:2']]);
+    S.track = [{ from: 1, to: 2, chords: [{ chord: 'I', beats: 2, rhythm: 'q. e e e' }, { chord: 'V', beats: 2, rhythm: 'q. q.' }] }];
+    followMeter('6/8', '12/8', { a: 0, b: 0 });
+    eq('6/8 → 12/8: a bar each, the rhythm the whole bar', looseOf(), [[1, 'I:4/q. e e e e e e e e e V:4/q. q. q. q.']]);
+    S.track = [{ from: 1, to: 1, chords: [{ chord: 'I', beats: 3 }, { chord: 'V', beats: 1 }] }];
+    followMeter('4/4', '3/4', { a: 0, b: 0 });
+    eq('4/4 → 3/4: a chord on beat 4 goes', looseOf(), [[1, 'I:3']]);
+    // a stretch from bar 0 once the pick-up is gone: it starts on bar 1, its chords where they sounded (H12)
+    const pk5 = [{ chord: 'V', beats: 1 }, { chord: 'I', beats: 4 }, { chord: 'IV', beats: 4 }, { chord: 'V', beats: 4 }, { chord: 'I', beats: 4 }];
+    let noPk = normalizeInto({ track: [{ from: 0, to: 4, chords: pk5 }] }, { meter: '4/4', lines: [] });
+    eq('pick-up taken away: every chord stays, a bar more to hold them', noPk.track, [{ from: 1, to: 5, chords: pk5 }]);
+    noPk = normalizeInto({ track: [{ from: 0, to: 4, chords: pk5 }, { from: 5, to: 6, chords: [{ chord: 'ii', beats: 8 }] }] }, { meter: '4/4', lines: [] });
+    eq('… but only up to the next stretch', noPk.track.map(r => [r.from, r.to]), [[1, 4], [5, 6]]);
+    eq('a pick-up bar alone: its chord in bar 1', normalizeInto({ track: [{ from: 0, to: 0, chords: [{ chord: 'V', beats: 1 }] }] }, { meter: '4/4', lines: [] }).track, [{ from: 1, to: 1, chords: [{ chord: 'V', beats: 1 }] }]);
     S.progressions = keep.p;
     S.track = keep.t;
     S.chart = keep.c;

@@ -16,6 +16,12 @@
        selection back by position, and save through the library as any
        edit does (auto-save decides whether it reaches storage)
      • 100 steps per song
+     • 'blocks' (the Rhythm page writing a song's blocks as the beat they
+       last, score.js writeAllBlocks) is no step of its own: it is put into
+       the step on screen. As a step, a tap there was two (Undo took back
+       only the writing, which the page then did again — Redo greyed and
+       Undo stuck lit), and a song opened there had Undo lit with nothing to
+       take back (bug report H6, 2026-11-22)
 
    Keys: ⌘Z / Ctrl-Z undo, ⇧⌘Z / Ctrl-Y redo (app.js). Buttons: the Edit
    box's rail (edit-box.js; its title bar until 2026-10-31).
@@ -92,6 +98,13 @@
     const next = snap(reason);
     if (!current) { current = next; announce(); return; }
     if (next.json === current.json) { current.sel = next.sel; current.part = next.part; return; }
+    if (reason === 'blocks') {
+      // into the step on screen: nothing to undo, and Redo stays
+      current.json = next.json;
+      current.sel = next.sel;
+      delete current.mel;
+      return;
+    }
     // fold only a run on the same note: ↑↑↑ on one note is one step, but
     // a fast ↑ → ↑ → ↑ across three notes is three
     const fold = FOLD[reason] && current.reason === reason && next.sel === current.sel &&
@@ -118,9 +131,11 @@
     }
   }
 
+  // a word being typed is finished first: that is an edit of its own, which
+  // empties Redo — checked before it, Redo popped nothing and threw (bug report M8)
   function undo(o) {
-    if (!canUndo(o)) return false;
     if (SW.score.isTyping()) SW.score.finishTextEdit();
+    if (!canUndo(o)) return false;
     future.push(current);
     current = past.pop();
     restore(current);
@@ -128,8 +143,8 @@
     return true;
   }
   function redo(o) {
-    if (!canRedo(o)) return false;
     if (SW.score.isTyping()) SW.score.finishTextEdit();
+    if (!canRedo(o)) return false;
     past.push(current);
     current = future.pop();
     restore(current);
