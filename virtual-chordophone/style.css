@@ -254,10 +254,11 @@ sup.fig { font-size: .45em; vertical-align: super; line-height: 0; }
 .boxes.five-tall .box:nth-child(5) { grid-column: 2 / span 2; }
 
 /* ---------------- the skeleton (app.js SKELETON) ----------------
-   only the key of D: the key arrows and the chord sets are hidden, the key tile just says D;
+   only D and A (the arrows step between them, the picker offers just the two); the chord sets are hidden;
    the letter name is big, the numeral under it larger than a sub-name usually is */
-body.skeleton #key-prev, body.skeleton #key-next, body.skeleton #set-seg { display: none; }
-body.skeleton .key-tile { pointer-events: none; }
+body.skeleton #set-seg { display: none; }
+.tb-btn:disabled { opacity: .35; cursor: default; }
+body.skeleton .key-grid { grid-template-columns: repeat(2, 1fr); }
 body.skeleton .box-face { top: 6%; bottom: 31%; gap: 4px; }
 body.skeleton .box-name { letter-spacing: .01em; text-indent: 0; }
 body.skeleton .box-sub {

@@ -83,14 +83,18 @@
      skeleton version of what I need, and hide the rest of the code — we'll get it all out later. Only I IV V
      vi IV/IV, just in the key of D. The chord name (D G A Bm C) large, the roman numeral under it — larger."
      While SKELETON is set:
-       • the key is D — the key arrows and the Basic · Full · Extended choice are hidden, the key tile only says D
+       • the key is D or A (the same night, the user: "I do actually need this to change to a different key, but
+         only to the key of A … default is D"): the key arrows and the key tile's picker step between the two;
+         every page opens on D; the choice is not saved (S.key on the device stays as it was)
+       • the Basic · Full · Extended choice is hidden
        • the boxes are I IV V vi IV/IV = D G A Bm C (keys F S D A W)
        • the letter name is the big name, the numeral under it, larger (body.skeleton in style.css);
          Settings' "Big name" choice is hidden
      Nothing is removed — every other key, chord set and the names choice are all still here, only hidden,
      and the saved key/set/names on the device are not touched. Set SKELETON to null to bring everything back. */
-  const SKELETON = { key: 2, places: ['f', 's', 'd', 'a', 'w'], names: 'letter' };
-  const keyNow = () => (SKELETON ? SKELETON.key : S.key);
+  const SKELETON = { key: 2, keys: [2, 9], places: ['f', 's', 'd', 'a', 'w'], names: 'letter' };   // D (default) and A
+  let skeletonKey = SKELETON ? SKELETON.key : null;
+  const keyNow = () => (SKELETON ? skeletonKey : S.key);
   const shown = () => (SKELETON ? SKELETON.places.slice() : C.placesOf(S.set));
   const namesNow = () => (SKELETON ? SKELETON.names : S.names);
   if (SKELETON) document.body.classList.add('skeleton');
@@ -292,18 +296,37 @@
     $('beat-name').textContent = S.beat ? S.beat.title : 'Add a beat';
     $('beat-btn').classList.toggle('has-beat', !!S.beat);
     $('play-btn').title = (S.beat ? 'Play the beat' : 'Play the click') + ' (Space)';
+    if (SKELETON) {                                   // the arrows step between the skeleton's keys, and stop at the ends
+      const i = SKELETON.keys.indexOf(keyNow());
+      $('key-prev').disabled = i <= 0;
+      $('key-next').disabled = i >= SKELETON.keys.length - 1;
+      $('key-prev').setAttribute('aria-label', i > 0 ? 'Key: ' + C.keyName(SKELETON.keys[i - 1]) : 'Key down');
+      $('key-next').setAttribute('aria-label', i < SKELETON.keys.length - 1 ? 'Key: ' + C.keyName(SKELETON.keys[i + 1]) : 'Key up');
+    }
     renderDots();
   }
   function renderDots() {
     const n = meter().beats;
     $('beat-dots').innerHTML = Array.from({ length: n }, (x, i) => '<i data-b="' + i + '"></i>').join('');
   }
-  $('key-prev').addEventListener('click', () => setKey(S.key - 1));
-  $('key-next').addEventListener('click', () => setKey(S.key + 1));
+  $('key-prev').addEventListener('click', () => stepKey(-1));
+  $('key-next').addEventListener('click', () => stepKey(1));
   $('key-tile').addEventListener('click', openKeySheet);
+  function stepKey(d) {
+    if (!SKELETON) { setKey(S.key + d); return; }
+    const i = SKELETON.keys.indexOf(keyNow()) + d;
+    if (i >= 0 && i < SKELETON.keys.length) setKey(SKELETON.keys[i]);
+  }
   function setKey(k) {
-    S.key = ((k % 12) + 12) % 12;
-    save(); renderTop(); renderBoxes();
+    k = ((k % 12) + 12) % 12;
+    if (SKELETON) {
+      if (SKELETON.keys.indexOf(k) === -1 || k === skeletonKey) return;
+      skeletonKey = k;                                // not saved: every page opens on the skeleton's default
+    } else {
+      S.key = k;
+      save();
+    }
+    renderTop(); renderBoxes();
     if (isOpen('box-sheet')) renderBoxSheet();
   }
   $('set-seg').addEventListener('click', e => {
@@ -412,7 +435,7 @@
 
   /* ---------------- the key ---------------- */
   function openKeySheet() {
-    const order = [0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5];        // round the circle of fifths
+    const order = SKELETON ? SKELETON.keys.slice() : [0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5];   // round the circle of fifths
     $('key-grid').innerHTML = order.map(k => {
       const n = C.keyName(k);
       return '<button type="button" class="key-pick' + (k === keyNow() ? ' on' : '') + '" data-k="' + k + '" style="--kc:' + (T.KEY_COLORS[n.charAt(0)] || '#888') + '"><b>' + esc(n) + '</b><small>major</small></button>';
