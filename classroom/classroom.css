@@ -211,3 +211,6 @@ dialog.t-dialog p { margin-bottom: 0.8rem; }
 dialog.t-dialog .row { display: flex; justify-content: flex-end; gap: 0.5rem; flex-wrap: wrap; }
 dialog.t-dialog .field { margin-bottom: 0.3rem; }
 .fine { font-size: 0.85rem; color: var(--muted); }
+dialog.t-dialog .steps { margin: 0 0 0.8rem 1.2rem; display: grid; gap: 0.3rem; font-size: 0.95rem; }
+dialog.t-dialog .steps a { color: #0369a1; font-weight: 700; }
+dialog.t-dialog { max-height: 90vh; overflow: auto; }

@@ -47,7 +47,7 @@
       const link = C.parseLink(it.url), app = link.ok ? link.app : { emoji: '🔗', name: 'Link' };
       return `<li><span>${app.emoji}</span><span class="t-fi-title">${esc(it.title || app.name)}</span>
         ${link.ok ? `<a href="${esc(link.url)}" target="_blank" rel="noopener">try ↗</a>` : ''}
-        <button class="icon-btn danger" data-act="folderItemDelete" data-c="${ci}" data-f="${fi}" data-i="${k}" title="Remove from this folder">✕</button></li>`;
+        <button class="btn small danger" data-act="folderItemDelete" data-c="${ci}" data-f="${fi}" data-i="${k}" title="Remove just this one from the folder">✕ Remove</button></li>`;
     }).join('');
     return `<div class="t-folder">
       <div class="t-folder-row">
@@ -55,7 +55,7 @@
         <input class="field" value="${esc(L.title)}" data-act="folderTitle" data-c="${ci}" data-f="${fi}" placeholder="Lesson name" aria-label="Lesson name">
         <span class="t-folder-count">${plural(L.items.length, 'thing', 'things')}</span>
         <button class="btn small" data-act="folderUse" data-c="${ci}" data-f="${fi}" title="Copy these into today's lesson">Use again</button>
-        <button class="icon-btn danger" data-act="folderDelete" data-c="${ci}" data-f="${fi}" title="Throw away this folder">🗑</button>
+        <button class="btn small danger" data-act="folderDelete" data-c="${ci}" data-f="${fi}" title="Take this whole lesson out of the Filing Cabinet">🗑 Remove lesson</button>
       </div>
       ${items ? `<ul class="t-folder-items">${items}</ul>` : ''}</div>`;
   }
@@ -210,7 +210,7 @@
       }
       case 'folderDelete': {
         const F = c.cabinet[fi];
-        if (!confirm(`Throw away "${F.title || 'this lesson'}" (${C.niceDate(F.date)}) from the Filing Cabinet? Students won't find it there after you publish.`)) return;
+        if (!confirm(`Remove "${F.title || 'this lesson'}" (${C.niceDate(F.date)}) from ${c.name}'s Filing Cabinet? Students won't find it there after you publish.`)) return;
         c.cabinet.splice(fi, 1); break;
       }
       case 'folderItemDelete': {

@@ -47,8 +47,16 @@
   <dialog class="t-dialog" id="gh-dialog">
     <h2>Connect to GitHub</h2>
     <div id="gh-off-box">
-      <p>Publish uses the same key as the <b>Librarian</b>: a fine-grained key with <b>Contents: Read and write</b> on
-        <b>eagleviewmusic.github.io</b>. If you connected the Librarian in this browser, you're already connected here.</p>
+      <p>Publish uses the same key as the <b>Librarian</b>. If you connected the Librarian in this browser, you're already
+        connected here. GitHub shows a key only once, so if you didn't save yours, make a new one:</p>
+      <ol class="steps">
+        <li>On GitHub, signed in as <b>Eagleviewmusic</b>, open
+          <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">New fine-grained access key</a>.</li>
+        <li><b>Name</b>: Classroom. <b>Expiration</b>: up to a year.</li>
+        <li><b>Repository access</b>: <i>Only select repositories</i> → <b>eagleviewmusic.github.io</b>.</li>
+        <li><b>Permissions → Repository permissions → Contents</b>: <i>Read and write</i>. Nothing else.</li>
+        <li>Press <b>Generate token</b>, copy it, paste it below. Save it in your password manager for your other computers.</li>
+      </ol>
       <input class="field" id="gh-key" type="password" placeholder="Paste the key (github_pat_…)" autocomplete="off" aria-label="GitHub key">
       <p class="t-add-msg" id="gh-msg"></p>
       <p class="fine">The key stays in this browser only. Connect on your own computer, not a shared classroom one.</p>
