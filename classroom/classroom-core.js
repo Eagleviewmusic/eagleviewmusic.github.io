@@ -19,7 +19,7 @@
   C.NAME_KEY = 'classroom_name_v1';
 
   // The mailbox (Claude Apps/classroom-mailbox, a Cloudflare Worker): students send work, the teacher reads it in inbox.html.
-  C.MAILBOX = 'https://classroom-mailbox.classroom-mailbox.workers.dev';
+  C.MAILBOX = '/api';
   // Testing on this Mac only: localStorage classroom_mailbox_dev = 'http://localhost:8787' (launch entry classroom-mailbox-dev)
   try {
     const dev = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.getItem('classroom_mailbox_dev');
