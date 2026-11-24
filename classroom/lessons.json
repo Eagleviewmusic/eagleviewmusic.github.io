@@ -1,19 +1,51 @@
 {
  "version": 1,
- "published": null,
+ "published": "2026-11-24T01:05:21.373Z",
  "classes": [
   {
    "id": "grade6",
    "name": "6th Grade",
-   "color": "teal",
-   "lesson": { "id": "g6start", "title": "", "note": "", "date": "2026-11-24", "items": [] },
+   "color": "green",
+   "lesson": {
+    "id": "g6start",
+    "title": "Pentatonic Xylophone",
+    "note": "",
+    "date": "2026-11-24",
+    "items": [
+     {
+      "id": "urqi5q1",
+      "title": "",
+      "url": "https://eagleviewmusic.com/rainbow-xylophone/?root=C&bars=7&dis=E4%2CB4&lock=1",
+      "note": ""
+     }
+    ]
+   },
    "cabinet": []
   },
   {
    "id": "grade5",
    "name": "5th Grade",
    "color": "purple",
-   "lesson": { "id": "g5start", "title": "", "note": "", "date": "2026-11-24", "items": [] },
+   "lesson": {
+    "id": "g5start",
+    "title": "Sharp Pentatonic",
+    "note": "",
+    "date": "2026-11-24",
+    "items": [
+     {
+      "id": "8xfd4zd",
+      "title": "",
+      "url": "https://eagleviewmusic.com/rainbow-xylophone/?root=C&bars=15&acc=C5%3Asharp%2CD5%3Asharp%2CE5%3Asharp%2CF4%3Asharp%2CG4%3Asharp%2CA4%3Asharp%2CC4%3Asharp%2CD4%3Asharp%2CF5%3Asharp%2CG5%3Asharp%2CB5%3Asharp%2CA5%3Asharp%2CC6%3Asharp&dis=E4%2CB4%2CF5%2CB5&accOn=1&lock=1",
+      "note": ""
+     },
+     {
+      "id": "59380wz",
+      "title": "The Eagle View Song",
+      "url": "https://eagleviewmusic.com/Song%20Writer%203.5/index.html#song=~eJztWlFv0zAQ_ivlnpOKpinrwhMCHvaEBGg8oAk5iRNbdeNgOyvVNGl_Y39vvwQ56SAN9RHMeCLay7Tb-c7nu8_fV_cGriGJAjDcCAoJfGR09paUgs4uOd3NPsiqhAB0JhWF5Obwzxu6hwTeQABpvYVksYwCqJUsFdWay0pD8vkGeA4J1AsIoCJbu_RrJlWjIQDF9oZtIYGv89nXGbU_EEDGpMo71_ZXSOACAqgFyax3AbdBz3LZM-kjU9-SH1sSXl3H0fFCTxtisNyVtXWFiH4W4pIqTY_q8FgGVyFGB_RJ0r9CF-2_L5GwAaSUGA1JdCpMz3p1exWAUSTbtBu33fTYPoWStskCMBKStV3n0Rr9sJ531sWLvrnnfNbZo_i0e7Tq7MvotP9y2dnj56f940N28fq0f3zID7ZUyHwPdrOCV7Q7ZUFSKiCBV3bS9kKQVBwshn4zkMCnti2k6P5YSXMwV3ZF3q52bdvo0HAHL6IQNy1_uLFjN8MQt1yGjJfMFZISt6sgLq-wtPt1OhbElaosfOryFklSUSxJHz8Lo3MfR79DN2SD-BXOM6gVz8cFpMeOvPLZnGyUTzCdMSkFUs5cOssp1canoCFvb8A_HyPpPUVhiZwEMkaGUaSq7jHCUnUXZot22t8f_cCtaHzaOjQNhoKGh0LuXM6p4iUz47qNza1v6_0I5_Yi5NmmqduVHdD-zq8aWz8M05k0PuH4OHgeYhF2k7izxC4RZE5LQV_6DOrOC2e1JMjBuTdHUnk9GmcDrNbzJyl2SjXW4b182Il8ttzSWKoNJEY11BHjArki3BVWlOReTc6rMvAJuFPcD2LwgO5MdYYERDqdVhlFArpbnVRIRbXz6sxl9XB3jwBHYSeWZJldhRFVOzFcqpIi6_RSONX9wrP7x6ZnG_mZT13fsfkcGaKh49EtMZH-ifRPpH8i_RPp_39I_0cMbd3VyJAjQzBMSIUArTtcKhovVEFZhjvPPRVeo2rP0ocLYS2CkERGEALj3t2OPtzdjww5wD8h9-OOYcCJQoIU1J2pkf9aD3i2v8GIBtL_GYqQiMQzpEC4xpMPgDYI2iEDkNPKIAPuHgEczN16QFBM-45l22E19pIdzIMaSziH8yAEPkij0s6kFF7iqxUJk0qYVMKkEiaVMKmESSX8TiW8ll6fm4Ya-7QeQTFDK6_HgfA312rP7RfC6E4nwzgGPpOjr-df0tFyDH9tB9RLiSGFciMbQ2YQo_-V3YeXAPjnCuA9dqkjh1vTzGtLYdF4iUuUybuhBcMV7HWu9p54Hx4dphht6dP_QWdh-OJWDbhyHku_sdc691aJwh5M0HcFYh7u7nEKOipxOw3ejwuTaphUw6QaJtUwqYb_TjVc3QbdN4i1rMovi7PzxTo6j5fxeRR_OVudtbRGUWJo_srYL7r-tK8CaOr8yBKvo_VqEa1uvwPnlz_N",
+      "note": ""
+     }
+    ]
+   },
    "cabinet": []
   }
  ]
