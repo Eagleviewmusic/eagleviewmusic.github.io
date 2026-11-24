@@ -1,6 +1,6 @@
 {
  "version": 1,
- "published": "2026-11-24T01:27:43.931Z",
+ "published": "2026-11-24T02:13:13.944Z",
  "classes": [
   {
    "id": "grade6",
@@ -18,7 +18,8 @@
       "url": "https://eagleviewmusic.com/rainbow-xylophone/?root=C&bars=7&dis=E4%2CB4&lock=1",
       "note": ""
      }
-    ]
+    ],
+    "sendBack": true
    },
    "cabinet": []
   },
@@ -44,7 +45,8 @@
       "url": "https://eagleviewmusic.com/rainbow-xylophone/?root=C&bars=13&dis=E4%2CB4%2CE5&lock=1",
       "note": ""
      }
-    ]
+    ],
+    "sendBack": true
    },
    "cabinet": []
   }
