@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#e0f2fe"/><stop offset="1" stop-color="#bae6fd"/></linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset=".55" stop-color="#cbd5e1"/><stop offset="1" stop-color="#94a3b8"/></linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3d9b1"/><stop offset="1" stop-color="#d6a46b"/></linearGradient>
+    <linearGradient id="ebony" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#475569"/><stop offset=".45" stop-color="#1e293b"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg)"/>
+  <circle cx="330" cy="70" r="90" fill="#fff" opacity=".35"/>
+  <circle cx="60" cy="350" r="70" fill="#fff" opacity=".25"/>
+  <g stroke-linejoin="round" stroke-linecap="round">
+
+    <rect x="70" y="74" width="120" height="120" rx="22" fill="#FF3B30" stroke="#0c4a6e" stroke-width="7"/><path d="M73.5 152 h30 a12 12 0 0 1 12 12 v26.5 h-23 a19 19 0 0 1 -19 -19z" fill="#0f172a" opacity=".3" stroke="none"/><text x="130" y="138" font-family="Arial Rounded MT Bold, Helvetica, Arial, sans-serif" font-weight="800" font-size="62" text-anchor="middle" fill="#fff" stroke="none">I</text><rect x="210" y="74" width="120" height="120" rx="22" fill="#34C759" stroke="#0c4a6e" stroke-width="7"/><path d="M213.5 152 h30 a12 12 0 0 1 12 12 v26.5 h-23 a19 19 0 0 1 -19 -19z" fill="#0f172a" opacity=".3" stroke="none"/><text x="270" y="138" font-family="Arial Rounded MT Bold, Helvetica, Arial, sans-serif" font-weight="800" font-size="54" text-anchor="middle" fill="#fff" stroke="none">IV</text><rect x="70" y="214" width="120" height="120" rx="22" fill="#30c0c6" stroke="#0c4a6e" stroke-width="7"/><path d="M73.5 292 h30 a12 12 0 0 1 12 12 v26.5 h-23 a19 19 0 0 1 -19 -19z" fill="#0f172a" opacity=".3" stroke="none"/><text x="130" y="278" font-family="Arial Rounded MT Bold, Helvetica, Arial, sans-serif" font-weight="800" font-size="62" text-anchor="middle" fill="#fff" stroke="none">V</text><rect x="210" y="214" width="120" height="120" rx="22" fill="#007AFF" stroke="#0c4a6e" stroke-width="7"/><path d="M213.5 292 h30 a12 12 0 0 1 12 12 v26.5 h-23 a19 19 0 0 1 -19 -19z" fill="#0f172a" opacity=".3" stroke="none"/><text x="270" y="278" font-family="Arial Rounded MT Bold, Helvetica, Arial, sans-serif" font-weight="800" font-size="54" text-anchor="middle" fill="#fff" stroke="none">vi</text>
+    <circle cx="322" cy="322" r="46" fill="#fff" stroke="#0c4a6e" stroke-width="7"/>
+    <text x="322" y="336" font-family="Arial Rounded MT Bold, Helvetica, Arial, sans-serif" font-weight="800" font-size="38" text-anchor="middle" fill="#0c4a6e" stroke="none">1.5</text>
+  </g>
+</svg>

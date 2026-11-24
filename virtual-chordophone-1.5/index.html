@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#161a24">
+<script>
+  // Light or dark, chosen in Settings and remembered on this device. Set before the page paints.
+  try { var t = localStorage.getItem('virtual_chordophone_theme_v1'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<title>Virtual Chordophone 1.5</title>
+<!-- a long press (smart board, pen, iPad) never opens the browser's right-click menu, drags or selects: a chord can be held as long as it needs -->
+<script src="lib/evm-hold-guard.js"></script>
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lib/evm-count-in.css">
+<link rel="stylesheet" href="style.css">
+  <!-- EVM visit counter: one anonymous count each time an app is opened. What is sent, and what never is: /what-we-count.html -->
+  <script>
+    (function () {
+      var off = false;
+      try { off = localStorage.getItem('skipgc') === 't'; } catch (e) {}
+      if (location.hash === '#toggle-goatcounter') {   // the teacher's own browsers opt out here (and back in)
+        try { off ? localStorage.removeItem('skipgc') : localStorage.setItem('skipgc', 't'); } catch (e) {}
+        alert(off ? 'Visits from this browser will be counted again.' : 'Visits from this browser will no longer be counted.');
+        return;
+      }
+      if (off || navigator.webdriver) return;
+      if (navigator.globalPrivacyControl || navigator.doNotTrack === '1' || window.doNotTrack === '1') return;   // the visitor asked not to be counted
+      if (!/(^|\.)eagleviewmusic\.com$/.test(location.hostname)) return;   // testing, or a copy on another site
+      try { if (window.top !== window && parent.location.host) return; } catch (e) {}   // framed by another of our apps, which counts itself
+      try {
+        var p = decodeURIComponent(location.pathname).replace(/index\.html$/, '');
+        var r = document.referrer.split(/[?#]/)[0];   // where the visit came from, never the rest of a link
+        var u = 'https://eagleviewmusic.goatcounter.com/count?p=' + encodeURIComponent(p) +
+          (r ? '&r=' + encodeURIComponent(r) : '') + '&s=' + screen.width + '&rnd=' + Math.random().toString(36).slice(2, 7);
+        if (!(navigator.sendBeacon && navigator.sendBeacon(u))) new Image().src = u;
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+
+<!-- ================= TOP BAR ================= -->
+<header class="topbar" id="topbar">
+  <div class="tb-group brand">
+    <a class="tb-btn home-btn" id="home-btn" href="../index.html" title="Back to Eagle View Music" aria-label="Back to Eagle View Music">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    </a>
+    <svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="2" y="2.5" width="9" height="9" rx="2.2" fill="#FF3B30"/>
+      <rect x="13" y="2.5" width="9" height="9" rx="2.2" fill="#34C759"/>
+      <rect x="2" y="12.5" width="9" height="9" rx="2.2" fill="#30c0c6"/>
+      <rect x="13" y="12.5" width="9" height="9" rx="2.2" fill="#007AFF"/>
+      <rect x="2" y="16.3" width="4.4" height="5.2" rx="1.2" fill="#1c1c1e" opacity=".45"/>
+    </svg>
+    <span class="brand-name">Virtual Chordophone <small class="brand-ver">1.5</small></span>
+  </div>
+
+  <div class="tb-group key-group" title="The key (major)">
+    <button class="tb-btn icon-btn" id="key-prev" type="button" aria-label="Key down a half step"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <button class="key-tile" id="key-tile" type="button" aria-label="Choose the key"><span id="key-name">C</span><small>major</small></button>
+    <button class="tb-btn icon-btn" id="key-next" type="button" aria-label="Key up a half step"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+  </div>
+
+  <div class="tb-group seg set-seg" id="set-seg" role="tablist" aria-label="Which chords">
+    <button type="button" data-set="basic" role="tab">Basic</button>
+    <button type="button" data-set="full" role="tab">Full</button>
+    <button type="button" data-set="extended" role="tab">Extended</button>
+  </div>
+
+  <div class="tb-spacer"></div>
+
+  <div class="tb-group tempo-group" title="Beats per minute">
+    <button class="tb-btn icon-btn" id="bpm-down" type="button" aria-label="Slower"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
+    <label class="bpm-field"><input id="bpm" type="number" inputmode="numeric" min="30" max="300" value="100" aria-label="BPM"><span>BPM</span></label>
+    <button class="tb-btn icon-btn" id="bpm-up" type="button" aria-label="Faster"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg></button>
+    <button class="tb-btn meter-btn" id="meter-btn" type="button" aria-label="Time signature"><span class="ts"><b id="ts-num">4</b><b id="ts-den">4</b></span></button>
+  </div>
+
+  <div class="tb-group play-group">
+    <button class="tb-btn beat-btn" id="beat-btn" type="button" title="Bring in a beat from Ostinato Builder">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="8" rx="8" ry="3"/><path d="M4 8v8c0 1.7 3.6 3 8 3s8-1.3 8-3V8"/><path d="M17 2l-4 6M7 2l4 6"/></svg>
+      <span id="beat-name">Add a beat</span>
+    </button>
+    <button class="play-btn" id="play-btn" type="button" aria-label="Play the beat (Space)" title="Play (Space)">
+      <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor" stroke="none"/></svg>
+      <svg class="i-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/></svg>
+    </button>
+    <div class="beat-dots" id="beat-dots" aria-hidden="true"></div>
+  </div>
+
+  <button class="tb-btn icon-btn gear-btn" id="settings-btn" type="button" aria-label="Settings" title="Settings">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+  </button>
+</header>
+
+<!-- ================= THE CHORD BOXES ================= -->
+<main class="boxes" id="boxes" aria-label="Chords"></main>
+
+<!-- ================= A CHORD BOX'S SETTINGS ================= -->
+<div class="sheet-back" id="box-sheet" hidden>
+  <div class="sheet box-sheet" role="dialog" aria-modal="true" aria-labelledby="bs-title">
+    <div class="sheet-head" id="bs-head">
+      <button class="tb-btn icon-btn" id="bs-prev" type="button" aria-label="The chord before"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="bs-name" id="bs-title"></div>
+      <button class="tb-btn icon-btn" id="bs-next" type="button" aria-label="The next chord"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+      <div class="tb-spacer"></div>
+      <button class="btn hear-btn" id="bs-hear" type="button" title="Hear two bars"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor" stroke="none"/></svg> Hear it</button>
+      <button class="tb-btn icon-btn" id="bs-close" type="button" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="seg sheet-tabs" id="bs-tabs" role="tablist">
+      <button type="button" data-tab="rhythm" role="tab">Rhythm</button>
+      <button type="button" data-tab="notes" role="tab">Chord &amp; notes</button>
+    </div>
+    <div class="sheet-body" id="bs-body"></div>
+  </div>
+</div>
+
+<!-- ================= BRING IN A BEAT ================= -->
+<div class="sheet-back" id="beat-sheet" hidden>
+  <div class="sheet narrow" role="dialog" aria-modal="true" aria-labelledby="beat-title">
+    <div class="sheet-head">
+      <div class="sheet-title" id="beat-title">A beat from Ostinato Builder</div>
+      <div class="tb-spacer"></div>
+      <button class="tb-btn icon-btn" data-close type="button" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="sheet-body" id="beat-body"></div>
+  </div>
+</div>
+
+<!-- ================= THE KEY ================= -->
+<div class="sheet-back" id="key-sheet" hidden>
+  <div class="sheet narrow" role="dialog" aria-modal="true" aria-labelledby="key-title">
+    <div class="sheet-head">
+      <div class="sheet-title" id="key-title">Key (major)</div>
+      <div class="tb-spacer"></div>
+      <button class="tb-btn icon-btn" data-close type="button" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="sheet-body"><div class="key-grid" id="key-grid"></div></div>
+  </div>
+</div>
+
+<!-- ================= TIME SIGNATURE ================= -->
+<div class="sheet-back" id="meter-sheet" hidden>
+  <div class="sheet narrow" role="dialog" aria-modal="true" aria-labelledby="meter-title">
+    <div class="sheet-head">
+      <div class="sheet-title" id="meter-title">Time signature</div>
+      <div class="tb-spacer"></div>
+      <button class="tb-btn icon-btn" data-close type="button" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="sheet-body"><div class="meter-grid" id="meter-grid"></div><p class="note" id="meter-note"></p></div>
+  </div>
+</div>
+
+<!-- ================= SETTINGS ================= -->
+<div class="sheet-back" id="app-sheet" hidden>
+  <div class="sheet narrow" role="dialog" aria-modal="true" aria-labelledby="app-title">
+    <div class="sheet-head">
+      <div class="sheet-title" id="app-title">Settings</div>
+      <div class="tb-spacer"></div>
+      <button class="tb-btn icon-btn" data-close type="button" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="sheet-body" id="app-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="lib/keyblocks-layers.js"></script>
+<script src="lib/theory.js"></script>
+<!-- lib/audio.js and lib/samples.js are copies of the Virtual Keyboard's (virtual-keyboard/audio.js, samples.js) — change them there, then copy.
+     The recorded instruments' notes are the keyboard's own: its manifest here, its MP3s fetched from the folder on the tag -->
+<script src="lib/audio.js"></script>
+<script src="../virtual-keyboard/samples/manifest.js"></script>
+<script src="lib/samples.js" data-base="../virtual-keyboard/samples/"></script>
+<script src="lib/virtual-instruments.js"></script>
+<script src="lib/evm-count-in.js"></script>
+<script src="js/chords.js"></script>
+<script src="js/rhythm.js"></script>
+<script src="js/player.js"></script>
+<script src="js/beat.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
