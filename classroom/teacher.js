@@ -112,7 +112,8 @@
       statusEl.className = 'status same'; statusEl.textContent = '✓ Same as the site';
       if (saved) { saved = null; try { localStorage.removeItem(SAVED_KEY); } catch (e) { /* fine */ } }
     } else if (saved && saved.json === mine) {
-      statusEl.className = 'status waiting'; statusEl.textContent = 'File saved · waiting to go on the site';
+      statusEl.className = 'status waiting';
+      statusEl.textContent = saved.how === 'publish' ? 'Published · on the site in about a minute' : 'File saved · waiting to go on the site';
     } else if (!pub) {
       statusEl.className = 'status'; statusEl.textContent = 'Can\'t read the site\'s file';
     } else {
@@ -252,22 +253,119 @@
     addLink(+box.form.dataset.c, text, box.form);
   });
 
-  /* ---------- the file ---------- */
-  $('#publish').addEventListener('click', () => {
+  /* ---------- publishing ---------- */
+  const GH = window.ClassroomGitHub;
+  function fileFromDraft() {
     const out = clone(draft.data);
     out.published = new Date().toISOString();
-    const blob = new Blob([JSON.stringify(out, null, 1)], { type: 'application/json' });
+    return out;
+  }
+  function remember(out, how) {   // the draft now matches what was sent; the chip waits for the site to match
+    draft.basedOn = out.published;
+    saved = { at: out.published, json: JSON.stringify(out.classes), how };
+    try { localStorage.setItem(SAVED_KEY, JSON.stringify(saved)); } catch (e) { /* fine */ }
+    persist();
+  }
+
+  // Publish: one commit of classroom/lessons.json with the Librarian's GitHub key.
+  async function publish() {
+    if (!GH.connected()) { openGitHub('Connect once, and Publish puts your changes on the site in one click.'); return; }
+    const btn = $('#publish');
+    btn.disabled = true; btn.textContent = 'Publishing…';
+    try {
+      for (let attempt = 0; ; attempt++) {
+        const site = await GH.read();
+        const siteData = site.data ? C.clean(site.data) : null;
+        if (attempt === 0 && siteData && C.sameContent(siteData, draft.data)) {
+          draft.basedOn = siteData.published || draft.basedOn; persist();
+          toastNotice('Nothing new to publish: the site already has these lessons.');
+          return;
+        }
+        if (attempt === 0 && siteData && siteData.published && (!draft.basedOn || siteData.published > draft.basedOn)
+            && !confirm(`The site has a newer version (published ${new Date(siteData.published).toLocaleString()}) than the one your draft started from, maybe from another computer.\n\nPublish your draft over it?`)) return;
+        const out = fileFromDraft();
+        try {
+          await GH.write(JSON.stringify(out, null, 1) + '\n', site.sha, 'Classroom: lessons published from the teacher page');
+        } catch (err) {
+          if ((err.status === 409 || err.status === 422) && attempt === 0) continue;   // the file changed in between: read it again, once
+          throw err;
+        }
+        remember(out, 'publish');
+        toastNotice('Published! Students will see the changes in about a minute.');
+        recheckSoon();
+        return;
+      }
+    } catch (err) {
+      toastNotice('Not published. ' + err.message + ' (You can still Save a file and upload it.)', true);
+      if (err.status === 401) { GH.disconnect(); refreshGitHub(); }
+    } finally {
+      btn.disabled = false; btn.textContent = '🚀 Publish';
+    }
+  }
+  $('#publish').addEventListener('click', publish);
+
+  // Save a file: the same lessons.json, downloaded (a backup, or to upload on GitHub by hand).
+  $('#save-file').addEventListener('click', () => {
+    const out = fileFromDraft();
+    const blob = new Blob([JSON.stringify(out, null, 1) + '\n'], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = 'lessons.json';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-    draft.basedOn = out.published;
-    saved = { at: out.published, json: JSON.stringify(out.classes) };
-    try { localStorage.setItem(SAVED_KEY, JSON.stringify(saved)); } catch (e) { /* fine */ }
-    persist();
+    remember(out, 'file');
     $('#saved-dialog').showModal();
   });
   $('#saved-ok').addEventListener('click', () => $('#saved-dialog').close());
+
+  /* ---------- the GitHub connection ---------- */
+  const ghDialog = $('#gh-dialog');
+  function refreshGitHub() {
+    const on = GH.connected();
+    $('#connect').textContent = on ? '🔗 GitHub ✓' : '🔗 Connect to GitHub';
+    $('#connect').title = on ? 'Connected as ' + GH.login() : 'Connect once so Publish can put changes on the site';
+    $('#gh-off-box').hidden = on; $('#gh-on-box').hidden = !on;
+    $('#gh-login').textContent = GH.login();
+  }
+  function openGitHub(message) {
+    refreshGitHub();
+    $('#gh-msg').textContent = message || '';
+    $('#gh-key').value = '';
+    ghDialog.showModal();
+    if (!GH.connected()) $('#gh-key').focus();
+  }
+  $('#connect').addEventListener('click', () => openGitHub());
+  $('#gh-go').addEventListener('click', async () => {
+    const go = $('#gh-go');
+    go.disabled = true; $('#gh-msg').textContent = 'Checking the key…';
+    try {
+      const login = await GH.connect($('#gh-key').value);
+      $('#gh-key').value = '';
+      refreshGitHub();
+      $('#gh-msg').textContent = '';
+      toastNotice('Connected to GitHub as ' + login + '. Publish is ready.');
+      ghDialog.close();
+    } catch (err) { $('#gh-msg').textContent = err.message; }
+    finally { go.disabled = false; }
+  });
+  $('#gh-key').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#gh-go').click(); } });
+  $('#gh-disconnect').addEventListener('click', () => {
+    if (!confirm('Disconnect from GitHub? This removes the key from this browser, for the Librarian too.')) return;
+    GH.disconnect(); refreshGitHub(); ghDialog.close();
+  });
+  ghDialog.addEventListener('click', e => { if (e.target.closest('[data-close-dialog]')) ghDialog.close(); });
+  window.addEventListener('storage', e => { if (e.key === 'librarian_github_v1') refreshGitHub(); });
+  refreshGitHub();
+
+  // After publishing, look at the site every 10 s for 3 minutes, so the chip turns green soon after it's live.
+  let soonTimer = null;
+  function recheckSoon() {
+    clearInterval(soonTimer);
+    let n = 0;
+    soonTimer = setInterval(async () => {
+      await loadSite(); refreshStatus();
+      if (++n >= 18 || (pub && C.sameContent(draft.data, pub))) clearInterval(soonTimer);
+    }, 10000);
+  }
 
   $('#open-file').addEventListener('click', () => $('#file-input').click());
   $('#file-input').addEventListener('change', async e => {

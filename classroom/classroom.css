@@ -209,3 +209,5 @@ dialog.t-dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
 dialog.t-dialog h2 { font-family: var(--heading); font-weight: 600; margin-bottom: 0.5rem; }
 dialog.t-dialog p { margin-bottom: 0.8rem; }
 dialog.t-dialog .row { display: flex; justify-content: flex-end; gap: 0.5rem; flex-wrap: wrap; }
+dialog.t-dialog .field { margin-bottom: 0.3rem; }
+.fine { font-size: 0.85rem; color: var(--muted); }

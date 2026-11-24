@@ -18,7 +18,9 @@
       <span id="status" class="status">Loading…</span>
       <a class="btn" href="./?draft" target="_blank" rel="noopener">👀 Preview as a student</a>
       <button class="btn" id="open-file" type="button" title="Load a lessons.json you saved before">📂 Open a file</button>
-      <button class="btn primary" id="publish" type="button">⬇ Save file to publish</button>
+      <button class="btn" id="save-file" type="button" title="Download lessons.json: a backup, or to upload on GitHub yourself">⬇ Save a file</button>
+      <button class="btn" id="connect" type="button">🔗 Connect to GitHub</button>
+      <button class="btn primary" id="publish" type="button" title="Put your changes on the site for students">🚀 Publish</button>
       <input type="file" id="file-input" accept=".json,application/json" hidden>
     </div>
   </header>
@@ -27,7 +29,7 @@
     <summary>ⓘ How it works</summary>
     <p>Paste links from your apps into a class (a Song Writer song, a xylophone layout, an Ostinato Builder lesson…).
       Students tap their class and see only today's lesson. When a lesson is done, move it to the Filing Cabinet: students can still
-      find it there to practice. Your changes stay in this browser until you <b>Save file to publish</b> and the file goes on the site.</p>
+      find it there to practice. Your changes stay in this browser until you <b>Publish</b>; students see them about a minute later.</p>
   </details>
   <div id="notice"></div>
 
@@ -35,12 +37,32 @@
 
   <dialog class="t-dialog" id="saved-dialog">
     <h2>lessons.json is saved</h2>
-    <p>It's in your <b>Downloads</b> folder. Put it on the site (ask Claude to publish the Classroom), and students will see the changes a minute or two later.</p>
-    <p>The chip at the top turns green when the site matches.</p>
+    <p>It's in your <b>Downloads</b> folder. Keep it as a backup, or put it on the site yourself: on GitHub, open the
+      <b>classroom</b> folder of eagleviewmusic.github.io, choose <b>Add file → Upload files</b>, and commit.
+      The file must be named exactly <b>lessons.json</b> (your browser may have named it <i>lessons (2).json</i>).</p>
+    <p>Easier: <b>Connect to GitHub</b> once, then <b>Publish</b> does it in one click.</p>
     <div class="row"><button class="btn primary" id="saved-ok" type="button">OK</button></div>
   </dialog>
 
+  <dialog class="t-dialog" id="gh-dialog">
+    <h2>Connect to GitHub</h2>
+    <div id="gh-off-box">
+      <p>Publish uses the same key as the <b>Librarian</b>: a fine-grained key with <b>Contents: Read and write</b> on
+        <b>eagleviewmusic.github.io</b>. If you connected the Librarian in this browser, you're already connected here.</p>
+      <input class="field" id="gh-key" type="password" placeholder="Paste the key (github_pat_…)" autocomplete="off" aria-label="GitHub key">
+      <p class="t-add-msg" id="gh-msg"></p>
+      <p class="fine">The key stays in this browser only. Connect on your own computer, not a shared classroom one.</p>
+      <div class="row"><button class="btn" type="button" data-close-dialog>Cancel</button><button class="btn primary" id="gh-go" type="button">Connect</button></div>
+    </div>
+    <div id="gh-on-box">
+      <p>Connected as <b id="gh-login"></b>. <b>Publish</b> puts your changes on the site in one click.</p>
+      <p class="fine">Disconnect removes the key from this browser, for the Librarian too.</p>
+      <div class="row"><button class="btn danger" id="gh-disconnect" type="button">Disconnect</button><button class="btn primary" type="button" data-close-dialog>Done</button></div>
+    </div>
+  </dialog>
+
   <script src="classroom-core.js"></script>
+  <script src="github.js"></script>
   <script src="teacher.js"></script>
 </body>
 </html>
