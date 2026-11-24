@@ -33,14 +33,20 @@
     $('#count').textContent = items.length === 1 ? '1 message' : items.length + ' messages';
     $('#list').innerHTML = shown.length ? shown.map(m => {
       const link = m.link ? C.parseLink(m.link) : null;
-      return `<article class="msg" data-id="${esc(m.id)}">
+      const what = m.kind === 'done' ? `<div class="msg-kind done">✅ Did it: <b>${esc(m.item || 'the activity')}</b></div>`
+        : m.kind === 'work' ? `<div class="msg-kind work">🎼 Sent their work: <b>${esc(m.item || 'Song Writer')}</b></div>` : '';
+      const open = !link || !link.ok ? ''
+        : m.kind === 'work' ? `<a class="btn small primary" href="${esc(link.url)}" target="_blank" rel="noopener">🎼 Open ${esc(m.name)}'s work ↗</a>`
+        : `<a class="btn small primary" href="${esc(link.url)}" target="_blank" rel="noopener">Open their ${esc(link.app.name)} ↗</a>`;
+      return `<article class="msg msg-${esc(m.kind || 'message')}" data-id="${esc(m.id)}">
         <div class="msg-head"><b class="msg-name">${esc(m.name)}</b>
           <span class="msg-class">${esc(m.className || '')}</span>
           <span class="msg-when">${esc(when(m.at))}</span>
           <button class="btn small danger" data-delete="${esc(m.id)}" type="button">🗑 Delete</button></div>
         ${m.lesson ? `<div class="msg-lesson">${esc(m.lesson)}</div>` : ''}
+        ${what}
         ${m.message ? `<p class="msg-text">${esc(m.message)}</p>` : ''}
-        ${link && link.ok ? `<a class="btn small primary" href="${esc(link.url)}" target="_blank" rel="noopener">Open their ${esc(link.app.name)} ↗</a>` : ''}
+        ${open}
       </article>`;
     }).join('') : '<div class="empty-card"><b>No messages yet.</b><br>When students press Send, their work shows up here.</div>';
   }

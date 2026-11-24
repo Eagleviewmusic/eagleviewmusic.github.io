@@ -224,6 +224,20 @@ textarea.field { resize: vertical; min-height: 2.6rem; }
 .msg-when { color: var(--muted); font-size: 0.9rem; flex: 1; }
 .msg-lesson { color: var(--muted); font-weight: 600; font-size: 0.9rem; }
 .msg-text { white-space: pre-wrap; font-size: 1.05rem; }
+.msg-kind { font-size: 1.05rem; }
+.msg-done { border-left: 6px solid #16a34a; }
+.msg-work { border-left: 6px solid #7c3aed; }
+
+/* Send to the Teacher, from the app bar */
+.send-btn { flex: none; display: inline-flex; align-items: center; gap: 0.35rem; min-height: 40px; padding: 0.4rem 1rem; border-radius: 999px;
+  border: 2px solid #fff; background: #fff; color: var(--ink); font-weight: 800; cursor: pointer; white-space: nowrap; }
+.send-btn:hover, .send-btn:focus-visible { background: var(--soft); outline: none; }
+dialog.send-dialog { width: min(440px, calc(100vw - 2rem)); }
+dialog.send-dialog form { display: grid; gap: 0.8rem; }
+dialog.send-dialog label { display: grid; gap: 0.3rem; font-weight: 700; }
+.send-what { background: var(--soft); color: var(--ink); border-radius: 12px; padding: 0.7rem 0.9rem; font-weight: 600; }
+.send-btn .send-short { display: none; }
+@media (max-width: 560px) { .send-btn .send-word { display: none; } .send-btn .send-short { display: inline; } }
 
 @media (max-width: 700px) {   /* phones: the header scrolls away instead of covering half the screen */
   .t-top { position: static; padding: 0.7rem 1rem; }

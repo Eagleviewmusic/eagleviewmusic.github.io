@@ -84,7 +84,7 @@
         </form>
         <div class="t-add-msg" data-msg="${ci}"></div>
         <label class="t-check"><input type="checkbox" data-act="lessonSendBack" data-c="${ci}" ${L.sendBack ? 'checked' : ''}>
-          📬 Students can send work back (a <b>Send to Mr. Walby</b> card; read it in the <a href="inbox.html">Inbox</a>)</label>
+          📬 Students can send work back (a <b>Send to the Teacher</b> card and button; read it in the <a href="inbox.html">Inbox</a>)</label>
         <div class="t-lesson-foot">
           <button class="btn" data-act="toCabinet" data-c="${ci}" ${L.items.length || L.title ? '' : 'disabled'}>🗄️ Lesson done: move it to the Filing Cabinet</button>
         </div>
