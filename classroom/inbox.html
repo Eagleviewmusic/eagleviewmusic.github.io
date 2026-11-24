@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Inbox · The Classroom</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="classroom.css">
+</head>
+<body class="teacher">
+  <header class="t-top">
+    <div><div class="brand">🦅 Eagle View Music</div><h1>📬 Classroom Inbox</h1></div>
+    <div class="t-actions">
+      <span id="count" class="status"></span>
+      <button class="btn" id="refresh" type="button" hidden>↻ Refresh</button>
+      <button class="btn" id="lock" type="button" hidden title="Forget the password on this computer">🔒 Lock</button>
+      <a class="btn" href="teacher.html">← Teacher page</a>
+    </div>
+  </header>
+
+  <main class="t-main inbox">
+    <form id="login" class="t-class login-card" hidden>
+      <div class="t-section">
+        <div class="t-label">Inbox password</div>
+        <input class="field" type="password" name="pw" autocomplete="current-password" aria-label="Inbox password">
+        <label class="remember"><input type="checkbox" name="remember" checked> Remember on this computer</label>
+        <p class="t-add-msg" id="login-msg"></p>
+        <button class="btn primary" type="submit">Open the Inbox</button>
+      </div>
+    </form>
+    <nav id="filters" class="drawer-tabs inbox-filters" hidden></nav>
+    <div id="list"></div>
+    <p class="help fine" id="note" hidden>New messages can take up to a minute to show. Messages delete themselves after 30 days.</p>
+  </main>
+
+  <script src="classroom-core.js"></script>
+  <script src="inbox.js"></script>
+</body>
+</html>

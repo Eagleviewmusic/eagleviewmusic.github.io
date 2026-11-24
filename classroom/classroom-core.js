@@ -16,6 +16,15 @@
 
   C.DRAFT_KEY = 'classroom_draft_v1';
   C.LAST_CLASS_KEY = 'classroom_last_class_v1';
+  C.NAME_KEY = 'classroom_name_v1';
+
+  // The mailbox (Claude Apps/classroom-mailbox, a Cloudflare Worker): students send work, the teacher reads it in inbox.html.
+  C.MAILBOX = 'https://classroom-mailbox.classroom-mailbox.workers.dev';
+  // Testing on this Mac only: localStorage classroom_mailbox_dev = 'http://localhost:8787' (launch entry classroom-mailbox-dev)
+  try {
+    const dev = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.getItem('classroom_mailbox_dev');
+    if (dev) C.MAILBOX = dev;
+  } catch (e) { /* fine */ }
 
   C.COLORS = [
     { id: 'teal',   main: '#0d9488', soft: '#ccfbf1', ink: '#134e4a' },
@@ -165,8 +174,10 @@
       ? { id: str(it.id, 20) || C.uid(), title: str(it.title, 120), url: it.url.slice(0, 20000), note: str(it.note, 300) } : null);
     const lesson = l => {
       l = l && typeof l === 'object' ? l : {};
-      return { id: str(l.id, 20) || C.uid(), title: str(l.title, 120), note: str(l.note, 1000),
+      const out = { id: str(l.id, 20) || C.uid(), title: str(l.title, 120), note: str(l.note, 1000),
         date: /^\d{4}-\d{2}-\d{2}$/.test(l.date) ? l.date : C.today(), items: (Array.isArray(l.items) ? l.items : []).map(item).filter(Boolean) };
+      if (l.sendBack === true) out.sendBack = true;   // students see "Send to Mr. Walby" (only written when on, so older files stay the same)
+      return out;
     };
     const classes = (raw && Array.isArray(raw.classes) ? raw.classes : []).filter(c => c && typeof c === 'object').map(c => ({
       id: str(c.id, 20) || C.uid(), name: str(c.name, 60) || 'Class', color: C.color(c.color).id,
@@ -180,6 +191,27 @@
     const r = await fetch('lessons.json?t=' + Date.now(), { cache: 'no-store' });
     if (!r.ok) throw new Error('lessons.json: ' + r.status);
     return C.clean(await r.json());
+  };
+
+  /* Talks to the mailbox. Resolves { ok, status, body }; a network failure (no answer at all, e.g. the school
+     network blocks the address) resolves { ok: false, status: 0, blocked: true }. */
+  C.mailboxReady = () => !/MAILBOX-SUBDOMAIN/.test(C.MAILBOX);
+  C.mailbox = async function (path, opts) {
+    const o = opts || {};
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), o.timeout || 15000);
+    const headers = {};
+    if (o.body) headers['Content-Type'] = 'application/json';
+    if (o.password) headers['Authorization'] = 'Bearer ' + o.password;
+    try {
+      const res = await fetch(C.MAILBOX + path, { method: o.method || 'GET', headers, body: o.body ? JSON.stringify(o.body) : undefined,
+        signal: ctrl.signal, cache: 'no-store' });
+      let body = null;
+      try { body = await res.json(); } catch (e) { /* no JSON */ }
+      return { ok: res.ok, status: res.status, body: body || {} };
+    } catch (e) {
+      return { ok: false, status: 0, blocked: true, body: {} };
+    } finally { clearTimeout(timer); }
   };
 
   C.readDraft = function () {

@@ -83,6 +83,8 @@
           <button class="btn primary" type="submit">Add</button>
         </form>
         <div class="t-add-msg" data-msg="${ci}"></div>
+        <label class="t-check"><input type="checkbox" data-act="lessonSendBack" data-c="${ci}" ${L.sendBack ? 'checked' : ''}>
+          📬 Students can send work back (a <b>Send to Mr. Walby</b> card; read it in the <a href="inbox.html">Inbox</a>)</label>
         <div class="t-lesson-foot">
           <button class="btn" data-act="toCabinet" data-c="${ci}" ${L.items.length || L.title ? '' : 'disabled'}>🗄️ Lesson done: move it to the Filing Cabinet</button>
         </div>
@@ -165,6 +167,7 @@
       case 'lessonTitle': c.lesson.title = el.value; persist(); refreshToCabinetButton(ci); return;
       case 'lessonNote': c.lesson.note = el.value; persist(); return;
       case 'lessonDate': if (el.value) { c.lesson.date = el.value; persist(); } return;
+      case 'lessonSendBack': if (el.checked) c.lesson.sendBack = true; else delete c.lesson.sendBack; persist(); return;
       case 'itemTitle': c.lesson.items[ii].title = el.value; persist(); return;
       case 'itemNote': c.lesson.items[ii].note = el.value; persist(); return;
       case 'folderTitle': c.cabinet[fi].title = el.value; persist(); return;
@@ -233,7 +236,7 @@
   }
 
   main.addEventListener('input', e => { const el = e.target.closest('[data-act]'); if (el && /^(INPUT|TEXTAREA)$/.test(el.tagName) && el.type !== 'date') act(el, e); });
-  main.addEventListener('change', e => { const el = e.target.closest('[data-act]'); if (el && el.type === 'date') act(el, e); });
+  main.addEventListener('change', e => { const el = e.target.closest('[data-act]'); if (el && (el.type === 'date' || el.type === 'checkbox')) act(el, e); });
   document.addEventListener('click', e => {
     const el = e.target.closest('button[data-act]');
     if (el && !el.disabled) { e.preventDefault(); act(el, e); }

@@ -53,11 +53,21 @@
     }).join('')}</div>`;
   }
 
+  const canSend = L => !!(L.sendBack && C.mailboxReady());
+  function sendCardHtml(c) {
+    return `<a class="item send-item" href="#/c/${encodeURIComponent(c.id)}/~send">
+      <span class="item-icon">📬</span>
+      <span class="item-text"><span class="item-title">Send to Mr. Walby</span>
+        <span class="item-app">Send a message, or a link to your work</span></span>
+      <span class="item-go">Send</span></a>`;
+  }
+
   function classHtml(c) {
     const L = c.lesson, base = `#/c/${encodeURIComponent(c.id)}`;
-    const body = L.items.length
+    const body = L.items.length || canSend(L)
       ? `<div class="lesson-head"><h2>${esc(L.title || 'Today\'s lesson')}</h2><span class="lesson-date">${esc(C.niceDate(L.date, true))}</span></div>
-         ${L.note ? `<p class="lesson-note">${esc(L.note)}</p>` : ''}${itemsHtml(L.items, base)}`
+         ${L.note ? `<p class="lesson-note">${esc(L.note)}</p>` : ''}${itemsHtml(L.items, base)}
+         ${canSend(L) ? `<div class="items">${sendCardHtml(c)}</div>` : ''}`
       : `<div class="empty-card"><b>Nothing here yet.</b><br>Mr. Walby will put today's lesson here.</div>`;
     return `<header class="bar" style="${C.colorVars(c.color)}"><a class="back" href="#/">◀ All classes</a><h1>${esc(c.name)}</h1></header>
       <main class="lesson" style="${C.colorVars(c.color)}">${body}
@@ -115,6 +125,50 @@
     document.title = (it.title || app.name) + ' · The Classroom';
   }
 
+  /* ---------- Send to Mr. Walby ---------- */
+  function savedName() { try { return localStorage.getItem(C.NAME_KEY) || ''; } catch (e) { return ''; } }
+  function showSend(c) {
+    openFrameKey = '';
+    const back = `#/c/${encodeURIComponent(c.id)}`;
+    root.innerHTML = `<header class="bar" style="${C.colorVars(c.color)}"><a class="back" href="${back}">◀ ${esc(c.name)}</a><h1>📬 Send to Mr. Walby</h1></header>
+      <main class="lesson send" style="${C.colorVars(c.color)}">
+        <form class="send-form" novalidate>
+          <label>Your first name<input class="field" name="name" maxlength="40" autocomplete="given-name" value="${esc(savedName())}"></label>
+          <label>Your message<textarea class="field" name="message" rows="4" maxlength="2000" placeholder="What did you make? What do you want Mr. Walby to know?"></textarea></label>
+          <label>Link to your work <span class="optional">(if you have one)</span>
+            <input class="field" name="link" maxlength="30000" placeholder="Paste it here, e.g. from Song Writer: Save my work → Copy" autocomplete="off"></label>
+          <button class="big-btn" type="submit">📬 Send</button>
+          <p class="send-msg" role="status"></p>
+        </form></main>`;
+    document.title = 'Send to Mr. Walby · The Classroom';
+    window.scrollTo(0, 0);
+    const form = root.querySelector('.send-form'), msg = form.querySelector('.send-msg'), btn = form.querySelector('button');
+    form.name.focus();
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const name = form.name.value.trim(), message = form.message.value.trim(), link = form.link.value.trim();
+      msg.className = 'send-msg';
+      if (!name) { msg.textContent = 'Type your first name.'; form.name.focus(); return; }
+      if (!message && !link) { msg.textContent = 'Write a message or paste a link.'; form.message.focus(); return; }
+      if (link && !/^https?:\/\//i.test(link)) { msg.textContent = 'That link should start with https://'; form.link.focus(); return; }
+      try { localStorage.setItem(C.NAME_KEY, name); } catch (err) { /* fine */ }
+      btn.disabled = true; btn.textContent = 'Sending…'; msg.textContent = '';
+      const r = await C.mailbox('/send', { method: 'POST', body: { classId: c.id, className: c.name, lesson: c.lesson.title || C.niceDate(c.lesson.date), name, message, link } });
+      if (r.ok) {
+        form.outerHTML = `<div class="empty-card sent"><b>Sent! ✓</b><br>Mr. Walby got your message, ${esc(name)}.<br>
+          <a class="big-btn" href="${back}">Back to ${esc(c.name)}</a> <a class="big-btn ghost" href="${back}/~send" data-again>Send another</a></div>`;
+        const again = root.querySelector('[data-again]');
+        if (again) again.addEventListener('click', ev => { ev.preventDefault(); showSend(c); });
+        return;
+      }
+      btn.disabled = false; btn.textContent = '📬 Try again';
+      msg.className = 'send-msg bad';
+      msg.textContent = r.blocked
+        ? 'Couldn\'t reach the mailbox. The school network may be blocking it. Tell Mr. Walby: "the mailbox didn\'t work."'
+        : (r.body.error || 'The mailbox had a problem. Try again.');
+    });
+  }
+
   /* ---------- drawing the screen for the address ---------- */
   function render() {
     const p = parts();
@@ -123,6 +177,10 @@
       const c = findClass(p[1]);
       if (c) {
         setLastClass(c.id);
+        if (p[2] === '~send' && canSend(c.lesson)) {
+          if (!root.querySelector('.send-form, .sent')) showSend(c);   // a refresh of the data mustn't wipe what they're typing
+          return;
+        }
         const it = p[2] && c.lesson.items.find(x => x.id === p[2]);
         if (it) { showPlayer(c, it, `#/c/${encodeURIComponent(c.id)}`, c.name); return; }
         draw(preview + classHtml(c), c.name);

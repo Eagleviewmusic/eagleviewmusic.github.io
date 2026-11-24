@@ -12,6 +12,7 @@
   --main: #0284c7; --soft: #e0f2fe; --ink: #0c4a6e;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 html, body { min-height: 100%; }
 body { font-family: var(--body); color: var(--text); background: var(--bg); background-attachment: fixed; line-height: 1.5; }
 a { color: inherit; }
@@ -193,6 +194,36 @@ textarea.field { resize: vertical; min-height: 2.6rem; }
 .t-folder-items li { display: flex; align-items: center; gap: 0.5rem; }
 .t-folder-items li span.t-fi-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .add-class { justify-self: start; }
+
+.t-check { display: flex; align-items: flex-start; gap: 0.5rem; margin-top: 0.8rem; padding: 0.6rem 0.75rem; border-radius: 10px; background: var(--soft); cursor: pointer; }
+.t-check input { margin-top: 0.3rem; width: 18px; height: 18px; flex: none; }
+.t-check a { color: #0369a1; font-weight: 700; }
+
+/* Send to Mr. Walby (student) */
+.send-item { border-style: dashed; border-color: var(--main); background: var(--soft); }
+.send-form { display: grid; gap: 1rem; background: var(--card); border-radius: 20px; padding: 1.4rem; box-shadow: var(--shadow); }
+.send-form label { display: grid; gap: 0.35rem; font-family: var(--heading); font-weight: 600; font-size: 1.15rem; color: var(--ink); }
+.send-form .field { font-family: var(--body); font-size: 1.05rem; font-weight: 400; color: var(--text); }
+.send-form .optional { font-family: var(--body); font-weight: 400; font-size: 0.9rem; color: var(--muted); }
+.send-form .big-btn { justify-self: start; border: none; cursor: pointer; font-size: 1.1rem; margin-top: 0; }
+.send-form .big-btn:disabled { opacity: 0.6; cursor: default; }
+.send-msg { font-weight: 700; min-height: 1.4em; }
+.send-msg.bad { color: #b91c1c; }
+.sent b { color: #15803d; font-size: 1.8rem; }
+.big-btn.ghost { background: transparent; color: var(--ink); border: 2px solid var(--main); }
+
+/* Inbox (teacher) */
+.login-card { max-width: 420px; }
+.remember { display: flex; gap: 0.5rem; align-items: center; margin: 0.6rem 0 0.2rem; color: var(--muted); }
+.inbox-filters { margin-bottom: -1rem; }
+#list { display: grid; gap: 0.8rem; }
+.msg { background: #fff; border: 1.5px solid var(--line); border-radius: 14px; padding: 0.9rem 1rem; box-shadow: var(--shadow); display: grid; gap: 0.4rem; justify-items: start; }
+.msg-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.8rem; width: 100%; }
+.msg-name { font-family: var(--heading); font-size: 1.3rem; font-weight: 600; }
+.msg-class { padding: 0.1rem 0.6rem; border-radius: 999px; background: #e0f2fe; color: #0c4a6e; font-weight: 700; font-size: 0.85rem; }
+.msg-when { color: var(--muted); font-size: 0.9rem; flex: 1; }
+.msg-lesson { color: var(--muted); font-weight: 600; font-size: 0.9rem; }
+.msg-text { white-space: pre-wrap; font-size: 1.05rem; }
 
 @media (max-width: 700px) {   /* phones: the header scrolls away instead of covering half the screen */
   .t-top { position: static; padding: 0.7rem 1rem; }
