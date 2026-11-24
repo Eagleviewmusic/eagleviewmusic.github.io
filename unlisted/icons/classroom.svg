@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#ede9fe"/><stop offset="1" stop-color="#ddd6fe"/></linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset=".55" stop-color="#cbd5e1"/><stop offset="1" stop-color="#94a3b8"/></linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3d9b1"/><stop offset="1" stop-color="#d6a46b"/></linearGradient>
+    <linearGradient id="ebony" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#475569"/><stop offset=".45" stop-color="#1e293b"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg)"/>
+  <circle cx="330" cy="70" r="90" fill="#fff" opacity=".35"/>
+  <circle cx="60" cy="350" r="70" fill="#fff" opacity=".25"/>
+  <g stroke-linejoin="round" stroke-linecap="round">
+
+    <rect x="58" y="78" width="160" height="114" rx="22" fill="#ccfbf1" stroke="#0d9488" stroke-width="10"/>
+    <text x="138" y="152" font-family="Arial Rounded MT Bold, Helvetica, Arial, sans-serif" font-weight="800" font-size="46" text-anchor="middle" fill="#134e4a">6th</text>
+    <rect x="58" y="214" width="160" height="114" rx="22" fill="#ede9fe" stroke="#7c3aed" stroke-width="10"/>
+    <text x="138" y="288" font-family="Arial Rounded MT Bold, Helvetica, Arial, sans-serif" font-weight="800" font-size="46" text-anchor="middle" fill="#4c1d95">5th</text>
+    <rect x="240" y="78" width="104" height="250" rx="16" fill="#f5f5f4" stroke="#3b0764" stroke-width="8"/>
+    <rect x="256" y="98" width="72" height="58" rx="8" fill="#d6d3d1" stroke="#78716c" stroke-width="5"/><rect x="277" y="123" width="30" height="9" rx="4" fill="#78716c"/><rect x="256" y="174" width="72" height="58" rx="8" fill="#d6d3d1" stroke="#78716c" stroke-width="5"/><rect x="277" y="199" width="30" height="9" rx="4" fill="#78716c"/><rect x="256" y="250" width="72" height="58" rx="8" fill="#d6d3d1" stroke="#78716c" stroke-width="5"/><rect x="277" y="275" width="30" height="9" rx="4" fill="#78716c"/>
+  </g>
+</svg>

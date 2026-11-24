@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>The Classroom · Teacher</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="classroom.css">
+</head>
+<body class="teacher">
+  <header class="t-top">
+    <div><div class="brand">🦅 Eagle View Music</div><h1>The Classroom · Teacher</h1></div>
+    <div class="t-actions">
+      <span id="status" class="status">Loading…</span>
+      <a class="btn" href="./?draft" target="_blank" rel="noopener">👀 Preview as a student</a>
+      <button class="btn" id="open-file" type="button" title="Load a lessons.json you saved before">📂 Open a file</button>
+      <button class="btn primary" id="publish" type="button">⬇ Save file to publish</button>
+      <input type="file" id="file-input" accept=".json,application/json" hidden>
+    </div>
+  </header>
+
+  <details class="help" open>
+    <summary>ⓘ How it works</summary>
+    <p>Paste links from your apps into a class (a Song Writer song, a xylophone layout, an Ostinato Builder lesson…).
+      Students tap their class and see only today's lesson. When a lesson is done, move it to the Filing Cabinet: students can still
+      find it there to practice. Your changes stay in this browser until you <b>Save file to publish</b> and the file goes on the site.</p>
+  </details>
+  <div id="notice"></div>
+
+  <main class="t-main" id="classes"><p class="loading">Loading…</p></main>
+
+  <dialog class="t-dialog" id="saved-dialog">
+    <h2>lessons.json is saved</h2>
+    <p>It's in your <b>Downloads</b> folder. Put it on the site (ask Claude to publish the Classroom), and students will see the changes a minute or two later.</p>
+    <p>The chip at the top turns green when the site matches.</p>
+    <div class="row"><button class="btn primary" id="saved-ok" type="button">OK</button></div>
+  </dialog>
+
+  <script src="classroom-core.js"></script>
+  <script src="teacher.js"></script>
+</body>
+</html>
