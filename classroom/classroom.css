@@ -194,6 +194,16 @@ textarea.field { resize: vertical; min-height: 2.6rem; }
 .t-folder-items li span.t-fi-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .add-class { justify-self: start; }
 
+@media (max-width: 700px) {   /* phones: the header scrolls away instead of covering half the screen */
+  .t-top { position: static; padding: 0.7rem 1rem; }
+  .t-top > div:first-child { min-width: 0; }
+  .t-top h1 { font-size: 1.3rem; }
+  .t-actions .btn { min-height: 36px; padding: 0.35rem 0.75rem; font-size: 0.88rem; }
+  .t-main { padding: 1rem 0.75rem; }
+  .t-item { flex-wrap: wrap; }
+  .t-item-btns { width: 100%; justify-content: flex-end; }
+}
+
 dialog.t-dialog { border: none; border-radius: 18px; padding: 1.5rem; max-width: 480px; box-shadow: 0 30px 60px rgba(15,23,42,0.3); }
 dialog.t-dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
 dialog.t-dialog h2 { font-family: var(--heading); font-weight: 600; margin-bottom: 0.5rem; }
