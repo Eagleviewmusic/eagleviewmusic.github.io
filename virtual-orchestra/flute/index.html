@@ -242,6 +242,11 @@
     }
     .note-btn.scale-note .names b { font-size: 22px; }
     .note-btn.scale-note .names small { font-size: 12px; }
+    /* The scale (Settings → Key and scale): every note of it the flute plays, in one row, narrower when there are many */
+    .note-pad.scale { width: 1012px; height: 70px; }
+    .note-btn.scale-note.narrow { font-size: 18px; }
+    .note-btn.scale-note.narrow .names b { font-size: 16px; }
+    .note-btn.scale-note.narrow .names small { font-size: 10px; }
 
     .tip-area {
       width: 1000px;
@@ -429,6 +434,7 @@
       color: #1f4d80;
     }
     .view-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .view-choice.three { grid-template-columns: 1fr; }
     .view-choice button {
       padding: 10px;
       border: 2px solid #e5e7eb;
@@ -572,10 +578,12 @@
       <h2>Settings</h2>
       <button type="button" class="sp-close" id="settingsClose" aria-label="Close settings">×</button>
     </div>
+    <div class="sp-section" id="keyScaleSection"></div>
     <div class="sp-section">
       <h3>Notes to show</h3>
-      <div class="view-choice" role="radiogroup" aria-label="Notes to show">
+      <div class="view-choice three" role="radiogroup" aria-label="Notes to show">
         <button type="button" role="radio" data-view="first"><b>First notes</b><small>F to high B♭, the B♭ scale, keys 1 to 0</small></button>
+        <button type="button" role="radio" data-view="scale"><b>The scale</b><small id="scaleViewHint">The notes of the key and scale above, low to high</small></button>
         <button type="button" role="radio" data-view="chromatic"><b>Every note</b><small>Low B to top C, with every sharp and flat</small></button>
       </div>
     </div>
@@ -622,6 +630,7 @@
       <div class="chart-grid" id="chartGrid"></div>
     </div>
   </div>
+  <script src="orchestra-keys.js"></script>
   <script src="flute-synth.js"></script>
   <script>
     // Fingerings for the Boehm flute (closed G♯, B foot) from the Woodwind Fingering Guide's basic
@@ -744,14 +753,29 @@
       try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; }
     }
     function saveSettings() {
-      try { localStorage.setItem(STORE_KEY, JSON.stringify({ version: 1, view, labels: labelView, picture, detail, sound: soundSettings })); } catch (e) { /* private window */ }
+      try { localStorage.setItem(STORE_KEY, JSON.stringify({ version: 1, view, labels: labelView, picture, detail, sound: soundSettings, keyScale: keyScale.state() })); } catch (e) { /* private window */ }
     }
     const saved = loadSettings();
-    let view = saved.view === 'first' ? 'first' : 'chromatic';
+    let view = ['first', 'scale'].includes(saved.view) ? saved.view : 'chromatic';
     let labelView = ['fingers', 'names', 'parts'].includes(saved.labels) ? saved.labels : 'keys';   // what the flute's keys say (Parts: 3D only)
     let picture = saved.picture === 'drawing' ? 'drawing' : '3d';   // the 3D flute, or the flat drawing
     let detail = saved.detail === 'low' ? 'low' : 'high';            // 3D: the flute mirrored in itself, or the studio only (slow computers)
     let keyMap = {};   // e.code -> pitch, for the view on screen
+
+    // Settings → Key and scale (orchestra-keys.js, shared by the orchestra's instruments): a key, a scale and the
+    // Virtual Keyboard's Flex computer keys, which play only the scale's notes, the same keys in every key
+    const keyScale = OrchestraKeys.create({
+      mount: document.getElementById('keyScaleSection'),
+      low: OrchestraKeys.pitchToMidi(notes[0].pitch),
+      high: OrchestraKeys.pitchToMidi(notes[notes.length - 1].pitch),
+      saved: saved.keyScale,
+      defaults: { key: 10, scale: 'major', keys: 'flex' },   // B♭ major, the First notes' scale
+      instrument: 'the flute', firstNotes: 'First notes',
+      colors: LETTER_COLORS, accent: '#3b6ea8',
+      onChange: keyScaleChanged,
+    });
+    keyScale.respell(notes);
+    const flexKeys = () => view !== 'first' && keyScale.flex;   // First notes keeps its own keys, 1 to 0
 
     // Which fingering each note shows, when it has more than one (kept while the page is open)
     const chosenFingering = {};
@@ -842,6 +866,11 @@
       return lower ? '⇧' + KEY_LABELS[lower] : '';
     }
 
+    // A button's key: its Flex key (none when the note is not in the scale), or its Chromatic one
+    function padLabel(pitch) {
+      return flexKeys() ? keyScale.labelFor(OrchestraKeys.pitchToMidi(pitch)) : chromaticLabel(pitch);
+    }
+
     function buildNotePad() {
       notePad.innerHTML = '';
       notePad.className = 'note-pad ' + view;
@@ -851,15 +880,24 @@
           addNoteButton(notesByPitch[pitch], FIRST_LABELS[i], 'scale-note', i * 92);
           keyMap[FIRST_CODES[i]] = pitch;
         });
+      } else if (view === 'scale') {
+        // First notes' buttons, as many as fit: the row stays 1012 px however many notes the scale has
+        const pitches = keyScale.scaleMidis().map(OrchestraKeys.midiToPitch).filter(p => notesByPitch[p]);
+        const col = Math.min(92, Math.floor(1012 / pitches.length));
+        pitches.forEach((pitch, i) => {
+          addNoteButton(notesByPitch[pitch], padLabel(pitch), 'scale-note' + (col < 60 ? ' narrow' : ''), i * col);
+          notePad.lastChild.style.width = (col - 6) + 'px';
+        });
+        Object.assign(keyMap, KEY_CODES);
       } else {
         let naturalIndex = -1;
         notes.forEach(note => {
           if (note.sharp) {
             // Sits over the line between the letter below and the letter above
-            addNoteButton(note, chromaticLabel(note.pitch), 'sharp', (naturalIndex + 1) * COL - 18 - 1);
+            addNoteButton(note, padLabel(note.pitch), 'sharp', (naturalIndex + 1) * COL - 18 - 1);
           } else {
             naturalIndex++;
-            addNoteButton(note, chromaticLabel(note.pitch), 'natural', naturalIndex * COL);
+            addNoteButton(note, padLabel(note.pitch), 'natural', naturalIndex * COL);
           }
         });
         Object.assign(keyMap, KEY_CODES);
@@ -1589,7 +1627,9 @@
 
     function showTips(note) {
       if (!note) {
-        tipArea.innerHTML = '<span class="hint">Press a note to see how to play it. Hold Shift to play the computer keys an octave higher.</span>';
+        tipArea.innerHTML = '<span class="hint">Press a note to see how to play it. ' + (flexKeys()
+          ? 'Hold Shift and the Z row plays an octave lower, the 1 row an octave higher.'
+          : 'Hold Shift to play the computer keys an octave higher.') + '</span>';
         return;
       }
       // A note with several fingerings shows the button and nothing else, the same button in the same place each
@@ -1770,9 +1810,14 @@
     const codesDown = {};   // e.code -> the pitch it started, so Shift can change mid-hold without stranding a note
 
     function pitchForCode(code, shift) {
+      if (flexKeys()) {
+        const midi = keyScale.midiForCode(code, shift);
+        const flexPitch = midi == null ? null : OrchestraKeys.midiToPitch(midi);
+        return notesByPitch[flexPitch] ? flexPitch : null;
+      }
       let pitch = keyMap[code];
       if (!pitch) return null;
-      if (shift && view === 'chromatic') {
+      if (shift && view !== 'first') {
         const up = pitch.slice(0, -1) + (Number(pitch.slice(-1)) + 1);
         if (notesByPitch[up]) pitch = up;
       }
@@ -1782,7 +1827,7 @@
     window.addEventListener('keydown', e => {
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'Escape') { closeChartSheet(); return closeSettings(); }
-      if (e.target.closest && e.target.closest('input, textarea')) return;
+      if (e.target.closest && e.target.closest('input, textarea, select')) return;
       const pitch = pitchForCode(e.code, e.shiftKey);
       if (!pitch) return;
       e.preventDefault();
@@ -1951,6 +1996,18 @@
     function refreshViewChoice() {
       settingsPanel.querySelectorAll('[data-view]').forEach(b =>
         b.setAttribute('aria-checked', String(b.dataset.view === view)));
+      document.getElementById('scaleViewHint').textContent = `The notes of ${keyScale.title()}, low to high`;
+    }
+    // A new key, scale or computer keys (Settings → Key and scale)
+    function keyScaleChanged() {
+      releaseAll();
+      keyScale.respell(notes);
+      chartGrid.innerHTML = '';   // the chart sheet spells its sharps and flats again when it next opens
+      saveSettings();
+      buildNotePad();
+      showNote(shownNote && buttonFor(shownNote.pitch) ? shownNote : null);
+      refreshViewChoice();
+      updateScale();
     }
     settingsPanel.querySelectorAll('[data-view]').forEach(b =>
       b.addEventListener('click', () => setView(b.dataset.view)));

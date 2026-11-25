@@ -17,6 +17,7 @@
 
 import * as THREE from './lib/three.module.min.js';
 import { OrbitControls } from './lib/OrbitControls.js';
+import { BASS, buildBass } from './clarinet-bass-3d.js';
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const clamp = THREE.MathUtils.clamp;
@@ -205,7 +206,9 @@ function segSegDist2(p1, q1, p2, q2) {
 const C = { mpEnd: 71, barrelEnd: 136, upperEnd: 326, lowerEnd: 566, end: 670.4 };
 const ROOT_Y = 336;                                                      // the page's y of the mouthpiece's tip
 // the body's radius: the upper joint is a plain cylinder, the lower joint widens a little toward the bell
-const RB = s => s < 326 ? 14.45 : s < 566 ? 14.3 + (s - 326) * 1.35 / 240 : 16;
+const RB_BB = s => s < 326 ? 14.45 : s < 566 ? 14.3 + (s - 326) * 1.35 / 240 : 16;
+// (the builders below read the body's radius through RB: buildClarinet points it at the model being built)
+let RB = RB_BB;
 const rad = (x, th, R) => V3(x, R * Math.sin(th * RAD), R * Math.cos(th * RAD));
 const nrm = th => V3(0, Math.sin(th * RAD), Math.cos(th * RAD));          // outward, round the tube
 const tan = th => V3(0, Math.cos(th * RAD), -Math.sin(th * RAD));         // round the tube, toward larger θ
@@ -280,8 +283,27 @@ const STUDIO_GLSL = `
     // in every product photo of a clarinet), the grey between them pulled down toward black, so a cup or a spatula breaks
     // into black and white bands instead of an even satin grey. (An outside judge measured photos: about a quarter of
     // the key's pixels under 35 %, a fifth to a half over 90 %; ours had neither.)
+    #ifdef FS_TUBE
+    // (the bass's plated neck and bell: big polished tubes, between the tent and the keys' hard set)
+    // (a mirror: the lit side of the tent burns out to white, the floor and the far side go nearly black, so every tube
+    // shows a hard dark band beside its highlight, as plated tubes do in product photographs)
+    // (2026-11-20 b: lifted, the floor and far side a light grey rather than near black: an outside judge read the old
+    // bell and bow as pewter beside the keys; the product photographs show them mostly white with thin dark lines)
+    #ifdef FS_NECK
+    v = 0.3 + 2.6 * smoothstep(0.4, 1.18, v);                            // (the slim neck keeps harder dark bands: lifted like the bell it vanished into the page)
+    #else
+    v = 0.5 + 2.4 * smoothstep(0.36, 1.12, v);
+    #endif
+    strip = 2.8;
+    #else
     v = 0.05 + 2.7 * pow(smoothstep(0.45, 1.5, v), 1.3);
     strip = 3.2;
+    #endif
+    #endif
+    #if defined( FS_BASS ) && !defined( FS_TUBE )
+    // (the bass's broad flat plates and spoons face the camera squarely, where this set is only mid grey: a white card
+    // round the lens, so a flat face shows white, as in the product photographs)
+    v = mix(v, 2.2, 0.8 * (1.0 - smoothstep(4.0, 30.0, rho)));
     #endif
     v = mix(v, 0.8, smoothstep(0.12, 0.6, rough));                        // a rough surface sees the tent's average
     vec3 white = vec3(1.0, 0.997, 0.985);
@@ -293,6 +315,9 @@ const STUDIO_GLSL = `
     // bright streak instead of the tent's even white
     float elev = degrees(asin(clamp(d.y, -1.0, 1.0)));
     float wall = smoothstep(50.0, 60.0 + e, abs(s)) * fsBand(elev, -52.0, 58.0, e + 6.0);
+    #if defined( FS_TUBE ) && !defined( FS_NECK )
+    wall *= 0.45;                                                        // (a big bell mirrors whole walls: only a grey there)
+    #endif
     c = mix(c, vec3(0.17, 0.172, 0.18), 0.9 * wall);
     c = mix(c, white * strip, fsBand(abs(s), 65.0, 74.0, 2.0 + e) * fsBand(elev, -38.0, 46.0, e + 3.0));
     // The dark band just ABOVE the camera (the black card over the lens): on a tube it is the narrow dark stripe just
@@ -303,10 +328,22 @@ const STUDIO_GLSL = `
     float fw = clamp(fwidth(u), 0.0, 8.0);
     float eT = max(0.8, 0.45 * fw) + 30.0 * rough, hi = max(23.0, 5.0 + 2.6 * fw);
     float band = smoothstep(5.0 - 3.0 - eT, 5.0 + 3.0 + eT, u) * (1.0 - smoothstep(hi - eT, hi + eT, u));
+    #ifdef FS_TUBE
+    band *= 0.8;                                                         // (the one crisp dark line down each plated tube)
+    #endif
+    #ifdef FS_BASS
+    // (the bass's broad flat plates and spoons face the camera squarely: a full black card there turned every one dark grey)
+    band *= 0.55;
+    #endif
     c = mix(c, vec3(0.045, 0.047, 0.052), 0.96 * band * (1.0 - smoothstep(30.0, 50.0, abs(s))));
     // two tall black flags a little off the camera's line, left and right: every dome, rod and rolled edge then carries a
     // dark line beside its highlight, which is what makes plated keys read as metal against black wood
+    #if defined( FS_TUBE ) && !defined( FS_NECK )
+    // (the plated tubes: the flags narrower, so a bell's flare carries thin dark lines instead of broad smears)
+    float flag = max(fsBand(s, 19.0, 25.0, 1.0 + e), fsBand(s, -37.0, -31.0, 1.0 + e)) * fsBand(elev, -60.0, 62.0, e + 5.0);
+    #else
     float flag = max(fsBand(s, 15.0, 29.0, 1.5 + e), fsBand(s, -41.0, -27.0, 1.5 + e)) * fsBand(elev, -60.0, 62.0, e + 5.0);
+    #endif
     c = mix(c, vec3(0.05, 0.05, 0.055), 0.9 * flag);
     return c;
   }`;
@@ -324,6 +361,9 @@ const TRACE_GLSL = `
   vec3 fsRadiance( vec3 P, vec3 D, float rough ) {
     float tBest = 1e9, under = 0.0, wBest = 0.0, body = 0.0; vec3 nBest = vec3( 0.0, 0.0, 1.0 );
     for ( int i = 0; i < FS_N; i ++ ) {
+      #ifdef FS_TUBE
+      if ( i >= FS_NB ) break;                                           // (the bass's bell mirrors only the body: cups showed in it as stray ovals)
+      #endif
       vec3 A = fsA[ i ].xyz; float r = fsA[ i ].w; vec3 U = fsB[ i ].xyz; float L = fsB[ i ].w;
       vec3 oc = P - A; float dU = dot( D, U ), oU = dot( oc, U );
       vec3 d2 = D - dU * U, o2 = oc - oU * U;
@@ -622,9 +662,9 @@ function mouthpieceGeo() {
     // (2026-11-19 c: the body is one smooth oval tapering from the tip to the round body by 38 mm, cut by the table and by
     // ONE beak plane; the flat cheek cuts fading in and out made folds like draped cloth)
     const rho = MP.rho(s), e = s >= 38 ? 1 : 1 - Math.pow(1 - s / 38, 2);
-    const A = Math.max(0.05, (MP.W0 + (rho - MP.W0) * e) * MP.arc(s)), B = 6 + (rho - 6) * e, zcb = -7 * (1 - e), bodyTop = zcb + B;
+    const A = Math.max(0.05, (MP.W0 + (rho - MP.W0) * (MP.eW ? MP.eW(s, e) : e)) * MP.arc(s)), B = 6 + (rho - 6) * e, zcb = -7 * (1 - e), bodyTop = zcb + B;
     const zp = Math.min(MP.zfP(s), MP.nose(s)), cut = zp < bodyTop + 3, top = cut ? Math.min(bodyTop, zp) : bodyTop;
-    const bot = -(MP.ZT - MP.face(s) + (rho - MP.ZT) * clamp((s - 68.6) / 2.0, 0, 1)), zc = (top + bot) / 2;
+    const bot = -(MP.ZT - MP.face(s) + (MP.noRamp ? 0 : (rho - MP.ZT) * clamp((s - 68.6) / 2.0, 0, 1))), zc = (top + bot) / 2;
     for (let j = 0; j < NS; j++) {
       const a = j / NS * Math.PI * 2, sy = Math.sin(a), cz = Math.cos(a);
       // how far from the section's middle each surface lets this ray go: the oval, then the table (smooth minimum)
@@ -634,7 +674,8 @@ function mouthpieceGeo() {
       if (cz < -1e-4) sum += Math.pow((bot - zc) / cz, -P);
       let r = Math.pow(sum, -1 / P);
       // the beak's face meets the body at a rounded edge (its own power)
-      if (cz > 1e-4 && cut) r = Math.pow(Math.pow(r, -14) + Math.pow((zp - zc) / cz, -14), -1 / 14);
+      // (MP.crown, the bass's: the beak's face rounded across, dropping crown mm at the sides; 0 = the B♭'s flat face)
+      if (cz > 1e-4 && cut) { const kq = (MP.crown || 0) * (sy / A) * (sy / A); r = Math.pow(Math.pow(r, -14) + Math.pow(kq > 1e-6 ? (-cz + Math.sqrt(cz * cz + 4 * kq * (zp - zc))) / (2 * kq) : (zp - zc) / cz, -14), -1 / 14); }
       pos.push(s, r * sy, zc + r * cz);
     }
   }
@@ -648,7 +689,7 @@ function mouthpieceGeo() {
 // (2026-11-19 b: its tip an arc 0.55 mm short of the mouthpiece's, so a thin black rail shows round it; the thinned vamp pale
 // cane ending in a U-shaped shoulder, the heel straw with lengthwise fibres; long enough to show below the ligature)
 function reedGeo() {
-  const L = 67.8, S = [0.55, 0.6, 0.7, 0.85, 1.05, 1.3, 1.6, 2.0, 2.5, 3.1, 3.85, 5, 6.5, 8, 10, 12, 14, 16, 18, 20, 22, 24];
+  const L = MP.reedL || 67.8, S = [0.55, 0.6, 0.7, 0.85, 1.05, 1.3, 1.6, 2.0, 2.5, 3.1, 3.85, 5, 6.5, 8, 10, 12, 14, 16, 18, 20, 22, 24];
   for (let s = 25; s < 37; s += 0.6) S.push(+s.toFixed(2));
   S.push(38, 40, 43, 47, 52, 57, 62, 65, 67.4, L);
   const NA = 44, pos = [], col = [], idx = [];
@@ -693,13 +734,19 @@ const RODS = {
   RF: { th: 2.0, lift: 2.6, s0: 449.4, s1: 551, r: 0.85 },       // (spread apart 2026-11-19 b: daylight between the two hinge tubes)
   RE: { th: 16.4, lift: 2.6, s0: 449.4, s1: 551, r: 0.9 },
 };
-for (const rd of Object.values(RODS)) {
-  rd.at = s => rad(s, rd.th, rd.R != null ? rd.R : RB(s) + rd.lift);
-  rd.a = rd.at(rd.s0); rd.b = rd.at(rd.s1); rd.dir = rd.b.clone().sub(rd.a).normalize();
+function initRods(R) {
+  for (const rd of Object.values(R)) {
+    rd.at = s => rad(s, rd.th, rd.R != null ? rd.R : RB(s) + rd.lift);
+    rd.a = rd.at(rd.s0); rd.b = rd.at(rd.s1); rd.dir = rd.b.clone().sub(rd.a).normalize();
+  }
+  return R;
 }
+initRods(RODS);
 
-function buildClarinet() {
-  const root = new THREE.Group(); root.name = 'clarinet'; root.rotation.z = -Math.PI / 2; root.position.y = ROOT_Y;
+function buildClarinet(model) {
+  const isBass = model === 'bass';
+  RB = isBass ? BASS.RB : RB_BB;
+  const root = new THREE.Group(); root.name = 'clarinet'; root.rotation.z = -Math.PI / 2; root.position.y = isBass ? BASS.rootY : ROOT_Y;
   const grain = grainTexture();
   const M = {
     silver: new THREE.MeshPhysicalMaterial({ color: 0xe8e6df, metalness: 1, roughness: 0.07, vertexColors: true }),
@@ -713,11 +760,15 @@ function buildClarinet() {
     lig: new THREE.MeshPhysicalMaterial({ color: 0xe6e5e1, metalness: 1, roughness: 0.1 }),
     rest: new THREE.MeshPhysicalMaterial({ color: 0xe8e6df, metalness: 1, roughness: 0.1 }),
     reed: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.82, metalness: 0, envMapIntensity: 1.95, vertexColors: true }),
+    // the bass's plated neck and bell: big polished tubes, lit by the softer tent (the flute's tube), not the keys' hard set
+    tube: new THREE.MeshPhysicalMaterial({ color: 0xe9e7e1, metalness: 1, roughness: 0.085, vertexColors: true }),
+    // the bass's neck: the same plating, but a slim tube that needs its dark bands to stand off a pale page (FS_NECK)
+    neck: new THREE.MeshPhysicalMaterial({ color: 0xe9e7e1, metalness: 1, roughness: 0.085, vertexColors: true }),
   };
   M.silver.name = 'silver';
   // Five pieces, so the clarinet can be taken apart: mouthpiece, barrel, upper joint, lower joint, bell.
-  const JOINTS = ['mp', 'barrel', 'upper', 'lower', 'bell'];
-  const jointOf = s => s < C.mpEnd ? 'mp' : s < C.barrelEnd ? 'barrel' : s < C.upperEnd ? 'upper' : s < C.lowerEnd ? 'lower' : 'bell';
+  const JOINTS = isBass ? BASS.JOINTS : ['mp', 'barrel', 'upper', 'lower', 'bell'];
+  const jointOf = isBass ? BASS.jointOf : s => s < C.mpEnd ? 'mp' : s < C.barrelEnd ? 'barrel' : s < C.upperEnd ? 'upper' : s < C.lowerEnd ? 'lower' : 'bell';
   const joints = {}, statics = {};
   for (const j of JOINTS) {
     joints[j] = new THREE.Group(); joints[j].name = 'joint:' + j; root.add(joints[j]);
@@ -728,6 +779,11 @@ function buildClarinet() {
   const plain = g => { g.userData.plain = true; return g; };
 
   // ---- the mouthpiece, its reed and ligature ----
+  // (the bass's is this one made larger; its beak is longer and comes to a finer tip: one straight slope, turning up late)
+  const mpWas = { TIP: MP.TIP, zfP: MP.zfP, zf: MP.zf, eW: MP.eW, crown: MP.crown, reedL: MP.reedL, noRamp: MP.noRamp };
+  if (isBass) { MP.TIP = 0.6; MP.zfP = s => -MP.ZT + 1 + MP.TIP + 0.5 * s + 0.012 * Math.pow(Math.max(0, s - 20), 2); MP.zf = MP.zfP;
+    // (2026-11-20 b: its width drawn in steadily from the ligature to the tip, a wedge seen from above, and the beak's face rounded across)
+    MP.eW = s => Math.min(1, Math.pow(s / 46, 0.85)); MP.crown = 1.6; MP.reedL = 70.9; MP.noRamp = true; }   // (the reed runs to the end of the table: a black wedge showed past its heel)
   addTo('mp', 'ebonite', mouthpieceGeo(), X(lathe([[71, 14.1], [71, 10.9], [73, 10.9], [73, 10.6], [86, 10.6], [86, 10.9], [88, 10.9], [88, 7.5], [80, 7.5]], { segs: 56, crease: 40 })));
   addTo('mp', 'cork', X(lathe([[73.2, 10.6], [73.2, 11.25], [85.8, 11.25], [85.8, 10.6]], { segs: 48, crease: 40 })));
   addTo('mp', 'dark', place(disc(7.5), V3(81, 0, 0), AX));
@@ -814,6 +870,9 @@ function buildClarinet() {
     }
   }
 
+  Object.assign(MP, mpWas);
+  const dense = (prof, step) => { const out = [prof[0]]; for (let i = 1; i < prof.length; i++) { const [y0, r0] = prof[i - 1], [y1, r1] = prof[i], n = Math.max(1, Math.round(Math.abs(y1 - y0) / step)); for (let k = 1; k <= n; k++) out.push([y0 + (y1 - y0) * k / n, r0 + (r1 - r0) * k / n]); } return out; };
+  if (!isBass) {
   // ---- the barrel ----
   addTo('barrel', 'wood', X(lathe([[77.2, 13.2], [77.2, 13.9], ...smoothProf([[77.4, 13.9], [86, 14.45], [96, 15.15], [106, 15.55], [118, 15.62], [125, 15.48], [129.6, 15.2]], 40), [129.8, 14.6]], { segs: 72, crease: 40 })));
   addTo('barrel', 'silver', plain(X(lathe([[71, 11.4], [71, 14.0], [71.3, 14.25], [72.2, 14.25], [72.35, 14.0], [72.5, 14.2], [73.3, 14.2], [73.45, 14.0], [73.6, 14.3], [77.0, 14.3], [77.4, 14.0], [77.4, 13.5]], { segs: 72, crease: 30 }))),
@@ -822,7 +881,6 @@ function buildClarinet() {
 
   // ---- the two joints of the body, their tenons and corks ----
   // (the body's lathes have a ring every 1.5 mm: the contact shading under the keys is baked into them as vertex colours)
-  const dense = (prof, step) => { const out = [prof[0]]; for (let i = 1; i < prof.length; i++) { const [y0, r0] = prof[i - 1], [y1, r1] = prof[i], n = Math.max(1, Math.round(Math.abs(y1 - y0) / step)); for (let k = 1; k <= n; k++) out.push([y0 + (y1 - y0) * k / n, r0 + (r1 - r0) * k / n]); } return out; };
   const tubeU = X(lathe(dense([[118.5, 7.5], [118.5, 10.7], [118.9, 11.0], [136, 11.0], [136, 14.2], [136.3, 14.45], [325.7, 14.45], [326, 14.2], [326, 11.0], [343.6, 11.0], [344, 10.7], [344, 7.5]], 1.5), { segs: 120, crease: 40 }));
   tubeU.userData.tube = true; addTo('upper', 'wood', tubeU);
   addTo('upper', 'cork', X(lathe([[121.5, 11.0], [121.5, 11.28], [132.5, 11.28], [132.5, 11.0]], { segs: 48, crease: 40 })), X(lathe([[329.5, 11.0], [329.5, 11.28], [340.5, 11.28], [340.5, 11.0]], { segs: 48, crease: 40 })));
@@ -852,6 +910,8 @@ function buildClarinet() {
     for (const s of [341, 345.6]) add('silver', place(lathe([[0, 0], [0, 1.15], [0.5, 1.15], [0.7, 0.9], [0.7, 0]], { segs: 16, crease: 40 }), rad(s, 180, RB(s) + 1.0), nrm(180)));
   }
 
+  }
+
   // ---- the moving parts ----
   const parts = {}, fingers = [], reflCups = [];
   const mkPart = (id, o) => {
@@ -879,7 +939,7 @@ function buildClarinet() {
   const cupAt = (dx, s, r, thMax = 80) => { const sh = seatH(r, s), th = wrapTh(dx, s, sh + 1, thMax); return { th, s, r, sh, n: nrm(th), seat: rad(s, th, RB(s) + sh), top: rad(s, th, RB(s) + sh + cupH(r)) }; };
   const cupTh = (th, s, r) => { const sh = seatH(r, s); return { th, s, r, sh, n: nrm(th), seat: rad(s, th, RB(s) + sh), top: rad(s, th, RB(s) + sh + cupH(r)) }; };
   const cupOn = (p, c) => {
-    partAdd(p, 'key', place(cupGeo(c.r), c.seat.clone(), c.n)); partAdd(p, 'pad', place(padGeo(c.r), c.seat.clone(), c.n));
+    partAdd(p, 'key', place((c.geo || cupGeo)(c.r), c.seat.clone(), c.n)); partAdd(p, 'pad', place(padGeo(c.r), c.seat.clone(), c.n));
     add('wood', place(seatGeo(c.r), c.seat.clone(), c.n)); add('dark', place(disc(c.r * 0.5), c.seat.clone().addScaledVector(c.n, -1.55), c.n));
     p.cups.push(c); reflCups.push({ p, c });
   };
@@ -947,6 +1007,11 @@ function buildClarinet() {
     }
   };
 
+  // (only the few three.js classes the bass uses: handing over the whole THREE namespace would pull all of three.js into the bundle)
+  if (isBass) buildBass({ THREE: { Matrix4: THREE.Matrix4, Mesh: THREE.Mesh, MeshStandardMaterial: THREE.MeshStandardMaterial, TorusGeometry: THREE.TorusGeometry, BufferAttribute: THREE.BufferAttribute, BoxGeometry: THREE.BoxGeometry }, V3, RAD, AX, AY, AZ, clamp, smooth, sweep, lathe, place, spline, densify, merge, rad, nrm, tan, wrap, wrapTh, cylX, ball, arcPts, strap, touchPad, plateGeo,
+    withUV, X, disc, rodSeg, interp, smoothProf, faceAway, contactShade, ringGeo, holePatch, cupWall, cupH, cupGeo, padGeo, seatGeo, seatH, post, armArc, lever, leverP, plate, flat, tearXY, domePad, capPad, leverZ,
+    dense, initRods, M, root, joints, statics, add, addTo, plain, parts, fingers, reflCups, mkPart, partAdd, chooseSign, onRod, sleeve, cupAt, cupTh, cupOn, pointed, cupArm, openCup, ringKey, rocker, rodStatic });
+  else {
   // ======== upper joint ========
   rodStatic(RODS.U1, [225.3, 257.5, 280.5, 322.6]);
   rodStatic(RODS.Th, [228, 250.6], { ball: 2.0 });
@@ -1166,12 +1231,14 @@ function buildClarinet() {
     { const [dx, s] = Lw(168, 1670); openCup('E', cupAt(dx, s, 8.6), RODS.RE, { angle: 7.5, w: 3.4, lug: 1.9 }); }
   }
 
+  }
+
   // ---- contact shading: the wood darkens where metal stands close over it (vertex colours on the body's wood) ----
   // Every vertex of the keywork near the tube goes into a 3 mm grid; each wood vertex finds its nearest metal within 6 mm.
   {
-    const t0 = performance.now(), CELL = 3, OX = 40, grid = new Map(), P = [];
+    const t0 = performance.now(), CELL = 3, OX = 40, grid = new Map(), P = [], aoX = isBass ? [112, 984] : [128, 572];
     const keyOf = (ix, iy, iz) => (ix * 64 + iy + OX) * 64 + iz + OX;
-    const push = (g, off) => { const p = g.attributes.position; for (let i = 0; i < p.count; i += 1) { const x = p.getX(i) + off.x, y = p.getY(i) + off.y, z = p.getZ(i) + off.z; if (x < 128 || x > 572 || Math.hypot(y, z) > RB(x) + 7) continue; const k = keyOf(Math.floor(x / CELL), Math.floor(y / CELL), Math.floor(z / CELL)); let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(P.length); P.push(x, y, z); } };
+    const push = (g, off) => { const p = g.attributes.position; for (let i = 0; i < p.count; i += 1) { const x = p.getX(i) + off.x, y = p.getY(i) + off.y, z = p.getZ(i) + off.z; if (x < aoX[0] || x > aoX[1] || Math.hypot(y, z) > RB(x) + 7) continue; const k = keyOf(Math.floor(x / CELL), Math.floor(y / CELL), Math.floor(z / CELL)); let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(P.length); P.push(x, y, z); } };
     const zero = V3(0, 0, 0);
     for (const j of ['upper', 'lower']) for (const g of [...statics[j].silver, ...statics[j].satin]) push(g, zero);
     for (const p of Object.values(parts)) for (const m of p.meshes) push(m.geometry, p.pivot);
@@ -1215,9 +1282,9 @@ function buildClarinet() {
   root.updateMatrixWorld(true);
   // what can hide a label: the body, as capsules (in the page's own space)
   const W3 = (s, y = 0, z = 0) => V3(s, y, z).applyMatrix4(root.matrix);
-  const capsules = [{ id: 'mp', a: W3(30), b: W3(70), r: 12.5 }, { id: 'body', a: W3(72), b: W3(640), r: 14.2 }, { id: 'bell', a: W3(645), b: W3(668), r: 25 }];
+  const capsules = isBass ? BASS.capsules(W3) : [{ id: 'mp', a: W3(30), b: W3(70), r: 12.5 }, { id: 'body', a: W3(72), b: W3(640), r: 14.2 }, { id: 'bell', a: W3(645), b: W3(668), r: 25 }];
   // the stand-ins the traced reflections test against: the body first (it reflects as black wood), then the cups
-  const refl = [
+  const refl = isBass ? BASS.refl(joints, V3) : [
     { obj: joints.mp, a: V3(34, 0, 0), u: AX.clone(), r: 12.8, L: 37 },
     { obj: joints.barrel, a: V3(71, 0, 0), u: AX.clone(), r: 14.8, L: 65 },
     { obj: joints.upper, a: V3(136, 0, 0), u: AX.clone(), r: 14.45, L: 190 },
@@ -1311,8 +1378,13 @@ const VIEWS = {
   bell:   { az: -22, el: -18, x: [436, 676], zoom: true },
 };
 
+// what the viewer needs to know about a model (the bass's is BASS, in clarinet-bass-3d.js)
+const BB = { rootY: ROOT_Y, floorS: C.end, VIEWS, linkage, CHIP_LIST, PICK_LIST, staticName, APART: { mp: -84, barrel: -56, upper: -28, lower: 0, bell: 28 }, reach: [84, 28], mix: [150, 420], shadow: { half: 95, cz: 0 }, label: '3D clarinet' };
+
 export function createClarinet(container, options = {}) {
   const opt = Object.assign({ labels: 'off', view: 'front', shot: false }, options);
+  // (these names shadow the B♭'s, so everything below reads the chosen model's)
+  const MD = opt.model === 'bass' ? BASS : BB, VIEWS = MD.VIEWS, linkage = MD.linkage, CHIP_LIST = MD.CHIP_LIST, PICK_LIST = MD.PICK_LIST, staticName = MD.staticName, ROOT_Y = MD.rootY;
   if (!document.getElementById('vc3d-style')) { const st = document.createElement('style'); st.id = 'vc3d-style'; st.textContent = CSS; document.head.appendChild(st); }
   container.classList.add('vc3d-root');
   if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
@@ -1322,7 +1394,7 @@ export function createClarinet(container, options = {}) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = FILM ? THREE.CustomToneMapping : THREE.NeutralToneMapping;
   renderer.toneMappingExposure = 0.9;
-  const canvas = renderer.domElement; canvas.className = 'vc3d-canvas'; canvas.setAttribute('aria-label', '3D clarinet: drag to turn it, pinch or scroll to zoom; with the keyboard, arrows turn it, Page Up and Page Down zoom, Home puts it back');
+  const canvas = renderer.domElement; canvas.className = 'vc3d-canvas'; canvas.setAttribute('aria-label', MD.label + ': drag to turn it, pinch or scroll to zoom; with the keyboard, arrows turn it, Page Up and Page Down zoom, Home puts it back');
   container.appendChild(canvas);
   const over = document.createElement('div'); over.className = 'vc3d-over'; container.appendChild(over);
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); over.appendChild(svg);
@@ -1333,7 +1405,7 @@ export function createClarinet(container, options = {}) {
   scene.environment = envRT.texture;
   pmrem.dispose();
 
-  const T = buildClarinet();
+  const T = buildClarinet(opt.model);
   scene.add(T.root);
   const PAINTABLE = Object.values(T.parts);
   for (const p of PAINTABLE) p.out = p.out.clone().applyQuaternion(T.root.quaternion);          // (the model lies along x; the page stands it up)
@@ -1342,7 +1414,7 @@ export function createClarinet(container, options = {}) {
   /* ---- the studio, looked up exactly by the polished metal ---- */
   // 'high' = the studio function in the shader; 'plain' = three.js's own baked lookup (the way out if the patch
   // ever fails to compile). The page never depends on the patch.
-  const metalMats = [T.M.silver, T.M.satin, T.M.lig, T.M.rest, T.M.wood, T.M.ebonite, ...PAINTABLE.map(p => p.mat)];
+  const metalMats = [T.M.silver, T.M.satin, T.M.lig, T.M.rest, T.M.tube, T.M.neck, T.M.wood, T.M.ebonite, ...PAINTABLE.map(p => p.mat)];
   const target = 'vec4 envMapColor = textureCubeUV( envMap, envMapRotation * reflectVec, roughness );\n\t\t\treturn envMapColor.rgb * envMapIntensity;';
   const chunk = THREE.ShaderChunk.envmap_physical_pars_fragment || '';
   const usable = chunk.includes(target);
@@ -1364,13 +1436,13 @@ export function createClarinet(container, options = {}) {
     level = q;
     for (const m of metalMats) {
       delete m.defines.FS_TRACE; delete m.defines.FS_N; delete m.defines.FS_NB;
-      const isWood = m === T.M.wood || m === T.M.ebonite; if (isWood) m.defines.FS_WOOD = 1; else m.defines.FS_METAL = 1;
+      const isWood = m === T.M.wood || m === T.M.ebonite, isNeck = m === T.M.neck, isTube = m === T.M.tube || isNeck; if (isWood) m.defines.FS_WOOD = 1; else m.defines.FS_METAL = 1; if (isTube) m.defines.FS_TUBE = 1; if (isNeck) m.defines.FS_NECK = 1; if (MD === BASS && !isWood && !isTube) m.defines.FS_BASS = 1;
       const isKey = /^key:/.test(m.name);
       if (isKey) m.defines.FS_KEYS = 1;
       if (q === 'plain') { m.onBeforeCompile = () => {}; m.customProgramCacheKey = () => 'vc-plain'; }
       else {
         if (q === 'high') { m.defines.FS_TRACE = 1; m.defines.FS_N = NR; m.defines.FS_NB = T.nBody; }
-        m.customProgramCacheKey = () => 'vc-' + q + (isKey ? '-k' : '') + (isWood ? '-w' : '');
+        m.customProgramCacheKey = () => 'vc-' + q + (isKey ? '-k' : '') + (isWood ? '-w' : '') + (isTube ? '-t' : '') + (isNeck ? '-n' : '') + (MD === BASS ? '-b' : '');
         m.onBeforeCompile = sh => {
           Object.assign(sh.uniforms, TU);
           sh.fragmentShader = sh.fragmentShader.replace('#include <envmap_physical_pars_fragment>', STUDIO_GLSL + TRACE_GLSL + '\n' +
@@ -1403,19 +1475,21 @@ export function createClarinet(container, options = {}) {
   }
   const centre = box.getCenter(V3());
   // taken apart: mouthpiece, barrel, upper joint, lower joint, bell, each slid along the instrument (mm, + = toward the bell)
-  const APART = { mp: -84, barrel: -56, upper: -28, lower: 0, bell: 28 };
+  // (a number slides the piece along the instrument; a vector, in the model's own frame, any way: the bass's mouthpiece comes off along its own line)
+  const APART = MD.APART, apartL = {}, apartW = {};
+  for (const [j, o] of Object.entries(APART)) { apartL[j] = typeof o === 'number' ? V3(o, 0, 0) : V3(...o); apartW[j] = V3(apartL[j].y, -apartL[j].x, apartL[j].z); }
   // and each end joint turns as it comes off (you twist gently as you pull), so putting it back shows the lining up:
   // the embouchure hole in line with the keys, the foot's rod in line with the middle of the last body key
   
   let apart = 0, apartTo = 0;
   // a point given in the assembled flute's coordinates, where it is now (its joint may be slid off and turned)
   const jointPlace = v => { const g = T.joints[T.jointOf(v.x)]; g.updateMatrix(); return v.applyMatrix4(g.matrix).applyMatrix4(T.root.matrix); };
-  box.max.y -= APART.mp; box.min.y -= APART.bell;
+  box.max.y += MD.reach[0]; box.min.y -= MD.reach[1];
 
   /* ---- contact shadow on a floor below, baked once ---- */
-  const floorY = ROOT_Y - C.end - 2.5;
+  const floorY = ROOT_Y - MD.floorS - 2.5;
   const shadow = (() => {
-    const W = 256, H = 256, halfW = 95, halfH = 95, cx = 0, cz = 0;
+    const W = 256, H = 256, halfW = MD.shadow.half, halfH = MD.shadow.half, cx = 0, cz = MD.shadow.cz;
     const rtA = new THREE.WebGLRenderTarget(W, H, { depthBuffer: false }), rtB = new THREE.WebGLRenderTarget(W, H, { depthBuffer: false });
     const cam = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 1, 1200);
     cam.position.set(cx, floorY + 900, cz); cam.up.set(0, 0, -1); cam.lookAt(cx, 0, cz);
@@ -1479,7 +1553,7 @@ export function createClarinet(container, options = {}) {
     const ins = insets(), aw = Math.max(40, W - ins.l - ins.r), ah = Math.max(40, H - ins.t - ins.b);
     const th = Math.tan(camera.fov * Math.PI / 360) * (ah / H), tw = Math.tan(camera.fov * Math.PI / 360) * (aw / H);
     // (where the parts will be once a take-apart under way has finished; a close-up keeps its stretch of the flute)
-    const pts = (xr ? fitPts.filter(p => p.s >= xr[0] && p.s <= xr[1]) : fitPts).map(p => { const v = p.clone(); v.y -= APART[p.j.name.slice(6)] * apartTo; return v; });
+    const pts = (xr ? fitPts.filter(p => p.s >= xr[0] && p.s <= xr[1]) : fitPts).map(p => { const v = p.clone(); v.addScaledVector(apartW[p.j.name.slice(6)], apartTo); return v; });
     const bb = new THREE.Box3(); for (const p of pts) bb.expandByPoint(p);
     const target = bb.getCenter(V3()); let dist = 1000;
     for (let it = 0; it < 6; it++) {
@@ -1512,7 +1586,7 @@ export function createClarinet(container, options = {}) {
   // How far up and down the instrument the view may go: the whole clarinet, and beyond its ends while taken apart
   // (the mouthpiece slides 84 mm up, the bell 28 mm down)
   const reach = new THREE.Box3();
-  function reachBox() { reach.copy(box); reach.max.y += 84 * apart; reach.min.y -= 28 * apart; return reach; }
+  function reachBox() { reach.copy(box); reach.max.y += MD.reach[0] * apart; reach.min.y -= MD.reach[1] * apart; return reach; }
   // gliding up or down the instrument while a button is held (+1 = toward the mouthpiece)
   let glideDir = 0, glideLast = 0;
   function fireView() { viewName = null; for (const cb of viewCbs) { try { cb(); } catch (e) { console.error(e); } } }
@@ -1560,8 +1634,8 @@ export function createClarinet(container, options = {}) {
       const d = apartTo - apart, step = dt * 2.2;
       apart = Math.abs(d) <= step ? apartTo : apart + Math.sign(d) * step;
       const e = apart * apart * (3 - 2 * apart);
-      for (const [j, g] of Object.entries(T.joints)) { g.position.x = APART[j] * e; g.updateMatrix(); }
-      shadow.plane.position.y = floorY - APART.bell * e;                      // the floor stays under the bell
+      for (const [j, g] of Object.entries(T.joints)) { g.position.copy(apartL[j]).multiplyScalar(e); g.updateMatrix(); }
+      shadow.plane.position.y = floorY + apartW.bell.y * e;                      // the floor stays under the bell
       if (apart === apartTo) shadow.bake();
       busy = true;
     }
@@ -1873,7 +1947,7 @@ export function createClarinet(container, options = {}) {
       const K = keys instanceof Set ? keys : new Set(keys || []);
       const { closed, moved } = linkage(K);
       const c0 = color ? new THREE.Color(color) : null, c1 = upper ? new THREE.Color(upper) : c0;
-      const mix = (out, s) => out.copy(c0).lerp(c1, clamp((s - 150) / 420, 0, 1));
+      const mix = (out, s) => out.copy(c0).lerp(c1, clamp((s - MD.mix[0]) / MD.mix[1], 0, 1));
       pressedNow = new Set([...K, ...closed]);
       for (const p of PAINTABLE) {
         const down = K.has(p.id) || closed.has(p.id);
@@ -1881,7 +1955,7 @@ export function createClarinet(container, options = {}) {
         if (down && c0) { mix(p.colTo, p.xMid); p.paintTo = 1; } else p.paintTo = 0;
       }
       // a finger on each covered hole
-      for (const f of T.fingers) { f.to = K.has(f.id) && c0 ? 1 : 0; if (f.to) mix(f.mat.color, f.s); }
+      for (const f of T.fingers) { f.to = (f.show ? f.show(K) : K.has(f.id)) && c0 ? 1 : 0; if (f.to) mix(f.mat.color, f.s); }
       invalidate();
     },
     setLabels(mode) {
@@ -1930,6 +2004,7 @@ export function createClarinet(container, options = {}) {
     views: Object.keys(VIEWS),
     get view() { return viewName; },
     get labels() { return labelMode; },
+    model: MD === BASS ? 'bass' : 'bb', rootY: ROOT_Y,
     scene, camera, renderer, controls, clarinet: T.root, materials: T.M, parts: T.parts,
     info() { let tris = 0; for (const m of T.meshes) tris += m.geometry.index.count / 3; return { triangles: tris, meshes: T.meshes.length, calls: renderer.info.render.calls, pixelRatio: renderer.getPixelRatio(), size: [W, H], cssScale, reflections: level, parts: PAINTABLE.length, lowRes }; },
     dispose() {
@@ -1945,7 +2020,7 @@ export function createClarinet(container, options = {}) {
       for (const m of T.meshes) m.geometry.dispose();
       for (const m of Object.values(T.M)) m.dispose();
       for (const p of PAINTABLE) p.mat.dispose();
-      envRT.dispose(); renderer.dispose();
+      envRT.dispose(); renderer.dispose(); try { renderer.forceContextLoss(); } catch (e) { /* (already gone) */ }
       canvas.remove(); over.remove(); container.classList.remove('vc3d-root');
       viewCbs.length = 0;
     },

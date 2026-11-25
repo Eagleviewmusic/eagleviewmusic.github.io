@@ -198,6 +198,11 @@
     }
     .note-btn.scale-note .names b { font-size: 26px; }
     .note-btn.scale-note .names small { font-size: 15px; }
+    /* The scale (Settings → Key and scale): every note of it this clarinet plays, low at the bottom, shorter when there are many */
+    .note-pad.scale { width: 170px; height: 760px; }
+    .note-btn.scale-note.narrow { font-size: 18px; padding: 0 10px; }
+    .note-btn.scale-note.narrow .names b { font-size: 17px; }
+    .note-btn.scale-note.narrow .names small { font-size: 12px; }
 
     .tip-area {
       width: 370px;
@@ -498,6 +503,7 @@
       color: #4b3470;
     }
     .view-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .view-choice.three { grid-template-columns: 1fr; }
     .view-choice button {
       padding: 10px;
       border: 2px solid #e5e7eb;
@@ -653,10 +659,12 @@
       <h2>Settings</h2>
       <button type="button" class="sp-close" id="settingsClose" aria-label="Close settings">×</button>
     </div>
+    <div class="sp-section" id="keyScaleSection"></div>
     <div class="sp-section">
       <h3>Notes to show</h3>
-      <div class="view-choice" role="radiogroup" aria-label="Notes to show">
+      <div class="view-choice three" role="radiogroup" aria-label="Notes to show">
         <button type="button" role="radio" data-view="first"><b>First notes</b><small>Low G to throat B♭, below the break, keys 1 to 0</small></button>
+        <button type="button" role="radio" data-view="scale"><b>The scale</b><small id="scaleViewHint">The notes of the key and scale above, low to high</small></button>
         <button type="button" role="radio" data-view="chromatic"><b>Every note</b><small id="everyNoteHint">Low E to high G, with every sharp and flat</small></button>
       </div>
     </div>
@@ -670,7 +678,7 @@
         <button type="button" role="radio" data-detail="high">Mirror reflections</button>
         <button type="button" role="radio" data-detail="low">Simple (faster)</button>
       </div>
-      <div class="sp-hint" id="pictureHint">The 3D clarinet is the B♭. The E♭ and the bass are shown as flat drawings.</div>
+      <div class="sp-hint" id="pictureHint">The B♭ and the bass clarinet have 3D models. The E♭ is shown as a flat drawing.</div>
     </div>
     <div class="sp-section">
       <h3>Fingering chart</h3>
@@ -698,6 +706,7 @@
       <div class="chart-grid" id="chartGrid"></div>
     </div>
   </div>
+  <script src="orchestra-keys.js"></script>
   <script src="clarinet-art.js"></script>
   <script src="clarinet-eb.js"></script>
   <script src="clarinet-bass.js"></script>
@@ -871,19 +880,37 @@
       try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; }
     }
     function saveSettings() {
-      try { localStorage.setItem(STORE_KEY, JSON.stringify({ version: 1, model: model.id, view, labels: labelView, zoom: zoomView, picture, detail, sound: soundSettings })); } catch (e) { /* private window */ }
+      try { localStorage.setItem(STORE_KEY, JSON.stringify({ version: 1, model: model.id, view, labels: labelView, zoom: zoomView, picture, detail, sound: soundSettings, keyScale: keyScale.state() })); } catch (e) { /* private window */ }
     }
     const saved = loadSettings();
     let model = MODELS[saved.model] || MODELS.bb;
     let notes = makeNotes(model.chart);
     let notesByPitch = Object.fromEntries(notes.map(n => [n.pitch, n]));
     let keyCodes = Object.assign({}, KEY_CODES, model.keyCodes);   // this clarinet's computer keys
-    let view = saved.view === 'first' ? 'first' : 'chromatic';
+    let view = ['first', 'scale'].includes(saved.view) ? saved.view : 'chromatic';
     let labelView = ['fingers', 'names'].includes(saved.labels) ? saved.labels : 'keys';   // what the clarinet's keys say
     let zoomView = saved.zoom === 'close' ? 'close' : 'whole';   // the whole instrument, or close on the keys
-    let picture = saved.picture === 'drawing' ? 'drawing' : '3d';   // the 3D clarinet (B♭ only), or the flat drawing
+    let picture = saved.picture === 'drawing' ? 'drawing' : '3d';   // the 3D clarinet (the B♭ and the bass), or the flat drawing
     let detail = saved.detail === 'low' ? 'low' : 'high';            // 3D: the clarinet mirrored in itself, or the studio only (slow computers)
     let keyMap = {};   // e.code -> pitch, for the view on screen
+
+    // Settings → Key and scale (orchestra-keys.js, shared by the orchestra's instruments): a key, a scale and the
+    // Virtual Keyboard's Flex computer keys, which play only the scale's notes, the same keys in every key.
+    // The key is the written one, as on the staff, the same on all three clarinets; the settings say what it sounds in.
+    const SOUNDS_ON = { eb: 'on an E♭ clarinet', bb: 'on a B♭ clarinet', bass: 'on a bass clarinet' };
+    const midiRange = () => [OrchestraKeys.pitchToMidi(notes[0].pitch), OrchestraKeys.pitchToMidi(notes[notes.length - 1].pitch)];
+    const keyScale = OrchestraKeys.create({
+      mount: document.getElementById('keyScaleSection'),
+      low: midiRange()[0], high: midiRange()[1],
+      saved: saved.keyScale,
+      defaults: { key: 0, scale: 'major', keys: 'flex' },   // C major: concert B♭ on the B♭ clarinet
+      instrument: 'this clarinet', firstNotes: 'First notes',
+      concert: () => ({ offset: model.offset, on: SOUNDS_ON[model.id] }),
+      colors: LETTER_COLORS, accent: '#6a4c93',
+      onChange: keyScaleChanged,
+    });
+    keyScale.respell(notes);
+    const flexKeys = () => view !== 'first' && keyScale.flex;   // First notes keeps its own keys, 1 to 0
 
     // Which fingering each note shows, when it has more than one (kept while the page is open, for this clarinet)
     let chosenFingering = {};
@@ -975,6 +1002,11 @@
       return lower ? '⇧' + KEY_LABELS[lower] : '';
     }
 
+    // A button's key: its Flex key (none when the note is not in the scale), or its Chromatic one
+    function padLabel(pitch) {
+      return flexKeys() ? keyScale.labelFor(OrchestraKeys.pitchToMidi(pitch)) : chromaticLabel(pitch);
+    }
+
     function buildNotePad() {
       notePad.innerHTML = '';
       notePad.className = 'note-pad ' + view;
@@ -985,6 +1017,15 @@
           addNoteButton(notesByPitch[pitch], FIRST_LABELS[i], 'scale-note', (FIRST.length - 1 - i) * 76);
           keyMap[FIRST_CODES[i]] = pitch;
         });
+      } else if (view === 'scale') {
+        // First notes' buttons, low at the bottom, as many as fit: the column stays 760 px however many notes the scale has
+        const pitches = keyScale.scaleMidis().map(OrchestraKeys.midiToPitch).filter(p => notesByPitch[p]);
+        const row = Math.min(76, Math.floor(760 / pitches.length));
+        pitches.forEach((pitch, i) => {
+          addNoteButton(notesByPitch[pitch], padLabel(pitch), 'scale-note' + (row < 50 ? ' narrow' : ''), (pitches.length - 1 - i) * row);
+          notePad.lastChild.style.height = (row - 6) + 'px';
+        });
+        Object.assign(keyMap, keyCodes);
       } else {
         const naturals = notes.filter(n => !n.sharp).length;
         const row = ROW(), halfSharp = tallWindow.matches ? 17 : 14;
@@ -996,15 +1037,15 @@
         notes.forEach(note => {
           if (note.sharp) {
             // Sits over the line between the letter below and the letter above
-            addNoteButton(note, chromaticLabel(note.pitch), 'sharp', padHeight - (naturalIndex + 1) * row - halfSharp - 1);
+            addNoteButton(note, padLabel(note.pitch), 'sharp', padHeight - (naturalIndex + 1) * row - halfSharp - 1);
           } else {
             naturalIndex++;
-            addNoteButton(note, chromaticLabel(note.pitch), 'natural', padHeight - (naturalIndex + 1) * row);
+            addNoteButton(note, padLabel(note.pitch), 'natural', padHeight - (naturalIndex + 1) * row);
           }
         });
         Object.assign(keyMap, keyCodes);
       }
-      if (view === 'first') notePad.style.height = '';
+      if (view !== 'chromatic') notePad.style.height = '';
     }
 
     // ----- the clarinet (clarinet-art.js) -----
@@ -1170,7 +1211,9 @@
       if (!note) {
         tipArea.innerHTML = view === 'first'
           ? '<span class="hint">Press a note to see how to play it.</span>'
-          : '<span class="hint">Press a note to see how to play it. Hold Shift to play the computer keys an octave higher.</span>';
+          : flexKeys()
+            ? '<span class="hint">Press a note to see how to play it. Hold Shift and the Z row plays an octave lower, the 1 row an octave higher.</span>'
+            : '<span class="hint">Press a note to see how to play it. Hold Shift to play the computer keys an octave higher.</span>';
         return;
       }
       const which = chosenFingering[note.pitch] || 0;
@@ -1377,9 +1420,14 @@
     const codesDown = {};   // e.code -> the pitch it started, so Shift can change mid-hold without stranding a note
 
     function pitchForCode(code, shift) {
+      if (flexKeys()) {
+        const midi = keyScale.midiForCode(code, shift);
+        const flexPitch = midi == null ? null : OrchestraKeys.midiToPitch(midi);
+        return notesByPitch[flexPitch] ? flexPitch : null;
+      }
       let pitch = keyMap[code];
       if (!pitch) return null;
-      if (shift && view === 'chromatic') {
+      if (shift && view !== 'first') {
         const up = pitch.slice(0, -1) + (Number(pitch.slice(-1)) + 1);
         if (notesByPitch[up]) pitch = up;
       }
@@ -1389,7 +1437,7 @@
     window.addEventListener('keydown', e => {
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'Escape') { closeChartSheet(); return closeSettings(); }
-      if (e.target.closest && e.target.closest('input, textarea')) return;
+      if (e.target.closest && e.target.closest('input, textarea, select')) return;
       const pitch = pitchForCode(e.code, e.shiftKey);
       if (!pitch) return;
       e.preventDefault();
@@ -1596,6 +1644,18 @@
     function refreshViewChoice() {
       settingsPanel.querySelectorAll('[data-view]').forEach(b =>
         b.setAttribute('aria-checked', String(b.dataset.view === view)));
+      document.getElementById('scaleViewHint').textContent = `The notes of ${keyScale.title()}, low to high`;
+    }
+    // A new key, scale or computer keys (Settings → Key and scale)
+    function keyScaleChanged() {
+      releaseAll();
+      keyScale.respell(notes);
+      chartGrid.innerHTML = '';   // the chart sheet spells its sharps and flats again when it next opens
+      saveSettings();
+      buildNotePad();
+      showNote(shownNote && buttonFor(shownNote.pitch) ? shownNote : null);
+      refreshViewChoice();
+      updateScale();
     }
     settingsPanel.querySelectorAll('[data-view]').forEach(b =>
       b.addEventListener('click', () => setView(b.dataset.view)));
@@ -1733,6 +1793,9 @@
       notes = makeNotes(model.chart);
       notesByPitch = Object.fromEntries(notes.map(n => [n.pitch, n]));
       keyCodes = Object.assign({}, KEY_CODES, model.keyCodes);
+      keyScale.setRange(...midiRange());   // this clarinet's notes, and what the key sounds in on it
+      keyScale.respell(notes);
+      refreshViewChoice();
       chosenFingering = {};
       saveSettings();
       art.setModel(model.id);
@@ -1799,13 +1862,13 @@
     if (document.fonts) document.fonts.ready.then(() => placeDial());
 
     // Responsive scaling: shrink (or grow) the whole app proportionally to fit the window
-    // ----- the 3D clarinet (clarinet-3d.js): the B♭ only; the E♭ and the bass keep the flat drawing -----
+    // ----- the 3D clarinets (clarinet-3d.js, with the bass's model in clarinet-bass-3d.js): the B♭ and the bass; the E♭ keeps the flat drawing -----
     const clarinetBox = document.getElementById('clarinetBox');
     const viewBar = document.getElementById('viewBar');
     const spinBtn = document.getElementById('spinBtn');
     const d3Btn = document.getElementById('d3Btn');
-    let spinning = false, loading3d = null;
-    const has3d = () => model.id === 'bb' && !clarinet3dFailed;
+    let spinning = false, loading3d = null, lib3d = null;
+    const has3d = () => (model.id === 'bb' || model.id === 'bass') && !clarinet3dFailed;
     const in3d = () => picture === '3d' && has3d();
     function markLook(name) {
       viewBar.querySelectorAll('[data-look]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.look === name)));
@@ -1824,23 +1887,34 @@
         document.head.appendChild(s);
       });
     }
+    // One 3D clarinet at a time: turning the dial between the B♭ and the bass takes the old one down and builds the other.
+    function make3d() {
+      const want = model.id === 'bass' ? 'bass' : 'bb';
+      if (clarinet3d && clarinet3d.model === want) return;
+      if (clarinet3d) { clarinet3d.dispose(); clarinet3d = null; }
+      clarinet3d = lib3d.createClarinet(document.getElementById('clarinet3d'), { model: want, labels: LABEL_MODES[labelView], view: zoomView === 'close' ? 'keys' : 'front', reflections: detail });
+      const note = document.getElementById('clarinetNote'); if (note) note.remove();
+      clarinet3d.onViewChange(() => {
+        markLook(null);
+        document.getElementById('clarinetHint').classList.add('used');
+        clearTimeout(clarinetBox._pe); clarinetBox._pe = setTimeout(() => panEnds(), 450);   // (the ▲ ▼ buttons' ends)
+      });
+      markLook(zoomView === 'close' ? null : 'front');
+      document.getElementById('apartBtn').setAttribute('aria-pressed', 'false');
+      window.clarinet3d = clarinet3d;
+      clarinet3d.setKeys(lastDrawn.keys || new Set(), lastDrawn.note ? lastDrawn.note.color : null, lastDrawn.note ? lastDrawn.note.upperColor || null : null);
+      setTimeout(panEnds, 60);
+    }
     function start3d() {
-      if (clarinet3d || clarinet3dFailed || loading3d) return;
+      if (clarinet3dFailed || loading3d) return;
+      if (lib3d) { make3d(); return; }
       loading3d = (location.protocol === 'file:' ? loadBundle() : import('./clarinet-3d.js').catch(loadBundle)).then(m => {
-        clarinet3d = m.createClarinet(document.getElementById('clarinet3d'), { labels: LABEL_MODES[labelView], view: zoomView === 'close' ? 'keys' : 'front', reflections: detail });
-        document.getElementById('clarinetNote').remove();
-        clarinet3d.onViewChange(() => {
-          markLook(null);
-          document.getElementById('clarinetHint').classList.add('used');
-          clearTimeout(clarinetBox._pe); clarinetBox._pe = setTimeout(() => panEnds(), 450);   // (the ▲ ▼ buttons' ends)
-        });
-        if (zoomView === 'close') markLook(null);
-        window.clarinet3d = clarinet3d;
-        clarinet3d.setKeys(lastDrawn.keys || new Set(), lastDrawn.note ? lastDrawn.note.color : null, lastDrawn.note ? lastDrawn.note.upperColor || null : null);
+        lib3d = m; loading3d = null;
+        make3d();
         showPicture();
       }).catch(err => {
         console.warn('[Virtual Clarinet] the 3D clarinet could not start:', err);
-        clarinet3dFailed = true;
+        clarinet3dFailed = true; loading3d = null;
         showPicture();
       });
     }
@@ -1852,7 +1926,7 @@
       d3Btn.setAttribute('aria-pressed', String(on));
       d3Btn.disabled = !has3d();
       d3Btn.title = clarinet3dFailed ? 'The 3D clarinet cannot start on this computer, so the flat drawing is shown'
-        : model.id !== 'bb' ? 'The 3D clarinet is the B♭: this clarinet is shown as the flat drawing'
+        : !has3d() ? 'The B♭ and the bass clarinet have 3D models: this clarinet is shown as the flat drawing'
         : on ? '3D is on: click for the flat drawing' : '3D is off: click for the clarinet you can turn round';
       settingsPanel.querySelectorAll('[data-picture]').forEach(b => {
         b.setAttribute('aria-checked', String(b.dataset.picture === (on ? '3d' : 'drawing')));
@@ -1860,7 +1934,7 @@
       });
       settingsPanel.querySelectorAll('[data-detail]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.detail === detail)));
       document.getElementById('detailSeg').hidden = !on;
-      document.getElementById('pictureHint').hidden = model.id === 'bb' && !clarinet3dFailed;
+      document.getElementById('pictureHint').hidden = has3d();
       if (on) start3d();
       if (clarinet3d) { clarinet3d.setAutoRotate(on && spinning); if (on) clarinet3d.resize(); }
     }
